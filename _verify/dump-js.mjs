@@ -1,8 +1,11 @@
 /* Dump kanonik dari modul JS ASLI. Dipakai sebagai acuan untuk
    membandingkan hasil port C# — baris per baris, format identik. */
-import * as Q from '../rpg/game/quality.mjs';
-import * as W from './world-3km.mjs';
-import * as L from '../rpg/game/locomotion.mjs';
+/* Lokasi modul JS asli bisa dioverride: RPG_JS_DIR=/path/ke/rpg/game node dump-js.mjs
+   Default ../../rpg/game = repo three.js di-checkout tepat di sebelah folder project. */
+const JS_DIR = process.env.RPG_JS_DIR || '../../rpg/game';
+const Q = await import(`${JS_DIR}/quality.mjs`);
+const W = await import('./world-3km.mjs');
+const L = await import(`${JS_DIR}/locomotion.mjs`);
 
 const out = [];
 /* 17 digit signifikan = round-trip penuh, jadi tidak ada kasus "tepat di
