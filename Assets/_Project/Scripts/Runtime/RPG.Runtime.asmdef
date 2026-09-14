@@ -1,0 +1,20 @@
+{
+    "name": "RPG.Runtime",
+    "rootNamespace": "RPG.Runtime",
+    "references": [
+        "RPG.Core",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.InputSystem",
+        "glTFast",
+        "Unity.Addressables"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

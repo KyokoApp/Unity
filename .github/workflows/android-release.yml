@@ -1,0 +1,188 @@
+name: Android APK → GitHub Releases
+
+# ============================================================
+# Membangun APK Android dan mengunggahnya ke GitHub Releases,
+# supaya game "bisa diinstal lewat GitHub".
+#
+# KAPAN JALAN:
+#   - manual (tombol Run workflow), atau
+#   - otomatis saat ada tag versi (v0.1.0, v1.0.0, ...)
+#
+# SECRETS YANG WAJIB ADA (Settings → Secrets and variables → Actions):
+#   UNITY_LICENSE    isi file .ulf (lisensi Personal/Pro yang sudah diaktivasi)
+#   UNITY_EMAIL      email akun Unity
+#   UNITY_PASSWORD   password akun Unity
+#
+# OPSIONAL (kalau tidak diisi, APK ditandatangani debug keystore —
+# bisa diinstal di HP sendiri tapi tidak bisa naik ke Play Store):
+#   ANDROID_KEYSTORE_BASE64   base64 dari file .keystore
+#   ANDROID_KEYSTORE_PASS
+#   ANDROID_KEYALIAS_NAME
+#   ANDROID_KEYALIAS_PASS
+#
+# PENTING — alur ini TIDAK BISA diuji dari sandbox tempat project ini
+# dibuat (tidak ada Unity, tidak ada kredensial GitHub). Jalankan sekali
+# lewat tombol Run workflow dan baca log-nya sebelum dianggap jalan.
+# ============================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      versionName:
+        description: 'Nama versi untuk APK (kosongkan = pakai tanggal)'
+        required: false
+        default: ''
+  push:
+    tags: ['v*']
+
+# Build Unity itu berat; batalkan build lama kalau ada yang baru.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UNITY_VERSION: 6000.0.32f1
+
+jobs:
+  # ---- 1. tes dulu: jangan pernah merilis build yang tesnya merah ----
+  test:
+    name: Tes EditMode
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-test-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-test-
+            Library-
+
+      - name: Jalankan tes EditMode
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          testMode: editmode
+          artifactsPath: artifacts-editmode
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hasil-tes-editmode
+          path: artifacts-editmode
+
+  # ---- 2. build APK ----
+  build:
+    name: Build APK (ARM64, IL2CPP)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-android-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-android-
+            Library-
+
+      - name: Build Android
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEYALIAS_NAME: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          ANDROID_KEYALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          targetPlatform: Android
+          # APK, bukan .aab — .aab untuk Play Store, APK untuk install langsung
+          androidBuildAppBundle: false
+          androidTargetSdkVersion: AndroidApiLevelAuto
+          # ARM64 saja: semua HP Android modern. Tambah ARMv7 kalau perlu HP tua,
+          # tapi ukuran APK hampir dua kali lipat.
+          customParameters: >-
+            -scriptingBackend IL2CPP
+            -androidBuildSystem Gradle
+            -androidArchitecture ARM64
+            -androidCreateSymbols Disabled
+
+      - name: Beri nama APK yang jelas
+        run: |
+          set -e
+          mkdir -p release
+          SRC=$(find build/Android -name '*.apk' | head -1)
+          test -n "$SRC" || { echo "APK tidak ditemukan di build/Android"; exit 1; }
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VER="${GITHUB_REF_NAME#v}"
+          elif [ -n "${{ inputs.versionName }}" ]; then
+            VER="${{ inputs.versionName }}"
+          else
+            VER="dev-$(date -u +%Y%m%d-%H%M)"
+          fi
+          echo "VERSION=$VER" >> "$GITHUB_ENV"
+          cp "$SRC" "release/aurelia-${VER}-arm64.apk"
+          ls -la release/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: release/*.apk
+
+  # ---- 3. unggah ke GitHub Releases ----
+  release:
+    name: Unggah ke Releases
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: release
+
+      - name: Buat/perbarui Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          APK=$(ls release/*.apk | head -1)
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="latest-dev"
+          fi
+          NOTES="Build otomatis dari \`${GITHUB_SHA::7}\`.
+
+          Install: unduh APK di bawah, izinkan \"Install unknown apps\" di Android, lalu buka file-nya.
+          Arsitektur: ARM64. Backend: IL2CPP."
+
+          # -dev build selalu menimpa tag 'latest-dev' supaya tidak menumpuk
+          if [ "$TAG" = "latest-dev" ]; then
+            gh release delete latest-dev --yes --cleanup-tag 2>/dev/null || true
+          fi
+          gh release create "$TAG" "$APK" \
+            --title "$TAG" \
+            --notes "$NOTES" \
+            $([ "$TAG" = "latest-dev" ] && echo --prerelease)
+
+      - name: Tandai sebagai rilis terbaru
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: github.event_name == 'push'
+        run: gh release edit "$GITHUB_REF_NAME" --latest
