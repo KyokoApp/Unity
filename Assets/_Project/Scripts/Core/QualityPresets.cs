@@ -94,16 +94,11 @@ namespace RPG.Core
             ButtonTheme = "mono",
             ButtonScale = 1,
             Layout = new Dictionary<string, (double, double)>(),
-            CarCamera = "near",
         };
 
         public static readonly string[] StickShapes = { "circle", "square" };
         public static readonly string[] ButtonThemes = { "mono", "color" };
-        public static readonly string[] CarCameraModes = { "near", "far", "cine" };
-        public static readonly Dictionary<string, string> CarCameraLabel = new Dictionary<string, string>
-        {
-            { "near", "Dekat" }, { "far", "Jauh" }, { "cine", "Sinematik" },
-        };
+        /* CarCameraModes / CarCameraLabel dibuang — tidak ada mobil. */
 
         /* Mengembalikan settings BARU (immutable style, sama seperti JS
            yang selalu menyebar {...settings}). */

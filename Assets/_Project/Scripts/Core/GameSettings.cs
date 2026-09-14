@@ -33,7 +33,8 @@ namespace RPG.Core
         public string ButtonTheme;
         public double? ButtonScale;
         public Dictionary<string, RawPoint> Layout;
-        public string CarCamera;
+        /* CarCamera sengaja TIDAK ada: game ini tanpa mobil.
+           Ini penyimpangan dari game/world-data.mjs yang masih punya field itu. */
     }
 
     public sealed class RawGfx
@@ -89,14 +90,13 @@ namespace RPG.Core
         /* Fraksi 0..1 terhadap viewport, bukan piksel — tetap pas setelah
            ponsel diputar. */
         public Dictionary<string, (double x, double y)> Layout;
-        public string CarCamera;
 
         public GameSettings Clone() => new GameSettings
         {
             Sensitivity = Sensitivity, CameraDistance = CameraDistance, Quality = Quality,
             Shadows = Shadows, Sound = Sound, Fps = Fps, Custom = Custom, ShowFps = ShowFps,
             Gfx = Gfx.Clone(), StickShape = StickShape, ButtonTheme = ButtonTheme,
-            ButtonScale = ButtonScale, CarCamera = CarCamera,
+            ButtonScale = ButtonScale,
             Layout = new Dictionary<string, (double, double)>(Layout),
         };
     }
@@ -193,7 +193,6 @@ namespace RPG.Core
                 ButtonTheme = Pick(s.ButtonTheme, QualityPresets.ButtonThemes, "mono"),
                 ButtonScale = ClampNum(s.ButtonScale, 0.75, 1.4, 1),
                 Layout = NormalizeLayout(s.Layout),
-                CarCamera = Pick(s.CarCamera, QualityPresets.CarCameraModes, "near"),
             };
         }
     }

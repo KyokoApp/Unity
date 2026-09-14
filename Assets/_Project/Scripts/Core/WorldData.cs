@@ -15,17 +15,17 @@ namespace RPG.Core
        - Math.imul / >>> di JS dipetakan ke aritmetika uint C# (unchecked),
          yang membungkus mod 2^32 persis seperti JS.
        - Math.hypot JS digantikan Math.Sqrt; selisihnya hanya muncul pada
-         magnitudo ekstrem yang tidak terjadi di dunia 24 km ini.
+         magnitudo ekstrem yang tidak terjadi di dunia 3 km ini.
        - Math.Sin/Cos .NET bisa beda beberapa ULP dari JS. Tes memakai
          toleransi, bukan kesamaan bit.
        ============================================================ */
     public static class WorldData
     {
-        public const double WorldSize = 6000;    // 24 km -> 12 km -> 6 km
+        public const double WorldSize = 3000;    // 24 km -> 12 km -> 6 km -> 3 km
         public const double WorldLimit = WorldSize / 2 - 32;
         public const double ChunkSize = 256;
         public const double WaterLevel = 0;
-        public const double RoadSpacing = 1500;  // 3000 hanya menyisakan lajur 0 di dunia 6 km
+        public const double RoadSpacing = 750;   // 1500 hanya menyisakan lajur 0 & 1 di dunia 3 km
 
         static double Clamp(double v, double a = 0, double b = 1) => Math.Max(a, Math.Min(b, v));
 
@@ -39,10 +39,10 @@ namespace RPG.Core
         static uint IMul(uint a, uint b) => unchecked(a * b);
 
         public static double RoadX(double z, int lane = 0)
-            => lane * RoadSpacing + 140 * Math.Sin(z / 1700);
+            => lane * RoadSpacing + 70 * Math.Sin(z / 850);
 
         public static double RoadZ(double x, int lane = 0)
-            => lane * RoadSpacing + 120 * Math.Sin(x / 1200);
+            => lane * RoadSpacing + 60 * Math.Sin(x / 600);
 
         public readonly struct RoadSample
         {
@@ -75,21 +75,21 @@ namespace RPG.Core
         }
 
         public static double RoadHeight(double x, double z)
-            => 28 + 14 * Math.Sin(x * .0007) * Math.Cos(z * .0006) + 6 * Math.Sin((x + z) * .001);
+            => 28 + 14 * Math.Sin(x * .0014) * Math.Cos(z * .0012) + 6 * Math.Sin((x + z) * .002);
 
         public static double TerrainH(double x, double z)
         {
             var baseH = RoadHeight(x, z);
-            var north = Smooth(500, 3500, -z);   // diskala: dunia 1/4 luasnya
-            var ridge = Math.Sin(x * .0014 + Math.Cos(z * .001)) * .5 + .5;
-            var h = baseH + 12 * Math.Sin(x * .006) * Math.Cos(z * .005) + 7 * Math.Sin((x - z) * .002);
-            h += north * (45 + 180 * ridge * ridge) + 18 * Math.Sin(x * .0012) * Math.Sin(z * .0017);
+            var north = Smooth(250, 1750, -z);   // diskala: dunia 1/16 luasnya
+            var ridge = Math.Sin(x * .0028 + Math.Cos(z * .002)) * .5 + .5;
+            var h = baseH + 12 * Math.Sin(x * .012) * Math.Cos(z * .01) + 7 * Math.Sin((x - z) * .004);
+            h += north * (45 + 180 * ridge * ridge) + 18 * Math.Sin(x * .0024) * Math.Sin(z * .0034);
 
             /* Sungai menerus + dua danau lebar. Tanggul jalan tetap di atas air. */
-            var river = Math.Abs(x - (800 + 140 * Math.Sin(z * .001)));
-            var lakeA = Math.Sqrt(Math.Pow((x + 2300) * .8, 2) + Math.Pow(z - 2300, 2));
-            var lakeB = Math.Sqrt(Math.Pow(x - 2300, 2) + Math.Pow((z + 2300) * .8, 2));
-            var wet = 1 - Smooth(60, 130, Math.Min(river, Math.Min(lakeA - 290, lakeB - 325)));
+            var river = Math.Abs(x - (400 + 70 * Math.Sin(z * .002)));
+            var lakeA = Math.Sqrt(Math.Pow((x + 1150) * .8, 2) + Math.Pow(z - 1150, 2));
+            var lakeB = Math.Sqrt(Math.Pow(x - 1150, 2) + Math.Pow((z + 1150) * .8, 2));
+            var wet = 1 - Smooth(30, 65, Math.Min(river, Math.Min(lakeA - 145, lakeB - 162.5)));
             h = h * (1 - wet) - 5 * wet;
 
             var road = 1 - Smooth(4, 42, RoadInfo(x, z).Edge);
@@ -109,12 +109,12 @@ namespace RPG.Core
         public static readonly Region[] Regions =
         {
             new Region { Id="heartlands", Name="Aurelia Heartlands", Subtitle="Padang hijau & gerbang kerajaan", X=0,     Z=0,     Color=new[]{.42,.56,.28}, Foliage=0x729b53 },
-            new Region { Id="frost",      Name="Frostspire Reach",   Subtitle="Puncak es & menara penjaga",      X=-1500, Z=-1500, Color=new[]{.68,.76,.77}, Foliage=0x8eafb0 },
-            new Region { Id="highlands",  Name="Crownfall Highlands",Subtitle="Pegunungan & reruntuhan kuno",    X=0,     Z=-1500, Color=new[]{.43,.49,.42}, Foliage=0x58705b },
-            new Region { Id="amber",      Name="Amber Wastes",       Subtitle="Bukit keemasan & kuil matahari",  X=1500,  Z=-1500, Color=new[]{.72,.56,.33}, Foliage=0xb88d4b },
-            new Region { Id="forest",     Name="Elderwood Wilds",    Subtitle="Hutan tua & batu bercahaya",      X=-1500, Z=1500,  Color=new[]{.25,.43,.33}, Foliage=0x3c7963 },
-            new Region { Id="bloom",      Name="Roseveil Expanse",   Subtitle="Dataran bunga & pohon merah muda",X=0,     Z=1500,  Color=new[]{.49,.48,.39}, Foliage=0xba7993 },
-            new Region { Id="coast",      Name="Azure Coast",        Subtitle="Lembah sungai & kristal biru",    X=1500,  Z=1500,  Color=new[]{.46,.60,.47}, Foliage=0x6faca1 },
+            new Region { Id="frost",      Name="Frostspire Reach",   Subtitle="Puncak es & menara penjaga",      X=-750,  Z=-750, Color=new[]{.68,.76,.77}, Foliage=0x8eafb0 },
+            new Region { Id="highlands",  Name="Crownfall Highlands",Subtitle="Pegunungan & reruntuhan kuno",    X=0,     Z=-750, Color=new[]{.43,.49,.42}, Foliage=0x58705b },
+            new Region { Id="amber",      Name="Amber Wastes",       Subtitle="Bukit keemasan & kuil matahari",  X=750,   Z=-750, Color=new[]{.72,.56,.33}, Foliage=0xb88d4b },
+            new Region { Id="forest",     Name="Elderwood Wilds",    Subtitle="Hutan tua & batu bercahaya",      X=-750,  Z=750,   Color=new[]{.25,.43,.33}, Foliage=0x3c7963 },
+            new Region { Id="bloom",      Name="Roseveil Expanse",   Subtitle="Dataran bunga & pohon merah muda",X=0,     Z=750,   Color=new[]{.49,.48,.39}, Foliage=0xba7993 },
+            new Region { Id="coast",      Name="Azure Coast",        Subtitle="Lembah sungai & kristal biru",    X=750,   Z=750,   Color=new[]{.46,.60,.47}, Foliage=0x6faca1 },
         };
 
         public static Region RegionAt(double x, double z)
@@ -140,7 +140,7 @@ namespace RPG.Core
                 if (d < d1) { second = first; d2 = d1; first = r; d1 = d; }
                 else if (d < d2) { second = r; d2 = d; }
             }
-            var blend = .5 * (1 - Smooth(0, 900, d2 - d1));
+            var blend = .5 * (1 - Smooth(0, 450, d2 - d1));
             var outc = new double[3];
             for (var i = 0; i < 3; i++)
                 outc[i] = first.Color[i] * (1 - blend) + second.Color[i] * blend;

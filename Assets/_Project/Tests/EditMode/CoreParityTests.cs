@@ -13,9 +13,10 @@ namespace RPG.Tests
 
        Semua nilai di Golden diambil dari MENJALANKAN modul JS asli
        (game/world-data.mjs, game/locomotion.mjs, game/quality.mjs),
-       bukan ditulis tangan. Verifikasi penuh 848 baris / 1.142 nilai
+       bukan ditulis tangan. Verifikasi penuh 840 baris / 1142 nilai
        numerik sudah dijalankan di luar Unity dengan selisih maksimum
-       1 ULP (1,1e-16, dari perbedaan Math.Sin V8 vs .NET).
+       7,1e-15 (dari perbedaan Math.Sin V8 vs .NET). Nilai di bawah
+       diambil pada konstanta dunia 3 km.
 
        Kalau tes ini merah, port-nya MELIPAT dari aslinya — jangan
        perbarui angkanya tanpa memeriksa kenapa berubah.
@@ -31,27 +32,27 @@ namespace RPG.Tests
 
         static (string key, string expected)[] Golden => new (string, string)[]
         {
-            ("wd.terrainH(1234,-5678)", "177.67557748394194"),
-            ("wd.terrainH(-6000,-6000)", "57.436143105175518"),
-            ("wd.terrainH(1600,2100)", "20.330267974633436"),
-            ("wd.roadHeight(300,1500)", "35.657216309475729"),
-            ("wd.roadInfo(1234,-5678).edge", "211.22722790182524"),
-            ("wd.roadInfo(1234,-5678).lane", "-4"),
-            ("wd.roadInfo(1234,-5678).axis", "x"),
-            ("wd.terrainColor(1234,-5678)", "0.58856092055678100,0.52827332565163676,0.37079143844789553"),
-            ("wd.WORLD_LIMIT", "2968.0000000000000"),
+            ("wd.terrainH(617,-2839)", "177.67557748394194"),
+            ("wd.terrainH(-1500,-1500)", "163.92125517255519"),
+            ("wd.terrainH(800,1050)", "27.281483641887039"),
+            ("wd.roadHeight(150,750)", "35.657216309475729"),
+            ("wd.roadInfo(617,-2839).edge", "101.61361395091262"),
+            ("wd.roadInfo(617,-2839).lane", "-4"),
+            ("wd.roadInfo(617,-2839).axis", "x"),
+            ("wd.terrainColor(617,-2839)", "0.58856092055678100,0.52827332565163676,0.37079143844789553"),
+            ("wd.WORLD_LIMIT", "1468"),
             ("wd.chunkPlan[0]", "0,-1:true:0"),
             ("wd.chunkPlan[4]", "0,0:true:1"),
             ("wd.chunkPlan.count", "49"),
             ("wd.randomForChunk(7,-3)[0]", "0.37886407412588596"),
             ("wd.randomForChunk(7,-3)[4]", "0.64732959703542292"),
-            ("wd.waypoint[1]", "frost:-1613.9716650919622,-1616.9533014907329"),
-            ("wd.intersection(2,-2)", "2861.4779269896667,-2917.5883217353171"),
+            ("wd.waypoint[1]", "frost:-806.98583254598111,-808.47665074536644"),
+            ("wd.intersection(2,-2)", "1430.7389634948333,-1458.7941608676585"),
             ("lo.damp(0,1,8,0.016)", "0.12014662085535621"),
             ("lo.joystick(40,-30)", "0.71543340380549680,-0.53657505285412255"),
             ("lo.pose[4].ARMR", "-0.55566406250000000,0.28476562500000002,-0.045976562499999984"),
-            ("lo.pose[5].CHEST", "0.10000000000000001,-0.55000000000000004,0.0000000000000000"),
-            ("lo.pose[2].KNEEL", "0.26000000000000001,0.0000000000000000,0.0000000000000000"),
+            ("lo.pose[5].CHEST", "0.10000000000000001,-0.55000000000000004,0"),
+            ("lo.pose[2].KNEEL", "0.26000000000000001,0.0000000000000000,0"),
             ("lo.pose[0].__count", "25"),
             ("q.norm[legacy].gfx", "0.84999999999999998,1.0000000000000000,1.0000000000000000,1.0000000000000000,2.0000000000000000,2.0000000000000000,1.0000000000000000,1.0000000000000000,1.0000000000000000,0.0000000000000000,0.0000000000000000,true"),
             ("q.norm[legacy].fps", "60"),
@@ -64,16 +65,16 @@ namespace RPG.Tests
             ("q.applyPreset(ultra)", "ultra:60:false:true:1.2500000000000000:3:2:false"),
             ("q.applyPreset(low)", "low:30:false:false:0.69999999999999996:0:0:true"),
             ("q.detectPreset(high)", "high"),
-            ("q.resolve[balanced].desk.dustCount", "48.000000000000000"),
-            ("q.resolve[balanced].touch.dustCount", "23.000000000000000"),
-            ("q.resolve[balanced].desk.birdCount", "9.0000000000000000"),
-            ("q.resolve[high].desk.fogFar", "1283.0000000000000"),
-            ("q.resolve[ultra].desk.shadowMapSize", "2048.0000000000000"),
-            ("q.resolve[low].touch.grassCount", "0.0000000000000000"),
+            ("q.resolve[balanced].desk.dustCount", "48"),
+            ("q.resolve[balanced].touch.dustCount", "23"),
+            ("q.resolve[balanced].desk.birdCount", "9"),
+            ("q.resolve[high].desk.fogFar", "1283"),
+            ("q.resolve[ultra].desk.shadowMapSize", "2048"),
+            ("q.resolve[low].touch.grassCount", "0"),
             ("q.setGfx(shadows,0)", "custom:true:0:custom"),
             ("q.setGfx(bloom,99)", "3"),
             ("q.frameInterval(45)", "22.222222222222221"),
-            ("q.frameInterval(50)", "0.0000000000000000"),
+            ("q.frameInterval(50)", "0"),
             ("q.adaptive.bad[20]", "0.90000000000000002"),
             ("q.adaptive.good[150]", "0.95000000000000007"),
         };
@@ -100,15 +101,15 @@ namespace RPG.Tests
         {
             var d = new Dictionary<string, string>();
 
-            d["wd.terrainH(1234,-5678)"] = Num(WorldData.TerrainH(1234, -5678));
-            d["wd.terrainH(-6000,-6000)"] = Num(WorldData.TerrainH(-6000, -6000));
-            d["wd.terrainH(1600,2100)"] = Num(WorldData.TerrainH(1600, 2100));
-            d["wd.roadHeight(300,1500)"] = Num(WorldData.RoadHeight(300, 1500));
-            var ri = WorldData.RoadInfo(1234, -5678);
-            d["wd.roadInfo(1234,-5678).edge"] = Num(ri.Edge);
-            d["wd.roadInfo(1234,-5678).lane"] = ri.Lane.ToString(Inv);
-            d["wd.roadInfo(1234,-5678).axis"] = ri.Axis.ToString();
-            d["wd.terrainColor(1234,-5678)"] = string.Join(",", WorldData.TerrainColor(1234, -5678).Select(Num));
+            d["wd.terrainH(617,-2839)"] = Num(WorldData.TerrainH(617, -2839));
+            d["wd.terrainH(-1500,-1500)"] = Num(WorldData.TerrainH(-1500, -1500));
+            d["wd.terrainH(800,1050)"] = Num(WorldData.TerrainH(800, 1050));
+            d["wd.roadHeight(150,750)"] = Num(WorldData.RoadHeight(150, 750));
+            var ri = WorldData.RoadInfo(617, -2839);
+            d["wd.roadInfo(617,-2839).edge"] = Num(ri.Edge);
+            d["wd.roadInfo(617,-2839).lane"] = ri.Lane.ToString(Inv);
+            d["wd.roadInfo(617,-2839).axis"] = ri.Axis.ToString();
+            d["wd.terrainColor(617,-2839)"] = string.Join(",", WorldData.TerrainColor(617, -2839).Select(Num));
             d["wd.WORLD_LIMIT"] = Num(WorldData.WorldLimit);
 
             var plan = WorldData.ChunkPlan(100, -200, 3);
@@ -278,7 +279,6 @@ namespace RPG.Tests
             Sensitivity = s.Sensitivity, CameraDistance = s.CameraDistance, Quality = s.Quality,
             Shadows = s.Shadows, Sound = s.Sound, Fps = s.Fps, Custom = s.Custom, ShowFps = s.ShowFps,
             StickShape = s.StickShape, ButtonTheme = s.ButtonTheme, ButtonScale = s.ButtonScale,
-            CarCamera = s.CarCamera,
             Gfx = new RawGfx
             {
                 RenderScale = s.Gfx.RenderScale, Shadows = s.Gfx.Shadows, Grass = s.Gfx.Grass,

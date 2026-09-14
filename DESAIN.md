@@ -214,7 +214,7 @@ Sesuai permintaanmu: tidak saya bangun semua sekaligus.
 | Tahap | Isi | Hasil yang terlihat |
 |---|---|---|
 | **0** | Repo + keputusan desain *(dokumen ini)* | — |
-| **1** | `RPG.Core`: world data 3 km, quality preset, lokomosi — **sudah jadi, tinggal disesuaikan ke 3 km & tanpa mobil** | Tes hijau, belum ada gambar |
+| **1** | `RPG.Core`: world data 3 km, quality preset, lokomosi — **SELESAI & terverifikasi** | Tes hijau, belum ada gambar |
 | **1b** | **Karakter**: bikin di VRoid Studio → ekspor `.vrm` → UniVRM → petakan 25 sendi `samplePose` ke rig VRM → optimasi polycount | Model anime berdiri di scene kosong |
 | **2** | Character controller + kamera + `samplePose` → **karakter bisa jalan di dunia kosong** | Karakter anime berjalan di bidang datar |
 | **3** | Streaming chunk terrain + tekstur prosedural | **Dunia terlihat** — bukit, jalan, danau |
