@@ -77,26 +77,83 @@ pelengkap. Kabar baiknya `game/locomotion.mjs` sudah punya `samplePose` dengan
 
 ---
 
-## 3. ⚠️ Satu hal yang harus kamu putuskan: karakternya
+## 3. Karakter — diputuskan: anime orisinal buatan sendiri (VRoid Studio)
 
-`character.glb` adalah **Shaw / Hornet dari Hollow Knight: Silksong**, karya Seifert,
-lisensi **CC-BY-4.0**.
+Kamu minta karakter bergaya anime terkenal / waifu. Ada bagian dari permintaan itu
+yang bisa saya penuhi sepenuhnya, dan satu bagian yang **tidak bisa** — saya jelaskan
+keduanya supaya tidak ada kejutan nanti.
 
-Masalahnya bukan lisensinya — **CC-BY itu longgar**. Masalahnya modelnya adalah
-**karya turunan dari game milik Team Cherry**. Mendistribusikan itu dalam aplikasi
-yang bisa diunduh orang lain adalah risiko hukum yang nyata, terlepas dari CC-BY
-di modelnya. Selama ini aman karena cuma PWA kecil; begitu jadi APK di GitHub
-Releases yang bisa diunduh siapa saja, risikonya naik.
+### Yang tidak bisa: memakai karakter anime yang sudah terkenal
 
-Tiga pilihan, urut dari yang saya sarankan:
+Rem, Zero Two, Hatsune Miku, Nezuko, dan sejenisnya **bukan soal lisensi** — tidak ada
+lisensi yang bisa diambil. Desain karakter itu hak cipta studio/penerbitnya
+(Crypton, A-1, CloverWorks, dll), dan mereka tidak memberikannya ke siapa pun
+untuk dipakai di game lain secara gratis.
 
-| Pilihan | Untung | Rugi |
+Ini beda dengan Kenney/Quaternius di atas: aset CC0 memang **diberikan** untuk dipakai.
+Karakter anime terkenal **tidak diberikan** — orang yang mengunggah modelnya ke
+Sketchfab/Booth pun tidak punya hak untuk memberikannya.
+
+Konsekuensi konkretnya kalau tetap dipakai di APK publik: penghapusan repo
+(DMCA), dan yang lebih menyakitkan — **Play Store akan menolak permanen**, karena
+Google memindai aset untuk IP pihak ketiga. Jadi bukan cuma "berisiko", tapi
+menutup pintu distribusi yang jadi tujuan awalnya.
+
+### Yang bisa: bikin karakter anime orisinal sendiri — dan ini justru lebih bagus
+
+**VRoid Studio** (gratis, dari pixiv Inc.) adalah pembuat karakter anime 3D.
+Saya cek langsung halamannya (`vroid.com/en/studio`, HTTP 200), dan pernyataan
+resminya persis yang kita butuhkan:
+
+> *"Models you create on VRoid Studio are yours to use freely on many different
+> platforms and services. You can set your own terms of use for the data of every
+> model, texture, item, etc you create on VRoid Studio, specifying if you give
+> permission for commercial use, credits, etc."*
+
+Artinya: karakter yang **kamu buat sendiri** di sana adalah milikmu, boleh dipakai
+di game komersial. Gayanya anime penuh — rambut, mata, ekspresi, pakaian, proporsi
+tubuh — dan basisnya memang karakter perempuan, jadi "waifuable"-nya terpenuhi
+tanpa meminjam milik orang lain.
+
+Jalur teknisnya ke Unity (sudah saya verifikasi semua):
+
+| Langkah | Alat | Status |
 |---|---|---|
-| **A. Ganti ke karakter CC0 asli** — Quaternius *Universal Base Characters* + *Universal Animation Library* (keduanya CC0, sudah saya cek halamannya ada) | Bersih total, ada rig + library animasi jalan/lari/serang, gaya low-poly cocok dengan aset Kenney | Kehilangan bentuk Hornet; `samplePose` 25-sendi harus dipetakan ulang ke rig baru |
-| **B. Bikin karakter orisinal sendiri** | Paling aman & paling khas | Paling lama |
-| **C. Tetap pakai Hornet** | Tidak ada kerja tambahan | Risiko hukum saat didistribusikan |
+| Bikin karakter | VRoid Studio (Windows/macOS, gratis) | `vroid.com/en/studio` → HTTP 200 |
+| Ekspor | `.vrm` (bisa dikonversi ke `.glb`) | — |
+| Impor ke Unity | **UniVRM** `vrm-c/UniVRM` | rilis **v0.131.2** (2026-07-24), `UniVRM-0.131.2_a471.unitypackage` tersedia |
+| Animasi | Rig VRM = humanoid standar Unity → bisa pakai *Universal Animation Library* (CC0) atau Mixamo | sudah dicek |
 
-Saya sarankan **A**. Tapi ini keputusanmu, bukan keputusan teknis.
+**Tiga catatan penting** (dari dokumentasi resmi + pengalaman komunitas):
+
+1. **Polycount VRoid cenderung berat**, terutama rambut dan pakaian. Untuk target
+   Android ini harus dioptimalkan (kurangi bone rambut, sederhanakan mesh pakaian).
+   Ini pekerjaan nyata, bukan formalitas.
+2. **Jangan redistribusi modelnya** dan jangan bikin character creator sendiri
+   dari aset VRoid — itu yang dilarang pixiv. Memakai karakternya di dalam game
+   tidak dilarang.
+3. **Pakaian dari Booth/pihak ketiga punya lisensi masing-masing.** Pakai yang
+   bawaan VRoid Studio atau bikin sendiri, supaya tidak ada lisensi liar di repo.
+
+### Alternatif kalau tidak mau bikin dari nol
+
+**VRoid Hub** (`hub.vroid.com`, HTTP 200) punya banyak model anime buatan komunitas,
+banyak yang mengizinkan pemakaian komersial. **Tapi lisensinya per model** — harus
+dibaca satu-satu dan dicatat di `CREDITS.md`. Lebih cepat, tapi lebih rapuh:
+pembuatnya bisa mengubah ketentuan kapan saja.
+
+**Rekomendasi saya: bikin sendiri di VRoid Studio.** Sekali kerja, milikmu
+selamanya, tidak ada yang bisa mencabutnya.
+
+### Konsekuensi teknis
+
+`character.glb` (Hornet) dibuang. `samplePose` 25-sendi yang sudah saya port ke C#
+**tetap dipakai** — VRM memakai rig humanoid standar, jadi 25 sendi itu tinggal
+dipetakan ulang namanya ke tulang VRM (`Hips`, `Spine`, `LeftUpperLeg`, dst).
+Logika animasinya tidak ditulis ulang.
+
+Bonus: Hornet itu **CC-BY-4.0 karya Seifert** — harus tetap dikreditkan selama
+dipakai. Karakter VRoid buatanmu tidak perlu kredit siapa pun.
 
 ---
 
@@ -158,7 +215,8 @@ Sesuai permintaanmu: tidak saya bangun semua sekaligus.
 |---|---|---|
 | **0** | Repo + keputusan desain *(dokumen ini)* | — |
 | **1** | `RPG.Core`: world data 3 km, quality preset, lokomosi — **sudah jadi, tinggal disesuaikan ke 3 km & tanpa mobil** | Tes hijau, belum ada gambar |
-| **2** | Character controller + kamera + `samplePose` → **karakter bisa jalan di dunia kosong** | Kotak kapsul berjalan di bidang datar |
+| **1b** | **Karakter**: bikin di VRoid Studio → ekspor `.vrm` → UniVRM → petakan 25 sendi `samplePose` ke rig VRM → optimasi polycount | Model anime berdiri di scene kosong |
+| **2** | Character controller + kamera + `samplePose` → **karakter bisa jalan di dunia kosong** | Karakter anime berjalan di bidang datar |
 | **3** | Streaming chunk terrain + tekstur prosedural | **Dunia terlihat** — bukit, jalan, danau |
 | **4** | Aset Kenney disebar pakai `randomForChunk` (RNG deterministik yang sudah ada) | **Hutan, batu, jamur, bunga** |
 | **5** | Orb + loop gameplay + HUD | **Bisa dimainkan** |
@@ -169,6 +227,11 @@ Sesuai permintaanmu: tidak saya bangun semua sekaligus.
 Tahap 2 adalah titik di mana kamu pertama kali melihat sesuatu bergerak. Menurut saya
 itu milestone yang tepat untuk dicek sebelum lanjut — kalau rasanya salah, lebih murah
 berhenti di situ daripada setelah tahap 4.
+
+**Tahap 1b butuh kamu.** VRoid Studio itu aplikasi desktop (Windows/macOS) — saya
+tidak bisa menjalankannya dari sandbox, dan karakternya memang sebaiknya kamu yang
+bikin supaya sesuai seleramu. Yang bisa saya kerjakan lebih dulu: semua sisi Unity-nya
+(siap menerima file `.vrm`), jadi begitu kamu taruh file-nya, langsung jalan.
 
 ---
 
