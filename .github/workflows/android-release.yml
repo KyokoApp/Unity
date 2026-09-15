@@ -178,7 +178,12 @@ jobs:
               echo "::error::$KS bukan keystore DER (size=${SZ}, byte0=0x${B0}). Kemungkinan ini LFS pointer: jalankan 'git lfs pull' / cek .gitattributes."
               exit 1
             fi
-            echo "ANDROID_KEYSTORE_NAME=$KS" >> "$GITHUB_ENV"
+            # Path ABSOLUT seperti yang dilihat container: dockerWorkspacePath
+            # default /github/workspace (docker.ts: --volume "$workspace":/github/workspace),
+            # jadi inilah jalan sebenarnya ke berkas yang sama. PlayerSettings.Android.keystoreName
+            # hanya menyimpan string dan diteruskan apa adanya ke Gradle -- kalau relatif,
+            # ia diresolve terhadap folder yang bukan workspace Unity di dalam container.
+            echo "ANDROID_KEYSTORE_NAME=/github/workspace/keystore/release.keystore" >> "$GITHUB_ENV"
           fi
           # Logs/ = tempat Unity menulis lognya (lihat -logfile di langkah build).
           # Harus ada SEBELUM container jalan; editor tidak membuat foldernya.
@@ -333,31 +338,56 @@ jobs:
       # (check-runs/{id}/annotations) selalu bisa. Jadi baris penentunya kita
       # SEMBUNKAN ke anotasi, bukan cuma ke artifact.
       # ------------------------------------------------------------
-      - name: Ruang disk + baca log Unity jadi anotasi
+      # ------------------------------------------------------------
+      # FORENSIK: cari sebab kegagalan di seluruh workspace, lalu
+      # SEMBUNKAN ke anotasi.
+      #
+      # Kenapa bukan baca log Actions saja: Unity dijalanakan game-ci dengan
+      # "-logfile /dev/stdout" (cli: dist/platforms/ubuntu/steps/build.sh), jadi
+      # tidak pernah ada Editor.log di disk; dan log mentah Actions diarahkan ke
+      # blob storage yang tidak selalu bisa diambil alat otomatis. Anotasi API
+      # (check-runs/{id}/annotations) SELALU bisa dibaca -- jadi di sinilah
+      # sebab sebenarnya dikeluarkan.
+      #
+      # -logfile di customParameters tetap dicoba (kalau editor mulai
+      # menghormati yang terakhir, kita dapat log utuhnya di Logs/).
+      # ------------------------------------------------------------
+      - name: Kumpulkan bukti kegagalan (anotasi + artifact)
         if: always()
         run: |
           df -h /
+          set +e
           mkdir -p logs
+          PATS='error CS[0-9]+|Scripts have compiler errors|Shader error|Aborting batchmode|extra field|BuildFailedException|Exception:|error:|Error building player|Keystore|keystore|no available seats|command line argument|FAILURE: Build'
           LOG=Logs/AureliaEditor.log
-          if [ ! -f "$LOG" ]; then
-            echo "::warning::Logs/AureliaEditor.log tidak ada -> override -logfile tidak diterima editor. Cari error di log langkah 'Build Android'."
+          if [ -f "$LOG" ]; then
+            echo "=== log Unity dari -logfile: $(stat -c%s "$LOG") byte ==="
+            cp "$LOG" logs/
+            grep -aE "$PATS" "$LOG" | head -20 > logs/evidence.txt
           else
-            SZ=$(stat -c%s "$LOG")
-            echo "=== log Unity: $SZ byte, $(wc -l < "$LOG") baris ==="
-            cp "$LOG" logs/ 2>/dev/null || true
-            PATS='error CS[0-9]{4}|Scripts have compiler errors|Shader error|Aborting batchmode|extra field|BuildFailedException|Exception:|error: |Error building player|Parsing errors|Unknown command line|no available seats'
-            grep -nE "$PATS" "$LOG" | head -24 | while IFS= read -r line; do
-              safe=$(printf '%s' "$line" | tr -d '\r\n' | cut -c1-520 | sed -e 's/::/-:/g' -e 's/%/25/g')
-              echo "::error::unitylog: $safe"
-            done
-            echo "=== 120 baris terakhir log ==="
-            tail -120 "$LOG"
+            echo "::warning::$LOG tidak ada -> editor mengabaikan override -logfile (punyanya game-ci menang). Bukti diambil dari jejak di workspace."
           fi
-          # Log lain yang biasa berisi sebab sebenarnya (impor aset, shader compiler).
-          for d in Library/Logs Logs Assets/../Logs; do
-            [ -d "$d" ] && find "$d" -maxdepth 1 -type f \( -name '*.log' -o -name '*.txt' \) -exec cp {} logs/ \; 2>/dev/null
+          # Kandidat: berkas teks terbesar yang ditinggalkan Unity/Bee/Gradle.
+          cand=$(find . -maxdepth 5 \( -name '*.log' -o -name '*.txt' -o -name '*.out' -o -name '*.yaml' \) \
+                   -not -path './.git/*' -printf '%s\t%p\n' 2>/dev/null | sort -rn | head -25 | cut -f2)
+          echo "=== kandidat berkas ==="; printf '%s\n' "$cand" | head -25
+          for f in $cand; do
+            hits=$(grep -aE "$PATS" "$f" 2>/dev/null | head -5)
+            [ -z "$hits" ] && continue
+            echo "=== dari $f ==="; printf '%s\n' "$hits"
+            { printf '### %s\n' "$f"; printf '%s\n' "$hits"; } >> logs/evidence.txt
+            printf '%s\n' "$hits" | while IFS= read -r l; do
+              safe=$(printf '%s' "$l" | tr -d '\r\n' | cut -c1-460 | sed -e 's/::/-:/g' -e 's/%/25/g')
+              echo "::error::bukti $(basename "$f"): $safe"
+            done
           done
-          echo "=== isi logs/ ==="; ls -la logs/ | head -20
+          # Inventaris: kalau pun tak ada yang cocok, aku minimal tahu apa yang ditinggalkan.
+          { echo "== Logs =="; ls -la Logs 2>/dev/null; echo "== Library/Logs =="; ls -la Library/Logs 2>/dev/null;
+            echo "== Library/Bee (teratas) =="; ls -S Library/Bee 2>/dev/null | head -12;
+            echo "== build/ =="; find build -maxdepth 2 2>/dev/null | head -20; } > logs/inventory.txt
+          cat logs/inventory.txt
+          echo "=== 40 baris terakhir Logs/evidence.txt ==="; tail -40 logs/evidence.txt 2>/dev/null
+          true
 
       - name: Upload log Unity
         if: always()
