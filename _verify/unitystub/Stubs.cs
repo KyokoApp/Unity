@@ -94,7 +94,14 @@ namespace UnityEngine
     public enum ScreenOrientation { Portrait, PortraitUpsideDown, LandscapeLeft, LandscapeRight, AutoRotation }
     public static class Screen { public static int width=>0; public static int height=>0; public static ScreenOrientation orientation; }
     public static class Application { public static bool isPlaying=>false; public static bool isBatchMode=>false;
-        public static bool isEditor=>false; public static string platform=>null; public static void Quit(){} }
+        public static bool isEditor=>false; public static string platform=>null; public static void Quit(){}
+        // API Unity asli yang dipakai AureliaCILogTap (kran log CI). Dulu tidak ada
+        // di stub, jadi harness akan menuduh kodenya salah padahal stub-nya bolong.
+        public static string unityVersion=>"6000.0.32f1"; public static string dataPath=>"Assets";
+        public delegate void LogCallback(string condition, string stackTrace, LogType type);
+        public static event LogCallback logMessageReceivedThreaded;
+        public static event LogCallback logMessageReceived; }
+    public enum LogType { Error, Assert, Warning, Log, Exception }
     public static class PlayerPrefs { public static bool HasKey(string k)=>false; public static float GetFloat(string k)=>0f;
         public static int GetInt(string k)=>0; public static string GetString(string k)=>null; public static void SetFloat(string k,float v){}
         public static void SetInt(string k,int v){} public static void SetString(string k,string v){} public static void DeleteKey(string k){}

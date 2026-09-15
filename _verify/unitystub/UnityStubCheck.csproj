@@ -5,6 +5,10 @@
     <Nullable>disable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AssemblyName>StubCheck</AssemblyName>
+    <!-- Editor skrip Unity Sungguh dikompilasi dengan UNITY_EDITOR terdefinisi;
+         tanpanya blok #if UNITY_EDITOR (mis. AureliaCILogTap) tidak pernah
+         diperiksa harness, dan error di dalamnya lolos ke CI. -->
+    <DefineConstants>$(DefineConstants);UNITY_EDITOR;UNITY_6000_0_OR_NEWER</DefineConstants>
     <NoWarn>CS0169;CS0414;CS0649;CS0067</NoWarn>
   </PropertyGroup>
   <ItemGroup>

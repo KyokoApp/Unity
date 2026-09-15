@@ -48,7 +48,14 @@ namespace UnityEditor
     public enum TextureImporterFormat { Automatic=-1, RGBA32=4, ASTC_4x4=48, ASTC_6x6=50, ASTC_8x8=52 }
     public static class Undo { public static void RegisterCreatedObjectUndo(Object o,string n){}
         public static void RecordObject(Object o,string n){} public static void SetTransformParent(UnityEngine.Transform t,UnityEngine.Transform p,string n){} }
-    public static class EditorApplication {}
+    public static class EditorApplication {
+        // EditorApplication.quitting -- dipakai AureliaCILogTap untuk menutup berkas log.
+        public static event Action quitting; }
+    public enum BuildTarget { NoTarget = -2, Android = 13, StandaloneWindows64 = 19 }
+    public static class EditorUserBuildSettings {
+        public static BuildTarget activeBuildTarget => BuildTarget.NoTarget;
+        public static bool buildAppBundle;
+        public static bool exportAsGoogleAndroidProject; }
     public static class EditorGraphicsSettings {
         public static void SetRenderPipelineGlobalSettingsAsset(UnityEngine.Rendering.RenderPipelineGlobalSettings s){}
     }
