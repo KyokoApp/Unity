@@ -94,7 +94,7 @@ Shader "Aurelia/Grass"
                 return frac(p.x * p.y);
             }
 
-            Varyings vert(Attributes in)
+            Varyings vert(Attributes i)
             {
                 Varyings o;
                 UNITY_SETUP_INSTANCE_ID(in);
@@ -110,14 +110,14 @@ Shader "Aurelia/Grass"
                 float t   = _Time.y * _WindSpeed;
                 float w1  = sin(t * 1.7 + originWS.x * 0.35 + originWS.z * 0.22);
                 float w2  = sin(t * 3.9 + originWS.x * 0.11 - originWS.z * 0.31) * 0.35;
-                float amp = (w1 + w2) * _WindStrength * in.uv.y * in.uv.y;
+                float amp = (w1 + w2) * _WindStrength * i.uv.y * i.uv.y;
 
-                float3 posOS = in.positionOS;
+                float3 posOS = i.positionOS;
                 posOS.x += amp;
                 posOS.z += amp * 0.6;
 
                 float3 positionWS = TransformObjectToWorld(posOS);
-                o.normalWS = TransformObjectToWorldNormal(in.normalOS);
+                o.normalWS = TransformObjectToWorldNormal(i.normalOS);
 
                 /* Tenggelamkan rumpun jauh ke pangkalnya supaya tidak pop
                    saat sel cache dibangun; kabut menutupi transisinya. */
@@ -127,7 +127,7 @@ Shader "Aurelia/Grass"
 
                 /* Variasi rona per rumpun (+/- 8%) supaya hamparan tidak
                    terlihat sebagai satu warna datar. */
-                o.uv = float2(in.uv.x, in.uv.y * (0.92 + h * 0.16));
+                o.uv = float2(i.uv.x, i.uv.y * (0.92 + h * 0.16));
 
                 o.positionWS = positionWS;
                 o.positionCS = TransformWorldToHClip(positionWS);
@@ -135,26 +135,26 @@ Shader "Aurelia/Grass"
                 return o;
             }
 
-            half4 frag(Varyings in) : SV_Target
+            half4 frag(Varyings i) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(in);
 
                 /* Gradasi pangkal->ujung: bagian paling terang ada di
                    ujung bilah, seperti rumput yang tersinari matahari. */
-                half3 albedo = lerp((half3)_BaseColor.rgb, (half3)_TipColor.rgb, saturate(in.uv.y));
+                half3 albedo = lerp((half3)_BaseColor.rgb, (half3)_TipColor.rgb, saturate(i.uv.y));
 
                 /* Half-Lambert dari matahari: sisi yang membelakangi
                    cahaya tetap menerima separuh, supaya rumpun tidak
                    pernah hitam pekat (murah, dan cocok untuk stylized). */
                 Light main = GetMainLight();
-                half  ndl  = dot(normalize(in.normalWS), main.direction) * 0.5 + 0.5;
+                half  ndl  = dot(normalize(i.normalWS), main.direction) * 0.5 + 0.5;
                 half3 lit  = albedo * main.color * (ndl * 0.75 + 0.25) * main.shadowAttenuation;
 
                 /* Ambient proyek (diatur DayNightCycle) masuk lewat SH. */
-                lit += albedo * SampleSH(normalize(in.normalWS));
+                lit += albedo * SampleSH(normalize(i.normalWS));
 
                 half4 col = half4(lit, 1.0);
-                col.rgb = MixFog(col.rgb, in.fogFactor);
+                col.rgb = MixFog(col.rgb, i.fogFactor);
                 return col;
             }
             ENDHLSL

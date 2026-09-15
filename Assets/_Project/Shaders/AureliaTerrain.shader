@@ -156,6 +156,10 @@ Shader "Aurelia/Terrain"
             #pragma target 2.0
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            /* Common.hlsl DEFINSI LerpWhiteTo yang dipakai Shadows.hlsl(327).
+               Tanpa include eksplisit ini, pass ShadowCaster gagal kompilasi
+               di glcore & gles3 (run 34944558100) walau pass utama sehat. */
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
             // cbuffer yang sama dengan Pass utama -- wajib, lihat catatan
             // di AureliaTerrainInput.hlsl
