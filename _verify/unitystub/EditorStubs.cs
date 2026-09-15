@@ -99,44 +99,4 @@ namespace UnityEngine.SceneManagement
         public static int sceneCount=>0;
         public static Scene CreateScene(string n)=>default; }
 }
-namespace UnityEngine.Rendering
-{
-    public static class GraphicsSettings { public static RenderPipelineAsset defaultRenderPipeline;
-        public static RenderPipelineAsset currentRenderPipeline;
-        public static T GetSettingsForRenderPipeline<T>() where T:RenderPipelineGlobalSettings => default;
-        public static bool TryGetRenderPipelineSettings<T>(out T s) where T:RenderPipelineGlobalSettings { s=default; return false; }
-    }
-    public class RenderPipelineAsset : ScriptableObject {}
-    public class ScriptableRendererData : ScriptableObject {}
-    public class RenderPipelineGlobalSettings : ScriptableObject {}
-    public class RenderPipelineGlobalSettings<TSelf,TPipe> : RenderPipelineGlobalSettings where TSelf:RenderPipelineGlobalSettings where TPipe:RenderPipeline {}
-    public class RenderPipeline : Object {}
-    public static class RenderPipelineGlobalSettingsUtils {
-        public static bool TryEnsure<TGlobalSetting,TRenderPipeline>(ref TGlobalSetting instance,string defaultPath,bool canCreateNewAsset)
-            where TGlobalSetting:RenderPipelineGlobalSettings where TRenderPipeline:RenderPipeline { return false; }
-    }
-}
-namespace UnityEngine.Rendering.Universal
-{
-    public class UniversalRendererData : UnityEngine.Rendering.ScriptableRendererData { public PostProcessData postProcessData; }
-    public class UniversalRenderPipelineAsset : UnityEngine.Rendering.RenderPipelineAsset {
-        public static UniversalRenderPipelineAsset Create(UnityEngine.Rendering.ScriptableRendererData r)=>null;
-        public static UniversalRenderPipelineAsset Create()=>null;
-        public float renderScale=1f;
-        public bool m_ConservativeEnclosingSphere;
-        public UnityEngine.Rendering.ScriptableRendererData[] m_RendererDataList = new UnityEngine.Rendering.ScriptableRendererData[1];
-    }
-    public class PostProcessData : ScriptableObject {}
-    public class UniversalAdditionalCameraData : Component {}
-    public class UniversalAdditionalLightData : Component {}
-    public class UniversalRenderPipelineGlobalSettings : UnityEngine.Rendering.RenderPipelineGlobalSettings {}
-    public class UniversalRenderPipeline : UnityEngine.Rendering.RenderPipeline {}
-}
-namespace UnityEngine { public static class QualitySettings {
-    public static UnityEngine.Rendering.RenderPipelineAsset renderPipeline;
-    public static string[] names=>new string[]{"Low","Medium","High"};
-    public static int GetQualityLevel()=>0;
-    public static void SetQualityLevel(int i,bool b){}
-    public static Rendering.ShadowQuality shadows;
-} }
 namespace UnityEditor.Rendering { public static class EditorGraphicsSettings { public static void PopulateRenderPipelineGraphicsSettings(UnityEngine.Rendering.RenderPipelineGlobalSettings s){} } }

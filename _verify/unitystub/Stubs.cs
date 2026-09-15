@@ -172,10 +172,18 @@ namespace UnityEngine
         public enum IndexFormat { UInt16, UInt32 }
         public enum ShadowQuality { Disable, HardOnly, All }
         public enum ShadowResolution { _256=256, _512=512, _1024=1024, _2048=2048, _4096=4096 }
+        // TANDA TANGAN DICOKEK API UNITY 6 (6000.0), bukan dikarang:
+        //   GraphicsSettings.GetSettingsForRenderPipeline<T>() -> RenderPipelineGlobalSettings
+        // Di Unity, T adalah TIPE PIPELINE-nya (mis. UniversalRenderPipeline), BUKAN tipe
+        // global settings-nya. Hasilnya RenderPipelineGlobalSettings, jadi pemanggil
+        // harus meng-cast (`as UniversalRenderPipelineGlobalSettings`).
+        // Stub yang salah di sini pernah membuat harness menolak kode yang justru
+        // benar, dan (yang lebih bahaya) tidak menangkap kode yang salah.
         public static class GraphicsSettings {
             public static RenderPipelineAsset defaultRenderPipeline;
             public static RenderPipelineAsset currentRenderPipeline;
-            public static T GetSettingsForRenderPipeline<T>() where T:RenderPipelineGlobalSettings => default;
+            public static RenderPipelineGlobalSettings GetSettingsForRenderPipeline<T>() where T:RenderPipeline => default;
+            public static RenderPipelineGlobalSettings GetSettingsForRenderPipeline(System.Type renderPipelineType) => default;
             public static bool TryGetRenderPipelineSettings<T>(out T s) where T:RenderPipelineGlobalSettings { s=default; return false; }
         }
         public class RenderPipelineGlobalSettings : ScriptableObject {}
