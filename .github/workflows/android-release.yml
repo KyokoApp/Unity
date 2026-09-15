@@ -358,35 +358,54 @@ jobs:
           df -h /
           set +e
           mkdir -p logs
-          PATS='error CS[0-9]+|Scripts have compiler errors|Shader error|Aborting batchmode|extra field|BuildFailedException|Exception:|error:|Error building player|Keystore|keystore|no available seats|command line argument|FAILURE: Build'
           LOG=Logs/AureliaEditor.log
           if [ -f "$LOG" ]; then
             echo "=== log Unity dari -logfile: $(stat -c%s "$LOG") byte ==="
             cp "$LOG" logs/
-            grep -aE "$PATS" "$LOG" | head -20 > logs/evidence.txt
+            grep -aE 'error CS|Shader error|Aborting batchmode|Scripts have compiler' "$LOG" | head -30 > logs/evidence.txt
           else
-            echo "::warning::$LOG tidak ada -> editor mengabaikan override -logfile (punyanya game-ci menang). Bukti diambil dari jejak di workspace."
+            echo "::warning::$LOG tidak ada -> editor mengabaikan override -logfile (-logfile /dev/stdout punyanya game-ci menang). Bukti diambil dari jejak di workspace."
           fi
-          # Kandidat: berkas teks terbesar yang ditinggalkan Unity/Bee/Gradle.
-          cand=$(find . -maxdepth 5 \( -name '*.log' -o -name '*.txt' -o -name '*.out' -o -name '*.yaml' \) \
-                   -not -path './.git/*' -printf '%s\t%p\n' 2>/dev/null | sort -rn | head -25 | cut -f2)
-          echo "=== kandidat berkas ==="; printf '%s\n' "$cand" | head -25
-          for f in $cand; do
-            hits=$(grep -aE "$PATS" "$f" 2>/dev/null | head -5)
-            [ -z "$hits" ] && continue
-            echo "=== dari $f ==="; printf '%s\n' "$hits"
-            { printf '### %s\n' "$f"; printf '%s\n' "$hits"; } >> logs/evidence.txt
-            printf '%s\n' "$hits" | while IFS= read -r l; do
-              safe=$(printf '%s' "$l" | tr -d '\r\n' | cut -c1-460 | sed -e 's/::/-:/g' -e 's/%/25/g')
-              echo "::error::bukti $(basename "$f"): $safe"
+
+          # ---- jaring lebar: error kompilasi C# ditulis Unity ke beberapa tempat
+          # di Library/ (Bee menyimpan output kompilernya), tidak ke Editor.log
+          # saat -logfile /dev/stdout. Cari ke seluruh workspace.
+          PAT='error CS[0-9]|Scripts have compiler errors|Shader error|extra field between|BuildFailedException|Error building player|keystore password|no available seats|Invalid keystore|Gradle build failed|FAILURE: Build failed'
+          found=$(timeout 220 grep -rlaE "$PAT" --exclude-dir=.git --exclude-dir=Logs . 2>/dev/null | head -8)
+          if [ -n "$found" ]; then
+            echo "=== berkas yang memuat jejak error ==="; printf '%s\n' "$found"
+            for f in $found; do
+              hits=$(timeout 40 grep -aE "$PAT" "$f" 2>/dev/null | head -4 | tr -d '\r')
+              [ -z "$hits" ] && continue
+              echo "--- $f"; printf '%s\n' "$hits"
+              { printf '### %s\n' "$f"; printf '%s\n' "$hits"; } >> logs/evidence.txt
+              printf '%s\n' "$hits" | while IFS= read -r l; do
+                safe=$(printf '%s' "$l" | tr -d '\r\n' | cut -c1-450 | sed -e 's/::/-:/g' -e 's/%/25/g')
+                echo "::error::bukti $(echo "$f" | tr '/.' '__'): $safe"
+              done
             done
+          else
+            echo "::warning::tidak ada satu pun berkas di workspace yang memuat pola error kompilasi/build -- kemungkinan kegagalan terjadi SEBELUM kompilasi (lisensi / impor proyek) atau pesannya hanya lewat stdout."
+          fi
+
+          # ---- penanda yang lebih andal dari menebak: assembly hasil kompilasi.
+          # RPG.Runtime.dll tidak ada / lebih tua dari sources = kompilasi gagal.
+          for a in RPG.Core RPG.Runtime RPG.Editor; do
+            f="Library/ScriptAssemblies/$a.dll"
+            if [ -f "$f" ]; then
+              echo "::error::$a.dll: ADA $(stat -c%s "$f") byte, mtime $(date -r "$f" +%H:%M:%S)"
+            else
+              echo "::error::$a.dll: HILANG (assembly ini tidak selesai dikompilasi -> build player pasti berhenti)"
+            fi
+            cp "$f" logs/ 2>/dev/null
           done
-          # Inventaris: kalau pun tak ada yang cocok, aku minimal tahu apa yang ditinggalkan.
+          ls -la Library/ScriptAssemblies > logs/assemblies.txt 2>&1
+          ls -S Library/Bee 2>/dev/null | head -15 >> logs/assemblies.txt
           { echo "== Logs =="; ls -la Logs 2>/dev/null; echo "== Library/Logs =="; ls -la Library/Logs 2>/dev/null;
-            echo "== Library/Bee (teratas) =="; ls -S Library/Bee 2>/dev/null | head -12;
-            echo "== build/ =="; find build -maxdepth 2 2>/dev/null | head -20; } > logs/inventory.txt
-          cat logs/inventory.txt
-          echo "=== 40 baris terakhir Logs/evidence.txt ==="; tail -40 logs/evidence.txt 2>/dev/null
+            echo "== build/ =="; find build -maxdepth 2 2>/dev/null | head -20; } >> logs/assemblies.txt
+          cat logs/assemblies.txt
+          echo "=== logs/evidence.txt ==="; head -60 logs/evidence.txt 2>/dev/null
+          du -sh logs 2>/dev/null
           true
 
       - name: Upload log Unity
