@@ -352,59 +352,71 @@ jobs:
       # -logfile di customParameters tetap dicoba (kalau editor mulai
       # menghormati yang terakhir, kita dapat log utuhnya di Logs/).
       # ------------------------------------------------------------
+      # ------------------------------------------------------------
+      # BUKTI. Sumber utama: Logs/AureliaUnity.log -- kran log yang dipasang
+      # AureliaCILogTap.cs di dalam Editor. Kenapa perlu: game-ci menjalankan
+      # Unity dengan "-logfile /dev/stdout" (cli: dist/platforms/ubuntu/steps/
+      # build.sh) sehingga Unity TIDAK pernah menulis Editor.log ke disk, dan
+      # menimpanya lewat customParameters terbukti tidak mempan (dicoba di run
+      # v0.2.0-cel-fix7 + fix8: Logs/AureliaEditor.log tidak pernah dibuat).
+      # Anotasi = saluran yang selalu bisa dibaca alat otomatis; log mentah
+      # Actions diarahkan ke blob storage yang tidak selalu bisa diambil.
+      # ------------------------------------------------------------
       - name: Kumpulkan bukti kegagalan (anotasi + artifact)
         if: always()
         run: |
           df -h /
           set +e
           mkdir -p logs
-          LOG=Logs/AureliaEditor.log
-          if [ -f "$LOG" ]; then
-            echo "=== log Unity dari -logfile: $(stat -c%s "$LOG") byte ==="
-            cp "$LOG" logs/
-            grep -aE 'error CS|Shader error|Aborting batchmode|Scripts have compiler' "$LOG" | head -30 > logs/evidence.txt
+          PAT='\] (Error|Exception|Assert):|error CS[0-9]|Scripts have compiler errors|Shader error|extra field|BuildFailedException|Error building player|keystore password|no available seats|Gradle build|FAILURE: Build|Aborting batchmode'
+
+          emit() {  # $1=prefix $2=baris -> satu anotasi, dibersihkan dari karakter perintah workflow
+            safe=$(printf '%s' "$2" | tr -d '\r\n' | cut -c1-460 | sed -e 's/::/-:/g' -e 's/%/25/g')
+            echo "::error::$1 $safe"
+          }
+
+          TAP=Logs/AureliaUnity.log
+          if [ -f "$TAP" ]; then
+            echo "=== kran log Unity: $(stat -c%s "$TAP") byte, $(wc -l < "$TAP") baris ==="
+            cp "$TAP" logs/
+            grep -anE "$PAT" "$TAP" | tail -20 > logs/evidence.txt
+            while IFS= read -r l; do emit "unity:" "$l"; done < logs/evidence.txt
+            echo "--- 50 baris terakhir kran log ---"; tail -50 "$TAP"
           else
-            echo "::warning::$LOG tidak ada -> editor mengabaikan override -logfile (-logfile /dev/stdout punyanya game-ci menang). Bukti diambil dari jejak di workspace."
+            echo "::warning::$TAP tidak ada -> LogTap tidak terpasang: RPG.Editor.dll tidak dikompilasi, atau build mati SEBELUM domain script dimuat (lisensi/impor)."
           fi
 
-          # ---- jaring lebar: error kompilasi C# ditulis Unity ke beberapa tempat
-          # di Library/ (Bee menyimpan output kompilernya), tidak ke Editor.log
-          # saat -logfile /dev/stdout. Cari ke seluruh workspace.
-          PAT='error CS[0-9]|Scripts have compiler errors|Shader error|extra field between|BuildFailedException|Error building player|keystore password|no available seats|Invalid keystore|Gradle build failed|FAILURE: Build failed'
-          found=$(timeout 220 grep -rlaE "$PAT" --exclude-dir=.git --exclude-dir=Logs . 2>/dev/null | head -8)
-          if [ -n "$found" ]; then
-            echo "=== berkas yang memuat jejak error ==="; printf '%s\n' "$found"
-            for f in $found; do
-              hits=$(timeout 40 grep -aE "$PAT" "$f" 2>/dev/null | head -4 | tr -d '\r')
-              [ -z "$hits" ] && continue
-              echo "--- $f"; printf '%s\n' "$hits"
-              { printf '### %s\n' "$f"; printf '%s\n' "$hits"; } >> logs/evidence.txt
-              printf '%s\n' "$hits" | while IFS= read -r l; do
-                safe=$(printf '%s' "$l" | tr -d '\r\n' | cut -c1-450 | sed -e 's/::/-:/g' -e 's/%/25/g')
-                echo "::error::bukti $(echo "$f" | tr '/.' '__'): $safe"
-              done
-            done
-          else
-            echo "::warning::tidak ada satu pun berkas di workspace yang memuat pola error kompilasi/build -- kemungkinan kegagalan terjadi SEBELUM kompilasi (lisensi / impor proyek) atau pesannya hanya lewat stdout."
-          fi
+          # Jaring kedua, HANYA berkas log. Run fix8 grep tanpa --include sehingga
+          # ikut mencocokkan teks di source PackageCache dan isi biner .dll:
+          # anotasi penuh sampah, pesan asli tenggelam.
+          found=$(timeout 200 grep -rlaE "$PAT" \
+                    --include='*.log' --include='*.txt' --include='*.out' --include='*.json' \
+                    --exclude-dir=.git Logs Library/Logs Library/Bee Temp build 2>/dev/null | head -6)
+          for f in $found; do
+            [ "$f" = "$TAP" ] && continue
+            echo "=== $f ==="
+            cp "$f" logs/ 2>/dev/null
+            timeout 30 grep -aE "$PAT" "$f" 2>/dev/null | head -4 > logs/hit.txt
+            while IFS= read -r l; do emit "$(basename "$f"):" "$l"; done < logs/hit.txt
+          done
 
-          # ---- penanda yang lebih andal dari menebak: assembly hasil kompilasi.
-          # RPG.Runtime.dll tidak ada / lebih tua dari sources = kompilasi gagal.
+          # Penanda paling andal untuk "kompilasi gagal": assembly Editor/Runner.
+          # Kalau berkasnya tidak ada, build player PASTI mati -- dan itu menjelaskan
+          # kenapa LogTap juga tidak sempat terpasang.
           for a in RPG.Core RPG.Runtime RPG.Editor; do
             f="Library/ScriptAssemblies/$a.dll"
             if [ -f "$f" ]; then
-              echo "::error::$a.dll: ADA $(stat -c%s "$f") byte, mtime $(date -r "$f" +%H:%M:%S)"
+              echo "::notice::$a.dll ADA $(stat -c%s "$f") byte (mtime $(date -r "$f" +%H:%M:%S)) -> kompilasi skrip LULUS"
             else
-              echo "::error::$a.dll: HILANG (assembly ini tidak selesai dikompilasi -> build player pasti berhenti)"
+              emit "berkas:" "$a.dll HILANG di Library/ScriptAssemblies -> assembly ini tidak selesai dikompilasi"
             fi
-            cp "$f" logs/ 2>/dev/null
           done
-          ls -la Library/ScriptAssemblies > logs/assemblies.txt 2>&1
-          ls -S Library/Bee 2>/dev/null | head -15 >> logs/assemblies.txt
-          { echo "== Logs =="; ls -la Logs 2>/dev/null; echo "== Library/Logs =="; ls -la Library/Logs 2>/dev/null;
-            echo "== build/ =="; find build -maxdepth 2 2>/dev/null | head -20; } >> logs/assemblies.txt
-          cat logs/assemblies.txt
-          echo "=== logs/evidence.txt ==="; head -60 logs/evidence.txt 2>/dev/null
+          { echo "== Library/ScriptAssemblies =="; ls -la Library/ScriptAssemblies 2>/dev/null | head -25;
+            echo "== Logs =="; ls -la Logs 2>/dev/null;
+            echo "== Library/Logs =="; ls -la Library/Logs 2>/dev/null;
+            echo "== build/ =="; find build -maxdepth 2 2>/dev/null | head -20; } > logs/inventory.txt
+          cat logs/inventory.txt
+          echo "=== logs/evidence.txt ==="; cat logs/evidence.txt 2>/dev/null | head -40
           du -sh logs 2>/dev/null
           true
 
