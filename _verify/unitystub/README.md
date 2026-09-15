@@ -9,6 +9,12 @@ Harness ini menutup celah itu sebagian: `Stubs.cs`, `Attrs.cs`, dan
 `AssetDatabase`, `UniversalRenderPipelineAsset`, …), lalu `UnityStubCheck.csproj`
 mengkompilasi **file C# yang benar-benar dikirim ke Unity** melawan tiruan itu.
 
+`UniVrmStubs.cs` agak lain: ia meniru API **paket** UniVRM/UniGLTF v0.131.2 yang
+dipakai `VrmPrefabBuilder.cs`. Tanda tangannya disalin dari sumber UniVRM pada
+tag yang sama dengan yang dikunci `Packages/manifest.json` — bukan dikarang.
+Kalau versi UniVRM berubah, file itu harus diperiksa ulang; stub yang menyimpang
+dari API asli membuat harness hijau sementara Unity merah.
+
 ## Menjalankan
 
 ```
