@@ -63,8 +63,26 @@ namespace RPG.Editor
             // --- 1. RendererData dengan PostProcessData yang benar ---
             var rendererPath = $"{RenderFolder}/AureliaRenderer.asset";
             var renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(rendererPath);
-            var postProcessData = AssetDatabase.LoadAssetAtPath<PostProcessData>(
-                "Packages/com.unity.render-pipelines.universal/Runtime/Data/PostProcessData.asset");
+            PostProcessData postProcessData = null;
+            var ppPaths = new[] {
+                "Packages/com.unity.render-pipelines.universal/Runtime/Data/PostProcessData.asset",
+                "Packages/com.unity.render-pipelines.universal/Runtime/Data/PostProcessData.asset",
+                "Packages/com.unity.render-pipelines.universal/Runtime/Data/PostProcessData.asset"
+            };
+            foreach (var p in ppPaths)
+            {
+                postProcessData = AssetDatabase.LoadAssetAtPath<PostProcessData>(p);
+                if (postProcessData != null) break;
+            }
+            if (postProcessData == null)
+            {
+                var guids = AssetDatabase.FindAssets("t:PostProcessData");
+                if (guids.Length > 0)
+                {
+                    var path = AssetDatabase.GUIDToAssetPath(guids[0]);
+                    postProcessData = AssetDatabase.LoadAssetAtPath<PostProcessData>(path);
+                }
+            }
 
             if (renderer == null)
             {
