@@ -152,7 +152,7 @@ namespace RPG.Runtime
             {
                 foreach (var m in kv.Value)
                 {
-                    for (var i = 0; i < perV; i++) { V[vi] = m.MultiplyPoint3(sv[i]); U[vi] = su[i]; C[vi] = sc[i]; vi++; }
+                    for (var i = 0; i < perV; i++) { V[vi] = m.MultiplyPoint3x4(sv[i]); U[vi] = su[i]; C[vi] = sc[i]; vi++; }
                     for (var i = 0; i < perT; i++) T[ti++] = st[i] + baseV;
                     baseV += perV;
                 }
