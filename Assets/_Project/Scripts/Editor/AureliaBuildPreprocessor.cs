@@ -90,6 +90,11 @@ namespace RPG.Editor
                   diubah. Lihat komentar di ValidateInputHandling. */
             ValidateInputHandling(log);
 
+            /* 6. Screenshot in-game (siang/senja/malam) untuk artifact CI.
+                  Dibungkus try/catch di dalamnya: screenshot adalah mata
+                  kita, bukan alasan build boleh gagal. */
+            SceneShots.Capture(log);
+
             /* Catatan karakter sudah dilaporkan langkah 2 (VrmPrefabBuilder):
                   ia bilang prefab dibangun, atau kenapa tidak. Tidak ada lagi
                   jalur yang diam-diam mengirim APK berisi kapsul. */

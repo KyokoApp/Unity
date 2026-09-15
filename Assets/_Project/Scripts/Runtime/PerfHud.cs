@@ -57,6 +57,8 @@ namespace RPG.Runtime
         [Header("Sumber")]
         public TerrainChunkStreamer Streamer;
         public WaterPlane Water;
+        public GrassField Grass;
+        public DayNightCycle Cycle;
 
         readonly Queue<float> _samples = new Queue<float>();
         readonly StringBuilder _sb = new StringBuilder(512);
@@ -166,6 +168,11 @@ namespace RPG.Runtime
 
             if (Water != null)
                 _sb.Append($"air: y={Water.transform.position.y:F2}, {Water.Size:F0} m\n");
+
+            if (Grass != null)
+                _sb.Append($"rumput: {Grass.ActiveClumps:N0} rumpun, {Grass.ActiveCells} sel\n");
+            if (Cycle != null)
+                _sb.Append(Cycle.Label + "\n");
 
             /* Diagnostik. Baris-baris ini ada karena build CI ke-5: game
                JALAN (HUD hidup, 18 fps, stik tergambar) tapi dunia gelap

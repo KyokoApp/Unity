@@ -223,7 +223,15 @@ bukan ditulis tangan; angka di `TerrainMeshTests.cs` diambil dari menjalankan
      tidak → build mati dengan *"script class layout is incompatible between
      the editor and the player"*. Detailnya ada di komentar
      `Assets/_Project/Scripts/Editor/AureliaBuildPreprocessor.cs`.
-4. **Kalibrasi sumbu tulang** — lihat `TAHAP-2.md` langkah 4. Ini satu-satunya
+4. **Suasana & rumput (Tahap 4)** — tombol Pagi/Siang/Sore/Malam/Realtime
+   ada di kiri-bawah layar; secara bawaan jam berjalan sendiri (15 menit
+   dunia nyata per hari game). Rumput ikut preset kualitas
+   (`SettingsStore`), dan tidak tumbuh di air atau lereng curam.
+   Lihat `TAHAP-4.md`.
+5. **Screenshot tanpa PC** — setiap run workflow "Android APK" mengunggah
+   artifact `screenshots` (siang/senja/malam) yang bisa dibuka dari halaman
+   run di browser HP.
+6. **Kalibrasi sumbu tulang** — lihat `TAHAP-2.md` langkah 4. Ini satu-satunya
    hal yang benar-benar butuh matamu: arah sumbu lokal tulang rigify tidak bisa
    diketahui tanpa membuka Unity.
 5. **Android** — *Project Settings → Player → Android*:

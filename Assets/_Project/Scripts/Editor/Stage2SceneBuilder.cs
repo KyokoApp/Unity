@@ -162,6 +162,25 @@ namespace RPG.Editor
             WaterPlane water = null;
             if (withTerrain) AddTerrainAndWater(charGo, notes, out streamer, out water);
 
+            // ---- siklus siang/malam + rumput (Tahap 4) ------------------
+            /* Hanya di scene Tahap 3: keduanya butuh terrain sebagai lantai
+               dan matahari sebagai sumber cahaya utama. */
+            DayNightCycle cycle = null;
+            GrassField grass = null;
+            if (withTerrain)
+            {
+                var cycleGo = new GameObject("DayNightCycle");
+                cycle = cycleGo.AddComponent<DayNightCycle>();
+                cycle.Sun = light;
+
+                var grassGo = new GameObject("GrassField");
+                grass = grassGo.AddComponent<GrassField>();
+                grass.Target = charGo != null ? charGo.transform : null;
+                grass.GrassMaterial = LoadOrCreateGrassMaterial(notes);
+                notes.Add("Rumput + siklus siang/malam terpasang. Tombol suasana Pagi/Siang/" +
+                          "Sore/Malam/Realtime ada di kiri-bawah layar.");
+            }
+
             /* HUD performa dipasang bersama scene, bukan nanti. Alasannya:
                tanpa angka di layar, "rasanya lancar" tidak bisa dipakai untuk
                memutuskan apa pun -- dan keputusan Tahap 7 (tier kualitas)
@@ -170,6 +189,8 @@ namespace RPG.Editor
             var hud = hudGo.AddComponent<PerfHud>();
             hud.Streamer = streamer;
             hud.Water = water;
+            hud.Grass = grass;
+            hud.Cycle = cycle;
             hud.Visible = withTerrain;
             notes.Add("PerfHud terpasang. F1 (atau ketuk sudut kanan-atas 3x) untuk sembunyikan.");
 
@@ -282,6 +303,34 @@ namespace RPG.Editor
             AssetDatabase.CreateAsset(m, path);
             AssetDatabase.SaveAssets();
             return m;
+        }
+
+        /* Material rumput dibuat sekali dan di-commit ke Library lewat
+           CreateAsset, sama seperti material debug lain. Kalau shader
+           Aurelia/Grass tidak ketemu, lebih baik rumput tanpa material
+           (tidak digambar) daripada build mati. */
+        static Material LoadOrCreateGrassMaterial(List<string> notes)
+        {
+            if (!AssetDatabase.IsValidFolder(RenderFolder))
+            {
+                AssetDatabase.CreateFolder("Assets/_Project", "Rendering");
+            }
+            var path = $"{RenderFolder}/AureliaGrass.mat";
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (existing != null) return existing;
+
+            var shader = Shader.Find("Aurelia/Grass");
+            if (shader == null)
+            {
+                notes.Add("Shader Aurelia/Grass tidak ketemu -- rumput dilewati. " +
+                          "Pastikan folder Assets/_Project/Shaders ikut tersalin.");
+                return null;
+            }
+            var mat = new Material(shader);
+            mat.name = "AureliaGrass";
+            AssetDatabase.CreateAsset(mat, path);
+            AssetDatabase.SaveAssets();
+            return mat;
         }
 
         static GameObject PlaceCharacter(float groundY, List<string> notes)

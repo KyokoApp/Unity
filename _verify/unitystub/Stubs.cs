@@ -12,7 +12,9 @@ namespace UnityEngine
         public static Vector2 operator*(Vector2 a,float k)=>default; public static Vector2 operator*(float k,Vector2 a)=>default;
         public static implicit operator Vector3(Vector2 v)=>default; }
     public struct Vector3 { public float x,y,z; public Vector3(float x,float y,float z){this.x=x;this.y=y;this.z=z;}
-        public float magnitude=>0f; public Vector3 normalized=>this; public static Vector3 zero=>default; public static Vector3 up=>default;
+        public static Vector3 forward=>default; public static Vector3 right=>default; public static Vector3 up=>default;
+        public static Vector3 operator -(Vector3 a)=>default;
+        public float magnitude=>0f; public Vector3 normalized=>this; public static Vector3 zero=>default;
         public static Vector3 operator*(Vector3 a,float k)=>default; public static Vector3 operator*(float k,Vector3 a)=>default;
         public static Vector3 operator/(Vector3 a,float k)=>default; public static Vector3 operator+(Vector3 a,Vector3 b)=>default;
         public static Vector3 operator-(Vector3 a,Vector3 b)=>default;
@@ -20,8 +22,10 @@ namespace UnityEngine
     public struct Quaternion { public float x,y,z,w; public static Quaternion identity=>default;
         public static Quaternion Euler(float x,float y,float z)=>default; public static Quaternion Euler(Vector3 v)=>default;
         public static Quaternion LookRotation(Vector3 f,Vector3 u)=>default; public static Quaternion Slerp(Quaternion a,Quaternion b,float t)=>default;
-        public static Quaternion operator*(Quaternion a,Quaternion b)=>default; }
+        public static Quaternion operator*(Quaternion a,Quaternion b)=>default;
+        public static Vector3 operator*(Quaternion q,Vector3 v)=>default; }
     public struct Color { public float r,g,b,a; public Color(float r,float g,float b){this.r=r;this.g=g;this.b=b;}
+        public static Color Lerp(Color a,Color b,float t)=>default;
         public Color(float r,float g,float b,float a){this.r=r;this.g=g;this.b=b;this.a=a;}
         public static Color white=>default; public static Color cyan=>default; public static Color yellow=>default; public static Color green=>default; }
     public struct Color32 { public byte r,g,b,a; public Color32(byte r,byte g,byte b,byte a){this.r=r;this.g=g;this.b=b;this.a=a;} }
@@ -38,7 +42,7 @@ namespace UnityEngine
         /* Unity punya overload terpisah untuk int dan float. Tanpa yang int,
            Mathf.Clamp(x, 8, 64) di sini mengembalikan float dan menyembunyikan
            perbedaan tipe yang Unity asli tolak. */
-        public static int Clamp(int v,int a,int b)=>v; }
+        public static int Clamp(int v,int a,int b)=>v;  public static int CeilToInt(float v)=>0; public static int FloorToInt(float v)=>0; public static float Lerp(float a,float b,float t)=>0f;}
     public class Object { public string name; public static void Destroy(Object o){} public static void DestroyImmediate(Object o){}
         public static T FindFirstObjectByType<T>() where T:Object => default; }
     public class Component : Object { public Transform transform=>null; public GameObject gameObject=>null;
@@ -69,6 +73,7 @@ namespace UnityEngine
         public void UploadMeshData(bool markNoLongerReadable){} public void MarkDynamic(){} }
     public struct Bounds { public Vector3 center; public Vector3 size; public Bounds(Vector3 c,Vector3 s){center=c;size=s;} }
     public class MeshFilter : Component { public Mesh sharedMesh; public Mesh mesh; }
+    public struct Matrix4x4 { public static Matrix4x4 TRS(Vector3 p,Quaternion q,Vector3 s)=>default; }
     public struct LayerMask { public int value;
         public static int NameToLayer(string n)=>0; public static int GetMask(params string[] n)=>0; }
     public class Collider : Component {}
@@ -76,6 +81,13 @@ namespace UnityEngine
     public class MonoBehaviour : Behaviour {}
     public class ScriptableObject : Object { public static T CreateInstance<T>() where T:ScriptableObject => default; }
     public static class Debug { public static void Log(object m){} public static void LogError(object m){} public static void LogWarning(object m){} }
+    public enum RenderTextureFormat { ARGB32 }
+    public class RenderTexture { public static RenderTexture active;
+        public static RenderTexture GetTemporary(int w,int h,int d,RenderTextureFormat f)=>null;
+        public static void ReleaseTemporary(RenderTexture r){} }
+    public static class Graphics {
+        public static void DrawMeshInstanced(Mesh m,int sub,Material mat,
+            System.Collections.Generic.List<Matrix4x4> list,int count){} }
     public static class Time { public static float deltaTime=>0f; public static float unscaledDeltaTime=>0f;
         public static float time=>0f; public static float realtimeSinceStartup=>0f; public static int frameCount=>0; public static float timeScale=1f; }
     public enum ScreenOrientation { Portrait, PortraitUpsideDown, LandscapeLeft, LandscapeRight, AutoRotation }
@@ -94,7 +106,8 @@ namespace UnityEngine
     public enum TouchPhase { Began, Moved, Stationary, Ended, Canceled }
     public struct Touch { public int fingerId; public Vector2 position; public TouchPhase phase; }
     public class Camera : Behaviour { public CameraClearFlags clearFlags; public float nearClipPlane, farClipPlane, fieldOfView;
-        public Color backgroundColor; public static Camera main=>null; }
+        public Color backgroundColor; public static Camera main=>null;
+        public RenderTexture targetTexture; public void Render(){} }
     public enum CameraClearFlags { Skybox, SolidColor, Depth, Nothing }
     public class Light : Behaviour { public LightType type; public Color color; public float intensity; public LightShadows shadows; }
     public enum LightType { Directional, Point, Spot, Area } public enum LightShadows { None, Hard, Soft }
@@ -104,8 +117,9 @@ namespace UnityEngine
         RightUpperArm,RightLowerArm,RightHand,LastBone }
     public class Texture : Object { public int width=>0; public int height=>0; }
     public class Texture2D : Texture { public Texture2D(int w,int h,TextureFormat f,bool mip){}
-        public TextureWrapMode wrapMode; public void SetPixels32(Color32[] c){} public void Apply(bool a,bool b){} }
-    public enum TextureFormat { RGBA32 } public enum TextureWrapMode { Repeat, Clamp } public enum FilterMode { Point, Bilinear, Trilinear }
+        public TextureWrapMode wrapMode; public void SetPixels32(Color32[] c){} public void Apply(bool a,bool b){}
+        public void Apply(){} public void ReadPixels(Rect r,int x,int y){} public byte[] EncodeToPNG()=>null; }
+    public enum TextureFormat { RGBA32, RGB24 } public enum TextureWrapMode { Repeat, Clamp } public enum FilterMode { Point, Bilinear, Trilinear }
     public class Material : Object { public Material(Shader s){} public bool HasProperty(string n)=>false; public void SetColor(string n,Color c){} }
     public class Shader : Object { public static Shader Find(string n)=>null; }
     namespace Profiling {
@@ -126,8 +140,9 @@ namespace UnityEngine
     public class GUIStyleState { public Color textColor; }
     public enum TextAnchor { MiddleCenter }
     public static class GUI { public static Color color; public static GUIStyleSkin skin=>new GUIStyleSkin();
-        public static void DrawTexture(Rect r,Texture t){} public static void Label(Rect r,string t,GUIStyle s){} }
-    public class GUIStyleSkin { public GUIStyle label=>new GUIStyle(); }
+        public static void DrawTexture(Rect r,Texture t){} public static void Label(Rect r,string t,GUIStyle s){}
+        public static bool Button(Rect r,string t,GUIStyle s)=>false; }
+    public class GUIStyleSkin { public GUIStyle label=>new GUIStyle(); public GUIStyle button=>new GUIStyle(); }
     namespace EventSystems { public class EventSystem : Behaviour { public static EventSystem current=>null;
         public bool IsPointerOverGameObject()=>false; public bool IsPointerOverGameObject(int id)=>false; }
         public class StandaloneInputModule : Behaviour {} }

@@ -269,6 +269,16 @@ jobs:
           path: release/*.apk
           retention-days: 30
 
+      # Mata kita selama pengembangan tanpa PC: tiga suasana dunia yang
+      # dirender Editor tepat sebelum build (SceneShots.cs). Kalau folder
+      # shots/ kosong, langkah ini diam-diam lewat (if-no-files-found).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots/*.png
+          if-no-files-found: ignore
+          retention-days: 30
+
   # ------------------------------------------------------------
   release:
     name: Unggah ke Releases

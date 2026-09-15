@@ -240,6 +240,38 @@ namespace RPG.Runtime
             ActiveChunks = _active.Count;
         }
 
+        /* Untuk screenshot batchmode (SceneShots): di edit mode tidak ada
+           loop Update yang men-stream chunk, jadi dipaksa sinkron di sini.
+           Jalur sinkronnya sudah ada (BuildBudgetedSync) -- dipakai ulang,
+           bukan ditulis ulang, supaya hasilnya identik dengan permainan. */
+        public void EditorStreamNow(int maxBuilds)
+        {
+            if (Target == null) return;
+            var prevThread = UseBackgroundThread;
+            UseBackgroundThread = false;
+            try
+            {
+                for (var i = 0; i < maxBuilds; i++)
+                {
+                    var p = Target.position;
+                    var cx = TerrainMesh.ChunkIndex(p.x);
+                    var cz = TerrainMesh.ChunkIndex(p.z);
+                    if (cx != _lastCx || cz != _lastCz || _active.Count == 0)
+                    {
+                        _lastCx = cx; _lastCz = cz;
+                        RefreshPlan(cx, cz);
+                    }
+                    BuildBudgetedSync();
+                    ActiveChunks = _active.Count;
+                    if (_pending.Count == 0 && _inFlight.Count == 0) break;
+                }
+            }
+            finally
+            {
+                UseBackgroundThread = prevThread;
+            }
+        }
+
         void RefreshPlan(int cx, int cz)
         {
             var plan = WorldData.ChunkPlan(cx * WorldData.ChunkSize + WorldData.ChunkSize * 0.5,
