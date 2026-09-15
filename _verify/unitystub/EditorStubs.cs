@@ -17,7 +17,7 @@ namespace UnityEditor
         public static void Refresh(){} public static void Refresh(ImportAssetOptions o){}
         public static bool DeleteAsset(string p)=>true; public static string MoveAsset(string a,string b)=>null; }
     [Flags] public enum ImportAssetOptions { Default=0, ForceUpdate=1 }
-    public static class EditorUtility { public static void SetDirty(Object o){} public static long GetRuntimeMemorySizeLong(Object o)=>0;
+    public static class EditorUtility { public static void SetDirty(Object o){}
         public static bool DisplayDialog(string t,string m,string ok)=>true;
         public static bool DisplayDialog(string t,string m,string ok,string cancel)=>true; }
     public static class Selection { public static GameObject activeGameObject; }

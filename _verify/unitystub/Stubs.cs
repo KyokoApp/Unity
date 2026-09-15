@@ -106,6 +106,15 @@ namespace UnityEngine
     public enum TextureFormat { RGBA32 } public enum TextureWrapMode { Repeat, Clamp } public enum FilterMode { Point, Bilinear, Trilinear }
     public class Material : Object { public Material(Shader s){} public bool HasProperty(string n)=>false; public void SetColor(string n,Color c){} }
     public class Shader : Object { public static Shader Find(string n)=>null; }
+    namespace Profiling {
+        /* Harus sama dengan Unity asli. Dulu stub menaruh
+           GetRuntimeMemorySizeLong di UnityEditor.EditorUtility (tidak ada di
+           Unity), dan persis itulah yang membuat build CI pertama gagal. */
+        public static class Profiler {
+            public static long GetRuntimeMemorySizeLong(Object o)=>0;
+            public static long GetTotalAllocatedMemoryLong()=>0;
+            public static long GetMonoUsedSizeLong()=>0;
+            public static long GetTotalReservedMemoryLong()=>0; } }
     public static class Gizmos { public static Color color; public static void DrawWireSphere(Vector3 c,float r){} public static void DrawLine(Vector3 a,Vector3 b){} }
     public static class RenderSettings { public static UnityEngine.Rendering.AmbientMode ambientMode;
         public static bool fog; public static FogMode fogMode; public static float fogStartDistance, fogEndDistance, fogDensity;

@@ -120,8 +120,11 @@ namespace RPG.Editor
             foreach (var t in texs)
             {
                 srcPx += (long)t.width * t.height;
-                // EditorUtility.GetRuntimeMemorySizeLong menghitung versi yang benar-benar diunggah ke GPU
-                dstBytes += EditorUtility.GetRuntimeMemorySizeLong(t);
+                // GetRuntimeMemorySizeLong ada di UnityEngine.Profiling.Profiler,
+                // BUKAN di UnityEditor.EditorUtility. (Stub harness dulu salah
+                // menaruhnya di EditorUtility, jadi kompilasi lokal hijau sementara
+                // Unity asli menolak -- sekarang stub-nya sudah dikoreksi.)
+                dstBytes += UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong(t);
             }
             sb.AppendLine($"tekstur         : {texs.Count} aset, {srcPx / 1_000_000.0:F1} MP sumber");
             sb.AppendLine($"  memori GPU    : {dstBytes / 1024f / 1024f:F1} MB");
