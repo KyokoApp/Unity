@@ -127,13 +127,18 @@ jobs:
 
       # ---- keystore tetap supaya bisa update tanpa uninstall ----
       # Kalau secret keystore kosong, pakai keystore yang di-commit di repo (keystore/release.keystore).
-      # Ini yang memperbaiki bug \"harus uninstall dulu\" — kunci debug acak tiap build dianggap app berbeda oleh Android.
+      # Ini yang memperbaiki bug "harus uninstall dulu" — kunci debug acak tiap build dianggap app berbeda oleh Android.
       - name: Siapkan keystore tetap
         id: ks
         run: |
           set -e
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "Keystore dari secret (lebih aman) dipakai."
+            echo "Keystore dari secret dipakai."
+            echo "ANDROID_KEYSTORE_BASE64=${{ secrets.ANDROID_KEYSTORE_BASE64 }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASS=${{ secrets.ANDROID_KEYSTORE_PASS }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYALIAS_NAME=${{ secrets.ANDROID_KEYALIAS_NAME }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYALIAS_PASS=${{ secrets.ANDROID_KEYALIAS_PASS }}" >> "$GITHUB_ENV"
+            echo "pakai=secret" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ -f keystore/release.keystore ]; then
@@ -235,10 +240,6 @@ jobs:
           # Tidak diset -> licensing_method.sh resolve ke "personal".
           # Jangan isi UNITY_LICENSE kecuali kamu memang punya .ulf.
           UNITY_LICENSING_METHOD: personal
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
-          ANDROID_KEYALIAS_NAME: ${{ secrets.ANDROID_KEYALIAS_NAME }}
-          ANDROID_KEYALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS }}
         with:
           unityVersion: ${{ env.UNITY_VERSION }}
           targetPlatform: Android
