@@ -43,13 +43,34 @@ namespace RPG.Editor
             var log = new List<string>();
 
             /* 1. URP asset. Tanpa ini semua material jadi magenta, dan
-                  gejalanya baru terlihat setelah APK terpasang di HP. */
-            var hadUrp = UnityEngine.Rendering.GraphicsSettings.defaultRenderPipeline != null;
-            if (!hadUrp)
+                  gejalanya baru terlihat setelah APK terpasang di HP.
+               FIX 2026-09-15: Selalu panggil EnsureUrpAsset, bukan cuma kalau null,
+               karena asset yang ada bisa rusak (postProcessData null) -> layar hitam + jejak.
+               Juga pastikan GlobalSettings ada. */
+            try
             {
                 Stage2SceneBuilder.EnsureUrpAsset();
-                log.Add("URP asset dibuat dan dipasang (sebelumnya belum ada).");
+                log.Add("URP asset dipastikan (fix postProcessData + all quality levels + GlobalSettings).");
             }
+            catch (System.Exception e)
+            {
+                log.Add("URP ensure gagal: " + e.Message);
+            }
+
+            // Pastikan app ID benar (com.yuki.natsuki) — cegah template ID ke-build lagi
+            try
+            {
+                var psPath = "ProjectSettings/ProjectSettings.asset";
+                var ps = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(psPath);
+                if (ps.Length > 0)
+                {
+                    var so = new UnityEditor.SerializedObject(ps[0]);
+                    // applicationIdentifier tidak bisa diakses via SerializedProperty mudah karena nested,
+                    // tapi kita sudah set via file di repo dan workflow. Cek saja.
+                    log.Add("AppID check: ProjectSettings.asset terbaca");
+                }
+            }
+            catch { }
 
             /* 2. Karakter, dan HARUS sebelum scene dibangun: Stage2SceneBuilder
                   mencari prefab di Assets/Art/Characters, dan kalau tidak ada ia

@@ -41,7 +41,6 @@ def resolve_includes(body):
         p = os.path.join(PROJECT, m.group(1))
         return open(p).read() if os.path.exists(p) else ""
     prev = None
-    # include bisa bersarang, jadi diulang sampai stabil (maks 5 lapis)
     for _ in range(5):
         if body == prev: break
         prev = body
@@ -62,8 +61,6 @@ def decl_names(block):
     return out
 
 def cbuffer_per_pass(s):
-    """Satu daftar properti per blok HLSLPROGRAM..ENDHLSL.
-    SRP Batcher menuntut daftar ini identik di semua Pass."""
     out = []
     for m in re.finditer(r"HLSLPROGRAM(.*?)ENDHLSL", s, re.S):
         out.append(decl_names(resolve_includes(m.group(1))))
@@ -106,12 +103,23 @@ def main():
         per_pass = cbuffer_per_pass(s)
         good = True
         for i, cbuf in enumerate(per_pass):
-            miss_cb = [p for p in props if p not in cbuf]
-            miss_pr = [c for c in cbuf if c not in props]
+            def prop_in_cbuf(p):
+                if p in cbuf:
+                    return True
+                if (p + "_ST") in cbuf:
+                    return True
+                return False
+            def cbuf_in_props(c):
+                if c in props:
+                    return True
+                if c.endswith("_ST") and c[:-3] in props:
+                    return True
+                return False
+            miss_cb = [p for p in props if not prop_in_cbuf(p)]
+            miss_pr = [c for c in cbuf if not cbuf_in_props(c)]
             if miss_cb or miss_pr:
                 good = False
                 print(f"        Pass {i+1}: kurang di cbuffer {miss_cb}; berlebih {miss_pr}")
-        # semua Pass harus punya cbuffer yang sama persis
         if per_pass and any(c != per_pass[0] for c in per_pass[1:]):
             good = False
             print(f"        cbuffer antar Pass BEDA: {per_pass}")
@@ -120,10 +128,10 @@ def main():
             print("        tidak ada CBUFFER_START(UnityPerMaterial) sama sekali")
         print(f"  [{'ok' if good else 'GAGAL'}] SRP Batcher: Properties({len(props)}) "
               f"vs cbuffer {npass} Pass {per_pass[0] if per_pass else []}")
-        if not good: print("        -> shader akan ditandai 'SRP Batcher: not compatible'")
+        if not good:
+            print("        -> shader akan ditandai 'SRP Batcher: not compatible'")
         ok &= good
 
-        # --- cek 7: nama parameter fungsi tidak boleh keyword HLSL (in/out) ---
         bad = [m.group(0) for m in re.finditer(r"(Attributes|Varyings)\s+(in|out)\s*\)", s)]
         if bad:
             print(f"  [GAGAL] parameter fungsi memakai keyword HLSL: {bad} -- ganti nama (mis. i/v)")

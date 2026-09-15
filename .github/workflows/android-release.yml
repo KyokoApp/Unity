@@ -125,6 +125,50 @@ jobs:
             Library-android-v2-
             Library-
 
+      # ---- keystore tetap supaya bisa update tanpa uninstall ----
+      # Kalau secret keystore kosong, pakai keystore yang di-commit di repo (keystore/release.keystore).
+      # Ini yang memperbaiki bug \"harus uninstall dulu\" — kunci debug acak tiap build dianggap app berbeda oleh Android.
+      - name: Siapkan keystore tetap
+        id: ks
+        run: |
+          set -e
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "Keystore dari secret (lebih aman) dipakai."
+            exit 0
+          fi
+          if [ -f keystore/release.keystore ]; then
+            echo "Keystore dari repo dipakai (fallback)."
+            B64=$(base64 -w0 keystore/release.keystore)
+            echo "ANDROID_KEYSTORE_BASE64=$B64" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASS=yuki123" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYALIAS_NAME=yuki" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYALIAS_PASS=yuki123" >> "$GITHUB_ENV"
+            echo "pakai=repo" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Tidak ada keystore di secret maupun di keystore/release.keystore — akan pakai debug keystore acak (harus uninstall tiap update)."
+            echo "pakai=debug" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ---- versionCode naik tiap build supaya Android mau update tanpa uninstall ----
+      - name: Naikkan versionCode + versionName
+        run: |
+          set -e
+          FILE=ProjectSettings/ProjectSettings.asset
+          # versionCode = run_number + 2 (supaya > 2 yang sudah ada)
+          VC=$(( ${{ github.run_number }} + 10 ))
+          echo "Set AndroidBundleVersionCode=$VC"
+          sed -i -E "s/AndroidBundleVersionCode: [0-9]+/AndroidBundleVersionCode: $VC/" "$FILE"
+          if [ -n "${{ github.event.inputs.versionName }}" ]; then
+            VN="${{ github.event.inputs.versionName }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            VN="${GITHUB_REF_NAME#v}"
+          else
+            VN="0.2.0-dev.${{ github.run_number }}"
+          fi
+          echo "Set bundleVersion=$VN"
+          sed -i -E "s/bundleVersion: .*/bundleVersion: $VN/" "$FILE"
+          grep -E "bundleVersion|AndroidBundleVersionCode|applicationIdentifier" "$FILE" | head -10
+
       # ---- karakter VRM, diunduh saat build, tidak pernah masuk git ----
       - name: Ambil AureliaChar.vrm dari Drive
         id: vrm

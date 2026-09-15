@@ -1,25 +1,24 @@
 // ============================================================
-// AureliaTerrain.shader — terrain cel-shading Genshin-style
+// AureliaTerrainCel.shader — terrain cel-shading ala Genshin
 //
-// FIX 2026-09-15: Dibuat cel-shading + diperbaiki SRP Batcher + clear bug
-// - Albedo dari vertex color (TerrainSurface)
-// - Diffuse di-quantize 3 tingkat via CelRamp (shadow/mid/high)
-// - Shadow tint kebiruan ala Genshin (tidak hitam pekat)
-// - Detail noise dari posisi dunia (tanpa jahitan chunk)
-// - Fog linear
+// Beda dengan Aurelia/Terrain yang half-Lambert halus:
+// - Diffuse di-quantize jadi 3 tingkat (shadow/mid/high) via CelRamp
+// - Detail noise tetap ada tapi lebih subtle
+// - Shadow tetap pakai mainLight.shadowAttenuation
+// - SRP Batcher compatible (Properties == CBUFFER)
 // ============================================================
-Shader "Aurelia/Terrain"
+Shader "Aurelia/TerrainCel"
 {
     Properties
     {
-        _DetailScale    ("Detail Scale (per meter dunia)", Float) = 0.35
+        _DetailScale    ("Detail Scale", Float) = 0.35
         _DetailStrength ("Detail Strength", Range(0, 0.5)) = 0.10
         _LargeScale     ("Large Variation Scale", Float) = 0.012
         _LargeStrength  ("Large Variation Strength", Range(0, 0.5)) = 0.14
         _AmbientBoost   ("Ambient Boost", Range(0, 2)) = 1.0
         _ShadowStep     ("Cel Shadow Step", Range(0, 1)) = 0.28
         _MidStep        ("Cel Mid Step", Range(0, 1)) = 0.58
-        _Feather        ("Cel Feather", Range(0.001, 0.2)) = 0.05
+        _Feather        ("Cel Feather", Range(0.001, 0.2)) = 0.04
         _ShadowTint     ("Shadow Tint", Color) = (0.78, 0.82, 0.88, 1)
     }
 
@@ -79,6 +78,7 @@ Shader "Aurelia/Terrain"
                 float4 _ShadowTint;
             CBUFFER_END
 
+            // hash & noise dari cel include, tapi butuh yang lama juga untuk kompatibilitas
             float Hash21(float2 p)
             {
                 p = frac(p * float2(123.34, 456.21));
@@ -126,13 +126,19 @@ Shader "Aurelia/Terrain"
                 half ndl = dot(N, mainLight.direction);
                 half halfLambert = saturate(ndl * 0.5 + 0.5);
 
+                // Cel ramp 3 tingkat ala Genshin
                 half cel = CelRamp(halfLambert, _ShadowStep, _MidStep, _Feather);
+
+                // Shadow tint: area shadow tidak hitam, tapi agak kebiruan seperti Genshin
                 half3 shadowAlbedo = albedo * _ShadowTint.rgb;
                 half3 litAlbedo = lerp(shadowAlbedo, albedo, cel);
 
                 half3 ambient = SampleSH(N) * _AmbientBoost;
-                half3 lit = litAlbedo * (ambient + mainLight.color * mainLight.distanceAttenuation
-                            * mainLight.shadowAttenuation * lerp(0.35, 1.0, cel));
+                half shadowAtten = mainLight.shadowAttenuation;
+
+                // Di area shadow, pakai ambient + sedikit main light yang sudah di-tint
+                // Di area terang, pakai full main light
+                half3 lit = litAlbedo * (ambient + mainLight.color * mainLight.distanceAttenuation * shadowAtten * lerp(0.35, 1.0, cel));
 
                 lit = MixFog(lit, IN.fogFactor);
                 return half4(lit, 1.0);
@@ -144,7 +150,6 @@ Shader "Aurelia/Terrain"
         {
             Name "ShadowCaster"
             Tags { "LightMode" = "ShadowCaster" }
-
             ZWrite On
             ZTest LEqual
             ColorMask 0

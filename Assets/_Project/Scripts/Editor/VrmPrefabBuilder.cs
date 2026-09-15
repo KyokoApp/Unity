@@ -66,9 +66,12 @@ namespace RPG.Editor
                 return false;
             }
 
-            if (AssetDatabase.LoadAssetAtPath<GameObject>(PrefabFile) != null)
+            var existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabFile);
+            if (existingPrefab != null)
             {
                 log.Add("Prefab karakter sudah ada: " + PrefabFile);
+                // Tetap convert ke cel-shading kalau masih MToon
+                try { ConvertToCelShading(existingPrefab, log); } catch (System.Exception e) { log.Add("Convert cel-shading skip: " + e.Message); }
                 return true;
             }
 
@@ -121,6 +124,18 @@ namespace RPG.Editor
             var meshCount = prefab.GetComponentsInChildren<SkinnedMeshRenderer>(true).Length;
             log.Add("Prefab karakter dibangun: " + PrefabFile +
                     " (" + meshCount + " SkinnedMeshRenderer)");
+
+            // FIX: Convert MToon (Built-in) ke CharCel (URP cel-shading Genshin)
+            // MToon 0.x tidak support URP -> magenta di build. Convert ke Aurelia/CharCel
+            try
+            {
+                ConvertToCelShading(prefab, log);
+            }
+            catch (System.Exception e)
+            {
+                log.Add("PERINGATAN: Convert ke cel-shading gagal: " + e.Message + " — karakter mungkin magenta");
+            }
+
             return true;
         }
 
@@ -154,6 +169,110 @@ namespace RPG.Editor
                 map[new SubAssetKey(tex)] = tex;
             }
             return map;
+        }
+
+        // Convert MToon materials ke Aurelia/CharCel (URP cel-shading Genshin)
+        static void ConvertToCelShading(GameObject prefab, List<string> log)
+        {
+            var celShader = Shader.Find("Aurelia/CharCel");
+            if (celShader == null)
+            {
+                log.Add("Shader Aurelia/CharCel tidak ketemu — skip convert cel-shading");
+                return;
+            }
+
+            int converted = 0;
+            var renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            foreach (var r in renderers)
+            {
+                var mats = r.sharedMaterials;
+                bool changed = false;
+                for (int i = 0; i < mats.Length; i++)
+                {
+                    var m = mats[i];
+                    if (m == null) continue;
+                    // Cek apakah ini MToon (Built-in) atau sudah URP
+                    if (m.shader != null && m.shader.name.Contains("MToon"))
+                    {
+                        var newMat = new Material(celShader);
+                        newMat.name = m.name + "_Cel";
+
+                        // Copy base texture & color
+                        if (m.HasProperty("_MainTex"))
+                        {
+                            var tex = m.GetTexture("_MainTex");
+                            if (tex != null) newMat.SetTexture("_BaseMap", tex);
+                        }
+                        if (m.HasProperty("_Color"))
+                            newMat.SetColor("_BaseColor", m.GetColor("_Color"));
+                        else if (m.HasProperty("_BaseColor"))
+                            newMat.SetColor("_BaseColor", m.GetColor("_BaseColor"));
+                        else
+                            newMat.SetColor("_BaseColor", Color.white);
+
+                        // Shade color dari MToon
+                        if (m.HasProperty("_ShadeColor"))
+                            newMat.SetColor("_ShadeColor", m.GetColor("_ShadeColor"));
+                        else
+                            newMat.SetColor("_ShadeColor", new Color(0.78f, 0.82f, 0.90f, 1f));
+
+                        // Shade texture kalau ada
+                        if (m.HasProperty("_ShadeTexture"))
+                        {
+                            var shadeTex = m.GetTexture("_ShadeTexture");
+                            if (shadeTex != null) newMat.SetTexture("_ShadeMap", shadeTex);
+                        }
+
+                        // Outline
+                        if (m.HasProperty("_OutlineWidth"))
+                        {
+                            float ow = m.GetFloat("_OutlineWidth");
+                            // MToon outline width dalam 0..1, convert ke meter
+                            newMat.SetFloat("_OutlineWidth", Mathf.Clamp(ow * 0.02f, 0f, 0.05f));
+                        }
+                        if (m.HasProperty("_OutlineColor"))
+                            newMat.SetColor("_OutlineColor", m.GetColor("_OutlineColor"));
+
+                        // Simpan material baru sebagai asset (supaya tidak hilang)
+                        var matPath = $"{TextureDir}/{newMat.name}.mat";
+                        // Pastikan folder ada
+                        if (!AssetDatabase.IsValidFolder(TextureDir))
+                            System.IO.Directory.CreateDirectory(TextureDir);
+                        // Kalau sudah ada, timpa
+                        var existing = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+                        if (existing != null)
+                        {
+                            existing.shader = celShader;
+                            existing.CopyPropertiesFromMaterial(newMat);
+                            mats[i] = existing;
+                        }
+                        else
+                        {
+                            AssetDatabase.CreateAsset(newMat, matPath);
+                            mats[i] = newMat;
+                        }
+                        changed = true;
+                        converted++;
+                    }
+                }
+                if (changed)
+                {
+                    r.sharedMaterials = mats;
+                    EditorUtility.SetDirty(r);
+                }
+            }
+
+            if (converted > 0)
+            {
+                EditorUtility.SetDirty(prefab);
+                // Save prefab changes
+                PrefabUtility.SaveAsPrefabAsset(prefab, PrefabFile);
+                log.Add($"Cel-shading: {converted} material MToon -> Aurelia/CharCel (Genshin-style)");
+            }
+            else
+            {
+                log.Add("Cel-shading: tidak ada material MToon yang perlu di-convert (mungkin sudah URP atau kapsul)");
+            }
         }
 
         /* Langkah 2: bangun GameObject dari VRM lalu simpan sebagai prefab.

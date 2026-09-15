@@ -32,6 +32,7 @@ namespace UnityEngine
     public struct Color32 { public byte r,g,b,a; public Color32(byte r,byte g,byte b,byte a){this.r=r;this.g=g;this.b=b;this.a=a;} }
     public struct Rect { public float x,y,width,height; public Rect(float x,float y,float w,float h){this.x=x;this.y=y;this.width=w;this.height=h;}
         public float xMax=>0f; public float yMax=>0f; public bool Contains(Vector2 p)=>false; }
+    public struct RectOffset { public int left,right,top,bottom; public RectOffset(int l,int r,int t,int b){left=l;right=r;top=t;bottom=b;} }
     public static class Mathf { public const float Rad2Deg=57.29578f; public const float Deg2Rad=0.01745329f;
         public static float Cos(float a)=>0f; public static float Sin(float a)=>0f; public static float Sqrt(float a)=>0f;
         public static float Abs(float a)=>a; public static float Clamp(float v,float a,float b)=>v;
@@ -40,9 +41,6 @@ namespace UnityEngine
         public static float Atan2(float y,float x)=>0f;
         public static int Max(int a,int b)=>a; public static int Min(int a,int b)=>a;
         public static float Round(float v)=>v;
-        /* Unity punya overload terpisah untuk int dan float. Tanpa yang int,
-           Mathf.Clamp(x, 8, 64) di sini mengembalikan float dan menyembunyikan
-           perbedaan tipe yang Unity asli tolak. */
         public static int Clamp(int v,int a,int b)=>v;  public static int CeilToInt(float v)=>0; public static int FloorToInt(float v)=>0; public static float Lerp(float a,float b,float t)=>0f;}
     public class Object { public string name; public static void Destroy(Object o){} public static void DestroyImmediate(Object o){}
         public static T FindFirstObjectByType<T>() where T:Object => default; }
@@ -58,14 +56,11 @@ namespace UnityEngine
         public string tag; public int layer; public T AddComponent<T>() where T:Component => default; public T GetComponent<T>()=>default;
         public T GetComponentInChildren<T>()=>default; public T[] GetComponentsInChildren<T>(bool inc)=>null;
         public static GameObject CreatePrimitive(PrimitiveType t)=>null; }
-    public class Renderer : Component { public Material sharedMaterial; }
+    public class Renderer : Component { public Material sharedMaterial; public Material[] sharedMaterials; }
     public class MeshRenderer : Renderer { public bool receiveShadows; public UnityEngine.Rendering.ShadowCastingMode shadowCastingMode; }
     public class SkinnedMeshRenderer : Renderer { public Transform[] bones; public Mesh sharedMesh; }
     public class Mesh : Object { public int vertexCount=>0; public int subMeshCount=>0; public int blendShapeCount=>0;
         public uint GetIndexCount(int s)=>0;
-        /* Tipe properti ini harus sama dengan Unity asli, karena harness ini
-           justru dipakai untuk menangkap salah tipe (mis. Color32[] masuk ke
-           Mesh.colors yang bertipe Color[]). */
         public Vector3[] vertices; public Vector3[] normals; public Color[] colors; public Color32[] colors32;
         public Vector2[] uv; public int[] triangles; public Bounds bounds;
         public UnityEngine.Rendering.IndexFormat indexFormat;
@@ -89,9 +84,6 @@ namespace UnityEngine
         public static RenderTexture GetTemporary(int w,int h,int d,RenderTextureFormat f)=>null;
         public static void ReleaseTemporary(RenderTexture r){} }
     public static class Graphics {
-        /* Unity 6 hanya punya overload Matrix4x4[] -- stub ini sempat
-           mengarang overload List<> dan meloloskan kode yang tidak bisa
-           dikompilasi Unity (build CI ke-8). Jangan ditambah lagi. */
         public static void DrawMeshInstanced(Mesh m,int sub,Material mat,
             Matrix4x4[] matrices,int count){} }
     public static class Time { public static float deltaTime=>0f; public static float unscaledDeltaTime=>0f;
@@ -124,15 +116,17 @@ namespace UnityEngine
         RightUpperArm,RightLowerArm,RightHand,LastBone }
     public class Texture : Object { public int width=>0; public int height=>0; }
     public class Texture2D : Texture { public Texture2D(int w,int h,TextureFormat f,bool mip){}
-        public TextureWrapMode wrapMode; public void SetPixels32(Color32[] c){} public void Apply(bool a,bool b){}
-        public void Apply(){} public void ReadPixels(Rect r,int x,int y){} public byte[] EncodeToPNG()=>null; }
+        public Texture2D(int w,int h){} public TextureWrapMode wrapMode; public void SetPixels32(Color32[] c){} public void Apply(bool a,bool b){}
+        public void Apply(){} public void ReadPixels(Rect r,int x,int y){} public byte[] EncodeToPNG()=>null;
+        public void SetPixels(Color[] c){} }
     public enum TextureFormat { RGBA32, RGB24 } public enum TextureWrapMode { Repeat, Clamp } public enum FilterMode { Point, Bilinear, Trilinear }
-    public class Material : Object { public Material(Shader s){} public bool HasProperty(string n)=>false; public void SetColor(string n,Color c){} }
+    public class Material : Object { public Material(Shader s){} public bool HasProperty(string n)=>false;
+        public void SetColor(string n,Color c){} public Color GetColor(string n)=>default;
+        public void SetTexture(string n,Texture t){} public Texture GetTexture(string n)=>null;
+        public void SetFloat(string n,float v){} public float GetFloat(string n)=>0f;
+        public void CopyPropertiesFromMaterial(Material m){} }
     public class Shader : Object { public static Shader Find(string n)=>null; }
     namespace Profiling {
-        /* Harus sama dengan Unity asli. Dulu stub menaruh
-           GetRuntimeMemorySizeLong di UnityEditor.EditorUtility (tidak ada di
-           Unity), dan persis itulah yang membuat build CI pertama gagal. */
         public static class Profiler {
             public static long GetRuntimeMemorySizeLong(Object o)=>0;
             public static long GetTotalAllocatedMemoryLong()=>0;
@@ -143,13 +137,28 @@ namespace UnityEngine
         public static bool fog; public static FogMode fogMode; public static float fogStartDistance, fogEndDistance, fogDensity;
         public static Color fogColor; public static Color ambientLight; }
     public enum FogMode { Linear, Exponential, ExponentialSquared }
-    public class GUIStyle { public GUIStyle(){} public GUIStyle(GUIStyle o){} public TextAnchor alignment; public int fontSize; public GUIStyleState normal=new GUIStyleState(); }
-    public class GUIStyleState { public Color textColor; }
+    public class GUIStyle { public GUIStyle(){} public GUIStyle(GUIStyle o){} public TextAnchor alignment; public int fontSize; public GUIStyleState normal=new GUIStyleState(); public RectOffset padding; public RectOffset margin; }
+    public class GUIStyleState { public Color textColor; public Texture2D background; }
     public enum TextAnchor { MiddleCenter }
-    public static class GUI { public static Color color; public static GUIStyleSkin skin=>new GUIStyleSkin();
+    public static class GUI { public static Color color; public static Color backgroundColor; public static GUIStyleSkin skin=>new GUIStyleSkin();
         public static void DrawTexture(Rect r,Texture t){} public static void Label(Rect r,string t,GUIStyle s){}
-        public static bool Button(Rect r,string t,GUIStyle s)=>false; }
-    public class GUIStyleSkin { public GUIStyle label=>new GUIStyle(); public GUIStyle button=>new GUIStyle(); }
+        public static bool Button(Rect r,string t,GUIStyle s)=>false;
+        public static void Box(Rect r,string t,GUIStyle s){} public static void Box(Rect r,string t){}
+        public static bool Toggle(Rect r,bool v,string t,GUIStyle s)=>false;
+        public static bool Toggle(Rect r,bool v,string t)=>false; }
+    public static class GUILayout {
+        public static void BeginArea(Rect r){} public static void EndArea(){}
+        public static Vector2 BeginScrollView(Vector2 v)=>default; public static void EndScrollView(){}
+        public static void Label(string t,GUIStyle s){} public static void Label(string t){}
+        public static bool Button(string t,GUIStyle s,params GUILayoutOption[] o)=>false;
+        public static bool Button(string t)=>false;
+        public static bool Toggle(bool v,string t,GUIStyle s)=>false;
+        public static bool Toggle(bool v,string t)=>false;
+        public static float HorizontalSlider(float v,float l,float r)=>0f;
+        public static void Space(float p){} public static void BeginHorizontal(){} public static void EndHorizontal(){}
+        public static void FlexibleSpace(){} }
+    public class GUILayoutOption {}
+    public class GUIStyleSkin { public GUIStyle label=>new GUIStyle(); public GUIStyle button=>new GUIStyle(); public GUIStyle box=>new GUIStyle(); public GUIStyle toggle=>new GUIStyle(); }
     namespace EventSystems { public class EventSystem : Behaviour { public static EventSystem current=>null;
         public bool IsPointerOverGameObject()=>false; public bool IsPointerOverGameObject(int id)=>false; }
         public class StandaloneInputModule : Behaviour {} }
@@ -160,6 +169,45 @@ namespace UnityEngine
         public void Dispose(){} }
     public enum AmbientMode { Skybox, Trilight, Flat, Custom }
         public enum ShadowCastingMode { Off, On, TwoSided, ShadowsOnly }
-        public enum IndexFormat { UInt16, UInt32 } }
+        public enum IndexFormat { UInt16, UInt32 }
+        public enum ShadowQuality { Disable, HardOnly, All }
+        public enum ShadowResolution { _256=256, _512=512, _1024=1024, _2048=2048, _4096=4096 }
+        public static class GraphicsSettings {
+            public static RenderPipelineAsset defaultRenderPipeline;
+            public static RenderPipelineAsset currentRenderPipeline;
+            public static T GetSettingsForRenderPipeline<T>() where T:RenderPipelineGlobalSettings => default;
+            public static bool TryGetRenderPipelineSettings<T>(out T s) where T:RenderPipelineGlobalSettings { s=default; return false; }
+        }
+        public class RenderPipelineGlobalSettings : ScriptableObject {}
+        public class RenderPipelineGlobalSettings<TSelf,TPipe> : RenderPipelineGlobalSettings where TSelf:RenderPipelineGlobalSettings where TPipe:RenderPipeline {}
+        public class RenderPipelineAsset : ScriptableObject {}
+        public class ScriptableRendererData : ScriptableObject {}
+        public class RenderPipeline : Object {}
+    }
+    public static class QualitySettings {
+        public static UnityEngine.Rendering.RenderPipelineAsset renderPipeline;
+        public static string[] names=>new string[0];
+        public static int GetQualityLevel()=>0;
+        public static void SetQualityLevel(int i,bool b){}
+        public static Rendering.ShadowQuality shadows;
+        public static Rendering.ShadowResolution shadowResolution;
+    }
+    public static class Resources {
+        public static T[] FindObjectsOfTypeAll<T>() where T:Object => new T[0];
+    }
 }
 namespace UnityEngine { public class SceneViewDummy {} }
+namespace UnityEngine.Rendering.Universal
+{
+    public class UniversalRendererData : UnityEngine.Rendering.ScriptableRendererData { public PostProcessData postProcessData; }
+    public class UniversalRenderPipelineAsset : UnityEngine.Rendering.RenderPipelineAsset {
+        public static UniversalRenderPipelineAsset Create(UnityEngine.Rendering.ScriptableRendererData r)=>null;
+        public static UniversalRenderPipelineAsset Create()=>null;
+        public float renderScale=1f;
+    }
+    public class PostProcessData : ScriptableObject {}
+    public class UniversalAdditionalCameraData : Component { }
+    public class UniversalAdditionalLightData : Component { }
+    public class UniversalRenderPipelineGlobalSettings : UnityEngine.Rendering.RenderPipelineGlobalSettings {}
+    public class UniversalRenderPipeline : UnityEngine.Rendering.RenderPipeline {}
+}

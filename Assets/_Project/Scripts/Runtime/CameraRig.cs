@@ -42,6 +42,8 @@ namespace RPG.Runtime
         public GameSettings Settings { get; private set; }
 
         Camera _cam;
+        TouchJoystick _joystick;
+        SettingsPanel _settingsPanel;
         int _dragId = int.MinValue;
         Vector2 _lastMouse;
         Vector2 _lastTouch;
@@ -62,6 +64,15 @@ namespace RPG.Runtime
             _cam = GetComponent<Camera>();
             if (_cam == null) _cam = gameObject.AddComponent<Camera>();
 
+            // FIX: pastikan camera clear solid color untuk hindari jejak
+            _cam.clearFlags = CameraClearFlags.SolidColor;
+            if (_cam.backgroundColor.a < 0.9f)
+            {
+                var c = _cam.backgroundColor;
+                c.a = 1f;
+                _cam.backgroundColor = c;
+            }
+
             Settings = SettingsStore.Load();
             Pitch = StartPitch;
             if (Target == null)
@@ -69,6 +80,8 @@ namespace RPG.Runtime
                 var motor = FindFirstObjectByType<CharacterMotor>();
                 if (motor != null) Target = motor.transform;
             }
+            _joystick = FindFirstObjectByType<TouchJoystick>();
+            _settingsPanel = FindFirstObjectByType<SettingsPanel>();
         }
 
         public void SetDistance(double meters)
@@ -120,12 +133,23 @@ namespace RPG.Runtime
         {
             var sens = (float)Settings.Sensitivity;
 
+            // Jika setting panel terbuka, jangan putar kamera
+            if (_settingsPanel != null && _settingsPanel.Visible) return;
+
             // ---- mouse (Editor & PC) ----
             if (Input.GetMouseButtonDown(1) || (DragAnywhere && Input.GetMouseButtonDown(0)
                 && !IsPointerOverUi()))
             {
-                _dragId = -1;
-                _lastMouse = Input.mousePosition;
+                // Jangan mulai drag kalau di area joystick
+                if (_joystick != null && Input.mousePosition.x < Screen.width * 0.5f && Input.mousePosition.y < Screen.height * 0.6f)
+                {
+                    // kemungkinan joystick, skip
+                }
+                else
+                {
+                    _dragId = -1;
+                    _lastMouse = Input.mousePosition;
+                }
             }
             if (_dragId == -1)
             {
@@ -139,23 +163,41 @@ namespace RPG.Runtime
             }
 
             // ---- sentuh (Android) ----
+            // FIX: hindari konflik dengan joystick — kalau touch di zona joystick, jangan pakai untuk kamera
             if (Input.touchCount > 0)
             {
-                var t = Input.GetTouch(0);
-                if (t.phase == TouchPhase.Began && !IsPointerOverUi(t))
+                for (int i = 0; i < Input.touchCount; i++)
                 {
-                    _dragId = t.fingerId;
-                    _lastTouch = t.position;
-                }
-                else if (t.fingerId == _dragId &&
-                         (t.phase == TouchPhase.Moved || t.phase == TouchPhase.Stationary))
-                {
-                    ApplyLook((t.position - _lastTouch).x, (t.position - _lastTouch).y, sens);
-                    _lastTouch = t.position;
-                }
-                else if (t.phase == TouchPhase.Ended || t.phase == TouchPhase.Canceled)
-                {
-                    if (t.fingerId == _dragId) _dragId = int.MinValue;
+                    var t = Input.GetTouch(i);
+                    // Skip kalau ini finger joystick
+                    if (_joystick != null && _joystick.IsActive)
+                    {
+                        // Joystick sudah pakai satu finger, jangan ambil finger itu untuk kamera
+                        // Dan jangan ambil touch di zona joystick
+                        if (t.position.x < Screen.width * 0.5f && t.position.y < Screen.height * 0.6f)
+                            continue;
+                    }
+
+                    if (t.phase == TouchPhase.Began && !IsPointerOverUi(t))
+                    {
+                        // Cek lagi: kalau di zona joystick, skip
+                        if (t.position.x < Screen.width * 0.5f && t.position.y < Screen.height * 0.6f)
+                            continue;
+                        _dragId = t.fingerId;
+                        _lastTouch = t.position;
+                        break;
+                    }
+                    else if (t.fingerId == _dragId &&
+                             (t.phase == TouchPhase.Moved || t.phase == TouchPhase.Stationary))
+                    {
+                        ApplyLook((t.position - _lastTouch).x, (t.position - _lastTouch).y, sens);
+                        _lastTouch = t.position;
+                        break;
+                    }
+                    else if (t.phase == TouchPhase.Ended || t.phase == TouchPhase.Canceled)
+                    {
+                        if (t.fingerId == _dragId) _dragId = int.MinValue;
+                    }
                 }
             }
         }

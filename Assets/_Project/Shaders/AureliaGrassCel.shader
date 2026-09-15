@@ -1,11 +1,13 @@
 // ============================================================
-// AureliaGrass.shader — rumput cel-shading Genshin-style (FIX)
+// AureliaGrassCel.shader — rumput cel-shading ala Genshin
+//
 // - Opaque, tanpa alpha
-// - Cel ramp 2 tingkat (shadow/high) untuk kesan toon
+// - Cel ramp 2 tingkat untuk rumput (shadow/high)
 // - Angin di vertex, fade via tenggelam
-// - FIX: clear bug + cel shading
+// - Specular stepped kecil di ujung bilah
+// - SRP Batcher compatible
 // ============================================================
-Shader "Aurelia/Grass"
+Shader "Aurelia/GrassCel"
 {
     Properties
     {
@@ -18,6 +20,8 @@ Shader "Aurelia/Grass"
         _FadeEnd       ("Tenggelam Penuh (m)", Range(20, 120)) = 30
         _CelStep       ("Cel Step", Range(0, 1)) = 0.35
         _CelFeather    ("Cel Feather", Range(0.001, 0.3)) = 0.08
+        _SpecPower     ("Specular Power", Range(4, 128)) = 32
+        _SpecThreshold ("Spec Threshold", Range(0, 1)) = 0.85
     }
 
     SubShader
@@ -74,6 +78,8 @@ Shader "Aurelia/Grass"
                 float  _FadeEnd;
                 float  _CelStep;
                 float  _CelFeather;
+                float  _SpecPower;
+                float  _SpecThreshold;
             CBUFFER_END
 
             static float Hash21(float2 p)
@@ -126,11 +132,19 @@ Shader "Aurelia/Grass"
                 half3 N = normalize(i.normalWS);
                 half ndl = dot(N, main.direction) * 0.5 + 0.5;
 
+                // Cel shading 2 tingkat untuk rumput
                 half cel = CelRamp2(ndl, _CelStep, _CelFeather);
                 half3 shadowAlbedo = _ShadowColor.rgb;
                 half3 celAlbedo = lerp(shadowAlbedo, albedo, cel);
 
                 half3 lit = celAlbedo * main.color * (cel * 0.7 + 0.3) * main.shadowAttenuation;
+
+                // Specular stepped di ujung rumput (catch light)
+                half3 V = normalize(GetWorldSpaceViewDir(i.positionWS));
+                half3 H = normalize(main.direction + V);
+                half spec = CelSpecular(N, H, _SpecPower, _SpecThreshold, 0.05);
+                lit += spec * 0.4 * main.color * saturate(i.uv.y);
+
                 lit += celAlbedo * SampleSH(N) * 0.6;
 
                 half4 col = half4(lit, 1.0);
