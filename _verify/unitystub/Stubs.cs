@@ -86,8 +86,11 @@ namespace UnityEngine
         public static RenderTexture GetTemporary(int w,int h,int d,RenderTextureFormat f)=>null;
         public static void ReleaseTemporary(RenderTexture r){} }
     public static class Graphics {
+        /* Unity 6 hanya punya overload Matrix4x4[] -- stub ini sempat
+           mengarang overload List<> dan meloloskan kode yang tidak bisa
+           dikompilasi Unity (build CI ke-8). Jangan ditambah lagi. */
         public static void DrawMeshInstanced(Mesh m,int sub,Material mat,
-            System.Collections.Generic.List<Matrix4x4> list,int count){} }
+            Matrix4x4[] matrices,int count){} }
     public static class Time { public static float deltaTime=>0f; public static float unscaledDeltaTime=>0f;
         public static float time=>0f; public static float realtimeSinceStartup=>0f; public static int frameCount=>0; public static float timeScale=1f; }
     public enum ScreenOrientation { Portrait, PortraitUpsideDown, LandscapeLeft, LandscapeRight, AutoRotation }

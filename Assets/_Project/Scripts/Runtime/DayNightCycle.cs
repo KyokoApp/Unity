@@ -104,11 +104,21 @@ namespace RPG.Runtime
             Apply();
         }
 
-        public string Label =>
-            $"waktu {Hour:F1} ({(Hour < 4.8f || Hour >= 19.5f ? "malam" :
-                                  Hour < 6.5f ? "subuh" :
-                                  Hour < 15f ? "siang" :
-                                  Hour < 17.8f ? "sore" : "senja")})";
+        /* C# 9 (bahasa yang dipakai Unity 6) melarang baris baru di dalam
+           interpolated string, jadi suasana dihitung dulu, baru disusun. */
+        public string Label
+        {
+            get
+            {
+                string suasana;
+                if (Hour < 4.8f || Hour >= 19.5f) suasana = "malam";
+                else if (Hour < 6.5f) suasana = "subuh";
+                else if (Hour < 15f) suasana = "siang";
+                else if (Hour < 17.8f) suasana = "sore";
+                else suasana = "senja";
+                return $"waktu {Hour:F1} ({suasana})";
+            }
+        }
 
         void Apply()
         {

@@ -57,7 +57,11 @@ namespace RPG.Runtime
 
         Mesh _clump;
         readonly Dictionary<long, Matrix4x4[]> _cells = new Dictionary<long, Matrix4x4[]>();
-        readonly List<Matrix4x4> _batch = new List<Matrix4x4>(1023);
+        /* DrawMeshInstanced di Unity 6 hanya menerima Matrix4x4[] (tidak ada
+           overload List<>), jadi pakai array pakai-ulang: tanpa alokasi per
+           frame, tanpa GC pressure di HP. */
+        readonly Matrix4x4[] _batch = new Matrix4x4[1023];
+        int _batchN;
         int _lastCx = int.MinValue, _lastCz;
         int _perCell;
         bool _on;
@@ -113,15 +117,15 @@ namespace RPG.Runtime
 
             RefreshCells(Target.position, false);
 
-            _batch.Clear();
+            _batchN = 0;
             ActiveClumps = 0;
             foreach (var kv in _cells)
             {
                 var arr = kv.Value;
                 for (var i = 0; i < arr.Length; i++)
                 {
-                    _batch.Add(arr[i]);
-                    if (_batch.Count == 1023) Flush();
+                    _batch[_batchN++] = arr[i];
+                    if (_batchN == 1023) Flush();
                 }
             }
             Flush();
@@ -129,10 +133,10 @@ namespace RPG.Runtime
 
         void Flush()
         {
-            if (_batch.Count == 0) return;
-            Graphics.DrawMeshInstanced(_clump, 0, GrassMaterial, _batch, _batch.Count);
-            ActiveClumps += _batch.Count;
-            _batch.Clear();
+            if (_batchN == 0) return;
+            Graphics.DrawMeshInstanced(_clump, 0, GrassMaterial, _batch, _batchN);
+            ActiveClumps += _batchN;
+            _batchN = 0;
         }
 
         void RefreshCells(Vector3 p, bool force)
