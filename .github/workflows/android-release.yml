@@ -58,6 +58,10 @@ on:
         description: 'Sertakan karakter VRM (butuh VRM_DRIVE_ID + repo privat)'
         required: false
         default: 'true'
+      tanpaCel:
+        description: 'Bangun TANPA shader cel (jika cel-shading yang mematikan build, ini tetap menghasilkan APK terpasang)'
+        required: false
+        default: 'false'
   push:
     tags: ['v*']
 
@@ -126,41 +130,72 @@ jobs:
             Library-
 
       # ---- keystore tetap supaya bisa update tanpa uninstall ----
-      # Kalau secret keystore kosong, pakai keystore yang di-commit di repo (keystore/release.keystore).
-      # Ini yang memperbaiki bug "harus uninstall dulu" — kunci debug acak tiap build dianggap app berbeda oleh Android.
+      #
+      # BUG LAMA (build fix..fix6): keystore dilempar sebagai *env var* ke langkah
+      # game-ci. game-ci/unity-builder@v6 TIDAK membaca ANDROID_KEYSTORE_* dari env
+      # -- ia memetakannya dari INPUT (dist/.../image-environment-factory.ts:
+      # ANDROID_KEYSTORE_NAME <- parameters.androidKeystoreName). Jadi langkah itu
+      # selalu lulus tanpa keluhan sementara Unity diam-diam memakai debug keystore,
+      # dan debug keystore tiap runner berbeda -> Android menolak update
+      # ("app not installed" / harus uninstall dulu). Perbaikan: pakai input.
+      #
+      # Keystore itu ada di repo (keystore/release.keystore) karena repo ini privat;
+      # secret dipakai kalau terisi.
       - name: Siapkan keystore tetap
         id: ks
+        env:
+          KS_B64:        ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS_S:     ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          KS_ALIAS_S:    ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          KS_ALIAS_PASS_S: ${{ secrets.ANDROID_KEYALIAS_PASS }}
         run: |
           set -e
-          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "Keystore dari secret dipakai."
-            echo "ANDROID_KEYSTORE_BASE64=${{ secrets.ANDROID_KEYSTORE_BASE64 }}" >> "$GITHUB_ENV"
-            echo "ANDROID_KEYSTORE_PASS=${{ secrets.ANDROID_KEYSTORE_PASS }}" >> "$GITHUB_ENV"
-            echo "ANDROID_KEYALIAS_NAME=${{ secrets.ANDROID_KEYALIAS_NAME }}" >> "$GITHUB_ENV"
-            echo "ANDROID_KEYALIAS_PASS=${{ secrets.ANDROID_KEYALIAS_PASS }}" >> "$GITHUB_ENV"
+          KS=keystore/release.keystore
+          if [ -n "$KS_B64" ]; then
+            mkdir -p keystore
+            printf '%s' "$KS_B64" | base64 -d > "$KS"
+            echo "ANDROID_KEYSTORE_PASS=$KS_PASS_S"       >> "$GITHUB_ENV"
+            echo "ANDROID_KEYALIAS_NAME=$KS_ALIAS_S"      >> "$GITHUB_ENV"
+            echo "ANDROID_KEYALIAS_PASS=$KS_ALIAS_PASS_S" >> "$GITHUB_ENV"
             echo "pakai=secret" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ -f keystore/release.keystore ]; then
-            echo "Keystore dari repo dipakai (fallback)."
-            B64=$(base64 -w0 keystore/release.keystore)
-            echo "ANDROID_KEYSTORE_BASE64=$B64" >> "$GITHUB_ENV"
-            echo "ANDROID_KEYSTORE_PASS=yuki123" >> "$GITHUB_ENV"
-            echo "ANDROID_KEYALIAS_NAME=yuki" >> "$GITHUB_ENV"
-            echo "ANDROID_KEYALIAS_PASS=yuki123" >> "$GITHUB_ENV"
+          elif [ -f "$KS" ]; then
+            echo "ANDROID_KEYSTORE_PASS=yuki123"      >> "$GITHUB_ENV"
+            echo "ANDROID_KEYALIAS_NAME=yuki"         >> "$GITHUB_ENV"
+            echo "ANDROID_KEYALIAS_PASS=yuki123"      >> "$GITHUB_ENV"
             echo "pakai=repo" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::Tidak ada keystore di secret maupun di keystore/release.keystore — akan pakai debug keystore acak (harus uninstall tiap update)."
+            echo "::warning::Tidak ada keystore (secret kosong dan $KS tidak ada) -> debug keystore acak; tiap build dianggap aplikasi berbeda."
             echo "pakai=debug" >> "$GITHUB_OUTPUT"
           fi
+          # Validasi DULU, sebelum 12 menit terbuang. Dua kegagalan yang pernah
+          # terjadi di sini: file LFS pointer (text, ~130 byte) dan keystore yang
+          # tidak bisa dibaca JDK. Kalau ini lolos, signing pasti punya bahan.
+          if [ -f "$KS" ]; then
+            SZ=$(stat -c%s "$KS")
+            B0=$(od -An -tx1 -N1 "$KS" | tr -d ' ')
+            echo "keystore $KS: ${SZ} byte, byte pertama 0x${B0}"
+            if [ "${B0}" != "30" ] || [ "$SZ" -lt 1000 ]; then
+              echo "::error::$KS bukan keystore DER (size=${SZ}, byte0=0x${B0}). Kemungkinan ini LFS pointer: jalankan 'git lfs pull' / cek .gitattributes."
+              exit 1
+            fi
+            echo "ANDROID_KEYSTORE_NAME=$KS" >> "$GITHUB_ENV"
+          fi
+          # Logs/ = tempat Unity menulis lognya (lihat -logfile di langkah build).
+          # Harus ada SEBELUM container jalan; editor tidak membuat foldernya.
+          mkdir -p Logs
 
-      # ---- versionCode naik tiap build supaya Android mau update tanpa uninstall ----
+      # ---- versionCode + versionName ----
+      # Android menolak update kalau versionCode tidak naik, dan menolak instalasi
+      # kalau paket yang sudah terpasang ditandatangani kunci lain. Keduanya adalah
+      # "error mulu" yang dilaporkan pengguna, jadi keduanya dikontrol di sini.
+      # game-ci membaca versionCode dari INPUT androidVersionCode (-> -androidVersionCode),
+      # ProjectSettings juga ikut ditulis supaya build manual di Editor sama.
       - name: Naikkan versionCode + versionName
         run: |
           set -e
           FILE=ProjectSettings/ProjectSettings.asset
-          # versionCode = run_number + 2 (supaya > 2 yang sudah ada)
-          VC=$(( ${{ github.run_number }} + 10 ))
+          VC=$(( ${{ github.run_number }} + 1000 ))
+          echo "ANDROID_VERSION_CODE=$VC" >> "$GITHUB_ENV"
           echo "Set AndroidBundleVersionCode=$VC"
           sed -i -E "s/AndroidBundleVersionCode: [0-9]+/AndroidBundleVersionCode: $VC/" "$FILE"
           if [ -n "${{ github.event.inputs.versionName }}" ]; then
@@ -172,7 +207,10 @@ jobs:
           fi
           echo "Set bundleVersion=$VN"
           sed -i -E "s/bundleVersion: .*/bundleVersion: $VN/" "$FILE"
-          grep -E "bundleVersion|AndroidBundleVersionCode|applicationIdentifier" "$FILE" | head -10
+          # app ID tidak boleh berubah lagi: ganti package = aplikasi baru di HP,
+          # lama tetap terpasang, keduanya berkelahi memperebutkan nama yang sama.
+          sed -i -E "s/^(  )applicationIdentifier:/\1applicationIdentifier:/" "$FILE"
+          grep -E "bundleVersion|AndroidBundleVersionCode|applicationIdentifier|packageName" "$FILE" | head -8
 
       # ---- karakter VRM, diunduh saat build, tidak pernah masuk git ----
       - name: Ambil AureliaChar.vrm dari Drive
@@ -232,6 +270,22 @@ jobs:
             echo "                     'sumber 1' di atas akan memakainya dan melewati Drive."
           fi
 
+      # ---- katup pelarian: build tanpa cel-shading ----
+      # Shader tidak bisa diuji di luar Unity, dan enam build terakhir mati tanpa
+      # satu pun baris penjelas. Kalau lagi-lagi exit 1, jalankan workflow ini lagi
+      # dengan tanpaCel=true: kalau yang ini hijau, pelakunya pasti salah satu shader
+      # Aurelia*Cel -- dan APK-nya tetap bisa dipasang, cuma tanpa gaya Genshin.
+      - name: Lepas cel-shading (kalau diminta)
+        if: ${{ github.event.inputs.tanpaCel == 'true' }}
+        run: |
+          set -e
+          ls Assets/_Project/Shaders/Aurelia*Cel.shader 2>/dev/null || true
+          rm -f Assets/_Project/Shaders/AureliaCharCel.shader \
+                Assets/_Project/Shaders/AureliaTerrainCel.shader \
+                Assets/_Project/Shaders/AureliaWaterCel.shader \
+                Assets/_Project/Shaders/AureliaGrassCel.shader
+          echo "::warning::cel-shading dilepas untuk build ini -- material jatuh kembali ke shader Aurelia/* non-cel."
+
       - name: Build Android
         uses: game-ci/unity-builder@v6
         env:
@@ -243,42 +297,75 @@ jobs:
         with:
           unityVersion: ${{ env.UNITY_VERSION }}
           targetPlatform: Android
-          androidBuildAppBundle: false      # APK, bukan .aab (.aab untuk Play Store)
+          # APK, bukan .aab. `androidBuildAppBundle` BUKAN input v6 (anotasi CI:
+          # "Unexpected input(s) 'androidBuildAppBundle'") -- yang benar androidExportType,
+          # dan 'androidPackage'-lah yang membuat EditorUserBuildSettings.buildAppBundle=false.
+          androidExportType: androidPackage
+          androidVersionCode: ${{ env.ANDROID_VERSION_CODE }}
+          # Keystore HARUS lewat input ini (lihat langkah 'Siapkan keystore tetap').
+          androidKeystoreName: ${{ env.ANDROID_KEYSTORE_NAME }}
+          androidKeystorePass: ${{ env.ANDROID_KEYSTORE_PASS }}
+          androidKeyaliasName: ${{ env.ANDROID_KEYALIAS_NAME }}
+          androidKeyaliasPass: ${{ env.ANDROID_KEYALIAS_PASS }}
           androidTargetSdkVersion: AndroidApiLevelAuto
           allowDirtyBuild: true             # folder VRM hasil unduhan membuat tree kotor
+          # -logfile ditulis TERAKHIR sehingga menimpa "-logfile /dev/stdout" punyanya
+          # game-ci (dist/platforms/ubuntu/steps/build.sh), dan path-nya /github/workspace
+          # = $GITHUB_WORKSPACE di host (docker.ts: --workdir /github/workspace,
+          # --volume "$workspace":/github/workspace). Itulah kenapa pencarian log di host
+          # selama ini selalu kosong: Unity tidak pernah menulis Editor.log ke disk.
+          # build.sh juga melakukan `chmod -R a+r $UNITY_PROJECT_PATH` setelah Unity mati,
+          # jadi file root-owned ini tetap bisa dibaca langkah berikutnya.
           customParameters: >-
             -scriptingBackend IL2CPP
             -androidBuildSystem Gradle
             -androidArchitecture ARM64
             -androidCreateSymbols Disabled
+            -logfile /github/workspace/Logs/AureliaEditor.log
 
-      - name: Ruang disk setelah build + log Unity
+      # ------------------------------------------------------------
+      # MATALOG: ubah log Unity jadi anotasi yang bisa dibaca mesin.
+      #
+      # Kenapa bukan sekadar upload artifact: enam build terakhir gagal semua dan
+      # satu-satunya hal yang dilaporkan adalah "Build failed with exit code 1" --
+      # log mentahnya (results-receiver.actions.githubusercontent.com -> blob
+      # storage) tidak selalu bisa diambil oleh alat otomatis. Anotasi API
+      # (check-runs/{id}/annotations) selalu bisa. Jadi baris penentunya kita
+      # SEMBUNKAN ke anotasi, bukan cuma ke artifact.
+      # ------------------------------------------------------------
+      - name: Ruang disk + baca log Unity jadi anotasi
         if: always()
         run: |
           df -h /
-          echo "=== cari log Unity ==="
           mkdir -p logs
-          find build -type f -name "*.log" -exec cp {} logs/ \; 2>/dev/null || true
-          ls -R build 2>/dev/null | head -200
-          # Editor.log biasanya di /root/.config/unity3d/Editor.log di dalam container, tapi setelah container selesai, file itu ada di host?
-          # Coba beberapa lokasi umum
-          for p in /root/.config/unity3d/Editor.log /home/runner/.config/unity3d/Editor.log /home/runner/.config/unity3d/Editor.log /tmp/unity*.log; do
-            if [ -f "$p" ]; then
-              echo "Found $p"
-              cp "$p" logs/ 2>/dev/null || true
-              tail -200 "$p" 2>/dev/null || true
-            fi
+          LOG=Logs/AureliaEditor.log
+          if [ ! -f "$LOG" ]; then
+            echo "::warning::Logs/AureliaEditor.log tidak ada -> override -logfile tidak diterima editor. Cari error di log langkah 'Build Android'."
+          else
+            SZ=$(stat -c%s "$LOG")
+            echo "=== log Unity: $SZ byte, $(wc -l < "$LOG") baris ==="
+            cp "$LOG" logs/ 2>/dev/null || true
+            PATS='error CS[0-9]{4}|Scripts have compiler errors|Shader error|Aborting batchmode|extra field|BuildFailedException|Exception:|error: |Error building player|Parsing errors|Unknown command line|no available seats'
+            grep -nE "$PATS" "$LOG" | head -24 | while IFS= read -r line; do
+              safe=$(printf '%s' "$line" | tr -d '\r\n' | cut -c1-520 | sed -e 's/::/-:/g' -e 's/%/25/g')
+              echo "::error::unitylog: $safe"
+            done
+            echo "=== 120 baris terakhir log ==="
+            tail -120 "$LOG"
+          fi
+          # Log lain yang biasa berisi sebab sebenarnya (impor aset, shader compiler).
+          for d in Library/Logs Logs Assets/../Logs; do
+            [ -d "$d" ] && find "$d" -maxdepth 1 -type f \( -name '*.log' -o -name '*.txt' \) -exec cp {} logs/ \; 2>/dev/null
           done
-          find . -maxdepth 3 -name "*.log" -exec ls -lh {} \; 2>/dev/null | head -20
-          ls -lh logs/ 2>/dev/null || true
+          echo "=== isi logs/ ==="; ls -la logs/ | head -20
 
-      - name: Upload log Unity kalau gagal
+      - name: Upload log Unity
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unity-logs
           path: logs/
-          if-no-files-found: warn
+          if-no-files-found: ignore
           retention-days: 7
 
       # UniVRM mengekstrak tekstur .vrm secara sinkron, tapi membuat prefab-nya
