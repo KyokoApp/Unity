@@ -327,19 +327,24 @@ jobs:
           androidKeyaliasPass: ${{ env.ANDROID_KEYALIAS_PASS }}
           androidTargetSdkVersion: AndroidApiLevelAuto
           allowDirtyBuild: true             # folder VRM hasil unduhan membuat tree kotor
-          # -logfile ditulis TERAKHIR sehingga menimpa "-logfile /dev/stdout" punyanya
-          # game-ci (dist/platforms/ubuntu/steps/build.sh), dan path-nya /github/workspace
-          # = $GITHUB_WORKSPACE di host (docker.ts: --workdir /github/workspace,
-          # --volume "$workspace":/github/workspace). Itulah kenapa pencarian log di host
-          # selama ini selalu kosong: Unity tidak pernah menulis Editor.log ke disk.
-          # build.sh juga melakukan `chmod -R a+r $UNITY_PROJECT_PATH` setelah Unity mati,
-          # jadi file root-owned ini tetap bisa dibaca langkah berikutnya.
+          # JANGAN pernah menambah -logfile di sini. Dua percobaan, dua pelajaran:
+          #   fix7/fix8: "-logfile <path>" diabaikan (yang pertama punyanya game-ci menang),
+          #                jadi Logs/AureliaEditor.log tidak pernah ada;
+          #   fix12: ternyata tidak diabaikan -- parser argumen game-ci
+          #                (UnityBuilderAction) membangun Dictionary dari argumen
+          #                baris perintah dan MELEMPAR "An item with the same key has
+          #                already been added. Key: logfile", jadi BuildProject mati
+          #                SEBELUM build player dimulai. Kunci ganda = exception,
+          #                bukan "yang terakhir menang" seperti dugaan kita.
+          # Log Unity tetap didapat lewat AureliaCILogTap (Application.logMessage-
+          # ReceivedThreaded -> Logs/AureliaUnity.log di root project, yang ikut
+          # ter-mount ke host) -- terbukti bekerja di run fix12: dari sanalah baris
+          # "Key: logfile" di atas terbaca.
           customParameters: >-
             -scriptingBackend IL2CPP
             -androidBuildSystem Gradle
             -androidArchitecture ARM64
             -androidCreateSymbols Disabled
-            -logfile /github/workspace/Logs/AureliaEditor.log
 
       # ------------------------------------------------------------
       # MATALOG: ubah log Unity jadi anotasi yang bisa dibaca mesin.
@@ -374,6 +379,11 @@ jobs:
       # v0.2.0-cel-fix7 + fix8: Logs/AureliaEditor.log tidak pernah dibuat).
       # Anotasi = saluran yang selalu bisa dibaca alat otomatis; log mentah
       # Actions diarahkan ke blob storage yang tidak selalu bisa diambil.
+      #
+      # Kalau blok ini berbunyi "LogTap tidak terpasang" padahal kompilasi LULUS,
+      # curigai argumen baris perintah ganda: UnityBuilderAction membangun
+      # Dictionary dari argv, dan kunci ganda (mis. -logfile dua kali) melempar
+      # ArgumentException SEBELUM build player mulai -- itu yang terjadi di fix12.
       # ------------------------------------------------------------
       - name: Kumpulkan bukti kegagalan (anotasi + artifact)
         if: always()
