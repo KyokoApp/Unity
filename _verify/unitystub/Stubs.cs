@@ -110,7 +110,8 @@ namespace UnityEngine
     public struct Touch { public int fingerId; public Vector2 position; public TouchPhase phase; }
     public class Camera : Behaviour { public CameraClearFlags clearFlags; public float nearClipPlane, farClipPlane, fieldOfView;
         public Color backgroundColor; public static Camera main=>null;
-        public RenderTexture targetTexture; public void Render(){} }
+        public RenderTexture targetTexture; public void Render(){}
+        public void AddCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveCommandBuffer(Rendering.CommandBuffer c){} }
     public enum CameraClearFlags { Skybox, SolidColor, Depth, Nothing }
     public class Light : Behaviour { public LightType type; public Color color; public float intensity; public LightShadows shadows; }
     public enum LightType { Directional, Point, Spot, Area } public enum LightShadows { None, Hard, Soft }
@@ -150,7 +151,11 @@ namespace UnityEngine
         public bool IsPointerOverGameObject()=>false; public bool IsPointerOverGameObject(int id)=>false; }
         public class StandaloneInputModule : Behaviour {} }
     namespace Rendering {
-        public enum AmbientMode { Skybox, Trilight, Flat, Custom }
+        public enum CameraEvent { AfterForwardOpaque, BeforeForwardOpaque }
+    public class CommandBuffer : System.IDisposable { public string name;
+        public void DrawMeshInstanced(UnityEngine.Mesh m,int sub,UnityEngine.Material mat,int pass,UnityEngine.Matrix4x4[] matrices,int count){}
+        public void Dispose(){} }
+    public enum AmbientMode { Skybox, Trilight, Flat, Custom }
         public enum ShadowCastingMode { Off, On, TwoSided, ShadowsOnly }
         public enum IndexFormat { UInt16, UInt32 } }
 }

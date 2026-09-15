@@ -24,6 +24,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace RPG.Editor
 {
@@ -68,10 +69,25 @@ namespace RPG.Editor
                     if (grass != null) { grass.PopulateNow(); }
 
                     ComposeCamera(cam, target);
-                    grass?.DrawNow();
 
-                    var path = Path.Combine(Folder, $"ingame-{Nama[i]}.png");
-                    if (RenderToPng(cam, path, 1280, 720)) jadi++;
+                    /* Rumput lewat CommandBuffer supaya pasti ikut dalam
+                       render manual (lihat catatan di GrassField.DrawInto). */
+                    CommandBuffer cmd = null;
+                    if (grass != null)
+                    {
+                        cmd = new CommandBuffer { name = "AureliaGrassShot" };
+                        grass.DrawInto(cmd);
+                        cam.AddCommandBuffer(CameraEvent.AfterForwardOpaque, cmd);
+                    }
+                    try
+                    {
+                        var path = Path.Combine(Folder, $"ingame-{Nama[i]}.png");
+                        if (RenderToPng(cam, path, 1280, 720)) jadi++;
+                    }
+                    finally
+                    {
+                        if (cmd != null) cam.RemoveCommandBuffer(cmd);
+                    }
                 }
 
                 /* Kembalikan realtime supaya build player (dan game-nya

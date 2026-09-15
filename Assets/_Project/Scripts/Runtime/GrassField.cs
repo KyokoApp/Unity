@@ -131,6 +131,29 @@ namespace RPG.Runtime
             Flush();
         }
 
+        /* Untuk screenshot batchmode: DrawMeshInstanced yang dipanggil
+           "apa adanya" hanya ikut pada render frame berikutnya, dan di
+           edit mode tidak ada frame berikutnya sebelum cam.Render().
+           Lewat CommandBuffer, perintah gambarnya MENEMPEL di kamera,
+           jadi pasti ikut saat kamera dirender manual. */
+        public void DrawInto(UnityEngine.Rendering.CommandBuffer cmd)
+        {
+            if (!_on || _clump == null || GrassMaterial == null || Target == null || cmd == null) return;
+            RefreshCells(Target.position, false);
+            _batchN = 0;
+            foreach (var kv in _cells)
+            {
+                var arr = kv.Value;
+                for (var i = 0; i < arr.Length; i++)
+                {
+                    _batch[_batchN++] = arr[i];
+                    if (_batchN == 1023) { cmd.DrawMeshInstanced(_clump, 0, GrassMaterial, 0, _batch, _batchN); _batchN = 0; }
+                }
+            }
+            if (_batchN > 0) cmd.DrawMeshInstanced(_clump, 0, GrassMaterial, 0, _batch, _batchN);
+            _batchN = 0;
+        }
+
         void Flush()
         {
             if (_batchN == 0) return;
