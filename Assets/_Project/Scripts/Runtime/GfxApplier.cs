@@ -80,7 +80,14 @@ namespace RPG.Runtime
             var r = GfxResolver.Resolve(s, true); // isTouch = true untuk Android
 
             // Shadows
-            QualitySettings.shadows = r.ShadowsEnabled ? ShadowQuality.All : ShadowQuality.Disable;
+            // HARUS ditulis penuh UnityEngine.ShadowQuality: Unity punya
+            // UnityEngine.ShadowQuality { Disable, HardOnly, All } (tipe dari
+            // QualitySettings.shadows) DAN URP punya UnityEngine.Rendering.Universal.ShadowQuality
+            // { Disabled, HardShadows, SoftShadows } yang ANGGOTA-NYA BERBEDA.
+            // Berkas ini meng-import kedua namespace, jadi nama telanjang berarti
+            // CS0104 'ambiguous reference' -- dan itu yang membunuh build
+            // v0.2.0-cel-fix6..fix10 (tujuh build, satu baris ini).
+            QualitySettings.shadows = r.ShadowsEnabled ? UnityEngine.ShadowQuality.All : UnityEngine.ShadowQuality.Disable;
             if (Sun != null)
             {
                 Sun.shadows = r.ShadowsEnabled ? LightShadows.Soft : LightShadows.None;

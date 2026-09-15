@@ -101,6 +101,12 @@ namespace UnityEngine
         public delegate void LogCallback(string condition, string stackTrace, LogType type);
         public static event LogCallback logMessageReceivedThreaded;
         public static event LogCallback logMessageReceived; }
+    // Sesuai dokumen Unity: enum ini ada di UnityEngine (QualitySettings.shadows,
+    // Light.shadows memakainya). URP mendefinisikan enum SENAMA di
+    // UnityEngine.Rendering.Universal dengan ANGGOTA BERBEDA -- lihat decoy di
+    // blok URP di bawah. Stub yang menaruh jenis di namespace yang salah adalah
+    // cara harness ini menyembunyikan CS0104 dari kita selama tujuh build.
+    public enum ShadowQuality { Disable, HardOnly, All }
     public enum LogType { Error, Assert, Warning, Log, Exception }
     public static class PlayerPrefs { public static bool HasKey(string k)=>false; public static float GetFloat(string k)=>0f;
         public static int GetInt(string k)=>0; public static string GetString(string k)=>null; public static void SetFloat(string k,float v){}
@@ -192,7 +198,6 @@ namespace UnityEngine
     public enum AmbientMode { Skybox, Trilight, Flat, Custom }
         public enum ShadowCastingMode { Off, On, TwoSided, ShadowsOnly }
         public enum IndexFormat { UInt16, UInt32 }
-        public enum ShadowQuality { Disable, HardOnly, All }
         public enum ShadowResolution { _256=256, _512=512, _1024=1024, _2048=2048, _4096=4096 }
         // TANDA TANGAN DICOKEK API UNITY 6 (6000.0), bukan dikarang:
         //   GraphicsSettings.GetSettingsForRenderPipeline<T>() -> RenderPipelineGlobalSettings
@@ -219,7 +224,7 @@ namespace UnityEngine
         public static string[] names=>new string[0];
         public static int GetQualityLevel()=>0;
         public static void SetQualityLevel(int i,bool b){}
-        public static Rendering.ShadowQuality shadows;
+        public static ShadowQuality shadows;
         public static Rendering.ShadowResolution shadowResolution;
     }
     public static class Resources {
@@ -236,6 +241,12 @@ namespace UnityEngine.Rendering.Universal
         public float renderScale=1f;
     }
     public class PostProcessData : ScriptableObject {}
+    // DECOY, sengaja: URP punya UnityEngine.Rendering.Universal.ShadowQuality
+    // { Disabled, HardShadows, SoftShadows } -- tabrakan nama dengan
+    // UnityEngine.ShadowQuality. Berkas yang meng-import kedua namespace lalu
+    // menulis `ShadowQuality.All` harus kena CS0104 di sini juga, bukan baru
+    // meledak di Unity 12 menit kemudian.
+    public enum ShadowQuality { Disabled, HardShadows, SoftShadows }
     public class UniversalAdditionalCameraData : Component { }
     public class UniversalAdditionalLightData : Component { }
     public class UniversalRenderPipelineGlobalSettings : UnityEngine.Rendering.RenderPipelineGlobalSettings {}
