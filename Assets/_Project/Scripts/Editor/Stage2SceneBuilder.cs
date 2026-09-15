@@ -33,6 +33,10 @@ namespace RPG.Editor
 {
     public static class Stage2SceneBuilder
     {
+        /* Padang rumput heartlands, jauh dari badan jalan mana pun. */
+        public const float SpawnX = 24f;
+        public const float SpawnZ = 30f;
+
         public const string ScenePath      = "Assets/_Project/Scenes/Tahap2.unity";
         public const string Scene3Path     = "Assets/_Project/Scenes/Tahap3.unity";
         public const string ShaderFolder   = "Assets/_Project/Shaders";
@@ -118,7 +122,11 @@ namespace RPG.Editor
                "karakter bisa jalan", bukan "dunia terlihat" (itu Tahap 3).
                Tingginya diambil dari WorldData supaya karakter berdiri di
                angka yang benar, bukan di y=0 karangan. */
-            var groundY = (float)WorldData.TerrainH(0, 0);
+            /* Spawn SENGAJA tidak di (0,0): titik itu persimpangan dua jalur
+               jalan (WorldData.Intersection(0,0)), jadi tanah di sekitarnya
+               berwarna badan jalan dan kesan pertama pemain = padang pasir.
+               Geser ke padang rumput heartlands. */
+            var groundY = (float)WorldData.TerrainH(SpawnX, SpawnZ);
             /* Bidang datar ini alat uji Tahap 2 ("karakter bisa jalan").
                Di scene Tahap 3 ia justru berbahaya: bidang 120x120 m yang
                memotong bukit bisa menutupi terrain asli dari sudut kamera
@@ -146,7 +154,7 @@ namespace RPG.Editor
             camGo.AddComponent<AudioListener>();
             var rig = camGo.AddComponent<CameraRig>();
             if (charGo != null) rig.Target = charGo.transform;
-            camGo.transform.position = new Vector3(0f, groundY + 2.5f, -6f);
+            camGo.transform.position = new Vector3(SpawnX, groundY + 2.5f, SpawnZ - 6f);
             camGo.tag = "MainCamera";
 
             // ---- EventSystem (dipakai CameraRig.IsPointerOverUi) ----------
@@ -229,7 +237,7 @@ namespace RPG.Editor
             sb.AppendLine($"  tersimpan di : {scenePath}");
             sb.AppendLine(withTerrain
                 ? $"  tanah        : terrain streaming (heightfield WorldData), spawn y={groundY:F2}"
-                : $"  tanah        : bidang datar 120x120 m di y={groundY:F2} (dari WorldData.TerrainH(0,0))");
+                : $"  tanah        : bidang datar 120x120 m di y={groundY:F2} (dari WorldData.TerrainH(Spawn))");
             sb.AppendLine($"  karakter     : {(charGo == null ? "TIDAK ADA — lihat catatan" : charGo.name)}");
             sb.AppendLine();
             sb.AppendLine("Kontrol:");
@@ -355,7 +363,7 @@ namespace RPG.Editor
                           "    tunggu impor selesai -> jalankan menu ini lagi.");
             }
 
-            instance.transform.position = new Vector3(0f, groundY, 0f);
+            instance.transform.position = new Vector3(SpawnX, groundY, SpawnZ);
             /* VRM dijamin menghadap +Z (spec VRM). CharacterMotor memakai
                yaw = atan2(x, z), jadi tanpa putaran tambahan karakter sudah
                menghadap arah yang benar. */

@@ -156,10 +156,12 @@ Shader "Aurelia/Terrain"
             #pragma target 2.0
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            /* Common.hlsl DEFINSI LerpWhiteTo yang dipakai Shadows.hlsl(327).
-               Tanpa include eksplisit ini, pass ShadowCaster gagal kompilasi
-               di glcore & gles3 (run 34944558100) walau pass utama sehat. */
-            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+            /* Bug Unity terdokumentasi: Shadows.hlsl memakai LerpWhiteTo
+               yang baru dideklarasikan rantai Lighting.hlsl. Tanpa include
+               Lighting.hlsl lebih dulu, pass ShadowCaster gagal kompilasi di
+               SEMUA platform (run 34944558100 & 34946050028) walau pass
+               utama sehat. Include guard membuat dobel-include aman. */
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
             // cbuffer yang sama dengan Pass utama -- wajib, lihat catatan
             // di AureliaTerrainInput.hlsl

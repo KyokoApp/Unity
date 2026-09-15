@@ -15,6 +15,7 @@ namespace UnityEngine
         public static Vector3 forward=>default; public static Vector3 right=>default; public static Vector3 up=>default;
         public static Vector3 operator -(Vector3 a)=>default;
         public float magnitude=>0f; public Vector3 normalized=>this; public static Vector3 zero=>default;
+        public static float Distance(Vector3 a,Vector3 b)=>0f;
         public static Vector3 operator*(Vector3 a,float k)=>default; public static Vector3 operator*(float k,Vector3 a)=>default;
         public static Vector3 operator/(Vector3 a,float k)=>default; public static Vector3 operator+(Vector3 a,Vector3 b)=>default;
         public static Vector3 operator-(Vector3 a,Vector3 b)=>default;
@@ -35,7 +36,7 @@ namespace UnityEngine
         public static float Cos(float a)=>0f; public static float Sin(float a)=>0f; public static float Sqrt(float a)=>0f;
         public static float Abs(float a)=>a; public static float Clamp(float v,float a,float b)=>v;
         public static float Clamp01(float v)=>v; public static float Max(float a,float b)=>a; public static float Min(float a,float b)=>a;
-        public static float DeltaAngle(float a,float b)=>0f; public static int RoundToInt(float v)=>0; public static float Exp(float v)=>0f;
+        public static float DeltaAngle(float a,float b)=>0f; public static int RoundToInt(float v)=>0; public static float SmoothStep(float a,float b,float t)=>0f; public static float Exp(float v)=>0f;
         public static float Atan2(float y,float x)=>0f;
         public static int Max(int a,int b)=>a; public static int Min(int a,int b)=>a;
         public static float Round(float v)=>v;

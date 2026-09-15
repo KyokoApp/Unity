@@ -237,7 +237,7 @@ namespace RPG.Runtime
                     var dx = (x + 0.5f) * CellSize - p.x;
                     var dz = (z + 0.5f) * CellSize - p.z;
                     if (dx * dx + dz * dz > r2) continue;
-                    var cell = PlaceCell(x, z);
+                    var cell = PlaceCell(x, z, p);
                     if (cell.Length > 0) _cells[Key(x, z)] = cell;
                 }
             }
@@ -245,13 +245,22 @@ namespace RPG.Runtime
 
         static long Key(int x, int z) => ((long)x << 32) | (uint)z;
 
-        Matrix4x4[] PlaceCell(int cx, int cz)
+        Matrix4x4[] PlaceCell(int cx, int cz, Vector3 focus)
         {
-            var list = new List<Matrix4x4>(_perCell);
+            /* Hamparan padat di dekat pemain lalu menipis ke arah tepi —
+               caranya membagi anggaran instance yang SAMA, supaya kesan
+               "padang rumput" terbaca tanpa menambah biaya GPU. Bagian jauh
+               toh tenggelam oleh fade & kabut. */
+            var ccx = (cx + 0.5f) * CellSize;
+            var ccz = (cz + 0.5f) * CellSize;
+            var d = Vector3.Distance(new Vector3(ccx, 0f, ccz), new Vector3(focus.x, 0f, focus.z));
+            var t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(d / Radius));
+            var count = Mathf.Max(3, Mathf.RoundToInt(_perCell * Mathf.Lerp(2.6f, 0.30f, t)));
+            var list = new List<Matrix4x4>(count);
             var ox = cx * CellSize;
             var oz = cz * CellSize;
 
-            for (var i = 0; i < _perCell; i++)
+            for (var i = 0; i < count; i++)
             {
                 var hx = Hash3(cx, cz, i * 3);
                 var hz = Hash3(cx, cz, i * 3 + 1);
@@ -299,12 +308,12 @@ namespace RPG.Runtime
             var uvs    = new List<Vector2>();
             var tris   = new List<int>();
 
-            for (var b = 0; b < 3; b++)
+            for (var b = 0; b < 4; b++)
             {
-                var yaw   = b * 120f + b * 17f;
-                var tilt  = 14f + b * 6f;
-                var h     = 0.30f + b * 0.06f;
-                var w     = 0.045f;
+                var yaw   = b * 90f + b * 17f;
+                var tilt  = 14f + b * 5f;
+                var h     = 0.30f + b * 0.05f;
+                var w     = 0.05f;
                 var rot   = Quaternion.Euler(0f, yaw, 0f);
                 var lean  = Quaternion.Euler(0f, 0f, tilt);
                 var fwd   = rot * lean * Vector3.forward;
