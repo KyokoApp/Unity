@@ -123,18 +123,15 @@ def main():
         if not good: print("        -> shader akan ditandai 'SRP Batcher: not compatible'")
         ok &= good
 
-    print()
-    # --- cek 7: nama parameter fungsi tidak boleh keyword HLSL (in/out) ---
-import re as _re
-bad = []
-for m in _re.finditer(r"(Attributes|Varyings)\s+(in|out)\s*\)", src):
-    bad.append(m.group(0))
-if bad:
-    gagal.append(f"parameter fungsi memakai keyword HLSL: {bad} -- ganti nama (mis. i/v)")
-else:
-    print("  [ok] tidak ada parameter fungsi bernama keyword HLSL (in/out)")
+        # --- cek 7: nama parameter fungsi tidak boleh keyword HLSL (in/out) ---
+        bad = [m.group(0) for m in re.finditer(r"(Attributes|Varyings)\s+(in|out)\s*\)", s)]
+        if bad:
+            print(f"  [GAGAL] parameter fungsi memakai keyword HLSL: {bad} -- ganti nama (mis. i/v)")
+            ok = False
+        else:
+            print("  [ok] tidak ada parameter fungsi bernama keyword HLSL (in/out)")
 
-print("SEMUA CEK LULUS" if ok else "ADA YANG GAGAL")
+    print("SEMUA CEK LULUS" if ok else "ADA YANG GAGAL")
     return 0 if ok else 1
 
 if __name__ == "__main__":
