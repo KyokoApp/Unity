@@ -249,6 +249,11 @@ namespace UnityEngine.Rendering.Universal
     public enum ShadowQuality { Disabled, HardShadows, SoftShadows }
     public class UniversalAdditionalCameraData : Component { }
     public class UniversalAdditionalLightData : Component { }
-    public class UniversalRenderPipelineGlobalSettings : UnityEngine.Rendering.RenderPipelineGlobalSettings {}
+    // SENGAJA internal, meniru URP 17: di versi itu tipe ini tidak lagi publik,
+    // jadi pemakaian bertipe dari assembly lain harus berbunyi CS0122 -- persis
+    // error yang membunuh build v0.2.0-cel-fix11 dan tidak pernah terlihat di
+    // harness lama. Di UnityStubCheck (satu assembly) ini tetap longgar; di
+    // _verify/asmdef/split_asmdefs.py (per-assembly, seperti Unity) ini menggigit.
+    internal class UniversalRenderPipelineGlobalSettings : UnityEngine.Rendering.RenderPipelineGlobalSettings {}
     public class UniversalRenderPipeline : UnityEngine.Rendering.RenderPipeline {}
 }

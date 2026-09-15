@@ -119,32 +119,49 @@ namespace RPG.Editor
                 }
             }
 
-            // --- 3. GlobalSettings (URP 17 wajib) ---
+            // --- 3. GlobalSettings ---
+            // URP 17 TIDAK lagi menyediakan UniversalRenderPipelineGlobalSettings sebagai
+            // tipe PUBLIK: halaman API-nya hilang di dokumen 17.0 (di 14.0 masih ada), dan
+            // menulis nama tipenya dari sini menghasilkan
+            //     error CS0122: 'UniversalRenderPipelineGlobalSettings' is inaccessible
+            //     due to its protection level
+            // yang membunuh RPG.Editor lalu seluruh build (run v0.2.0-cel-fix11).
+            // Jadi: cari lewat FILTER STRING dan buat lewat REFLEKSI. Keduanya tidak
+            // peduli pada aksesibilitas tipe, jadi skrip ini tetap kompilasi di URP 14,
+            // 15, 17 dan seterusnya -- sementara akses bertipe akan pecah tiap kali URP
+            // memindahkan atau menyembunyikan kelasnya.
             try
             {
-                var global = GraphicsSettings.GetSettingsForRenderPipeline<UniversalRenderPipeline>() as UniversalRenderPipelineGlobalSettings;
+                var basePath = "Assets/UniversalRenderPipelineGlobalSettings.asset";
+                var found = AssetDatabase.FindAssets("t:UniversalRenderPipelineGlobalSettings");
+                var targetPath = found.Length > 0 ? AssetDatabase.GUIDToAssetPath(found[0]) : null;
+                if (targetPath == null && File.Exists(basePath)) targetPath = basePath;
+
+                UnityEngine.Object global = null;
+                if (targetPath != null)
+                    global = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(targetPath);
+
                 if (global == null)
                 {
-                    var guids = AssetDatabase.FindAssets("t:UniversalRenderPipelineGlobalSettings");
-                    if (guids.Length > 0)
+                    var settingsType = System.Type.GetType(
+                        "UnityEngine.Rendering.Universal.UniversalRenderPipelineGlobalSettings, " +
+                        "Unity.RenderPipelines.Universal.Runtime");
+                    if (settingsType != null)
                     {
-                        var path = AssetDatabase.GUIDToAssetPath(guids[0]);
-                        global = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineGlobalSettings>(path);
-                    }
-                }
-                if (global == null)
-                {
-                    var defaultPath = "Assets/UniversalRenderPipelineGlobalSettings.asset";
-                    if (!File.Exists(defaultPath))
-                    {
-                        var newGlobal = ScriptableObject.CreateInstance<UniversalRenderPipelineGlobalSettings>();
-                        AssetDatabase.CreateAsset(newGlobal, defaultPath);
-                        global = newGlobal;
-                        Debug.Log($"[Aurelia] GlobalSettings dibuat: {defaultPath}");
+                        var fresh = ScriptableObject.CreateInstance(settingsType);
+                        AssetDatabase.CreateAsset(fresh, basePath);
+                        AssetDatabase.SaveAssets();
+                        global = fresh;
+                        Debug.Log($"[Aurelia] GlobalSettings dibuat lewat refleksi: {basePath}");
                     }
                     else
                     {
-                        global = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineGlobalSettings>(defaultPath);
+                        // Bukan fatal: URP punya postprocessor yang membuat aset ini sendiri
+                        // saat aset URP diimpor. Kita cuma tidak boleh pura-pura sukses.
+                        Debug.LogWarning("[Aurelia] Tipe UniversalRenderPipelineGlobalSettings tidak ditemukan di " +
+                                         "assembly URP yang dimuat -- GlobalSettings tidak kita buat. " +
+                                         "URP biasanya membuatnya sendiri saat impor; kalau build berikutnya " +
+                                         "layar hitam, buat manual: Assets > Create > Rendering > URP Global Settings.");
                     }
                 }
                 if (global != null) EditorUtility.SetDirty(global);
