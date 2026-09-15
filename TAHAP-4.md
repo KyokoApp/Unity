@@ -69,3 +69,25 @@ Dua baris baru: `rumput: N rumpun, M sel` dan `waktu H.H (suasana)`.
   yang membaca/menulis `SettingsStore`.
 - **Tahap 7**: langit sungguhan, bayangan berkualitas, tier perangkat
   berdasarkan angka fps yang terkumpul dari PerfHud.
+
+## Hasil akhir (build ke-17, run 34947616844, head c840201)
+
+- Screenshot CI membuktikan: siang = padang rumput hijau cerah, senja =
+  cahaya oranye hangat, malam = biru gelap dengan siluet rumput.
+- Rumput: rumpun 4 bilah, instanced, densitas jatuh menurut jarak
+  (padat di dekat pemain, menipis ke tepi radius 30 m) sehingga anggaran
+  instance ~2 ribu tetap terbaca sebagai hamparan, bukan titik-titik.
+- Spawn karakter DIPINDAH dari (0,0) — titik itu persimpangan dua jalur
+  jalan dunia, jadi tanah di sekitarnya berwarna badan jalan (kesan
+  pertama = padang pasir). Spawn baru (24, 30) di padang heartlands.
+- Perbaikan bug yang ditemukan lewat screenshot CI:
+  1. `Awake()` tidak dijamin jalan di edit mode → `EnsureInit()` idempoten.
+  2. `Mesh.colors` yang tak diisi = array kosong (bukan null) → crash telan
+     di try/catch, screenshot diam-diam kosong.
+  3. `in` adalah keyword HLSL terlarang sebagai nama parameter shader →
+     rumput magenta di semua platform.
+  4. Pass ShadowCaster terrain: bug Unity terdokumentasi, Shadows.hlsl
+     butuh Lighting.hlsl diinclude lebih dulu (LerpWhiteTo).
+  5. CommandBuffer kamera diam-diam diabaikan URP → screenshot memakai
+     mesh bake world-space (GrassField.BakeInto), play mode tetap
+     DrawMeshInstanced.
