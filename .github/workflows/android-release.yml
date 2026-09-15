@@ -522,6 +522,65 @@ jobs:
           mkdir -p release && cp "$APK" "release/aurelia-${VER}-arm64.apk"
           ls -la release/
 
+      # ------------------------------------------------------------
+      # BUKTI SUDAH DIPINJAM: siapa yang menandatangani APK ini?
+      #
+      # Semua "harus uninstall dulu / app not installed" bermuara ke satu hal:
+      # apakah kunci penandatangan SAMA antar build. Kalau langkah 'Siapkan
+      # keystore tetap' diam-diam jatuh ke debug keystore, APK-nya tetap hijau
+      # dan tetap bisa diunduh -- yang gagal adalah INSTALASI di HP, dan itu
+      # tidak kelihatan dari CI sama sekali. Jadi sertifikat di dalam APK dibaca
+      # di sini dan dikeluarkan sebagai anotasi: CN=yuki = kunci repo; kalau
+      # muncul CN=Android Debug, berarti fallback debug yang kepakai.
+      # ------------------------------------------------------------
+      - name: Verifikasi penandatangan APK
+        run: |
+          set +e
+          # Path ABSOLUT: langkah ini beberapa kali berpindah direktori, dan
+          # OLDPWD hanya menyimpan direktor SEBELUM cd terakhir -- mengandalkannya
+          # untuk "$OLDPWD/$APK" akan menunjuk ke /tmp dan diam-diam tidak
+          # menemukan apa-apa.
+          APK=$(find "$GITHUB_WORKSPACE/build" -name '*.apk' | head -1)
+          [ -f "$APK" ] || { echo "::warning::tidak ada APK untuk diverifikasi"; exit 0; }
+          cd /tmp && rm -rf sigchk && mkdir sigchk && cd sigchk
+          unzip -o -q "$APK" 'META-INF/*' 2>/dev/null
+          CERT=$(ls META-INF/*.RSA META-INF/*.DSA 2>/dev/null | head -1)
+          if [ -z "$CERT" ]; then
+            echo "::error::tidak ada blok sertifikat di APK -> kemungkinan unsigned; tidak akan bisa dipasang"
+            exit 1
+          fi
+          openssl pkcs7 -inform DER -in "$CERT" -print_certs -noout > c.pem 2>/dev/null
+          SUBJ=$(openssl x509 -in c.pem -noout -subject -issuer -dates 2>/dev/null | tr '\n' ' ')
+          echo "penandatangan: $SUBJ"
+          echo "::notice::APK ditandatangani: ${SUBJ:0:240}"
+          case "$SUBJ" in
+            *"Android Debug"*) echo "::error::APK ditandatangani debug key (CN=Android Debug) -> tiap build kunci baru -> install timpa akan DITOLAK. Isi secret ANDROID_KEYSTORE_* atau pastikan keystore/release.keystore terpakai.";;
+            *"CN = yuki"*|*"CN=yuki"*) echo "OK: kunci release repo dipakai; update antar build bisa dipasang tanpa uninstall.";;
+            *) echo "::warning::penandatangan bukan CN=yuki -- periksa langkah 'Siapkan keystore tetap' (output: pakai=repo/secret/debug).";;
+          esac
+          # Skema v2 = yang dipakai Android 11+; APK yang cuma punya META-INF (v1)
+          # sering ditolak diam-diam di Android baru. Magic 'APK Sig Block 42' duduk
+          # tepat sebelum Central Directory, jadi cukup dilihat di ekor berkas.
+          if tail -c 4096 "$APK" | grep -qa 'APK Sig Block 42'; then
+            echo "v2 signing block: ADA"
+          else
+            echo "::warning::tidak ditemukan APK Signing Block -> hanya skema v1; di Android 11+ ini bisa ditolak"
+          fi
+          unzip -l "$APK" | grep -c 'META-INF' | xargs echo "entri META-INF:"
+          cd /tmp && rm -rf sigchk
+          openssl pkcs7 -inform DER -in "$CERT" -print_certs -noout > c.pem 2>/dev/null
+          SUBJ=$(openssl x509 -in c.pem -noout -subject -issuer -dates 2>/dev/null | tr '\n' ' ')
+          echo "penandatangan: $SUBJ"
+          echo "::notice::APK ditandatangani: ${SUBJ:0:240}"
+          case "$SUBJ" in
+            *"Android Debug"*) echo "::error::APK ditandatangani debug key (CN=Android Debug) -> tiap build kunci baru -> install timpa akan DITOLAK. Isi secret ANDROID_KEYSTORE_* atau pastikan keystore/release.keystore terpakai.";;
+            *"CN = yuki"*|*"CN=yuki"*) echo "OK: kunci release repo dipakai; update antar build bisa dipasang tanpa uninstall.";;
+            *) echo "::warning::penandatangan bukan CN=yuki -- periksa langkah 'Siapkan keystore tetap' (output: pakai=repo/secret/debug).";;
+          esac
+          # Skema v2/v3 = yang dipakai Android 11+; kalau cuma ada META-INF (v1),
+          # instalasi di Android baru bisa gagal meski APK-nya "berhasil dibangun".
+          unzip -l "$APK" | grep -c "META-INF" | xargs echo "jumlah entri META-INF:"
+
       # Artifact hanya bisa diunduh orang yang punya akses repo.
       # Ini jalur unduh yang AMAN walau repo masih publik.
       - uses: actions/upload-artifact@v4
