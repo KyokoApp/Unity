@@ -158,6 +158,12 @@ namespace RPG.Runtime
             RefreshCells(Target.position, false);
             var sv = _clump.vertices; var su = _clump.uv; var sc = _clump.colors; var st = _clump.triangles;
             if (sv == null || st == null) return 0;
+            /* Mesh.colors yang TIDAK pernah diisi mengembalikan array KOSONG
+               di Unity (bukan null) — menyalin sc[i] langsung meledak dengan
+               IndexOutOfRangeException (kejadian di run 34943282165).
+               Warna vertex memang opsional: shader memakai uv untuk gradasi. */
+            var hasC = sc != null && sc.Length == sv.Length;
+            var hasU = su != null && su.Length == sv.Length;
             var perV = sv.Length; var perT = st.Length;
             var n = 0; foreach (var kv in _cells) n += kv.Value.Length;
             if (n == 0 || perV == 0) return 0;
@@ -167,7 +173,13 @@ namespace RPG.Runtime
             {
                 foreach (var m in kv.Value)
                 {
-                    for (var i = 0; i < perV; i++) { V[vi] = m.MultiplyPoint3x4(sv[i]); U[vi] = su[i]; C[vi] = sc[i]; vi++; }
+                    for (var i = 0; i < perV; i++)
+                    {
+                        V[vi] = m.MultiplyPoint3x4(sv[i]);
+                        U[vi] = hasU ? su[i] : Vector2.zero;
+                        C[vi] = hasC ? sc[i] : Color.white;
+                        vi++;
+                    }
                     for (var i = 0; i < perT; i++) T[ti++] = st[i] + baseV;
                     baseV += perV;
                 }
