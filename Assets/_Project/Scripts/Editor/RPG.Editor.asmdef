@@ -1,17 +1,17 @@
 {
-    "name": "RPG.Runtime",
-    "rootNamespace": "RPG.Runtime",
+    "name": "RPG.Editor",
+    "rootNamespace": "RPG.Editor",
     "references": [
         "RPG.Core",
+        "RPG.Runtime",
         "Unity.RenderPipelines.Universal.Runtime",
-        "Unity.InputSystem",
-        "glTFast",
-        "Unity.Addressables",
         "UnityEngine.UI"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
-    "allowUnsafeCode": true,
+    "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,

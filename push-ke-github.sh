@@ -58,8 +58,9 @@ git push -u origin main
 say "selesai"
 echo "    Buka https://github.com/KyokoApp/Unity untuk memastikan isinya masuk."
 echo
-echo "    Langkah berikutnya (lihat DESAIN.md):"
+echo "    Langkah berikutnya (lihat CARA-PAKAI.md, TAHAP-2.md, TAHAP-3.md):"
 echo "      1. Buka folder ini di Unity Hub (Unity 6000.0.32f1)"
-echo "      2. Buat URP Asset + Universal Renderer, pasang di Graphics & Quality"
-echo "      3. Window → General → Test Runner → EditMode  (harus 7/7 hijau)"
-echo "      4. Baru lanjut Tahap 2: character controller + kamera"
+echo "      2. Tools → Aurelia → 1. Buat URP Asset"
+echo "      3. Window → General → Test Runner → EditMode  (harus 42/42 hijau)"
+echo "      4. Tools → Aurelia → 4. Bangun scene Tahap 3 (dunia terlihat)"
+echo "      5. Tekan Play — karakter jalan, terrain mengalir, air bergerak"

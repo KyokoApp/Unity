@@ -17,6 +17,10 @@
 .vs/
 .idea/
 .consulo/
+# CATATAN: tiga pola di bawah ini untuk file yang DIHASILKAN Unity
+# (Assembly-CSharp.csproj, Project.sln, dst) -- memang jangan ikut di repo.
+# Tapi harness di _verify/ menulis .csproj-nya sendiri dengan tangan; itu
+# kode sumber. Pengecualiannya ada di bagian "_verify" di bawah file ini.
 *.csproj
 *.unityproj
 *.sln
@@ -45,3 +49,24 @@ Thumbs.db
 *.wav
 *.mp3
 *.ogg
+
+# ============================================================
+# Model karakter berlisensi "Redistribution_Prohibited"
+# JANGAN masuk git — repo ini publik. File-nya cuma ada di
+# disk lokal tiap orang yang punya lisensinya.
+# Lihat Assets/Art/Characters/LISENSI.md
+# ============================================================
+/Assets/Art/Characters/*.vrm
+/Assets/Art/Characters/*.vrm.meta
+/Assets/Art/Characters/*.glb
+/Assets/Art/Characters/*.fbx
+/Assets/Art/Characters/Textures/
+/Assets/Art/Characters/*.prefab
+/Assets/Art/Characters/*.prefab.meta
+
+# Hasil build harness verifikasi (dotnet)
+_verify/**/bin/
+_verify/**/obj/
+# ...tapi .csproj harness BUKAN hasil generate Unity, jadi jangan di-ignore.
+# Tanpa baris ini verify.yml gagal di CI: "project file not found".
+!_verify/**/*.csproj
