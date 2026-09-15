@@ -86,7 +86,7 @@ namespace RPG.Editor
                     }
                     finally
                     {
-                        if (cmd != null) cam.RemoveCommandBuffer(cmd);
+                        if (cmd != null) cam.RemoveCommandBuffer(CameraEvent.AfterForwardOpaque, cmd);
                     }
                 }
 

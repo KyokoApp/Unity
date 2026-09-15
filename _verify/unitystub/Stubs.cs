@@ -111,7 +111,7 @@ namespace UnityEngine
     public class Camera : Behaviour { public CameraClearFlags clearFlags; public float nearClipPlane, farClipPlane, fieldOfView;
         public Color backgroundColor; public static Camera main=>null;
         public RenderTexture targetTexture; public void Render(){}
-        public void AddCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveCommandBuffer(Rendering.CommandBuffer c){} }
+        public void AddCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveAllCommandBuffers(){} }
     public enum CameraClearFlags { Skybox, SolidColor, Depth, Nothing }
     public class Light : Behaviour { public LightType type; public Color color; public float intensity; public LightShadows shadows; }
     public enum LightType { Directional, Point, Spot, Area } public enum LightShadows { None, Hard, Soft }
