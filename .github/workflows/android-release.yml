@@ -87,6 +87,29 @@ jobs:
         with:
           lfs: true
 
+      # ------------------------------------------------------------
+      # Runner GitHub hanya MENJAMIN 14 GB disk. Image Unity untuk Android
+      # berisi lib IL2CPP untuk SEMUA arsitektur (termasuk armeabi-v7a yang
+      # tidak kita pakai), dan saat layer Docker-nya diekstrak butuh lebih
+      # dari 14 GB. Build pertama gagal persis di situ:
+      #   docker: failed to register layer: ...armeabi-v7a/libunityruntime.a
+      #   no space left on device
+      #
+      # Jadi: buang software bawaan runner yang tidak dipakai job ini,
+      # SEBELUM game-ci menarik image. Job ini tidak butuh dotnet/Android
+      # SDK/ghc di host -- semuanya jalan di dalam container Unity.
+      # ------------------------------------------------------------
+      - name: Bebaskan ruang disk runner
+        run: |
+          df -h /
+          sudo swapoff -a || true
+          sudo rm -f /swapfile || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /opt/hostedtoolcache /usr/local/share/boost
+          sudo apt-get clean || true
+          sudo docker system prune -af || true
+          df -h /
+
       # Cache Library/ -- tanpa ini setiap build mengimpor ulang semua aset
       # dari nol (~15-25 menit tambahan).
       - uses: actions/cache@v4
@@ -178,6 +201,10 @@ jobs:
             -androidBuildSystem Gradle
             -androidArchitecture ARM64
             -androidCreateSymbols Disabled
+
+      - name: Ruang disk setelah build
+        if: always()
+        run: df -h /
 
       # AureliaBuildPreprocessor membangun scene + mendaftarkannya sebelum
       # build. Kalau ia gagal, APK-nya kosong -- jadi periksa di sini.
