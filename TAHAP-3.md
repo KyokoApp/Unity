@@ -344,8 +344,9 @@ kurang, **yang dilihat pertama adalah karakter, bukan tanah.**
 
 ## Cara menjalankan
 
-Prasyarat Tahap 2 (Active Input Handling = **Both**, URP Asset, karakter VRM
-sudah diimpor) tetap berlaku. Lihat `TAHAP-2.md` bagian "Cara menjalankan".
+Prasyarat Tahap 2 (Active Input Handling = **Input Manager (Old)**, URP Asset,
+karakter VRM sudah diimpor) tetap berlaku. Lihat `TAHAP-2.md` bagian "Cara
+menjalankan".
 
 ### 1. Bangun scene
 

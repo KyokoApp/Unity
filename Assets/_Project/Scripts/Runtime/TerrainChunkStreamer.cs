@@ -415,18 +415,18 @@ namespace RPG.Runtime
                 /* UploadMeshData(true) sudah membuang salinan CPU, jadi mesh bekas
                    ini tetap bisa dipakai ulang sebagai wadah — datanya ditulis
                    ulang sepenuhnya oleh FillMesh. */
-                if (_pool.Count < 64) _pool.Push(m); else Destroy(m);
+                if (_pool.Count < 64) _pool.Push(m); else ObjectUtil.SafeDestroy(m);
             }
             _active.Remove(key);
-            Destroy(go);
+            ObjectUtil.SafeDestroy(go);
         }
 
         void OnDestroy()
         {
             StopWorker();
-            foreach (var live in _active.Values) if (live.Go != null) Destroy(live.Go);
+            foreach (var live in _active.Values) ObjectUtil.SafeDestroy(live.Go);
             _active.Clear();
-            while (_pool.Count > 0) Destroy(_pool.Pop());
+            while (_pool.Count > 0) ObjectUtil.SafeDestroy(_pool.Pop());
             _wake.Dispose();
         }
 

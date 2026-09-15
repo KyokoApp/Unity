@@ -97,6 +97,6 @@ namespace RPG.Runtime
             transform.localScale = new Vector3(Size, 1f, Size);
         }
 
-        void OnDestroy() { if (_mesh != null) Destroy(_mesh); }
+        void OnDestroy() { ObjectUtil.SafeDestroy(_mesh); }
     }
 }

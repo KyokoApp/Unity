@@ -4,7 +4,6 @@
     "references": [
         "RPG.Core",
         "Unity.RenderPipelines.Universal.Runtime",
-        "Unity.InputSystem",
         "glTFast",
         "Unity.Addressables",
         "UnityEngine.UI"

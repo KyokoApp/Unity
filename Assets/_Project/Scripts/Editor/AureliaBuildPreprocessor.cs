@@ -76,10 +76,9 @@ namespace RPG.Editor
                     ". APK tidak akan punya isi. Lihat log di atas.");
             }
 
-            /* 4. Active Input Handling harus "Both" atau CharacterMotor
-                  melempar InvalidOperationException saat runtime -- di HP,
-                  setelah build selesai, tanpa cara mudah melihat lognya. */
-            WarnIfInputHandlingSalah(log);
+            /* 4. Active Input Handling: DIPERIKSA saja di sini, tidak pernah
+                  diubah. Lihat komentar di ValidateInputHandling. */
+            ValidateInputHandling(log);
 
             /* 5. Karakter. Ini informasi penting, bukan error: file .vrm
                   di-gitignore, jadi build CI tidak akan punya karakter. */
@@ -92,11 +91,48 @@ namespace RPG.Editor
             Debug.Log("[Aurelia] Preprocess build:\n  - " + string.Join("\n  - ", log));
         }
 
-        static void WarnIfInputHandlingSalah(List<string> log)
+        /* ============================================================
+           Active Input Handling
+
+           activeInputHandler: 0 = Input Manager (lama), 1 = Input System
+           Package (baru), 2 = Both.
+
+           KENAPA TIDAK DIUBAH DI SINI -- dulu diubah, dan itu yang
+           mematikan build. OnPreprocessBuild jalan SETELAH assembly Editor
+           selesai dikompilasi. Mengubah activeInputHandler di titik ini
+           membuat assembly PLAYER dikompilasi dengan define
+           ENABLE_INPUT_SYSTEM sementara assembly EDITOR tidak, sehingga
+           class yang sama punya field berbeda di dua sisi:
+
+               Type '[Unity.RenderPipelines.Core.Runtime]
+               UnityEngine.Rendering.DebugActionDesc' has an extra field
+               'buttonAction' of type 'UnityEngine.InputSystem.InputAction'
+               in the player and thus can't be serialized
+
+           lalu build mati dengan:
+
+               Error building player because script class layout is
+               incompatible between the editor and the player.
+
+           (persis yang terjadi di build CI ke-3, run 34924201212.)
+
+           Nilai yang benar hidup di ProjectSettings/ProjectSettings.asset
+           yang ikut di-commit, jadi sudah benar SEBELUM Unity mengimpor
+           project -- Editor dan Player lalu dikompilasi dengan define yang
+           sama. Metode ini hanya memverifikasi, dan gagal lebih awal kalau
+           nilainya salah.
+
+           Kenapa 0, bukan 2 ("Both") seperti dugaan sebelumnya:
+             - tidak ada satu pun skrip di project ini yang memakai API Input
+               System baru; semuanya lewat kelas Input lama (CharacterMotor,
+               TouchJoystick, CameraRig);
+             - Unity sendiri menolak Both di Android: "Active Input Handling
+               is set to Both, this is unsupported on Android and might cause
+               issues with input and application performance".
+           Jadi 0 = Input Manager lama: cukup, didukung Android, konsisten.
+           ============================================================ */
+        static void ValidateInputHandling(List<string> log)
         {
-            /* activeInputHandler: 0 = Input Manager (lama), 1 = Input System
-               Package (baru), 2 = Both. Dibaca dari ProjectSettings karena
-               tidak ada API publik yang bisa di-set dari skrip. */
             const string key = "activeInputHandler";
             var serialized = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset");
             if (serialized.Length == 0)
@@ -111,16 +147,31 @@ namespace RPG.Editor
                 log.Add("Properti 'activeInputHandler' tidak ditemukan; dilewati.");
                 return;
             }
-            if (prop.intValue != 2)
+
+            switch (prop.intValue)
             {
-                log.Add($"PERINGATAN: Active Input Handling = {prop.intValue} (harus 2 = Both). " +
-                        "CharacterMotor memakai kelas Input lama dan akan melempar " +
-                        "InvalidOperationException saat runtime.");
-                /* Diubah otomatis, bukan cuma diperingatkan: build CI tidak
-                   ada orangnya untuk membaca peringatan. */
-                prop.intValue = 2;
-                so.ApplyModifiedPropertiesWithoutUndo();
-                log.Add("  -> sudah diubah ke Both secara otomatis.");
+                case 0:
+                    log.Add("Active Input Handling = 0 (Input Manager lama) -- sesuai: " +
+                            "semua input game ini memakai kelas Input lama.");
+                    break;
+
+                case 1:
+                    /* Fatal. Gagal di sini jauh lebih murah daripada gagal di
+                       HP: dengan Input System saja, CharacterMotor yang
+                       memanggil Input.GetAxis melempar InvalidOperationException
+                       di frame pertama -- APK terpasang tapi tak bisa dimainkan,
+                       dan lognya tidak gampang dibaca. */
+                    throw new BuildFailedException(
+                        "[Aurelia] Active Input Handling = 1 (Input System Package saja). " +
+                        "CharacterMotor/TouchJoystick/CameraRig memakai kelas Input lama dan " +
+                        "akan melempar InvalidOperationException saat runtime. Set " +
+                        "'activeInputHandler: 0' di ProjectSettings/ProjectSettings.asset.");
+
+                default:
+                    log.Add("PERINGATAN: Active Input Handling = " + prop.intValue +
+                            " (Both). Unity menandainya tidak didukung di Android; sebaiknya 0. " +
+                            "TIDAK diubah di sini -- ubah di ProjectSettings/ProjectSettings.asset.");
+                    break;
             }
         }
     }

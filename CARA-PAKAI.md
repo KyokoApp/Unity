@@ -106,7 +106,7 @@ Project Settings > Player > Android
   -> Company / Product Name : isi (jadi nama aplikasi di HP)
   -> Package Name           : mis. com.kyoko.aurelia
 Project Settings > Player > Other Settings
-  -> Active Input Handling  : Both        <- WAJIB, lihat catatan di bawah
+  -> Active Input Handling  : Input Manager (Old)   <- WAJIB, lihat catatan di bawah
 File > Build And Run  (atau Build -> dapat file .apk)
 ```
 
@@ -208,9 +208,21 @@ bukan ditulis tangan; angka di `TerrainMeshTests.cs` diambil dari menjalankan
    - *Project Settings → Graphics → Scriptable Render Pipeline Settings*
    - *Project Settings → Quality* (tiap tier)
 3. **Active Input Handling** — *Project Settings → Player → Other Settings →
-   Configuration* → set **Both**. **Jangan** *Input System Package* saja:
-   `CharacterMotor` masih memakai kelas `Input` lama dan akan melempar
-   `InvalidOperationException` saat runtime.
+   Configuration* → set **Input Manager (Old)**. Nilainya sudah di-commit di
+   `ProjectSettings/ProjectSettings.asset` (`activeInputHandler: 0`), jadi
+   biasanya tidak perlu disentuh sama sekali.
+   - **Jangan** *Input System Package (New)*: `CharacterMotor`, `TouchJoystick`,
+     dan `CameraRig` memakai kelas `Input` lama dan akan melempar
+     `InvalidOperationException` saat runtime.
+   - **Jangan** *Both*: tidak ada satu pun skrip yang memakai API Input System
+     baru, dan Unity sendiri menolaknya di Android (*"Active Input Handling is
+     set to Both, this is unsupported on Android"*).
+   - **Jangan** mengubah setelan ini lewat skrip *saat build sedang berjalan*.
+     `OnPreprocessBuild` jalan setelah assembly Editor dikompilasi, jadi
+     assembly Player akan dapat define `ENABLE_INPUT_SYSTEM` sementara Editor
+     tidak → build mati dengan *"script class layout is incompatible between
+     the editor and the player"*. Detailnya ada di komentar
+     `Assets/_Project/Scripts/Editor/AureliaBuildPreprocessor.cs`.
 4. **Kalibrasi sumbu tulang** — lihat `TAHAP-2.md` langkah 4. Ini satu-satunya
    hal yang benar-benar butuh matamu: arah sumbu lokal tulang rigify tidak bisa
    diketahui tanpa membuka Unity.

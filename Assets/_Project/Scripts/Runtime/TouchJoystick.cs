@@ -67,7 +67,7 @@ namespace RPG.Runtime
 
         void OnDestroy()
         {
-            if (_dot != null) Destroy(_dot);
+            ObjectUtil.SafeDestroy(_dot);
         }
 
         public float RadiusPx =>

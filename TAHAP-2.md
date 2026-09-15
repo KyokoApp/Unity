@@ -85,15 +85,26 @@ dari file `.vrm` saja; itu sifat rigify saat diekspor Blender.
 - Taruh `AureliaChar.vrm` di `Assets/Art/Characters/`, tunggu impornya selesai
   sampai muncul `AureliaChar.prefab`
 
-### 1. Active Input Handling → **Both**
+### 1. Active Input Handling → **Input Manager (Old)**
 
 *Project Settings → Player → Other Settings → Configuration → Active Input
-Handling = **Both**.*
+Handling = **Input Manager (Old)**.* Sudah di-commit di
+`ProjectSettings/ProjectSettings.asset` (`activeInputHandler: 0`), jadi langkah
+ini biasanya tidak perlu dikerjakan manual.
 
-**Ini wajib, bukan pilihan.** `CharacterMotor` dan `CameraRig` masih memakai
-kelas `Input` lama. Kalau disetel ke *Input System Package (New)* saja,
+**Ini wajib, bukan pilihan.** `CharacterMotor` dan `CameraRig` memakai kelas
+`Input` lama. Kalau disetel ke *Input System Package (New)* saja,
 `Input.GetAxisRaw()` akan melempar `InvalidOperationException` saat runtime.
-Migrasi penuh ke Input System baru masuk akal dikerjakan bareng HUD di Tahap 5.
+
+*(Catatan koreksi: dokumen ini sempat menyuruh setel **Both**. Itu salah. Tidak
+ada skrip yang memakai API Input System baru, Unity menolak Both di Android,
+dan mengubah nilainya dari dalam skrip build merusak kompilasi. Lihat
+`CARA-PAKAI.md` bagian Active Input Handling.)*
+
+Migrasi penuh ke Input System baru masuk akal dikerjakan bareng HUD di Tahap 5 —
+kalau nanti jadi, setel `activeInputHandler` di file ProjectSettings (bukan dari
+skrip) dan pastikan package `com.unity.inputsystem` kembali dirujuk di
+`RPG.Runtime.asmdef`.
 
 ### 2. Menu pembangun
 
