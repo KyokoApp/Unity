@@ -80,7 +80,16 @@ namespace UnityEngine
     public class Collider : Component {}
     public class AudioListener : Behaviour {}
     public class MonoBehaviour : Behaviour {}
-    public class ScriptableObject : Object { public static T CreateInstance<T>() where T:ScriptableObject => default; }
+    public class ScriptableObject : Object {
+        public static T CreateInstance<T>() where T:ScriptableObject => default;
+        // Unity ASLI punya overload ini (ScriptableObject.CreateInstance(Type),
+        // "Creates an instance of a specified type") -- stub sempat lupa, dan
+        // lalu menuduh skrip build-nya yang salah ("No overload for method
+        // 'CreateInstance' takes 1 arguments") padahal yang bolong stub-nya.
+        // Harness yang salah tuduh lebih mahal daripada tidak punya harness:
+        // lama-lama kita belajar mengabaikan merahnya.
+        public static Object CreateInstance(System.Type type) => default;
+    }
     public static class Debug { public static void Log(object m){} public static void LogError(object m){} public static void LogWarning(object m){} }
     public enum RenderTextureFormat { ARGB32 }
     public class RenderTexture { public static RenderTexture active;
