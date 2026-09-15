@@ -70,3 +70,6 @@ _verify/**/obj/
 # ...tapi .csproj harness BUKAN hasil generate Unity, jadi jangan di-ignore.
 # Tanpa baris ini verify.yml gagal di CI: "project file not found".
 !_verify/**/*.csproj
+
+# hasil generation _verify/asmdef/split_asmdefs.py (dibangun ulang tiap CI, jangan ikut commit)
+_verify/asmdef/.generated/

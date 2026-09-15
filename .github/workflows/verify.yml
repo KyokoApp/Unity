@@ -57,6 +57,18 @@ jobs:
       - name: Cek SRP Batcher shader
         run: python3 _verify/shaders/check_shader.py
 
+      # Diagnostik BARU, sengaja TIDAK menggating (continue-on-error): sampai
+      # terbukti stabil, kegagalan di sini boleh kuning, bukan merah -- tapi
+      # pesannya tetap dibaca. Kegunaannya: harness _verify/unitystub melebur
+      # SEMUA skrip jadi satu assembly, padahal Unity memisah per-.asmdef, jadi
+      # kelas error "lolos di harness, gagal di build Unity 6-12 menit kemudian"
+      # (RPG.Runtime.dll -> csc exitcode 1, run v0.2.0-cel-fix9) tidak pernah
+      # terlihat di sini. Skrip ini menyusun ulang project sesuai .asmdef dan
+      # mengompilasinya assembly demi assembly -- 60 detik, tanpa lisensi Unity.
+      - name: Kompilasi per-assembly (cermin .asmdef)
+        continue-on-error: true
+        run: python3 _verify/asmdef/split_asmdefs.py
+
       # Retakan antar chunk dan winding sudah diverifikasi di dalam
       # _verify/terrain, tapi keduanya hanya DICETAK, tidak membuat
       # proses gagal. Langkah ini yang mengubahnya jadi gerbang:

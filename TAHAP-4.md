@@ -91,3 +91,45 @@ Dua baris baru: `rumput: N rumpun, M sel` dan `waktu H.H (suasana)`.
   5. CommandBuffer kamera diam-diam diabaikan URP → screenshot memakai
      mesh bake world-space (GrassField.BakeInto), play mode tetap
      DrawMeshInstanced.
+
+## CI APK: kenapa enam build mati tanpa sebab, dan apa yang diubah (2026-09-16)
+
+Rantai `v0.2.0-cel-fix` .. `fix9` gagal semua dengan satu-satunya pesan
+`Build failed with exit code 1`. Dari anotasi check-run + sumber resmi game-ci
+ditemukan empat sebab, dan keempatnya SENYAP:
+
+1. **Harness verifikasinya sendiri rusak.** `EditorStubs.cs` mendefinisikan
+   ulang namespace yang sudah ada di `Stubs.cs` (10x CS0101) sejak commit
+   8517741, jadi `verify.yml` merah karena dirinya sendiri dan **tidak ada**
+   build CI yang memeriksa kompilasi C# lagi.error kompilasi lolos bebas ke
+   Unity, yang baru bicara setelah 6-12 menit dan satu seat lisensi termakan.
+2. **Keystore tidak pernah dipakai.** `ANDROID_KEYSTORE_*` dilempar sebagai
+   `env:`, padahal unity-builder@v6 memetakannya dari INPUT
+   (cli `image-environment-factory.ts`). Akibatnya tiap build ditandatangani
+   debug key acak -> Android menolak timpa-install -> "harus uninstall dulu".
+   Sekarang lewat `androidKeystoreName/Pass` + `androidKeyaliasName/Pass`,
+   dengan path absolut di container (`/github/workspace/...`) dan validasi dini
+   (file kecil / byte pertama bukan 0x30 = LFS pointer -> gagal sebelum
+   12 menit terbuang). `keystore/release.keystore` dibuat ulang sebagai PKCS12
+   PBES2+AES-256 (yang lama PBE-SHA1-3DES, algoritma legacy yang JDK 17 curigai).
+3. **`androidBuildAppBundle` bukan input v6** -> APK dipilih lewat
+   `androidExportType: androidPackage`; versionCode lewat `androidVersionCode`.
+4. **Log Unity tidak pernah ada di disk.** game-ci menjalankan
+   `unity-editor -logfile /dev/stdout`, jadi tidak ada Editor.log; mencoba
+   menimpanya lewat `customParameters` juga tidak mempan (yang pertama menang).
+   Karena itu ditambahkan **`AureliaCILogTap.cs`**: `[InitializeOnLoad]`
+   menempel ke `Application.logMessageReceivedThreaded` dan menulis seluruh
+   konsol Unity ke `Logs/AureliaUnity.log` — file itu ada di dalam mount
+   container, jadi sampai ke host. Langkah "Kumpulkan bukti kegagalan"
+   memecah isinya menjadi anotasi `file(baris,kolom): error CSxxxx: ...`,
+   dan jaring keduanya memindai `Library/Bee/tundra.log.json`.
+   Dari jaring itulah akhirnya terbaca: `Csc ... RPG.Runtime.dll -> exitcode 1`.
+
+Pelajaran prosesnya, dan itu yang ditambahkan ke repo:
+`_verify/asmdef/check_asmdef_refs.py` (menolak `using` yang assembly-nya tidak
+terdaftar di `.asmdef`) dan `_verify/asmdef/split_asmdefs.py` (menyusun ulang
+project **per-assembly** seperti Unity, lalu `dotnet build` tiap assembly —
+60 detik, tanpa lisensi). Harness satu-gundukan tidak akan pernah melihat
+kesalahan lintas-assembly; koreksi kecil di `UnityStubCheck.csproj`
+(`UNITY_EDITOR` tidak didefinisikan!) juga membuat blok `#if UNITY_EDITOR` di
+skrip Runtime tadinya tidak ikut diperiksa sama sekali.
