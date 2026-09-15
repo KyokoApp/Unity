@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using RPG.Core;
 
 namespace RPG.Runtime
 {
@@ -165,6 +166,35 @@ namespace RPG.Runtime
 
             if (Water != null)
                 _sb.Append($"air: y={Water.transform.position.y:F2}, {Water.Size:F0} m\n");
+
+            /* Diagnostik. Baris-baris ini ada karena build CI ke-5: game
+               JALAN (HUD hidup, 18 fps, stik tergambar) tapi dunia gelap
+               total di HP, dan tidak ada cara melihat logcat tanpa PC.
+               Dengan angka ini, satu screenshot cukup untuk membedakan
+               "kamera terkubur di dalam tanah", "tidak ada lampu", dan
+               "tidak ada langit". */
+            var cam = Camera.main;
+            if (cam == null)
+            {
+                _sb.Append("DIAG: MainCamera TIDAK ADA -- tag MainCamera belum diset?\n");
+            }
+            else
+            {
+                var cp = cam.transform.position;
+                _sb.Append($"DIAG cam : ({cp.x:F1}; {cp.y:F1}; {cp.z:F1}) clear={cam.clearFlags}\n");
+                if (Streamer != null && Streamer.Target != null)
+                {
+                    var tp = Streamer.Target.position;
+                    _sb.Append($"DIAG tgt : ({tp.x:F1}; {tp.y:F1}; {tp.z:F1})\n");
+                }
+                var h  = (float)WorldData.TerrainH(cp.x, cp.z);
+                var dy = cp.y - h;
+                _sb.Append($"DIAG tnh : tinggi={h:F1}, cam.y-tinggi={dy:F1}" +
+                           (dy < 0f ? "  <-- KAMERA DI DALAM TANAH" : "") + "\n");
+                _sb.Append("DIAG lain: lampu=" +
+                           (Object.FindFirstObjectByType<Light>() != null ? "ada" : "TIDAK ADA") +
+                           $", ambient={RenderSettings.ambientMode}, fog={(RenderSettings.fog ? "ya" : "tidak")}\n");
+            }
 
             GUI.Label(new Rect(12, 12, Screen.width - 24, Screen.height), _sb.ToString(), Style);
         }

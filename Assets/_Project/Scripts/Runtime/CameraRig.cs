@@ -48,6 +48,17 @@ namespace RPG.Runtime
 
         void Awake()
         {
+            /* Paksa landscape. Dunia terbuka dengan stik virtual di kiri dan
+               tombol lari/lompat di kanan tidak terbaca dalam portrait, dan
+               game fantasi ingin cakrawala lebar. PlayerSettings sudah diset
+               LandscapeLeft; ini jaring pengaman supaya Play di Editor (dan
+               build lama yang belum punya setelan itu) ikut benar. */
+            if (Screen.orientation != ScreenOrientation.LandscapeLeft &&
+                Screen.orientation != ScreenOrientation.LandscapeRight)
+            {
+                Screen.orientation = ScreenOrientation.LandscapeLeft;
+            }
+
             _cam = GetComponent<Camera>();
             if (_cam == null) _cam = gameObject.AddComponent<Camera>();
 

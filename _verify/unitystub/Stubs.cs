@@ -78,7 +78,8 @@ namespace UnityEngine
     public static class Debug { public static void Log(object m){} public static void LogError(object m){} public static void LogWarning(object m){} }
     public static class Time { public static float deltaTime=>0f; public static float unscaledDeltaTime=>0f;
         public static float time=>0f; public static float realtimeSinceStartup=>0f; public static int frameCount=>0; public static float timeScale=1f; }
-    public static class Screen { public static int width=>0; public static int height=>0; }
+    public enum ScreenOrientation { Portrait, PortraitUpsideDown, LandscapeLeft, LandscapeRight, AutoRotation }
+    public static class Screen { public static int width=>0; public static int height=>0; public static ScreenOrientation orientation; }
     public static class Application { public static bool isPlaying=>false; public static bool isBatchMode=>false;
         public static bool isEditor=>false; public static string platform=>null; public static void Quit(){} }
     public static class PlayerPrefs { public static bool HasKey(string k)=>false; public static float GetFloat(string k)=>0f;
@@ -92,7 +93,8 @@ namespace UnityEngine
     public enum KeyCode { Space, LeftShift, RightShift, F1, F2, Escape }
     public enum TouchPhase { Began, Moved, Stationary, Ended, Canceled }
     public struct Touch { public int fingerId; public Vector2 position; public TouchPhase phase; }
-    public class Camera : Behaviour { public CameraClearFlags clearFlags; public float nearClipPlane, farClipPlane, fieldOfView; }
+    public class Camera : Behaviour { public CameraClearFlags clearFlags; public float nearClipPlane, farClipPlane, fieldOfView;
+        public Color backgroundColor; public static Camera main=>null; }
     public enum CameraClearFlags { Skybox, SolidColor, Depth, Nothing }
     public class Light : Behaviour { public LightType type; public Color color; public float intensity; public LightShadows shadows; }
     public enum LightType { Directional, Point, Spot, Area } public enum LightShadows { None, Hard, Soft }
@@ -118,7 +120,7 @@ namespace UnityEngine
     public static class Gizmos { public static Color color; public static void DrawWireSphere(Vector3 c,float r){} public static void DrawLine(Vector3 a,Vector3 b){} }
     public static class RenderSettings { public static UnityEngine.Rendering.AmbientMode ambientMode;
         public static bool fog; public static FogMode fogMode; public static float fogStartDistance, fogEndDistance, fogDensity;
-        public static Color fogColor; }
+        public static Color fogColor; public static Color ambientLight; }
     public enum FogMode { Linear, Exponential, ExponentialSquared }
     public class GUIStyle { public GUIStyle(){} public GUIStyle(GUIStyle o){} public TextAnchor alignment; public int fontSize; public GUIStyleState normal=new GUIStyleState(); }
     public class GUIStyleState { public Color textColor; }

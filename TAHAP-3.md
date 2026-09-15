@@ -473,3 +473,26 @@ cd _verify/nunit    && dotnet test             # 42 tes
 cd _verify/unitystub && dotnet build           # 0 error 0 warning
 python3 _verify/shaders/check_shader.py        # Properties vs cbuffer
 ```
+
+## Catatan dari perangkat (build CI ke-5, 2026-09-15)
+
+APK pertama yang benar-benar dipasang di HP mengungkapkan dua hal yang tidak
+bisa terlihat dari CI:
+
+1. **Layar gelap seragam** — game jalan (PerfHud hidup, ~18 fps, stik
+   tergambar) tapi dunia tidak kelihatan. Penyebabnya: scene dibangun dari
+   `EmptyScene`, yang TIDAK punya material skybox, sementara
+   `RenderSettings.ambientMode` diset `Skybox`. Ambient dari skybox yang tidak
+   ada = hitam, jadi seluruh dunia hanya diterangi hampir-nol. Sekarang:
+   `clearFlags = SolidColor` dengan warna sama seperti fog, dan
+   `ambientMode = Flat` dengan ambient abu-abu terang. Langit sungguhan =
+   pekerjaan Tahap 7.
+2. **Portrait** — `defaultScreenOrientation` bawaan templat = AutoRotation, dan
+   HP memilih portrait. Sekarang PlayerSettings = LandscapeLeft, plus jaring
+   pengaman di `CameraRig.Awake`.
+
+Selain itu scene Tahap 3 tidak lagi memuat bidang datar 120x120 m peninggalan
+Tahap 2 (ia memotong bukit), dan PerfHud mendapat baris `DIAG` (posisi kamera,
+posisi target, tinggi terrain di kamera, ada/tidaknya lampu) supaya satu
+screenshot dari HP cukup untuk mendiagnosis layar gelap berikutnya tanpa
+logcat.

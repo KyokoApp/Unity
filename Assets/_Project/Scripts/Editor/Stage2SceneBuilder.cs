@@ -119,13 +119,20 @@ namespace RPG.Editor
                Tingginya diambil dari WorldData supaya karakter berdiri di
                angka yang benar, bukan di y=0 karangan. */
             var groundY = (float)WorldData.TerrainH(0, 0);
-            var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            ground.name = "Ground (sementara — diganti Tahap 3)";
-            ground.transform.position = new Vector3(0f, groundY, 0f);
-            ground.transform.localScale = new Vector3(12f, 1f, 12f);   // 120 m x 120 m
-            var groundMat = LoadOrCreateMaterial("AureliaGroundDebug",
-                                                 new Color(0.42f, 0.56f, 0.28f), notes);
-            ground.GetComponent<MeshRenderer>().sharedMaterial = groundMat;
+            /* Bidang datar ini alat uji Tahap 2 ("karakter bisa jalan").
+               Di scene Tahap 3 ia justru berbahaya: bidang 120x120 m yang
+               memotong bukit bisa menutupi terrain asli dari sudut kamera
+               tertentu. Jadi hanya dibuat kalau terrain tidak ikut. */
+            if (!withTerrain)
+            {
+                var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                ground.name = "Ground (sementara — diganti Tahap 3)";
+                ground.transform.position = new Vector3(0f, groundY, 0f);
+                ground.transform.localScale = new Vector3(12f, 1f, 12f);   // 120 m x 120 m
+                var groundMat = LoadOrCreateMaterial("AureliaGroundDebug",
+                                                     new Color(0.42f, 0.56f, 0.28f), notes);
+                ground.GetComponent<MeshRenderer>().sharedMaterial = groundMat;
+            }
 
             // ---- karakter -----------------------------------------------
             var charGo = PlaceCharacter(groundY, notes);
@@ -166,8 +173,18 @@ namespace RPG.Editor
             hud.Visible = withTerrain;
             notes.Add("PerfHud terpasang. F1 (atau ketuk sudut kanan-atas 3x) untuk sembunyikan.");
 
-            // ---- pencahayaan langit dasar ---------------------------------
-            RenderSettings.ambientMode = AmbientMode.Skybox;
+            // ---- langit & ambient ------------------------------------------
+            /* EmptyScene TIDAK punya material skybox. ambientMode = Skybox
+               tanpa skybox membuat ambient HITAM: walau ada matahari, dunia
+               terlihat seperti foto malam -- persis gejala build CI ke-5 di
+               HP (layar gelap seragam, hanya HUD dan stik yang kelihatan).
+               Sampai langit sungguhan dikerjakan, pakai warna datar yang
+               sama dengan fog: cakrawala menyatu dengan kabut dan ambient
+               tidak pernah nol. */
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0.62f, 0.70f, 0.78f);
+            RenderSettings.ambientMode = AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.50f, 0.56f, 0.64f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             /* Terukur di _verify/terrain: jangkauan streaming radius 2 = 1.280 m,
@@ -175,7 +192,7 @@ namespace RPG.Editor
                supaya chunk tidak muncul tiba-tiba di ujung pandang. */
             RenderSettings.fogStartDistance = 220f;
             RenderSettings.fogEndDistance = withTerrain ? 1150f : 600f;
-            RenderSettings.fogColor = new Color(0.62f, 0.70f, 0.78f);
+            RenderSettings.fogColor = cam.backgroundColor;
 
             // ---- simpan ----------------------------------------------------
             /* Pakai scenePath (parameter), bukan ScenePath (konstanta Tahap 2).
@@ -189,7 +206,9 @@ namespace RPG.Editor
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"=== SCENE {(withTerrain ? "TAHAP 3" : "TAHAP 2")} DIBANGUN ===");
             sb.AppendLine($"  tersimpan di : {scenePath}");
-            sb.AppendLine($"  tanah        : bidang datar 120x120 m di y={groundY:F2} (dari WorldData.TerrainH(0,0))");
+            sb.AppendLine(withTerrain
+                ? $"  tanah        : terrain streaming (heightfield WorldData), spawn y={groundY:F2}"
+                : $"  tanah        : bidang datar 120x120 m di y={groundY:F2} (dari WorldData.TerrainH(0,0))");
             sb.AppendLine($"  karakter     : {(charGo == null ? "TIDAK ADA — lihat catatan" : charGo.name)}");
             sb.AppendLine();
             sb.AppendLine("Kontrol:");
