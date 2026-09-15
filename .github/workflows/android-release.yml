@@ -81,7 +81,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     outputs:
-      vrmDipakai: ${{ steps.vrm.outputs.dipakai }}
+      # "vrmDipakai" = karakter BENAR-BENAR ada di APK (prefab terbentuk),
+      # bukan cuma "file .vrm berhasil diunduh". Lihat langkah 'karakter'.
+      vrmDipakai: ${{ steps.karakter.outputs.ada }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -206,6 +208,32 @@ jobs:
         if: always()
         run: df -h /
 
+      # UniVRM mengekstrak tekstur .vrm secara sinkron, tapi membuat prefab-nya
+      # lewat EditorApplication.delayCall -- yang tidak pernah jalan di batchmode.
+      # VrmPrefabBuilder (dipanggil AureliaBuildPreprocessor) mengerjakan bagian
+      # itu secara sinkron. Tanpa langkah ini, build CI ke-4 menghasilkan APK 25 MB
+      # berisi KAPSUL, dan tidak ada satu pun langkah yang mengeluh.
+      - name: Pastikan karakter benar-benar masuk build
+        id: karakter
+        run: |
+          set -e
+          PREFAB=Assets/Art/Characters/AureliaChar.prefab
+          if [ -f "$PREFAB" ]; then
+            echo "ada=true" >> "$GITHUB_OUTPUT"
+            echo "Prefab karakter terbentuk: $(stat -c%s "$PREFAB") byte"
+            ls Assets/Art/Characters/AureliaChar.Textures 2>/dev/null | wc -l | xargs echo "jumlah tekstur:"
+          else
+            echo "ada=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Prefab karakter tidak terbentuk -- APK berisi kapsul placeholder."
+          fi
+          # VRM sudah terunduh tapi prefab tidak jadi = bug, bukan nasib.
+          # Lebih baik build gagal di sini daripada APK tanpa karakter dirilis.
+          if [ "${{ steps.vrm.outputs.dipakai }}" = "true" ] && [ ! -f "$PREFAB" ]; then
+            echo "::error::VRM terunduh (${{ steps.vrm.outputs.dipakai }}) tapi $PREFAB tidak terbentuk."
+            echo "        Lihat log langkah 'Build Android', cari baris '[Aurelia]'."
+            exit 1
+          fi
+
       # AureliaBuildPreprocessor membangun scene + mendaftarkannya sebelum
       # build. Kalau ia gagal, APK-nya kosong -- jadi periksa di sini.
       - name: Pastikan APK ada dan tidak kosong
@@ -215,8 +243,11 @@ jobs:
           test -n "$APK" || { echo "::error::APK tidak ditemukan di build/"; exit 1; }
           SZ=$(stat -c%s "$APK")
           echo "APK: $APK ($((SZ/1024/1024)) MB)"
-          # APK Unity kosong ~20-30 MB (engine saja). Dengan karakter ~50 MB+.
-          if [ "$SZ" -lt 15000000 ]; then
+          # APK Unity tanpa konten ~25 MB (engine saja). Dengan karakter VRM
+          # (15 MB tekstur + mesh) harusnya jauh di atas itu.
+          MIN=15000000
+          if [ -f Assets/Art/Characters/AureliaChar.prefab ]; then MIN=30000000; fi
+          if [ "$SZ" -lt "$MIN" ]; then
             echo "::error::APK hanya $((SZ/1024/1024)) MB -- kemungkinan scene kosong."
             exit 1
           fi
@@ -243,6 +274,14 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 'gh release create' memanggil git untuk menentukan remote/repo. Tanpa
+      # checkout, job ini mati dengan:
+      #   failed to run git: fatal: not a git repository
+      # (kegagalan build CI ke-4, run 34926918799 -- APK-nya sendiri sudah jadi.)
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       # GERBAK LISENSI. Release di repo publik bisa diunduh siapa saja.
       # Kalau APK-nya memuat karakter Redistribution_Prohibited, itu redistribusi.
       - name: Tolak kalau repo publik dan VRM ikut ter-build

@@ -51,13 +51,23 @@ namespace RPG.Editor
                 log.Add("URP asset dibuat dan dipasang (sebelumnya belum ada).");
             }
 
-            /* 2. Scene. Selalu dibangun ulang, bukan "kalau belum ada":
+            /* 2. Karakter, dan HARUS sebelum scene dibangun: Stage2SceneBuilder
+                  mencari prefab di Assets/Art/Characters, dan kalau tidak ada ia
+                  diam-diam memasang kapsul placeholder. UniVRM seharusnya
+                  membuat prefab itu sendiri lewat AssetPostprocessor, tapi
+                  separuh alurnya ditunda EditorApplication.delayCall yang tidak
+                  pernah jalan di batchmode -- jadi build CI menghasilkan APK
+                  berisi kapsul (run 34926918799). VrmPrefabBuilder mengerjakan
+                  alur yang sama secara sinkron. */
+            VrmPrefabBuilder.EnsurePrefab(log);
+
+            /* 3. Scene. Selalu dibangun ulang, bukan "kalau belum ada":
                   scene yang tersimpan di Library bisa basi terhadap kode.
                   Membangun ulang itu murah (detik) dan hasilnya pasti
                   cocok dengan Stage2SceneBuilder yang sekarang. */
             var scenePath = Stage2SceneBuilder.BuildForBuildPlayer(log);
 
-            /* 3. Daftarkan ke build settings. Tanpa ini scene-nya ada di
+            /* 4. Daftarkan ke build settings. Tanpa ini scene-nya ada di
                   disk tapi tidak ikut dikemas. */
             if (!string.IsNullOrEmpty(scenePath) && File.Exists(scenePath))
             {
@@ -76,17 +86,13 @@ namespace RPG.Editor
                     ". APK tidak akan punya isi. Lihat log di atas.");
             }
 
-            /* 4. Active Input Handling: DIPERIKSA saja di sini, tidak pernah
+            /* 5. Active Input Handling: DIPERIKSA saja di sini, tidak pernah
                   diubah. Lihat komentar di ValidateInputHandling. */
             ValidateInputHandling(log);
 
-            /* 5. Karakter. Ini informasi penting, bukan error: file .vrm
-                  di-gitignore, jadi build CI tidak akan punya karakter. */
-            var charPath = Path.Combine(Stage2SceneBuilder.CharFolder, "AureliaChar.vrm");
-            if (!File.Exists(charPath))
-                log.Add("PERHATIAN: AureliaChar.vrm tidak ada di checkout ini " +
-                        "(file-nya memang di-gitignore). APK memakai kapsul placeholder, " +
-                        "BUKAN karakter anime. Lihat TANPA-PC.md untuk cara menyertakannya.");
+            /* Catatan karakter sudah dilaporkan langkah 2 (VrmPrefabBuilder):
+                  ia bilang prefab dibangun, atau kenapa tidak. Tidak ada lagi
+                  jalur yang diam-diam mengirim APK berisi kapsul. */
 
             Debug.Log("[Aurelia] Preprocess build:\n  - " + string.Join("\n  - ", log));
         }
