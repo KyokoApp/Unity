@@ -306,6 +306,15 @@ jobs:
         with:
           unityVersion: ${{ env.UNITY_VERSION }}
           targetPlatform: Android
+          # DIPINJAM. Default 'latest' berarti action memanggil
+          # https://api.github.com/repos/game-ci/cli/releases/latest dari runner --
+          # dan api.github.com menjawab 403 (rate limit) tepat di run v0.2.0-cel-fix11,
+          # 90 detik sebelum Unity sempat mulai: bukan salah proyek ini, tapi
+          # dependensi jaringan yang tidak perlu. v0.1.65 (2026-09-15) sudah
+          # memuat game-ci/cli#246 -- strategi lisensi 'personal' yang workflow ini
+          # andalkan -- jadi pin ini tidak mengorbankan apa pun. Naikkan
+          # sengaja, sekali, lewat pull request: bukan kejutan jam 3 pagi.
+          cliVersion: v0.1.65
           # APK, bukan .aab. `androidBuildAppBundle` BUKAN input v6 (anotasi CI:
           # "Unexpected input(s) 'androidBuildAppBundle'") -- yang benar androidExportType,
           # dan 'androidPackage'-lah yang membuat EditorUserBuildSettings.buildAppBundle=false.
