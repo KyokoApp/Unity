@@ -124,10 +124,14 @@ jobs:
           # v2: cache Library dari run 5 terbukti bisa membuat IL2CPP
           # segfault (exit 139) saat assembly Runtime berubah di atas state
           # incremental build sebelumnya (run 6). Kunci baru = impor bersih.
-          key: Library-android-v2-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-          restore-keys: |
-            Library-android-v2-
-            Library-
+          # v3: TANPA restore-keys. Cache Library yang basi bukan cuma lambat --
+          # ia MEMBOHONG: run v0.2.0-cel-fix9 punya Library/ScriptAssemblies/RPG.Runtime.dll
+          # sisa build sebelumnya, jadi pemeriksaan "dll ada = kompilasi lulus" berkata
+          # LULUS padahal csc gagal hari itu juga. Lebih baik impor bersih (+8 menit)
+          # daripada menatap结论 yang salah. Run 5 juga pernah kena IL2CPP segfault
+          # akibat cache Library (lihat komentar di bawah), jadi ini bukan pertama kalinya
+          # Library silang-build menyesatkan kita.
+          key: Library-android-v3-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
       # ---- keystore tetap supaya bisa update tanpa uninstall ----
       #
@@ -396,8 +400,19 @@ jobs:
             [ "$f" = "$TAP" ] && continue
             echo "=== $f ==="
             cp "$f" logs/ 2>/dev/null
-            timeout 30 grep -aE "$PAT" "$f" 2>/dev/null | head -4 > logs/hit.txt
-            while IFS= read -r l; do emit "$(basename "$f"):" "$l"; done < logs/hit.txt
+            # Format kanonik Unity/MSBuild: "Assets/.../File.cs(12,34): error CS0246: ...".
+            # Di berkas JSON ia terkubur dalam satu baris panjang, jadi grep -o yang diambil,
+            # bukan seluruh baris (run fix9 memotong pesan di 460 karakter pertama, yang
+            # isinya cuma nama node -- persis pesan yang kita butuhkan jatuh di luar potongan).
+            timeout 40 grep -aoE '[A-Za-z0-9_./\\-]+\.cs\([0-9]+,[0-9]+\): (error|warning) CS[0-9]+: [^"\\]{0,300}' "$f" 2>/dev/null \
+              | sort -u | head -14 > logs/hit.txt
+            if [ ! -s logs/hit.txt ]; then
+              timeout 40 grep -aoE 'error CS[0-9]+: [^"\\]{0,300}' "$f" 2>/dev/null | sort -u | head -14 > logs/hit.txt
+            fi
+            while IFS= read -r l; do emit "kompilasi:" "$l"; done < logs/hit.txt
+            cat logs/hit.txt
+            # Jejak node yang gagal (csc exitcode != 0) -- menyebut assembly mana.
+            timeout 40 grep -aoE '"annotation":"[^"]{0,180}"' "$f" 2>/dev/null | sort -u | head -6
           done
 
           # Penanda paling andal untuk "kompilasi gagal": assembly Editor/Runner.
@@ -406,7 +421,14 @@ jobs:
           for a in RPG.Core RPG.Runtime RPG.Editor; do
             f="Library/ScriptAssemblies/$a.dll"
             if [ -f "$f" ]; then
-              echo "::notice::$a.dll ADA $(stat -c%s "$f") byte (mtime $(date -r "$f" +%H:%M:%S)) -> kompilasi skrip LULUS"
+              # "ada" tidak cukup: Library bisa dipulihkan dari cache sehingga dll ini sisa
+              # build LAMA. Yang berarti: dll lebih baru daripada semua sumbernya.
+              tua=$(find Assets -name '*.cs' -newer "$f" 2>/dev/null | head -1)
+              if [ -n "$tua" ]; then
+                emit "dll-basi:" "$a.dll ($(date -r "$f" +%H:%M:%S)) lebih TUA dari $tua -> dll ini sisa cache, kompilasi assembly ini GAGAL"
+              else
+                echo "::notice::$a.dll $(stat -c%s "$f") byte, lebih baru dari semua sumber -> kompilasi LULUS"
+              fi
             else
               emit "berkas:" "$a.dll HILANG di Library/ScriptAssemblies -> assembly ini tidak selesai dikompilasi"
             fi
