@@ -113,10 +113,12 @@ namespace RPG.Runtime
             }
 
             // RenderScale — URP asset
-            var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            UniversalRenderPipelineAsset urp = null;
+            try { urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset; } catch { }
+            if (urp == null) urp = GraphicsSettings.defaultRenderPipeline as UniversalRenderPipelineAsset;
+            if (urp == null) urp = QualitySettings.renderPipeline as UniversalRenderPipelineAsset;
             if (urp != null)
             {
-                // renderScale di URP 17 ada di asset
                 urp.renderScale = Mathf.Clamp((float)r.RenderScale, 0.5f, 1.5f);
             }
 

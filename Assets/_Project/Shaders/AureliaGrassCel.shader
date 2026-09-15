@@ -92,8 +92,8 @@ Shader "Aurelia/GrassCel"
             Varyings vert(Attributes i)
             {
                 Varyings o;
-                UNITY_SETUP_INSTANCE_ID(in);
-                UNITY_TRANSFER_INSTANCE_ID(in, o);
+                UNITY_SETUP_INSTANCE_ID(i);
+                UNITY_TRANSFER_INSTANCE_ID(i, o);
 
                 float3 originWS = TransformObjectToWorld(float3(0, 0, 0));
                 float  h        = Hash21(originWS.xz);
@@ -124,7 +124,7 @@ Shader "Aurelia/GrassCel"
 
             half4 frag(Varyings i) : SV_Target
             {
-                UNITY_SETUP_INSTANCE_ID(in);
+                UNITY_SETUP_INSTANCE_ID(i);
 
                 half3 albedo = lerp((half3)_BaseColor.rgb, (half3)_TipColor.rgb, saturate(i.uv.y));
 
