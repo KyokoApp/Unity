@@ -141,7 +141,7 @@ namespace UnityEngine
         public static bool fog; public static FogMode fogMode; public static float fogStartDistance, fogEndDistance, fogDensity;
         public static Color fogColor; public static Color ambientLight; }
     public enum FogMode { Linear, Exponential, ExponentialSquared }
-    public class GUIStyle { public GUIStyle(){} public GUIStyle(GUIStyle o){} public TextAnchor alignment; public int fontSize; public GUIStyleState normal=new GUIStyleState(); public RectOffset padding; public RectOffset margin; }
+    public class GUIStyle { public GUIStyle(){} public GUIStyle(GUIStyle o){} public TextAnchor alignment; public int fontSize; public bool wordWrap; public bool richText; public GUIStyleState hover=new GUIStyleState(); public GUIStyleState active=new GUIStyleState(); public int paddingLeft, paddingRight, paddingTop, paddingBottom; public GUIStyleState normal=new GUIStyleState(); public RectOffset padding; public RectOffset margin; }
     public class GUIStyleState { public Color textColor; public Texture2D background; }
     public enum TextAnchor { MiddleCenter }
     public static class GUI { public static Color color; public static Color backgroundColor; public static GUIStyleSkin skin=>new GUIStyleSkin();
