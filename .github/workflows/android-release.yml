@@ -295,6 +295,122 @@ jobs:
                 Assets/_Project/Shaders/AureliaGrassCel.shader
           echo "::warning::cel-shading dilepas untuk build ini -- material jatuh kembali ke shader Aurelia/* non-cel."
 
+      # ------------------------------------------------------------
+      # UJI KESTORE DENGAN JDK-NYA SENDIRI -- sebelum Unity start.
+      #
+      # Run v0.2.0-cel-fix13 bertahan 30 menit (kompilasi LULUS, IL2CPP LULUS,
+      # Gradle LULUS) lalu mati di baris paling akhir:
+      #
+      #     UnityException: Can not sign the application
+      #
+      # Tidak ada detail: Unity hanya bilang "tidak bisa menandatangani". Satu-
+      # satunya pertanyaan yang tersisa adalah apakah JDK pembaca PKCS12 kami
+      # menerima berkas + password + alias ini. Pertanyaan itu dijawab keytool
+      # dalam 5 detik, memakai JDK yang sama-sama dipakai toolchain Android --
+      # jadi keputusannya diambil SEBELUM 30 menit, bukan sesudahnya, dan dengan
+      # pesan Java yang sebenarnya ("keystore password was incorrect", "UnrecoverableKeyException",
+      # "algorithm ... not available") alih-alih satu baris tanpa sebab.
+      #
+      # Kalau JDK menolak: kita bangun keystore baru dengan keytool-nya juga, jadi
+      # build tetap menghasilkan APK yang tertandatangani. Harganya dicatat jujur
+      # di anotasi: kunci baru = sekali install perlu uninstall.
+      # ------------------------------------------------------------
+      # ------------------------------------------------------------
+      # UJI KESTORE DENGAN JDK-NYA SENDIRI -- sebelum Unity start.
+      #
+      # Run v0.2.0-cel-fix13 bertahan 30 menit (kompilasi LULUS, IL2CPP LULUS,
+      # Gradle LULUS) lalu mati di baris paling akhir:
+      #
+      #     UnityException: Can not sign the application
+      #
+      # Unity tidak menambahkan apa pun. Satu-satunya pertanyaan yang tersisa:
+      # mampukah toolchain Java di runner membaca keystore ini DAN menandatangani
+      # sesuatu dengannya? Dua tes di bawah menjawabnya dalam ~5 detik --
+      # `keytool -list` (baca: berkas + storepass + alias) dan `jarsigner`
+      # (pakai kunci privat + rantai sertifikat + algoritma tanda tangan, yaitu
+      # persis langkah yang gagal di Unity). Kalau keduanya lulus sementara Unity
+      # tetap gagal, penyebabnya bukan filenya tapi KONFIGURASI di sekitarnya
+      # (bentuk path keystoreName), dan anotasi 'unityAkanPakai' di bawah
+      # menunjukkan string persis yang dikirim.
+      #
+      # Kalau JDK menolak: dibuat keystore cadangan DENGAN keytool yang sama, jadi
+      # build tetap menghasilkan APK bertanda tangan. Harganya dicatat jujur:
+      # kunci berbeda = sekali install perlu uninstall.
+      # ------------------------------------------------------------
+      - name: Uji keystore dengan JDK runner
+        id: kstest
+        run: |
+          set +e
+          HOST_KS="keystore/release.keystore"
+          if [ ! -f "$HOST_KS" ]; then
+            echo "::warning::tidak ada $HOST_KS -> Unity akan memakai debug keystore (kunci baru tiap build)."
+            exit 0
+          fi
+          KT="$(command -v keytool)"
+          if [ -z "$KT" ]; then
+            for d in "$JAVA_HOME/bin" /usr/lib/jvm /usr/local/lib/jvm /opt/java; do
+              c=$(find "$d" -maxdepth 3 -name keytool -type f 2>/dev/null | head -1)
+              [ -x "$c" ] && KT="$c" && break
+            done
+          fi
+          if [ -z "$KT" ]; then
+            echo "::warning::keytool tidak ditemukan -> keystore tidak bisa diuji lebih dulu."
+            exit 0
+          fi
+          echo "keytool: $KT ($("$KT" -version 2>&1 | head -1))"
+          echo "menguji $HOST_KS: dibaca, lalu dipakai menandatangani"
+
+          KS_OK=0
+          if "$KT" -list -keystore "$HOST_KS" -storepass "$ANDROID_KEYSTORE_PASS" \
+                  -alias "$ANDROID_KEYALIAS_NAME" > /tmp/keytool.txt 2>&1; then
+            KS_OK=1
+            echo "=== keytool menerima ==="; head -4 /tmp/keytool.txt
+            echo "::notice::baca OK. unityAkanPakai: androidKeystoreName=${ANDROID_KEYSTORE_NAME} alias=${ANDROID_KEYALIAS_NAME}"
+          else
+            echo "=== keytool MENOLAK ==="; head -14 /tmp/keytool.txt
+            echo "::error::JDK menolak keystore: $(head -3 /tmp/keytool.txt | tr '\n' ' ' | cut -c1-240)"
+          fi
+
+          JARBIN="$(dirname "$KT")/jarsigner"
+          if [ -x "$JARBIN" ]; then
+            rm -rf /tmp/sigtest && mkdir -p /tmp/sigtest/META-INF
+            printf 'Manifest-Version: 1.0\nCreated-By: aurelia-ci\n\n' > /tmp/sigtest/META-INF/MANIFEST.MF
+            (cd /tmp/sigtest && zip -qr unsigned.jar META-INF)
+            "$JARBIN" -keystore "$HOST_KS" -storepass "$ANDROID_KEYSTORE_PASS" \
+                     -keypass "$ANDROID_KEYALIAS_PASS" \
+                     -signedjar /tmp/sigtest/signed.jar \
+                     /tmp/sigtest/unsigned.jar "$ANDROID_KEYALIAS_NAME" > /tmp/sig.txt 2>&1
+            if [ -s /tmp/sigtest/signed.jar ]; then
+              KS_OK=1
+              echo "=== jarsigner menerima ==="; head -4 /tmp/sig.txt
+              echo "::notice::jarsigner SUKSES -> berkas, password, alias, dan kunci privat sehat. Kalau Unity tetap 'Can not sign', yang salah adalah cara path/flag diberikan, bukan isinya."
+            else
+              KS_OK=0
+              echo "=== jarsigner MENOLAK ==="; head -10 /tmp/sig.txt
+              echo "::error::jarsigner gagal: $(head -5 /tmp/sig.txt | tr '\n' ' ' | cut -c1-280)"
+            fi
+          else
+            echo "::warning::jarsigner tidak ada di samping keytool -> hanya tes baca yang dijalankan."
+          fi
+
+          if [ "$KS_OK" != "1" ]; then
+            ALT="keystore/ci-generated.keystore"
+            "$KT" -genkeypair -noprompt -storetype PKCS12 \
+                  -dname "CN=yuki, OU=natsuki, O=yuki, L=Jakarta, C=ID" \
+                  -validity 9125 -keyalg RSA -keysize 2048 -sigalg SHA256withRSA \
+                  -alias yuki -keystore "$ALT" -storepass yuki123 -keypass yuki123 > /tmp/gen.txt 2>&1
+            if [ -s "$ALT" ] && "$KT" -list -keystore "$ALT" -storepass yuki123 -alias yuki > /dev/null 2>&1; then
+              echo "ANDROID_KEYSTORE_NAME=/github/workspace/$ALT" >> "$GITHUB_ENV"
+              echo "ANDROID_KEYSTORE_PASS=yuki123" >> "$GITHUB_ENV"
+              echo "ANDROID_KEYALIAS_NAME=yuki" >> "$GITHUB_ENV"
+              echo "ANDROID_KEYALIAS_PASS=yuki123" >> "$GITHUB_ENV"
+              echo "::warning::keystore release tidak bisa dipakai, jadi build ini menandatangani dengan $ALT (dibuat keytool runner). APK terpasang, tapi kuncinya BEDA dari build lain: uninstall sekali, dan simpan $ALT / isinya ke secret ANDROID_KEYSTORE_BASE64 supaya build berikutnya konsisten."
+            else
+              head -6 /tmp/gen.txt
+              echo "::error::keystore cadangan pun gagal dibuat -- build kemungkinan mati di signing lagi."
+            fi
+          fi
+
       - name: Build Android
         uses: game-ci/unity-builder@v6
         env:
@@ -407,6 +523,18 @@ jobs:
             echo "--- 50 baris terakhir kran log ---"; tail -50 "$TAP"
           else
             echo "::warning::$TAP tidak ada -> LogTap tidak terpasang: RPG.Editor.dll tidak dikompilasi, atau build mati SEBELUM domain script dimuat (lisensi/impor)."
+          fi
+
+          # Konteks: satu baris error tanpa stack-tetangga hampir tidak pernah
+          # cukup (lihat 'Can not sign the application' di fix13 -- penyebabnya
+          # ada di baris-baris SEBELUMNYA). Ambil ±10 baris di sekitar error fatal
+          # pertama sebagai satu anotasi panjang.
+          if [ -f "$TAP" ]; then
+            LINE=$(grep -anE '\] (Error|Exception):' "$TAP" | tail -1 | cut -d: -f1)
+            if [ -n "$LINE" ]; then
+              CTX=$(sed -n "$((LINE>10 ? LINE-10 : 1)),$((LINE+6))p" "$TAP" | tr '\n' '|' | cut -c1-1400)
+              echo "::error::konteks sekitar baris $LINE: ${CTX}"
+            fi
           fi
 
           # Jaring kedua, HANYA berkas log. Run fix8 grep tanpa --include sehingga
