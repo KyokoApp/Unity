@@ -73,7 +73,8 @@ namespace UnityEngine
         public void UploadMeshData(bool markNoLongerReadable){} public void MarkDynamic(){} }
     public struct Bounds { public Vector3 center; public Vector3 size; public Bounds(Vector3 c,Vector3 s){center=c;size=s;} }
     public class MeshFilter : Component { public Mesh sharedMesh; public Mesh mesh; }
-    public struct Matrix4x4 { public static Matrix4x4 TRS(Vector3 p,Quaternion q,Vector3 s)=>default; }
+    public struct Matrix4x4 { public static Matrix4x4 TRS(Vector3 p,Quaternion q,Vector3 s)=>default;
+        public Vector3 MultiplyPoint3(Vector3 p)=>default; }
     public struct LayerMask { public int value;
         public static int NameToLayer(string n)=>0; public static int GetMask(params string[] n)=>0; }
     public class Collider : Component {}

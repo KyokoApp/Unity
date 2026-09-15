@@ -131,6 +131,37 @@ namespace RPG.Runtime
             Flush();
         }
 
+        /* KHUSUS SCREENSHOT (dipakai Editor/SceneShots): gabungan SEMUA
+           instance jadi SATU mesh bake world-space. Jalur ini kebal terhadap
+           quirks pipeline (CommandBuffer kamera di URP bisa diam-diam
+           diabaikan; DrawMeshInstanced biasa butuh frame berikutnya).
+           2.250 instance x 15 vertex = ~34 ribu vertex — ringan untuk
+           sekali render editor. Play mode tetap pakai instancing. */
+        public int BakeInto(Mesh dst)
+        {
+            if (!_on || _clump == null || Target == null || dst == null) return 0;
+            RefreshCells(Target.position, false);
+            var sv = _clump.vertices; var su = _clump.uv; var sc = _clump.colors; var st = _clump.triangles;
+            if (sv == null || st == null) return 0;
+            var perV = sv.Length; var perT = st.Length;
+            var n = 0; foreach (var kv in _cells) n += kv.Value.Length;
+            if (n == 0 || perV == 0) return 0;
+            var V = new Vector3[n * perV]; var U = new Vector2[n * perV]; var C = new Color[n * perV]; var T = new int[n * perT];
+            var vi = 0; var ti = 0; var baseV = 0;
+            foreach (var kv in _cells)
+            {
+                foreach (var m in kv.Value)
+                {
+                    for (var i = 0; i < perV; i++) { V[vi] = m.MultiplyPoint3(sv[i]); U[vi] = su[i]; C[vi] = sc[i]; vi++; }
+                    for (var i = 0; i < perT; i++) T[ti++] = st[i] + baseV;
+                    baseV += perV;
+                }
+            }
+            dst.vertices = V; dst.uv = U; dst.colors = C; dst.triangles = T;
+            dst.RecalculateBounds();
+            return n;
+        }
+
         /* Untuk screenshot batchmode: DrawMeshInstanced yang dipanggil
            "apa adanya" hanya ikut pada render frame berikutnya, dan di
            edit mode tidak ada frame berikutnya sebelum cam.Render().

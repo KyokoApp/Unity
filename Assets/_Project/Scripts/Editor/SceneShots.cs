@@ -70,14 +70,24 @@ namespace RPG.Editor
 
                     ComposeCamera(cam, target);
 
-                    /* Rumput lewat CommandBuffer supaya pasti ikut dalam
-                       render manual (lihat catatan di GrassField.DrawInto). */
-                    CommandBuffer cmd = null;
+                    /* Rumput di-bake jadi satu mesh world-space supaya PASTI
+                       ikut render manual — kebal terhadap quirks URP
+                       (CommandBuffer kamera bisa diam-diam diabaikan). */
+                    GameObject baked = null;
                     if (grass != null)
                     {
-                        cmd = new CommandBuffer { name = "AureliaGrassShot" };
-                        grass.DrawInto(cmd);
-                        cam.AddCommandBuffer(CameraEvent.AfterForwardOpaque, cmd);
+                        var msh = new Mesh { name = "ShotGrassBake" };
+                        var nInst = grass.BakeInto(msh);
+                        Debug.Log($"SceneShots: rumput dibake {nInst} instance untuk {Nama[i]}");
+                        if (nInst > 0)
+                        {
+                            baked = new GameObject("ShotGrass");
+                            baked.AddComponent<MeshFilter>().sharedMesh = msh;
+                            var mr = baked.AddComponent<MeshRenderer>();
+                            mr.sharedMaterial = grass.GrassMaterial;
+                            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                            mr.receiveShadows = false;
+                        }
                     }
                     try
                     {
@@ -86,7 +96,7 @@ namespace RPG.Editor
                     }
                     finally
                     {
-                        if (cmd != null) cam.RemoveCommandBuffer(CameraEvent.AfterForwardOpaque, cmd);
+                        if (baked != null) UnityEngine.Object.DestroyImmediate(baked);
                     }
                 }
 
