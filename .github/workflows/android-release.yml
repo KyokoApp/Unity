@@ -117,9 +117,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: Library
-          key: Library-android-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          # v2: cache Library dari run 5 terbukti bisa membuat IL2CPP
+          # segfault (exit 139) saat assembly Runtime berubah di atas state
+          # incremental build sebelumnya (run 6). Kunci baru = impor bersih.
+          key: Library-android-v2-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
-            Library-android-
+            Library-android-v2-
             Library-
 
       # ---- karakter VRM, diunduh saat build, tidak pernah masuk git ----
