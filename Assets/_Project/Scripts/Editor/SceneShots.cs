@@ -78,7 +78,7 @@ namespace RPG.Editor
                     {
                         var msh = new Mesh { name = "ShotGrassBake" };
                         var nInst = grass.BakeInto(msh);
-                        Debug.Log($"SceneShots: rumput dibake {nInst} instance untuk {Nama[i]}");
+                        Debug.Log($"SceneShots: rumput dibake {nInst} instance untuk {Nama[i]} | state: {grass.InitState} | mat={grass.GrassMaterial != null}");
                         if (nInst > 0)
                         {
                             baked = new GameObject("ShotGrass");

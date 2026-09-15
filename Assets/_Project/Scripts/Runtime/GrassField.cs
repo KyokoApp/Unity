@@ -66,8 +66,16 @@ namespace RPG.Runtime
         int _perCell;
         bool _on;
 
-        void Awake()
+        void Awake() => EnsureInit();
+
+        /* Inisialisasi idempoten. PENTING: di edit mode (screenshot batchmode)
+           Awake() TIDAK dijamin dipanggil saat AddComponent, jadi semua jalur
+           masuk (DrawNow/PopulateNow/BakeInto) memastikan state siap dulu.
+           Di play mode ini hanya berjalan sekali dari Awake. */
+        void EnsureInit()
         {
+            if (_clump != null) return;
+
             /* Tingkat kualitas dibaca dari setelan tersimpan, supaya rumput
                ikut preset rendah/tinggi yang nanti dipilih pemain -- dan
                supaya build CI (tanpa PlayerPrefs) jatuh ke default
@@ -103,16 +111,22 @@ namespace RPG.Runtime
         /* Dipanggil tiap frame saat bermain: gambar semua sel yang terlihat. */
         void LateUpdate() => DrawNow();
 
+        /* Diagnosa ringkas — dipakai SceneShots lewat log CI. */
+        public string InitState =>
+            $"on={_on} clump={_clump != null} target={Target != null} perCell={_perCell} cells={_cells.Count}";
+
         /* Untuk screenshot batchmode (tidak ada loop Update di edit mode)
            dan untuk kasus Target dipindah teleport. */
         public void PopulateNow()
         {
+            EnsureInit();
             if (!_on || Target == null) return;
             RefreshCells(Target.position, true);
         }
 
         public void DrawNow()
         {
+            EnsureInit();
             if (!_on || _clump == null || GrassMaterial == null || Target == null) return;
 
             RefreshCells(Target.position, false);
@@ -139,6 +153,7 @@ namespace RPG.Runtime
            sekali render editor. Play mode tetap pakai instancing. */
         public int BakeInto(Mesh dst)
         {
+            EnsureInit();
             if (!_on || _clump == null || Target == null || dst == null) return 0;
             RefreshCells(Target.position, false);
             var sv = _clump.vertices; var su = _clump.uv; var sc = _clump.colors; var st = _clump.triangles;
