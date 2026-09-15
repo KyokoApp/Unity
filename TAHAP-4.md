@@ -133,3 +133,11 @@ project **per-assembly** seperti Unity, lalu `dotnet build` tiap assembly —
 kesalahan lintas-assembly; koreksi kecil di `UnityStubCheck.csproj`
 (`UNITY_EDITOR` tidak didefinisikan!) juga membuat blok `#if UNITY_EDITOR` di
 skrip Runtime tadinya tidak ikut diperiksa sama sekali.
+
+### EKSEKUSI: satu baris itu (2026-09-16)
+
+`GfxApplier.cs(83)` ditulis ulang menjadi `UnityEngine.ShadowQuality.All / .Disable`,
+dan stubnya diberi decoy `UnityEngine.Rendering.Universal.ShadowQuality` supaya
+CS0104 kelas ini SELALU terlihat di `verify.yml` (60 detik) dan tidak pernah lagi
+butuh 7 build Unity untuk ketemu. Build `v0.2.0-cel-fix11` = verifikasi pertama
+dengan rantai bukti lengkap: kran log Unity -> `Logs/AureliaUnity.log` -> anotasi.

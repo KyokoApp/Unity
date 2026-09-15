@@ -400,11 +400,13 @@ jobs:
             [ "$f" = "$TAP" ] && continue
             echo "=== $f ==="
             cp "$f" logs/ 2>/dev/null
+            # HANYA error: run fix10 menenggelamkan pesan asli di bawah
+            # CS0618 dari berkas punyanya game-ci yang kebetulan juga ikut ter-grep.
             # Format kanonik Unity/MSBuild: "Assets/.../File.cs(12,34): error CS0246: ...".
             # Di berkas JSON ia terkubur dalam satu baris panjang, jadi grep -o yang diambil,
             # bukan seluruh baris (run fix9 memotong pesan di 460 karakter pertama, yang
             # isinya cuma nama node -- persis pesan yang kita butuhkan jatuh di luar potongan).
-            timeout 40 grep -aoE '[A-Za-z0-9_./\\-]+\.cs\([0-9]+,[0-9]+\): (error|warning) CS[0-9]+: [^"\\]{0,300}' "$f" 2>/dev/null \
+            timeout 40 grep -aoE '[A-Za-z0-9_./\\-]+\.cs\([0-9]+,[0-9]+\): error CS[0-9]+: [^"\\]{0,300}' "$f" 2>/dev/null \
               | sort -u | head -14 > logs/hit.txt
             if [ ! -s logs/hit.txt ]; then
               timeout 40 grep -aoE 'error CS[0-9]+: [^"\\]{0,300}' "$f" 2>/dev/null | sort -u | head -14 > logs/hit.txt
