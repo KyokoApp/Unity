@@ -55,6 +55,9 @@ namespace UnityEngine
     public class GameObject : Object { public GameObject(){} public GameObject(string n){} public Transform transform=>null;
         public string tag; public int layer; public T AddComponent<T>() where T:Component => default; public T GetComponent<T>()=>default;
         public T GetComponentInChildren<T>()=>default; public T[] GetComponentsInChildren<T>(bool inc)=>null;
+        // Ada di Unity asli (GameObject.SetActive / activeSelf) -- dulu lupa ditulis
+        // di stub, supaya 'SetActive tidak ada' dikira bug kode padahal bug harness.
+        public void SetActive(bool v){} public bool activeSelf=>true; public bool activeInHierarchy=>true;
         public static GameObject CreatePrimitive(PrimitiveType t)=>null; }
     public class Renderer : Component { public Material sharedMaterial; public Material[] sharedMaterials; }
     public class MeshRenderer : Renderer { public bool receiveShadows; public UnityEngine.Rendering.ShadowCastingMode shadowCastingMode; }
@@ -121,6 +124,7 @@ namespace UnityEngine
         public void SetPixels(Color[] c){} }
     public enum TextureFormat { RGBA32, RGB24 } public enum TextureWrapMode { Repeat, Clamp } public enum FilterMode { Point, Bilinear, Trilinear }
     public class Material : Object { public Material(Shader s){} public bool HasProperty(string n)=>false;
+        public Shader shader;   // Material.shader ada di Unity asli (get/set)
         public void SetColor(string n,Color c){} public Color GetColor(string n)=>default;
         public void SetTexture(string n,Texture t){} public Texture GetTexture(string n)=>null;
         public void SetFloat(string n,float v){} public float GetFloat(string n)=>0f;
@@ -156,8 +160,19 @@ namespace UnityEngine
         public static bool Toggle(bool v,string t)=>false;
         public static float HorizontalSlider(float v,float l,float r)=>0f;
         public static void Space(float p){} public static void BeginHorizontal(){} public static void EndHorizontal(){}
-        public static void FlexibleSpace(){} }
-    public class GUILayoutOption {}
+        public static void FlexibleSpace(){}
+        // Overload dengan GUILayoutOption -- ada di Unity asli (GUILayout.Label(text,
+        // style, params options[]), dst). SettingsPanel memakainya; stub dulu tidak
+        // punya, jadi harness melaporkan 'GUILayout tidak punya Height' seolah-olah
+        // bug di game. Harness yang berisik = harness yang diabaikan.
+        public static GUILayoutOption Width(float w)=>new GUILayoutOption();
+        public static GUILayoutOption Height(float h)=>new GUILayoutOption();
+        public static GUILayoutOption MinWidth(float w)=>new GUILayoutOption();
+        public static GUILayoutOption MaxWidth(float w)=>new GUILayoutOption();
+        public static GUILayoutOption ExpandWidth(bool e)=>new GUILayoutOption();
+        public static void Label(string t,GUIStyle s,params GUILayoutOption[] o){}
+        public static bool Toggle(bool v,string t,GUIStyle s,params GUILayoutOption[] o)=>false;
+        public static float HorizontalSlider(float v,float l,float r,params GUILayoutOption[] o)=>0f; }    public class GUILayoutOption {}
     public class GUIStyleSkin { public GUIStyle label=>new GUIStyle(); public GUIStyle button=>new GUIStyle(); public GUIStyle box=>new GUIStyle(); public GUIStyle toggle=>new GUIStyle(); }
     namespace EventSystems { public class EventSystem : Behaviour { public static EventSystem current=>null;
         public bool IsPointerOverGameObject()=>false; public bool IsPointerOverGameObject(int id)=>false; }

@@ -235,9 +235,12 @@ namespace RPG.Editor
 
                         // Simpan material baru sebagai asset (supaya tidak hilang)
                         var matPath = $"{TextureDir}/{newMat.name}.mat";
-                        // Pastikan folder ada
-                        if (!AssetDatabase.IsValidFolder(TextureDir))
-                            System.IO.Directory.CreateDirectory(TextureDir);
+                        // Pastikan folder ada -- LEWAT AssetDatabase, bukan
+                        // System.IO.Directory.CreateDirectory. Folder yang dibuat diam-diam
+                        // dengan CreateDirectory tidak dikenal AssetDatabase, jadi
+                        // CreateAsset melempar exception; exception di OnPreprocessBuild
+                        // = seluruh build APK berhenti dengan exit code 1.
+                        EnsureAssetFolder(TextureDir);
                         // Kalau sudah ada, timpa
                         var existing = AssetDatabase.LoadAssetAtPath<Material>(matPath);
                         if (existing != null)
@@ -272,6 +275,38 @@ namespace RPG.Editor
             else
             {
                 log.Add("Cel-shading: tidak ada material MToon yang perlu di-convert (mungkin sudah URP atau kapsul)");
+            }
+        }
+
+        /* Pastikan sebuah folder di bawah Assets/ dikenal AssetDatabase.
+           Dibuat lewat AssetDatabase.CreateFolder, BUKAN Directory.CreateDirectory:
+           folder yang dibuat diam-diam dengan CreateDirectory tidak dikenal
+           AssetDatabase, jadi CreateAsset melempar -- dan exception yang lolos dari
+           OnPreprocessBuild membunuh seluruh build APK dengan exit code 1.
+           Helper ini menelan semua kegagalan sendiri: gagal bikin folder tidak boleh
+           lebih fatal daripada gagal build. */
+        static void EnsureAssetFolder(string folder)
+        {
+            try
+            {
+                if (AssetDatabase.IsValidFolder(folder)) return;
+                var normalized = folder.Replace('\\', '/');
+                var parent = System.IO.Path.GetDirectoryName(normalized)?.Replace('\\', '/');
+                var name = System.IO.Path.GetFileName(normalized);
+                if (string.IsNullOrEmpty(parent) || string.IsNullOrEmpty(name)) return;
+                if (parent != "Assets" && !AssetDatabase.IsValidFolder(parent))
+                {
+                    var grand = System.IO.Path.GetDirectoryName(parent)?.Replace('\\', '/');
+                    if (!string.IsNullOrEmpty(grand))
+                        AssetDatabase.CreateFolder(grand, System.IO.Path.GetFileName(parent));
+                }
+                if (!AssetDatabase.IsValidFolder(folder))
+                    AssetDatabase.CreateFolder(parent, name);
+                AssetDatabase.Refresh();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[Aurelia] EnsureAssetFolder({folder}) gagal: {e.Message}");
             }
         }
 
