@@ -17,4 +17,7 @@ namespace UnityEditor
 {
     [AttributeUsage(AttributeTargets.Method)] public class MenuItem : Attribute { public MenuItem(string p){} public MenuItem(string p,bool v){} public MenuItem(string p,bool v,int pr){} }
     [AttributeUsage(AttributeTargets.Method)] public class InitializeOnLoadMethod : Attribute {}
+    // UnityEditor.InitializeOnLoad -- untuk kelas STATIK; Unity menjalankan static
+    // ctor-nya setiap domain script dimuat. Attributenya Accepts class, bukan method.
+    [AttributeUsage(AttributeTargets.Class)]  public class InitializeOnLoad : Attribute {}
 }
