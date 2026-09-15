@@ -251,9 +251,29 @@ jobs:
             -androidArchitecture ARM64
             -androidCreateSymbols Disabled
 
-      - name: Ruang disk setelah build
+      - name: Ruang disk setelah build + log Unity
         if: always()
-        run: df -h /
+        run: |
+          df -h /
+          echo "=== cari log Unity ==="
+          find build -type f -name "*.log" 2>/dev/null | head -20
+          ls -R build 2>/dev/null | head -100
+          cat /root/.config/unity3d/Editor.log 2>/dev/null | tail -500 || true
+          cat /home/runner/.config/unity3d/Editor.log 2>/dev/null | tail -500 || true
+          find . -name "Editor.log" 2>/dev/null | xargs ls -lh 2>/dev/null | head -20
+          find Library -name "*.log" 2>/dev/null | head -10
+
+      - name: Upload log Unity kalau gagal
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-logs
+          path: |
+            build/**/*.log
+            /root/.config/unity3d/Editor.log
+            /home/runner/.config/unity3d/Editor.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       # UniVRM mengekstrak tekstur .vrm secara sinkron, tapi membuat prefab-nya
       # lewat EditorApplication.delayCall -- yang tidak pernah jalan di batchmode.
