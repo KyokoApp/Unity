@@ -47,7 +47,7 @@ jobs:
           cp shots/*.png shots-ci/
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
-          git add shots-ci/
+          git add -f shots-ci/ # *.png di-.gitignore, paksa tambah
           if git diff --cached --quiet; then
             echo "tidak ada PNG baru, lewati commit"
           else
