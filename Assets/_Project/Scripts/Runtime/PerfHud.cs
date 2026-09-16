@@ -147,7 +147,8 @@ namespace RPG.Runtime
 
         void OnGUI()
         {
-            if (!Visible) return;
+            // IMGUI menggambar di atas segalanya — sembunyi saat loading.
+            if (!Visible || LoadingScreen.IsShown) return;
 
             var n = Mathf.Max(_samples.Count, 1);
             var avg = _sum / n;

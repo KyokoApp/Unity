@@ -107,6 +107,17 @@ namespace RPG.Runtime
         public bool ThreadActive => _worker != null && _worker.IsAlive;
         public int DiscardedBuilds { get; private set; }
 
+        /* Kemajuan streaming 0..1 — dibaca loading screen. */
+        public float Progress01
+        {
+            get
+            {
+                if (_wantedCount <= 0) return 1f;
+                return Mathf.Clamp01((float)_active.Count / _wantedCount);
+            }
+        }
+        int _wantedCount;
+
         /* ---- keadaan main-thread saja ---- */
         /* Nilai bukan cuma GameObject: jumlah segitiga/verteks ikut disimpan.
            Kalau tidak, satu-satunya cara mengetahui ukurannya adalah membaca
@@ -282,6 +293,7 @@ namespace RPG.Runtime
             foreach (var c in plan)
                 if (TerrainMesh.ChunkInWorld(c.Cx, c.Cz))
                     _wanted.Add(Key(c.Cx, c.Cz));
+            _wantedCount = _wanted.Count;
 
             // buang yang sudah tidak diminta
             var stale = new List<long>();
@@ -459,6 +471,9 @@ namespace RPG.Runtime
             foreach (var live in _active.Values) ObjectUtil.SafeDestroy(live.Go);
             _active.Clear();
             while (_pool.Count > 0) ObjectUtil.SafeDestroy(_pool.Pop());
+            // _holder dibuat di Awake — kalau tidak dihancurkan, tiap reload
+            // scene meninggalkan GameObject "TerrainChunks" kosong.
+            if (_holder != null) ObjectUtil.SafeDestroy(_holder.gameObject);
             _wake.Dispose();
         }
 

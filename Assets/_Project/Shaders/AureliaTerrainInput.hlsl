@@ -22,6 +22,8 @@ CBUFFER_START(UnityPerMaterial)
     float _LargeScale;
     float _LargeStrength;
     float _AmbientBoost;
+    float _ToonSteps;
+    float _ToonSoftness;
 CBUFFER_END
 
 #endif

@@ -11,32 +11,16 @@ namespace RPG.Runtime
        CHARACTER RIG — menulis localRotation tulang tiap frame dari
        hasil RigMapping.Resolve().
 
-       Kenapa langsung menulis Transform, bukan pakai Animator/muscle:
-       komentar di Locomotion.cs sudah mengantisipasi jalur ini
-       ("langsung menulis localRotation per Transform"). Nilai dari
-       SamplePose adalah rotasi RELATIF terhadap bind pose, jadi
-       bind pose direkam sekali di Awake lalu dikomposisikan:
+       localRotation = bindRotation * Quaternion.Euler(rad -> deg)
 
-           localRotation = bindRotation * Quaternion.Euler(rad -> deg)
+       Animator pada prefab VRM DIMATIKAN selama jalur prosedural
+       aktif. Kalau nanti kamu mengimpor animasi jadi (Mixamo /
+       Quaternius — lihat TAHAP-5.md), AnimatorBridge akan menyetel
+       ProceduralEnabled=false dan Animator kembali mengambil alih.
 
-       Animator pada prefab VRM DIMATIKAN. Alasannya: tanpa
-       RuntimeAnimatorController pun, Animator humanoid bisa menulis
-       ulang tulang tiap update dan menimpa pose kita. VRMSpringBone
-       (rok & rambut) tetap jalan karena ia LateUpdate dan menyentuh
-       tulang yang berbeda.
-
-       ----------------------------------------------------------
-       PENTING — ORIENTASI SUMBU TULANG
-       Model ini diekspor dari Blender, jadi sumbu lokal tulangnya
-       adalah hasil rigify, BUKAN sumbu ternormalisasi Unity Humanoid.
-       Arah "ayun kaki ke depan" bisa jadi sumbu X, bisa -X, bisa Z.
-       Itu tidak bisa dipastikan tanpa membuka Unity.
-
-       Karena itu tiap kelompok sendi punya pengali sumbu yang bisa
-       diubah di Inspector (SignLeg, SignArm, dst). Cara memakainya:
-       jalankan menu Tools > Aurelia > Uji pose karakter, lihat kaki
-       mana yang bergerak ke arah salah, lalu balik tanda yang
-       bersangkutan. Rinciannya di TAHAP-2.md bagian "Kalibrasi sumbu".
+       Tambahan Tahap 5: pose DIHALUSKAN antar frame (tidak patah
+       saat input berubah mendadak), badan LEAN saat berputar, dan
+       lutut MENYEKUK sesaat saat mendarat dari lompatan tinggi.
        ============================================================ */
     [DisallowMultipleComponent]
     public class CharacterRig : MonoBehaviour
@@ -49,6 +33,15 @@ namespace RPG.Runtime
                  "(pakai Avatar humanoid). Kalau gagal, otomatis turun ke pencarian nama.")]
         public bool PreferAvatarLookup = true;
 
+        [Tooltip("Kalau false, ApplyPose dilewati (untuk jalur Animator/animasi jadi).")]
+        public bool ProceduralEnabled = true;
+
+        [Header("Kehalusan")]
+        [Tooltip("Laju pose mengejar target (1/detik). Makin besar makin responsif, makin kecil makin lembut.")]
+        public float PoseSmoothRate = 14f;
+        [Tooltip("Seberapa kuat badan miring saat berputar (0 = mati).")]
+        [Range(0f, 1f)] public float LeanStrength = 0.7f;
+
         [Header("Kalibrasi sumbu — balik tanda kalau anggota badan bergerak ke arah salah")]
         [Range(-1f, 1f)] public float SignLegX = 1f, SignLegY = 1f, SignLegZ = 1f;
         [Range(-1f, 1f)] public float SignArmX = 1f, SignArmY = 1f, SignArmZ = -1f;
@@ -60,16 +53,8 @@ namespace RPG.Runtime
         [Tooltip("Kunci karakter di bind pose (untuk memeriksa apakah bind-nya benar).")]
         public bool FreezeAtBindPose = false;
 
-        /* Bind pose DISERIALISASI, bukan cuma disimpan di memori.
-
-           Alasannya konkret: menu "Tools > Aurelia > 3. Uji pose karakter"
-           memutar tulang di Edit Mode untuk kalibrasi sumbu. Perubahan yang
-           belum di-save itu IKUT terbawa waktu masuk Play Mode, jadi kalau
-           bind pose direkam ulang di Awake() ia akan merekam pose uji sebagai
-           "pose netral" dan seluruh animasi jadi miring permanen.
-
-           Dengan bind pose tersimpan di scene/prefab, Awake() hanya merekam
-           ulang kalau daftarnya kosong atau ada tulang yang hilang. */
+        /* Bind pose DISERIALISASI ... (alasan: lihat TAHAP-2.md —
+           menu uji pose di Edit Mode ikut terbawa ke Play Mode). */
         [System.Serializable]
         public struct BindEntry
         {
@@ -82,7 +67,11 @@ namespace RPG.Runtime
 
         readonly Dictionary<Joint, Transform> _bones = new Dictionary<Joint, Transform>();
         readonly Dictionary<Joint, Quaternion> _bind = new Dictionary<Joint, Quaternion>();
+        readonly Dictionary<Joint, Locomotion.Vec3> _prev = new Dictionary<Joint, Locomotion.Vec3>();
         Animator _animator;
+        float _lean;
+        float _leanTarget;
+        float _crouch;
 
         public bool IsBound => _bones.Count > 0;
         public int BoundCount => _bones.Count;
@@ -99,6 +88,7 @@ namespace RPG.Runtime
         {
             _bones.Clear();
             _bind.Clear();
+            _prev.Clear();
 
             _animator = CharacterRoot.GetComponentInChildren<Animator>();
             var missing = new List<string>();
@@ -137,8 +127,9 @@ namespace RPG.Runtime
                                               LocalRotation = _bind[kv.Key] })
                 .ToArray();
 
-            /* Animator dimatikan supaya tidak menimpa pose kita. */
-            if (_animator != null && _animator.enabled) _animator.enabled = false;
+            /* Animator hanya dimatikan di jalur prosedural. Jalur Animator
+               (animasi jadi) membutuhkannya menyala. */
+            if (_animator != null) _animator.enabled = !ProceduralEnabled;
 
             LastBindReport =
                 $"[CharacterRig] terikat {_bones.Count}/{RigMapping.AllJoints.Length} tulang " +
@@ -190,21 +181,59 @@ namespace RPG.Runtime
             return null;
         }
 
+        /* Kecepatan putar badan ternormalisasi (-1..1), diisi motor tiap
+           frame. Dipakai untuk lean (badan miring saat berputar). */
+        public void SetLean(float yawRateNorm) { _leanTarget = yawRateNorm; }
+
+        /* Sekuk lutut sesaat (0..1), dipicu saat mendarat. */
+        public void PulseCrouch(float strength)
+        {
+            _crouch = Mathf.Clamp(_crouch + strength, 0f, 1f);
+        }
+
         /* ----------------------------------------------------------
            Terapkan pose. Dipanggil dari CharacterMotor di LateUpdate
            (setelah karakter bergerak, sebelum SpringBone jalan).
            ---------------------------------------------------------- */
         public void ApplyPose(IReadOnlyDictionary<Joint, Locomotion.Vec3> pose)
         {
+            if (!ProceduralEnabled) return;
             if (FreezeAtBindPose) { ResetToBind(); return; }
+
+            var dt = Time.deltaTime;
+            var k = 1f - Mathf.Exp(-PoseSmoothRate * Mathf.Max(0f, dt));
+            _lean += (_leanTarget - _lean) * (1f - Mathf.Exp(-8f * Mathf.Max(0f, dt)));
+            _crouch *= Mathf.Exp(-6f * Mathf.Max(0f, dt));
+            if (_crouch < 0.001f) _crouch = 0f;
 
             foreach (var kv in _bones)
             {
                 if (!pose.TryGetValue(kv.Key, out var v)) continue;
+
+                // Haluskan: pose mengejar target, bukan teleport.
+                if (_prev.TryGetValue(kv.Key, out var p))
+                {
+                    v = new Locomotion.Vec3(
+                        p.X + (v.X - p.X) * k,
+                        p.Y + (v.Y - p.Y) * k,
+                        p.Z + (v.Z - p.Z) * k);
+                }
+                _prev[kv.Key] = v;
+
+                // Lean + crouch ditambahkan di ruang abstrak (sebelum tanda
+                // kalibrasi), supaya ikut arah sumbu yang benar.
+                var ex = 0.0; var ey = 0.0;
+                if (kv.Key == Joint.Chest) ey = _lean * 0.30 * LeanStrength;
+                else if (kv.Key == Joint.Spine) ey = _lean * 0.18 * LeanStrength;
+                else if (kv.Key == Joint.LeftUpperLeg || kv.Key == Joint.RightUpperLeg)
+                    ex = _crouch * 0.55;
+                else if (kv.Key == Joint.LeftLowerLeg || kv.Key == Joint.RightLowerLeg)
+                    ex = _crouch * 0.80;
+
                 GetSigns(kv.Key, out var sx, out var sy, out var sz);
                 var q = Quaternion.Euler(
-                    (float)(v.X * sx * Mathf.Rad2Deg),
-                    (float)(v.Y * sy * Mathf.Rad2Deg),
+                    (float)((v.X + ex) * sx * Mathf.Rad2Deg),
+                    (float)((v.Y + ey) * sy * Mathf.Rad2Deg),
                     (float)(v.Z * sz * Mathf.Rad2Deg));
                 kv.Value.localRotation = _bind[kv.Key] * q;
             }
@@ -228,6 +257,8 @@ namespace RPG.Runtime
         public void ResetToBind()
         {
             foreach (var kv in _bones) kv.Value.localRotation = _bind[kv.Key];
+            _prev.Clear();
+            _lean = 0f; _leanTarget = 0f; _crouch = 0f;
         }
 
         void GetSigns(Joint j, out float x, out float y, out float z)

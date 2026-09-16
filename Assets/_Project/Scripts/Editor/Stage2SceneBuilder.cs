@@ -11,7 +11,8 @@
 //   Tools > Aurelia > 1. Buat URP Asset        (sekali saja)
 //   Tools > Aurelia > 2. Bangun scene Tahap 2  (karakter saja, tanpa tanah)
 //   Tools > Aurelia > 3. Uji pose karakter     (untuk kalibrasi sumbu)
-//   Tools > Aurelia > 4. Bangun scene Tahap 3  (karakter + terrain + air)
+//   Tools > Aurelia > 4. Bangun scene Tahap 3  (karakter + terrain + air
+//       + volume/kualitas/VFX/loading/HUD Tahap 5)
 //   Tools > Aurelia > 5. Laporkan stat terrain (di Play Mode)
 //   Tools > Aurelia > Laporkan biaya karakter  (di VrmCharacterImportSettings)
 // ============================================================
@@ -189,6 +190,23 @@ namespace RPG.Editor
                           "Sore/Malam/Realtime ada di kiri-bawah layar.");
             }
 
+            // ---- volume, kualitas, VFX, boot (Tahap 5) ----------------------
+            /* StylizedVolume membangun profile-nya saat runtime; QualityApplier
+               menerapkan preset + adaptive resolution; AnimeVFX menyiapkan pool
+               sparkle-nya; WorldBoot mengatur loading -> streaming -> HUD.
+               HUD-nya sendiri (GenshinHud) dibangun WorldBoot saat runtime,
+               bukan di sini — sprite prosedural UiKit tidak selamat kalau
+               scene disimpan. Hanya di scene Tahap 3 (butuh terrain). */
+            if (withTerrain)
+            {
+                new GameObject("StylizedVolume").AddComponent<StylizedVolume>();
+                new GameObject("Quality").AddComponent<QualityApplier>();
+                new GameObject("AnimeVFX").AddComponent<AnimeVFX>();
+                new GameObject("WorldBoot").AddComponent<WorldBoot>();
+                notes.Add("Tahap 5: volume stylized (bloom+grade+vignette), quality applier " +
+                          "(preset beneran jalan), VFX anime, loading screen, HUD ala Genshin.");
+            }
+
             /* HUD performa dipasang bersama scene, bukan nanti. Alasannya:
                tanpa angka di layar, "rasanya lancar" tidak bisa dipakai untuk
                memutuskan apa pun -- dan keputusan Tahap 7 (tier kualitas)
@@ -245,6 +263,8 @@ namespace RPG.Editor
             sb.AppendLine("  Spasi               lompat");
             sb.AppendLine("  seret mouse / jari  putar kamera");
             sb.AppendLine("  HP: stik virtual muncul di kiri-bawah saat disentuh");
+            sb.AppendLine("  tombol ATK/E/Q/JMP/DSH  aksi (klik/sentuh, kanan-bawah)");
+            sb.AppendLine("  tombol '=' (kiri-atas)  buka panel PENGATURAN");
             if (notes.Count > 0)
             {
                 sb.AppendLine();
@@ -375,6 +395,17 @@ namespace RPG.Editor
             motor.Rig = rig;
             motor.Camera = Object.FindFirstObjectByType<CameraRig>();
             motor.Joystick = instance.AddComponent<TouchJoystick>();
+
+            // ---- toon (Tahap 5): VRM -> cel shading saat runtime ----------
+            var toon = instance.AddComponent<ToonCharacterSetup>();
+            toon.CharacterRoot = instance.transform;
+            toon.RampTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                "Assets/_Project/Textures/ToonRamp_Default.png");
+            /* AnimatorBridge default MATI (pose prosedural). Nyalakan + pasang
+               AnimatorController kalau mau animasi jadi — lihat TAHAP-5.md. */
+            instance.AddComponent<AnimatorBridge>().enabled = false;
+            notes.Add("Toon: material karakter dikonversi ke cel shading saat bermain " +
+                      "(outline hanya untuk opaque; transparan/cutout tanpa outline).");
 
             if (prefab != null) rig.Bind();
 

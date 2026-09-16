@@ -1,20 +1,21 @@
 // ============================================================
 // DayNightCycle.cs
 //
-// Pencahayaan Tahap 4: satu komponen yang memegang matahari, ambient,
-// warna kabut, dan warna langit (clear color kamera -- project ini
-// sengaja belum punya skydome; langit datar yang warnanya sama dengan
-// kabut membuat cakrawala menyatu).
+// Pencahayaan: matahari + ambient + kabut + LANGIT GRADIEN.
+// Langit (AureliaSky) digerakkan dari tabel keyframe yang sama,
+// jadi horizon dan kabut selalu senada — trik utama tampilan
+// stylized yang "menyatu".
 //
-// DEFAULT = REALTIME: jam berjalan terus (satu hari game = DayMinutes
-// menit dunia nyata), mulai pagi supaya kesan pertama cerah. Bisa
-// dikunci ke jam tertentu lewat tombol kecil di sudut kiri-atas
-// (Pagi / Siang / Sore / Malam / Realtime) -- game ini arena pribadi,
-// jadi "cuaca" adalah mainan, bukan gangguan.
+// CATATAN soal SDFGI/HDDAGI: itu fitur GODOT, tidak ada di Unity.
+// Di URP mobile, padanannya yang benar untuk gaya stylized BUKAN
+// realtime GI (terlalu mahal untuk HP), melainkan: 1 directional
+// light + ambient datar/trilight yang di-keyframe + skybox gradien
+// + fog berwarna. Persis yang dilakukan komponen ini.
 //
-// Warna dan intensitas diinterpolasi dari tabel keyframe jam, bukan
-// rumus astronomi: yang dicari adalah RASA (pagi keemasan, siang
-// netral, sore jingga, malam biru), bukan akurasi.
+// Perbaikan Tahap 5: kamera di-cache (dulu Camera.main tiap frame),
+// tombol tidak alokasi per frame, bayangan mati otomatis di malam
+// hari (hemat shadow pass), tombol pindah ke atas-tengah supaya
+// tidak menutupi stik.
 // ============================================================
 using UnityEngine;
 
@@ -23,8 +24,10 @@ namespace RPG.Runtime
     [DisallowMultipleComponent]
     public class DayNightCycle : MonoBehaviour
     {
-        [Header("Matahari")]
+        [Header("Matahari & langit")]
         public Light Sun;
+        [Tooltip("Material langit Aurelia/Sky. Kosong = langit warna datar (fallback lama).")]
+        public Material SkyMaterial;
 
         [Header("Waktu")]
         [Tooltip("Jam berjalan sendiri mengikuti waktu nyata.")]
@@ -38,18 +41,21 @@ namespace RPG.Runtime
 
         [HideInInspector] public float Hour;
 
-        /* Tabel keyframe: jam, warna matahari, intensitas, ambient, kabut.
-           Enam suasana: tengah malam, subuh, pagi, siang, senja, malam. */
+        [Header("Tombol suasana (alat dev)")]
+        public bool ShowButtons = true;
+
+        /* Tabel keyframe: jam, warna matahari, intensitas, ambient, kabut,
+           + warna langit (zenith & horizon). Enam suasana. */
         static readonly float[] KJam = { 0f,    4.8f,  6.5f,  9f,    15f,   17.8f, 19.5f, 24f };
         static readonly Color[] KSun =
         {
-            new Color(0.35f, 0.42f, 0.60f),   // tengah malam: bulan biru redup
-            new Color(0.45f, 0.42f, 0.55f),   // subuh
-            new Color(1.00f, 0.72f, 0.45f),   // pagi keemasan
-            new Color(1.00f, 0.96f, 0.88f),   // siang netral hangat
-            new Color(1.00f, 0.93f, 0.80f),   // sore mulai miring
-            new Color(1.00f, 0.55f, 0.28f),   // senja jingga
-            new Color(0.45f, 0.40f, 0.60f),   // biru setelah matahari pergi
+            new Color(0.35f, 0.42f, 0.60f),
+            new Color(0.45f, 0.42f, 0.55f),
+            new Color(1.00f, 0.72f, 0.45f),
+            new Color(1.00f, 0.96f, 0.88f),
+            new Color(1.00f, 0.93f, 0.80f),
+            new Color(1.00f, 0.55f, 0.28f),
+            new Color(0.45f, 0.40f, 0.60f),
             new Color(0.35f, 0.42f, 0.60f),
         };
         static readonly float[] KInt = { 0.10f, 0.12f, 0.75f, 1.05f, 0.95f, 0.70f, 0.12f, 0.10f };
@@ -75,14 +81,47 @@ namespace RPG.Runtime
             new Color(0.10f, 0.11f, 0.18f),
             new Color(0.05f, 0.06f, 0.10f),
         };
+        static readonly Color[] KTop =
+        {
+            new Color(0.015f, 0.025f, 0.07f),
+            new Color(0.10f, 0.12f, 0.22f),
+            new Color(0.45f, 0.58f, 0.78f),
+            new Color(0.36f, 0.55f, 0.82f),
+            new Color(0.38f, 0.56f, 0.80f),
+            new Color(0.28f, 0.30f, 0.52f),
+            new Color(0.05f, 0.06f, 0.14f),
+            new Color(0.015f, 0.025f, 0.07f),
+        };
+        static readonly Color[] KHor =
+        {
+            new Color(0.07f, 0.09f, 0.16f),
+            new Color(0.28f, 0.24f, 0.30f),
+            new Color(0.98f, 0.78f, 0.58f),
+            new Color(0.75f, 0.82f, 0.88f),
+            new Color(0.76f, 0.78f, 0.82f),
+            new Color(1.00f, 0.62f, 0.36f),
+            new Color(0.16f, 0.14f, 0.24f),
+            new Color(0.07f, 0.09f, 0.16f),
+        };
+
+        static readonly string[] BtnLabel = { "Pagi", "Siang", "Sore", "Malam", "Live" };
+        static readonly float[] BtnJam    = { 6.5f, 12f, 17.2f, 21.5f, -1f };
+
+        static readonly int SunDirId = Shader.PropertyToID("_SunDirection");
+        static readonly int TopId = Shader.PropertyToID("_TopColor");
+        static readonly int HorId = Shader.PropertyToID("_HorizonColor");
+        static readonly int SunColId = Shader.PropertyToID("_SunColor");
 
         GUIStyle _style;
-        int _button = 4;   // 4 = Realtime
+        Camera _cam;
+        bool _allowShadows = true;
 
         void Awake()
         {
             Hour = StartHour;
             if (Sun == null) Sun = Object.FindFirstObjectByType<Light>();
+            _cam = Camera.main;
+            RefreshSettings();
             Apply();
         }
 
@@ -104,8 +143,13 @@ namespace RPG.Runtime
             Apply();
         }
 
-        /* C# 9 (bahasa yang dipakai Unity 6) melarang baris baru di dalam
-           interpolated string, jadi suasana dihitung dulu, baru disusun. */
+        /* Dipanggil panel pengaturan setelah nilai berubah. */
+        public void RefreshSettings()
+        {
+            _allowShadows = SettingsStore.Load().Shadows;
+            Apply();
+        }
+
         public string Label
         {
             get
@@ -132,61 +176,71 @@ namespace RPG.Runtime
             var inten  = Mathf.Lerp(KInt[i], KInt[i + 1], t);
             var amb    = Color.Lerp(KAmb[i], KAmb[i + 1], t);
             var fog    = Color.Lerp(KFog[i], KFog[i + 1], t);
+            var top    = Color.Lerp(KTop[i], KTop[i + 1], t);
+            var hor    = Color.Lerp(KHor[i], KHor[i + 1], t);
 
             if (Sun != null)
             {
-                /* Matahari terbit dari timur (sumbu +X) dan terbenam di
-                   barat; malam hari ia di bawah cakrawala dan yang
-                   "tersisa" hanyalah cahaya bulan redup dari arah yang
-                   sama, dibalik. */
                 var ang = (Hour / 24f) * 360f - 90f;
                 var rad = ang * Mathf.Deg2Rad;
                 var dir = new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0.30f);
                 Sun.transform.rotation = Quaternion.LookRotation(-dir.normalized, Vector3.up);
                 Sun.color = sunCol;
                 Sun.intensity = inten;
+                // Malam hari: bayangan mati (cahaya 0,1 nyaris tak terlihat,
+                // tapi shadow pass-nya tetap dibayar kalau menyala).
+                Sun.shadows = (_allowShadows && inten > 0.25f)
+                    ? LightShadows.Soft : LightShadows.None;
             }
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = amb;
             RenderSettings.fogColor = fog;
 
-            /* Langit = clear color kamera, sama dengan fog supaya
-               cakrawala tidak punya garis batas. */
-            var cam = Camera.main;
-            if (cam != null)
+            if (SkyMaterial != null)
             {
-                cam.clearFlags = CameraClearFlags.SolidColor;
-                cam.backgroundColor = fog;
+                SkyMaterial.SetColor(TopId, top);
+                SkyMaterial.SetColor(HorId, hor);
+                SkyMaterial.SetColor(SunColId, sunCol);
+                if (Sun != null)
+                {
+                    var toSun = Sun.transform.rotation * new Vector3(0f, 0f, -1f);
+                    SkyMaterial.SetVector(SunDirId,
+                        new Vector4(toSun.x, toSun.y, toSun.z, 0f));
+                }
+            }
+            else
+            {
+                // Fallback scene lama tanpa langit: clear color = kabut.
+                if (_cam == null) _cam = Camera.main;
+                if (_cam != null)
+                {
+                    _cam.clearFlags = CameraClearFlags.SolidColor;
+                    _cam.backgroundColor = fog;
+                }
             }
         }
 
-        /* Tombol suasana. Kecil dan di sudut supaya tidak mengganggu;
-           IMGUI dipilih karena sudah dipakai PerfHud dan stik, jadi
-           tidak menambah sistem UI baru di tahap ini. */
         void OnGUI()
         {
+            if (!ShowButtons || LoadingScreen.IsShown) return;
             if (_style == null)
             {
-                _style = new GUIStyle(GUI.skin.button) { fontSize = 20 };
+                _style = new GUIStyle(GUI.skin.button) { fontSize = 18 };
             }
 
-            string[] label = { "Pagi", "Siang", "Sore", "Malam", "Realtime" };
-            float[] jam    = { 6.5f, 12f, 17.2f, 21.5f, -1f };
-
-            for (var i = 0; i < label.Length; i++)
+            const float bw = 84f, bh = 38f, gap = 6f;
+            var total = BtnLabel.Length * bw + (BtnLabel.Length - 1) * gap;
+            var x0 = (Screen.width - total) * 0.5f;
+            for (var i = 0; i < BtnLabel.Length; i++)
             {
-                var r = new Rect(12 + i * 108, Screen.height - 64, 100, 48);
-                if (GUI.Button(r, label[i], _style))
+                var r = new Rect(x0 + i * (bw + gap), 10f, bw, bh);
+                if (GUI.Button(r, BtnLabel[i], _style))
                 {
-                    _button = i;
-                    if (jam[i] < 0f) { Realtime = true; }
-                    else SetHour(jam[i], false);
+                    if (BtnJam[i] < 0f) { Realtime = true; }
+                    else SetHour(BtnJam[i], false);
                 }
             }
-
-            var info = new Rect(12, Screen.height - 92, 500, 26);
-            GUI.Label(info, Label + (_button == 4 ? "" : "  (dikunci)"), GUI.skin.label);
         }
     }
 }

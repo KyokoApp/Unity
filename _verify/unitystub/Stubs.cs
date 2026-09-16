@@ -45,7 +45,7 @@ namespace UnityEngine
            perbedaan tipe yang Unity asli tolak. */
         public static int Clamp(int v,int a,int b)=>v;  public static int CeilToInt(float v)=>0; public static int FloorToInt(float v)=>0; public static float Lerp(float a,float b,float t)=>0f;}
     public class Object { public string name; public static void Destroy(Object o){} public static void DestroyImmediate(Object o){}
-        public static T FindFirstObjectByType<T>() where T:Object => default; }
+        public static T FindFirstObjectByType<T>() where T:Object => default; public static void DontDestroyOnLoad(Object o){} }
     public class Component : Object { public Transform transform=>null; public GameObject gameObject=>null;
         public T GetComponent<T>()=>default; public T GetComponentInChildren<T>()=>default; public T[] GetComponentsInChildren<T>(bool x)=>null; }
     public class Behaviour : Component { public bool enabled; }
@@ -55,10 +55,10 @@ namespace UnityEngine
         public void SetParent(Transform p){} public void SetParent(Transform p,bool worldPositionStays){} }
     public enum PrimitiveType { Sphere, Capsule, Cylinder, Cube, Plane, Quad }
     public class GameObject : Object { public GameObject(){} public GameObject(string n){} public Transform transform=>null;
-        public string tag; public int layer; public T AddComponent<T>() where T:Component => default; public T GetComponent<T>()=>default;
+        public string tag; public int layer; public bool activeSelf=>true; public void SetActive(bool v){} public T AddComponent<T>() where T:Component => default; public T GetComponent<T>()=>default;
         public T GetComponentInChildren<T>()=>default; public T[] GetComponentsInChildren<T>(bool inc)=>null;
         public static GameObject CreatePrimitive(PrimitiveType t)=>null; }
-    public class Renderer : Component { public Material sharedMaterial; }
+    public class Renderer : Component { public Material sharedMaterial; public Material[] sharedMaterials; }
     public class MeshRenderer : Renderer { public bool receiveShadows; public UnityEngine.Rendering.ShadowCastingMode shadowCastingMode; }
     public class SkinnedMeshRenderer : Renderer { public Transform[] bones; public Mesh sharedMesh; }
     public class Mesh : Object { public int vertexCount=>0; public int subMeshCount=>0; public int blendShapeCount=>0;
@@ -81,7 +81,7 @@ namespace UnityEngine
         public static int NameToLayer(string n)=>0; public static int GetMask(params string[] n)=>0; }
     public class Collider : Component {}
     public class AudioListener : Behaviour {}
-    public class MonoBehaviour : Behaviour {}
+    public class MonoBehaviour : Behaviour { public Coroutine StartCoroutine(System.Collections.IEnumerator r)=>null; public void StopCoroutine(Coroutine c){} }
     public class ScriptableObject : Object { public static T CreateInstance<T>() where T:ScriptableObject => default; }
     public static class Debug { public static void Log(object m){} public static void LogError(object m){} public static void LogWarning(object m){} }
     public enum RenderTextureFormat { ARGB32 }
@@ -93,32 +93,35 @@ namespace UnityEngine
            mengarang overload List<> dan meloloskan kode yang tidak bisa
            dikompilasi Unity (build CI ke-8). Jangan ditambah lagi. */
         public static void DrawMeshInstanced(Mesh m,int sub,Material mat,
-            Matrix4x4[] matrices,int count){} }
-    public static class Time { public static float deltaTime=>0f; public static float unscaledDeltaTime=>0f;
+            Matrix4x4[] matrices,int count){}
+        public static void DrawMeshInstanced(Mesh m,int sub,Material mat,
+            Matrix4x4[] matrices,int count,MaterialPropertyBlock props){} }
+    public static class Time { public static float deltaTime=>0f; public static float unscaledDeltaTime=>0f; public static float unscaledTime=>0f;
         public static float time=>0f; public static float realtimeSinceStartup=>0f; public static int frameCount=>0; public static float timeScale=1f; }
     public enum ScreenOrientation { Portrait, PortraitUpsideDown, LandscapeLeft, LandscapeRight, AutoRotation }
     public static class Screen { public static int width=>0; public static int height=>0; public static ScreenOrientation orientation; }
     public static class Application { public static bool isPlaying=>false; public static bool isBatchMode=>false;
-        public static bool isEditor=>false; public static string platform=>null; public static void Quit(){} }
+        public static bool isEditor=>false; public static string platform=>null; public static void Quit(){} public static int targetFrameRate; }
     public static class PlayerPrefs { public static bool HasKey(string k)=>false; public static float GetFloat(string k)=>0f;
         public static int GetInt(string k)=>0; public static string GetString(string k)=>null; public static void SetFloat(string k,float v){}
         public static void SetInt(string k,int v){} public static void SetString(string k,string v){} public static void DeleteKey(string k){}
         public static void Save(){} }
     public static class Input { public static float GetAxisRaw(string n)=>0f; public static bool GetKey(KeyCode c)=>false;
         public static bool GetKeyDown(KeyCode c)=>false; public static bool GetMouseButton(int b)=>false;
-        public static bool GetMouseButtonDown(int b)=>false; public static Vector3 mousePosition=>default; public static int touchCount=>0;
+        public static bool GetMouseButtonDown(int b)=>false; public static Vector3 mousePosition=>default; public static bool touchSupported=>false; public static int touchCount=>0;
         public static Touch GetTouch(int i)=>default; }
     public enum KeyCode { Space, LeftShift, RightShift, F1, F2, Escape }
     public enum TouchPhase { Began, Moved, Stationary, Ended, Canceled }
     public struct Touch { public int fingerId; public Vector2 position; public TouchPhase phase; }
     public class Camera : Behaviour { public CameraClearFlags clearFlags; public float nearClipPlane, farClipPlane, fieldOfView;
-        public Color backgroundColor; public static Camera main=>null;
+        public Color backgroundColor; public float aspect; public static Camera main=>null;
         public RenderTexture targetTexture; public void Render(){}
         public void AddCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveAllCommandBuffers(){} }
     public enum CameraClearFlags { Skybox, SolidColor, Depth, Nothing }
     public class Light : Behaviour { public LightType type; public Color color; public float intensity; public LightShadows shadows; }
     public enum LightType { Directional, Point, Spot, Area } public enum LightShadows { None, Hard, Soft }
-    public class Animator : Behaviour { public bool isHuman=>false; public Transform GetBoneTransform(HumanBodyBones b)=>null; }
+    public class Animator : Behaviour { public bool isHuman=>false; public Transform GetBoneTransform(HumanBodyBones b)=>null; public RuntimeAnimatorController runtimeAnimatorController;
+        public void SetFloat(string n,float v){} public void SetBool(string n,bool v){} public void SetInteger(string n,int v){} public void SetTrigger(string n){} }
     public enum HumanBodyBones { Hips,Spine,Chest,Neck,Head,LeftUpperLeg,LeftLowerLeg,LeftFoot,LeftToes,
         RightUpperLeg,RightLowerLeg,RightFoot,RightToes,LeftUpperArm,LeftLowerArm,LeftHand,
         RightUpperArm,RightLowerArm,RightHand,LastBone }
@@ -127,8 +130,15 @@ namespace UnityEngine
         public TextureWrapMode wrapMode; public void SetPixels32(Color32[] c){} public void Apply(bool a,bool b){}
         public void Apply(){} public void ReadPixels(Rect r,int x,int y){} public byte[] EncodeToPNG()=>null; }
     public enum TextureFormat { RGBA32, RGB24 } public enum TextureWrapMode { Repeat, Clamp } public enum FilterMode { Point, Bilinear, Trilinear }
-    public class Material : Object { public Material(Shader s){} public bool HasProperty(string n)=>false; public void SetColor(string n,Color c){} }
-    public class Shader : Object { public static Shader Find(string n)=>null; }
+    public class Material : Object { public Material(Shader s){} public Shader shader; public Color color; public Texture mainTexture; public int renderQueue;
+        public bool HasProperty(string n)=>false; public void SetColor(string n,Color c){} public void SetColor(int id,Color c){}
+        public void SetFloat(string n,float v){} public void SetFloat(int id,float v){}
+        public void SetInt(string n,int v){} public void SetInt(int id,int v){}
+        public void SetTexture(string n,Texture t){} public void SetTexture(int id,Texture t){}
+        public void SetVector(string n,Vector4 v){} public void SetVector(int id,Vector4 v){}
+        public Color GetColor(string n)=>default; public float GetFloat(string n)=>0f; public Texture GetTexture(string n)=>null;
+        public void EnableKeyword(string k){} public void DisableKeyword(string k){} }
+    public class Shader : Object { public static Shader Find(string n)=>null; public static int PropertyToID(string n)=>0; }
     namespace Profiling {
         /* Harus sama dengan Unity asli. Dulu stub menaruh
            GetRuntimeMemorySizeLong di UnityEditor.EditorUtility (tidak ada di
@@ -145,7 +155,7 @@ namespace UnityEngine
     public enum FogMode { Linear, Exponential, ExponentialSquared }
     public class GUIStyle { public GUIStyle(){} public GUIStyle(GUIStyle o){} public TextAnchor alignment; public int fontSize; public GUIStyleState normal=new GUIStyleState(); }
     public class GUIStyleState { public Color textColor; }
-    public enum TextAnchor { MiddleCenter }
+    public enum TextAnchor { UpperLeft, UpperCenter, UpperRight, MiddleLeft, MiddleCenter, MiddleRight, LowerLeft, LowerCenter, LowerRight }
     public static class GUI { public static Color color; public static GUIStyleSkin skin=>new GUIStyleSkin();
         public static void DrawTexture(Rect r,Texture t){} public static void Label(Rect r,string t,GUIStyle s){}
         public static bool Button(Rect r,string t,GUIStyle s)=>false; }
@@ -163,3 +173,79 @@ namespace UnityEngine
         public enum IndexFormat { UInt16, UInt32 } }
 }
 namespace UnityEngine { public class SceneViewDummy {} }
+
+/* ===== Tambahan Tahap 5: coroutine, uGUI, Volume URP =====
+   Sama seperti stub lain di berkas ini: bentuk API-nya meniru Unity
+   asli sedekat yang dibutuhkan kode Runtime, hanya untuk pemeriksaan
+   kompilasi. */
+namespace UnityEngine
+{
+    public struct Vector4 { public float x,y,z,w; public Vector4(float x,float y,float z,float w){this.x=x;this.y=y;this.z=z;this.w=w;}
+        public static Vector4 zero=>default; }
+    public class YieldInstruction {}
+    public class WaitForSeconds : YieldInstruction { public WaitForSeconds(float seconds){} }
+    public class Coroutine : YieldInstruction {}
+    public static class Resources { public static T GetBuiltinResource<T>(string path) where T : Object => default;
+        public static T Load<T>(string path) where T : Object => default; }
+    public class RectTransform : Transform { public Vector2 anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta, offsetMin, offsetMax;
+        public Rect rect; }
+    public static class RectTransformUtility { public static bool ScreenPointToLocalPointInRectangle(RectTransform rect, Vector2 screenPoint, Camera cam, out Vector2 localPoint){localPoint=default;return false;} }
+    public enum FontStyle { Normal, Bold, Italic, BoldAndItalic }
+    public class Font : Object {}
+    public class Sprite : Object { public Rect rect; public static Sprite Create(Texture2D texture, Rect rect, Vector2 pivot)=>null; }
+    public class MaterialPropertyBlock { public void SetColor(int nameID, Color value){} public void SetColor(string name, Color value){}
+        public void SetFloat(int nameID, float value){} public void SetFloat(string name, float value){} public void Clear(){} }
+    public class RuntimeAnimatorController : Object {}
+}
+namespace UnityEngine.UI
+{
+    public enum RenderMode { ScreenSpaceOverlay, ScreenSpaceCamera, WorldSpace }
+    public enum ScaleMode { ConstantPixelSize, ScaleWithScreenSize, ConstantPhysicalSize }
+    public class Canvas : Behaviour { public RenderMode renderMode; public int sortingOrder; public float scaleFactor; public bool overrideSorting; }
+    public class CanvasScaler : Behaviour { public ScaleMode uiScaleMode; public Vector2 referenceResolution; public float matchWidthOrHeight; }
+    public class Graphic : Behaviour { public Color color; public Material material; public bool raycastTarget; }
+    public class MaskableGraphic : Graphic {}
+    public class Image : MaskableGraphic { public Sprite sprite; public Type type; public FillMethod fillMethod;
+        public float fillAmount; public bool fillClockwise; public int fillOrigin;
+        public enum Type { Simple, Sliced, Tiled, Filled }
+        public enum FillMethod { Horizontal, Vertical, Radial90, Radial180, Radial360 } }
+    public class Text : MaskableGraphic { public string text; public Font font; public int fontSize; public FontStyle fontStyle; public TextAnchor alignment; }
+    public class Button : Behaviour { public ButtonClickedEvent onClick = new ButtonClickedEvent();
+        public class ButtonClickedEvent : UnityEngine.Events.UnityEvent {} }
+    public class CanvasGroup : Behaviour { public float alpha; public bool interactable; public bool blocksRaycasts; }
+}
+namespace UnityEngine.Events
+{
+    public delegate void UnityAction();
+    public class UnityEvent { public void AddListener(UnityAction call){} public void RemoveListener(UnityAction call){} public void Invoke(){} }
+}
+namespace UnityEngine.EventSystems
+{
+    public interface IEventSystemHandler {}
+    public interface IPointerDownHandler : IEventSystemHandler { void OnPointerDown(PointerEventData eventData); }
+    public interface IPointerUpHandler : IEventSystemHandler { void OnPointerUp(PointerEventData eventData); }
+    public interface IDragHandler : IEventSystemHandler { void OnDrag(PointerEventData eventData); }
+    public class BaseEventData { public BaseEventData(EventSystem s){} }
+    public class PointerEventData : BaseEventData { public PointerEventData(EventSystem s):base(s){} public Vector2 position; public int pointerId; }
+}
+namespace UnityEngine.Rendering
+{
+    /* RenderPipelineAsset + GraphicsSettings sudah ada di EditorStubs.cs
+       (harness ini satu assembly -- deklarasi ganda = error). */
+    public class Volume : MonoBehaviour { public bool isGlobal; public float priority; public VolumeProfile profile; }
+    public class VolumeProfile : ScriptableObject { public T Add<T>(bool overrides) where T : VolumeComponent => default;
+        public bool TryGet<T>(out T component) where T : VolumeComponent { component = default; return false; }
+        public bool Has<T>() where T : VolumeComponent => false; }
+    public class VolumeComponent : ScriptableObject { public bool active = true; }
+    public class FloatParameter { public float value; public bool overrideState; }
+    public class ColorParameter { public Color value; public bool overrideState; }
+}
+namespace UnityEngine.Rendering.Universal
+{
+    public class Bloom : VolumeComponent { public FloatParameter threshold = new FloatParameter(); public FloatParameter intensity = new FloatParameter();
+        public FloatParameter scatter = new FloatParameter(); public ColorParameter tint = new ColorParameter(); }
+    public class ColorAdjustments : VolumeComponent { public FloatParameter saturation = new FloatParameter(); public FloatParameter contrast = new FloatParameter();
+        public ColorParameter colorFilter = new ColorParameter(); }
+    public class Vignette : VolumeComponent { public ColorParameter color = new ColorParameter(); public FloatParameter intensity = new FloatParameter();
+        public FloatParameter smoothness = new FloatParameter(); }
+}

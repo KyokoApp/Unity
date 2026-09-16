@@ -31,6 +31,9 @@ Shader "Aurelia/Grass"
         _WindSpeed     ("Kecepatan Angin", Range(0, 4)) = 1.1
         _FadeStart     ("Mulai Tenggelam (m)", Range(10, 80)) = 22
         _FadeEnd       ("Tenggelam Penuh (m)", Range(20, 120)) = 30
+        _WindNoise     ("Noise Angin (RG=arah, B=kekuatan)", 2D) = "gray" {}
+        _WindNoiseStrength ("Kekuatan Noise (0=sin murni)", Range(0, 1)) = 0
+        _WindNoiseScale ("Skala Noise (per meter)", Float) = 0.045
     }
 
     SubShader
@@ -83,7 +86,13 @@ Shader "Aurelia/Grass"
                 float  _WindSpeed;
                 float  _FadeStart;
                 float  _FadeEnd;
+                float  _WindNoiseStrength;
+                float  _WindNoiseScale;
             CBUFFER_END
+
+            // Tekstur di luar cbuffer (aturan Unity). Dibake oleh
+            // tools/bake_toon_textures.py, dipasang oleh scene builder.
+            TEXTURE2D(_WindNoise);   SAMPLER(sampler_WindNoise);
 
             /* Hash murah dari posisi dunia instance: tiap rumpun punya
                fase angin dan variasi rona sendiri, tanpa data per-instance. */

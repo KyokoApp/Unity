@@ -4,22 +4,23 @@ using RPG.Core;
 namespace RPG.Runtime
 {
     /* ============================================================
-       TOUCH JOYSTICK — stik virtual untuk Android.
+       TOUCH JOYSTICK — stik virtual IMGUI untuk Android.
 
-       Sengaja TIDAK pakai uGUI/Canvas di Tahap 2. HUD yang sebenarnya
-       baru dikerjakan di Tahap 5 (lihat DESAIN.md), dan membangun
-       Canvas sekarang hanya untuk dibongkar lagi nanti adalah kerja
-       ganda. Versi ini membaca Touch langsung dan menggambar dirinya
-       lewat OnGUI — cukup untuk membuktikan karakter bisa dikendalikan
-       dari layar sentuh.
+       CATATAN TAHAP 5: HUD Genshin (GenshinHud + VirtualJoystick)
+       adalah jalur utama sekarang — tampilannya konsisten dengan
+       tombol aksi. Komponen ini TETAP DIPERTAHANKAN sebagai
+       cadangan: kalau Canvas HUD gagal dibangun (atau di scene
+       Tahap 2/3 lama), stik ini yang jalan. CharacterMotor
+       otomatis memakai VirtualJoystick kalau ada, kalau tidak
+       memakai komponen ini.
 
-       Yang penting: sumbunya dihitung dengan Locomotion.JoystickAxis(),
-       fungsi yang SUDAH diuji paritas terhadap game aslinya. Jadi
-       deadzone 0,14 dan perilaku "amount" setelah deadzone persis
-       sama dengan versi three.js, bukan karangan baru.
+       Sumbunya dihitung dengan Locomotion.JoystickAxis() — deadzone
+       0,14 dan perilaku "amount" persis sama dengan game aslinya.
 
-       Radius 55 px adalah angka asli dari game lama (diameter stik
-       110 px), dikalikan ButtonScale dari setelan.
+       Perbaikan Tahap 5: tombol diskalakan mengikuti layar (dulu
+       96 px mentah = kecil sekali di HP 1080p), tombol lari
+       dilacak per jari (dulu bisa mati sendiri saat multi-sentuh),
+       dan gambar disembunyikan saat loading screen tampil.
        ============================================================ */
     [DisallowMultipleComponent]
     public class TouchJoystick : MonoBehaviour
@@ -55,14 +56,14 @@ namespace RPG.Runtime
         public bool JumpPressed { get; private set; }
 
         int _finger = int.MinValue;
+        int _runFinger = int.MinValue;
         Vector2 _origin;
         Texture2D _dot;
         double _buttonScale = 1.0;
 
         void Awake()
         {
-            var s = SettingsStore.Load();
-            _buttonScale = s.ButtonScale;
+            RefreshSettings();
         }
 
         void OnDestroy()
@@ -70,9 +71,15 @@ namespace RPG.Runtime
             ObjectUtil.SafeDestroy(_dot);
         }
 
-        public float RadiusPx =>
-            BaseRadiusPx * (float)_buttonScale *
-            (ScaleWithScreen ? Mathf.Max(0.4f, Screen.height / ReferenceScreenHeight) : 1f);
+        public void RefreshSettings()
+        {
+            _buttonScale = SettingsStore.Load().ButtonScale;
+        }
+
+        public float UiScale =>
+            ScaleWithScreen ? Mathf.Max(0.5f, Screen.height / ReferenceScreenHeight) : 1f;
+
+        public float RadiusPx => BaseRadiusPx * (float)_buttonScale * UiScale;
 
         void Update()
         {
@@ -126,10 +133,17 @@ namespace RPG.Runtime
             {
                 var t = Input.GetTouch(i);
                 if (t.fingerId == _finger) continue;
+                var up = t.phase == TouchPhase.Ended || t.phase == TouchPhase.Canceled;
 
-                if (ShowRunButton && RunButtonRect().Contains(t.position))
+                if (ShowRunButton)
                 {
-                    RunHeld = t.phase != TouchPhase.Ended && t.phase != TouchPhase.Canceled;
+                    if (t.phase == TouchPhase.Began && RunButtonRect().Contains(t.position))
+                        _runFinger = t.fingerId;
+                    if (t.fingerId == _runFinger)
+                    {
+                        if (up) _runFinger = int.MinValue;
+                        else RunHeld = true;
+                    }
                 }
                 if (ShowJumpButton && JumpButtonRect().Contains(t.position) &&
                     t.phase == TouchPhase.Began)
@@ -137,6 +151,7 @@ namespace RPG.Runtime
                     JumpPressed = true;
                 }
             }
+            if (Input.touchCount == 0) _runFinger = int.MinValue;
         }
 
         bool InZone(Vector2 p)
@@ -149,14 +164,14 @@ namespace RPG.Runtime
 
         Rect RunButtonRect()
         {
-            var s = 96f * (float)_buttonScale;
-            return new Rect(Screen.width - s - 24f, 24f, s, s);
+            var s = 96f * (float)_buttonScale * UiScale;
+            return new Rect(Screen.width - s - 24f * UiScale, 24f * UiScale, s, s);
         }
 
         Rect JumpButtonRect()
         {
-            var s = 96f * (float)_buttonScale;
-            return new Rect(Screen.width - s - 24f, 24f + s + 16f, s, s);
+            var s = 96f * (float)_buttonScale * UiScale;
+            return new Rect(Screen.width - s - 24f * UiScale, 24f * UiScale + s + 16f * UiScale, s, s);
         }
 
         GUIStyle _labelStyle;
@@ -169,7 +184,7 @@ namespace RPG.Runtime
                     _labelStyle = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
                     _labelStyle.normal.textColor = Color.white;
                 }
-                _labelStyle.fontSize = Mathf.Max(11, Mathf.RoundToInt(14f * (float)_buttonScale));
+                _labelStyle.fontSize = Mathf.Max(11, Mathf.RoundToInt(14f * (float)_buttonScale * UiScale));
                 return _labelStyle;
             }
         }
@@ -177,7 +192,9 @@ namespace RPG.Runtime
         // ------------------------------------------------------------------
         void OnGUI()
         {
-            if (!Visible) return;
+            // IMGUI selalu menggambar DI ATAS Canvas — jadi saat loading
+            // tampil, stik harus sembunyi sendiri.
+            if (!Visible || LoadingScreen.IsShown) return;
             EnsureDot();
 
             if (ShowRunButton)

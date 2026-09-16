@@ -26,6 +26,8 @@ Shader "Aurelia/Terrain"
         _LargeScale     ("Large Variation Scale", Float) = 0.012
         _LargeStrength  ("Large Variation Strength", Range(0, 0.5)) = 0.14
         _AmbientBoost   ("Ambient Boost", Range(0, 2)) = 1.0
+        _ToonSteps      ("Tingkat Cahaya Toon (2-5)", Range(2, 5)) = 3
+        _ToonSoftness   ("Kelembutan Tingkat (0=keras)", Range(0, 0.5)) = 0.30
     }
 
     SubShader
@@ -128,6 +130,16 @@ Shader "Aurelia/Terrain"
                 // DESAIN.md §4 tentang aset Kenney).
                 half diffuse = saturate(ndl * 0.5 + 0.5);
                 diffuse = diffuse * diffuse;
+
+                // Posterize LEMBUT ala Genshin: diffuse dilipat ke beberapa
+                // tingkat dengan tepi halus. Softness 0,5 = nyaris gradasi
+                // normal, 0 = garis keras. 0,30: terbaca stylized.
+                {
+                    float tx = diffuse * _ToonSteps;
+                    float tb = floor(tx) + smoothstep(0.5 - _ToonSoftness,
+                                                     0.5 + _ToonSoftness, frac(tx));
+                    diffuse = tb / _ToonSteps;
+                }
 
                 half3 ambient = SampleSH(N) * _AmbientBoost;
                 half3 lit = albedo * (ambient + mainLight.color * (mainLight.distanceAttenuation

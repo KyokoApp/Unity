@@ -6,15 +6,15 @@ namespace RPG.Runtime
     /* ============================================================
        WATER PLANE — permukaan air.
 
-       Sesuai DESAIN.md §4: "Air — shader, bukan mesh. Referensi sudah
-       ada di world-data.mjs." Jadi di sini hanya satu quad besar yang
-       mengikuti karakter, dan semua gerakannya dikerjakan di shader
-       dari posisi dunia + waktu.
+       Satu quad DATAR 1 segmen (4 verteks) yang mengikuti karakter.
+       SEMUA gelombang dihitung di fragment shader dari posisi dunia
+       + waktu (lihat AureliaWater.shader).
 
-       Kenapa quad mengikuti karakter dan bukan satu plane 3 km:
-       satu plane 3 km pada y=0 akan menutupi seluruh dunia dan
-       membuang fill-rate di tempat yang tidak terlihat. Quad 2x radius
-       streaming sudah menutup semua yang bisa terlihat.
+       PERBAIKAN BUG Tahap 5: dulu quad 8x8 (81 verteks) dengan
+       displacement di VERTEX. Di atas bentang 1.400 m itu 1 verteks
+       tiap 175 m untuk gelombang sepanjang ~110 m — undersampling
+       parah, gelombangnya terlihat acak. Sekarang quad polos +
+       normal fragment: benar DAN lebih murah.
 
        Posisinya di-SNAP ke kelipatan ukuran quad. Tanpa ini, quad yang
        mengikuti karakter akan membuat pola gelombang "berenang" mundur
@@ -59,27 +59,20 @@ namespace RPG.Runtime
         void EnsureMesh()
         {
             if (_mesh != null) return;
-            /* 8x8 subdivisi. Cukup untuk memberi gelombang skala besar sesuatu
-               untuk digerakkan di vertex shader tanpa membuat quad polos. */
-            const int N = 8;
-            var verts = new Vector3[(N + 1) * (N + 1)];
-            var uvs = new Vector2[verts.Length];
-            var tris = new int[N * N * 6];
-            for (var j = 0; j <= N; j++)
-            for (var i = 0; i <= N; i++)
+            // Satu quad: gelombang tidak butuh tessellasi karena murni
+            // dihitung di fragment (normal analitik).
+            var verts = new Vector3[]
             {
-                verts[j * (N + 1) + i] = new Vector3(i / (float)N - 0.5f, 0f, j / (float)N - 0.5f);
-                uvs[j * (N + 1) + i] = new Vector2(i / (float)N, j / (float)N);
-            }
-            var t = 0;
-            for (var j = 0; j < N; j++)
-            for (var i = 0; i < N; i++)
+                new Vector3(-0.5f, 0f, -0.5f), new Vector3(0.5f, 0f, -0.5f),
+                new Vector3(-0.5f, 0f,  0.5f), new Vector3(0.5f, 0f,  0.5f),
+            };
+            var uvs = new Vector2[]
             {
-                var a = j * (N + 1) + i; var b = a + 1; var c = a + N + 1; var d = c + 1;
-                // winding sama dengan TerrainMesh: normal harus +Y
-                tris[t++] = a; tris[t++] = c; tris[t++] = b;
-                tris[t++] = c; tris[t++] = d; tris[t++] = b;
-            }
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(0f, 1f), new Vector2(1f, 1f),
+            };
+            // winding sama dengan TerrainMesh: normal harus +Y
+            var tris = new int[] { 0, 2, 1, 2, 3, 1 };
             _mesh = new Mesh { name = "WaterQuad", vertices = verts, uv = uvs, triangles = tris };
             _mesh.RecalculateNormals();
             _mesh.RecalculateBounds();

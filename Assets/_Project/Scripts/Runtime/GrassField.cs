@@ -1,31 +1,21 @@
 // ============================================================
 // GrassField.cs
 //
-// Rumput Tahap 4: rumpun bilah bergaya stylized (ala Genshin: warna
-// gradasi pangkal->ujung, goyangan angin, tanpa tekstur) yang ditarik
-// SATU draw call per 1023 rumpun lewat Graphics.DrawMeshInstanced.
+// Rumput stylized (gradasi pangkal->ujung, goyangan angin, tanpa
+// tekstur alpha) yang ditarik SATU draw call per 1023 rumpun lewat
+// Graphics.DrawMeshInstanced.
 //
-// KENAPA INSTANCED, BUKAN MESH RAKSASA
-// ------------------------------------
-// Jumlah rumpun datang dari sistem kualitas yang sudah ada di Core
-// (GfxResolver.GrassCount -- angka yang sama dengan game three.js
-// aslinya: 9.000 rumpun di sekitar pemain pada tingkat tertinggi untuk
-// perangkat sentuh). Membangun ulang mesh 40 ribu vertex setiap pemain
-// melangkah akan menyebabkan hitch; dengan instancing, yang diperbarui
-// hanya daftar matriks per sel 8 m, dan sel yang tidak berubah dipakai
-// ulang dari cache.
-//
-// KENAPA TANPA TEKSTUR
-// --------------------
-// Tekstur alpha rumput butuh atlas + alpha-testing (sortir & bandwidth
-// di HP menengah). Bentuk bilah sudah meruncing di geometri, jadi
-// siluetnya dibaca sebagai rumput meski warnanya flat -- justru itu
-// tampilan stylized yang dicari. Angin dikerjakan di vertex shader
-// (AureliaGrass.shader), bukan di CPU.
-//
-// Penempatan deterministik: hash integer sel+indeks, jadi posisi rumput
-// sama setiap kali pemain kembali ke tempat yang sama (tidak "berkedip"
-// saat sel dibangun ulang), dan tidak butuh Random ber-seed.
+// Perbaikan Tahap 5:
+// [1] BUG CACHE: dulu RefreshCells me-Clear SEMUA sel tiap pindah
+//     sel 8 m (ribuan TerrainH + alokasi List per sel = hitch +
+//     GC). Komentar lamanya bahkan mengklaim "dipakai ulang dari
+//     cache" padahal tidak. Sekarang sel dipertahankan, yang jauh
+//     dibuang, yang baru dibangun.
+// [2] LOD DUA TINGKAT: dekat = rumpun 4 bilah, jauh = 3 quad
+//     silang (2,6x lebih murah). Tanpa ini, rumput jauh membuang
+//     vertex untuk detail yang tidak terlihat.
+// [3] Hembusan angin pakai noise texture (opsional, _WindNoise) —
+//     tanpa tekstur tetap jalan dengan gelombang sin.
 // ============================================================
 using System.Collections.Generic;
 using UnityEngine;
@@ -43,6 +33,9 @@ namespace RPG.Runtime
         [Header("Bentuk")]
         public Material GrassMaterial;
 
+        [Tooltip("Noise angin (RG=arah, B=kekuatan). Kosong = sin murni.")]
+        public Texture WindNoise;
+
         [Tooltip("Radius sebaran rumput di sekitar target (m).")]
         [Range(10f, 60f)] public float Radius = 30f;
 
@@ -52,34 +45,40 @@ namespace RPG.Runtime
         [Tooltip("Rumpun per sel pada tingkat kualitas penuh; skala kualitas diterapkan di Awake.")]
         [Range(4, 96)] public int PerCellBase = 26;
 
+        [Tooltip("Di bawah jarak ini (m) dipakai mesh detail; di atasnya mesh silang murah.")]
+        [Range(6f, 40f)] public float LodDistance = 14f;
+
         public int ActiveClumps { get; private set; }
-        public int ActiveCells  => _cells.Count;
+        public int ActiveCells => _near.Count + _far.Count;
+        public int NearClumps { get; private set; }
+        public int FarClumps { get; private set; }
 
         Mesh _clump;
-        readonly Dictionary<long, Matrix4x4[]> _cells = new Dictionary<long, Matrix4x4[]>();
+        Mesh _farClump;
+        readonly Dictionary<long, Matrix4x4[]> _near = new Dictionary<long, Matrix4x4[]>();
+        readonly Dictionary<long, Matrix4x4[]> _far = new Dictionary<long, Matrix4x4[]>();
+        readonly HashSet<long> _wanted = new HashSet<long>();
+        readonly List<long> _drop = new List<long>();
         /* DrawMeshInstanced di Unity 6 hanya menerima Matrix4x4[] (tidak ada
            overload List<>), jadi pakai array pakai-ulang: tanpa alokasi per
            frame, tanpa GC pressure di HP. */
         readonly Matrix4x4[] _batch = new Matrix4x4[1023];
-        int _batchN;
         int _lastCx = int.MinValue, _lastCz;
         int _perCell;
         bool _on;
+
+        static readonly int WindNoiseId = Shader.PropertyToID("_WindNoise");
+        static readonly int WindNoiseStrId = Shader.PropertyToID("_WindNoiseStrength");
 
         void Awake() => EnsureInit();
 
         /* Inisialisasi idempoten. PENTING: di edit mode (screenshot batchmode)
            Awake() TIDAK dijamin dipanggil saat AddComponent, jadi semua jalur
-           masuk (DrawNow/PopulateNow/BakeInto) memastikan state siap dulu.
-           Di play mode ini hanya berjalan sekali dari Awake. */
+           masuk (DrawNow/PopulateNow/BakeInto) memastikan state siap dulu. */
         void EnsureInit()
         {
             if (_clump != null) return;
 
-            /* Tingkat kualitas dibaca dari setelan tersimpan, supaya rumput
-               ikut preset rendah/tinggi yang nanti dipilih pemain -- dan
-               supaya build CI (tanpa PlayerPrefs) jatuh ke default
-               'balanced', bukan ke nol. */
             var resolved = GfxResolver.Resolve(SettingsStore.Load(), true);
             _on = resolved.GrassEnabled;
             if (!_on) return;
@@ -90,12 +89,34 @@ namespace RPG.Runtime
             _perCell = Mathf.Max(4, Mathf.RoundToInt(PerCellBase * (float)scale));
 
             _clump = BuildClump();
+            _farClump = BuildFarClump();
+
+            if (GrassMaterial != null && WindNoise != null &&
+                GrassMaterial.HasProperty("_WindNoise"))
+            {
+                GrassMaterial.SetTexture(WindNoiseId, WindNoise);
+                GrassMaterial.SetFloat(WindNoiseStrId, 0.65f);
+            }
 
             if (Target == null)
             {
                 var motor = Object.FindFirstObjectByType<CharacterMotor>();
                 if (motor != null) Target = motor.transform;
             }
+        }
+
+        /* Dipanggil panel pengaturan / QualityApplier setelah preset berubah. */
+        public void RefreshSettings()
+        {
+            var resolved = GfxResolver.Resolve(SettingsStore.Load(), true);
+            _on = resolved.GrassEnabled;
+            var scale = resolved.GrassCount > 0 && PerCellBase > 0
+                ? (double)resolved.GrassCount / (PerCellBase * CellCount())
+                : 0.0;
+            _perCell = Mathf.Max(4, Mathf.RoundToInt(PerCellBase * (float)scale));
+            _near.Clear();
+            _far.Clear();
+            _lastCx = int.MinValue;
         }
 
         int CellCount()
@@ -113,10 +134,9 @@ namespace RPG.Runtime
 
         /* Diagnosa ringkas — dipakai SceneShots lewat log CI. */
         public string InitState =>
-            $"on={_on} clump={_clump != null} target={Target != null} perCell={_perCell} cells={_cells.Count}";
+            $"on={_on} clump={_clump != null} target={Target != null} perCell={_perCell} " +
+            $"cells={ActiveCells} near={NearClumps} far={FarClumps}";
 
-        /* Untuk screenshot batchmode (tidak ada loop Update di edit mode)
-           dan untuk kasus Target dipindah teleport. */
         public void PopulateNow()
         {
             EnsureInit();
@@ -131,103 +151,119 @@ namespace RPG.Runtime
 
             RefreshCells(Target.position, false);
 
-            _batchN = 0;
-            ActiveClumps = 0;
-            foreach (var kv in _cells)
+            ActiveClumps = 0; NearClumps = 0; FarClumps = 0;
+            FlushSet(_near, _clump, true);
+            FlushSet(_far, _farClump, false);
+        }
+
+        void FlushSet(Dictionary<long, Matrix4x4[]> set, Mesh mesh, bool near)
+        {
+            var n = 0;
+            var count = 0;
+            foreach (var kv in set)
             {
                 var arr = kv.Value;
                 for (var i = 0; i < arr.Length; i++)
                 {
-                    _batch[_batchN++] = arr[i];
-                    if (_batchN == 1023) Flush();
+                    _batch[n++] = arr[i];
+                    if (n == 1023)
+                    {
+                        Graphics.DrawMeshInstanced(mesh, 0, GrassMaterial, _batch, n);
+                        count += n; n = 0;
+                    }
                 }
             }
-            Flush();
+            if (n > 0)
+            {
+                Graphics.DrawMeshInstanced(mesh, 0, GrassMaterial, _batch, n);
+                count += n;
+            }
+            ActiveClumps += count;
+            if (near) NearClumps = count; else FarClumps = count;
         }
 
         /* KHUSUS SCREENSHOT (dipakai Editor/SceneShots): gabungan SEMUA
-           instance jadi SATU mesh bake world-space. Jalur ini kebal terhadap
-           quirks pipeline (CommandBuffer kamera di URP bisa diam-diam
-           diabaikan; DrawMeshInstanced biasa butuh frame berikutnya).
-           2.250 instance x 15 vertex = ~34 ribu vertex — ringan untuk
-           sekali render editor. Play mode tetap pakai instancing. */
+           instance jadi mesh bake world-space. */
         public int BakeInto(Mesh dst)
         {
             EnsureInit();
             if (!_on || _clump == null || Target == null || dst == null) return 0;
             RefreshCells(Target.position, false);
-            var sv = _clump.vertices; var su = _clump.uv; var sc = _clump.colors; var st = _clump.triangles;
-            if (sv == null || st == null) return 0;
-            /* Mesh.colors yang TIDAK pernah diisi mengembalikan array KOSONG
-               di Unity (bukan null) — menyalin sc[i] langsung meledak dengan
-               IndexOutOfRangeException (kejadian di run 34943282165).
-               Warna vertex memang opsional: shader memakai uv untuk gradasi. */
-            var hasC = sc != null && sc.Length == sv.Length;
-            var hasU = su != null && su.Length == sv.Length;
-            var perV = sv.Length; var perT = st.Length;
-            var n = 0; foreach (var kv in _cells) n += kv.Value.Length;
-            if (n == 0 || perV == 0) return 0;
-            var V = new Vector3[n * perV]; var U = new Vector2[n * perV]; var C = new Color[n * perV]; var T = new int[n * perT];
-            var vi = 0; var ti = 0; var baseV = 0;
-            foreach (var kv in _cells)
-            {
-                foreach (var m in kv.Value)
-                {
-                    for (var i = 0; i < perV; i++)
-                    {
-                        V[vi] = m.MultiplyPoint3x4(sv[i]);
-                        U[vi] = hasU ? su[i] : Vector2.zero;
-                        C[vi] = hasC ? sc[i] : Color.white;
-                        vi++;
-                    }
-                    for (var i = 0; i < perT; i++) T[ti++] = st[i] + baseV;
-                    baseV += perV;
-                }
-            }
-            dst.vertices = V; dst.uv = U; dst.colors = C; dst.triangles = T;
+
+            var V = new List<Vector3>();
+            var U = new List<Vector2>();
+            var T = new List<int>();
+            var n = BakeSet(_near, _clump, V, U, T) + BakeSet(_far, _farClump, V, U, T);
+            if (n == 0) return 0;
+            dst.vertices = V.ToArray();
+            dst.uv = U.ToArray();
+            dst.triangles = T.ToArray();
             dst.RecalculateBounds();
             return n;
         }
 
-        /* Untuk screenshot batchmode: DrawMeshInstanced yang dipanggil
-           "apa adanya" hanya ikut pada render frame berikutnya, dan di
-           edit mode tidak ada frame berikutnya sebelum cam.Render().
-           Lewat CommandBuffer, perintah gambarnya MENEMPEL di kamera,
-           jadi pasti ikut saat kamera dirender manual. */
+        static int BakeSet(Dictionary<long, Matrix4x4[]> set, Mesh src,
+                           List<Vector3> V, List<Vector2> U, List<int> T)
+        {
+            var sv = src.vertices; var su = src.uv; var st = src.triangles;
+            if (sv == null || st == null || sv.Length == 0) return 0;
+            var hasU = su != null && su.Length == sv.Length;
+            var n = 0;
+            foreach (var kv in set)
+            {
+                foreach (var m in kv.Value)
+                {
+                    var baseV = V.Count;
+                    for (var i = 0; i < sv.Length; i++)
+                    {
+                        V.Add(m.MultiplyPoint3x4(sv[i]));
+                        U.Add(hasU ? su[i] : Vector2.zero);
+                    }
+                    for (var i = 0; i < st.Length; i++) T.Add(st[i] + baseV);
+                    n++;
+                }
+            }
+            return n;
+        }
+
         public void DrawInto(UnityEngine.Rendering.CommandBuffer cmd)
         {
             if (!_on || _clump == null || GrassMaterial == null || Target == null || cmd == null) return;
             RefreshCells(Target.position, false);
-            _batchN = 0;
-            foreach (var kv in _cells)
+            DrawSetInto(cmd, _near, _clump);
+            DrawSetInto(cmd, _far, _farClump);
+        }
+
+        void DrawSetInto(UnityEngine.Rendering.CommandBuffer cmd,
+                         Dictionary<long, Matrix4x4[]> set, Mesh mesh)
+        {
+            var n = 0;
+            foreach (var kv in set)
             {
                 var arr = kv.Value;
                 for (var i = 0; i < arr.Length; i++)
                 {
-                    _batch[_batchN++] = arr[i];
-                    if (_batchN == 1023) { cmd.DrawMeshInstanced(_clump, 0, GrassMaterial, 0, _batch, _batchN); _batchN = 0; }
+                    _batch[n++] = arr[i];
+                    if (n == 1023)
+                    {
+                        cmd.DrawMeshInstanced(mesh, 0, GrassMaterial, 0, _batch, n);
+                        n = 0;
+                    }
                 }
             }
-            if (_batchN > 0) cmd.DrawMeshInstanced(_clump, 0, GrassMaterial, 0, _batch, _batchN);
-            _batchN = 0;
-        }
-
-        void Flush()
-        {
-            if (_batchN == 0) return;
-            Graphics.DrawMeshInstanced(_clump, 0, GrassMaterial, _batch, _batchN);
-            ActiveClumps += _batchN;
-            _batchN = 0;
+            if (n > 0) cmd.DrawMeshInstanced(mesh, 0, GrassMaterial, 0, _batch, n);
         }
 
         void RefreshCells(Vector3 p, bool force)
         {
             var cx = Mathf.FloorToInt(p.x / CellSize);
             var cz = Mathf.FloorToInt(p.z / CellSize);
-            if (!force && cx == _lastCx && cz == _lastCz && _cells.Count > 0) return;
+            if (!force && cx == _lastCx && cz == _lastCz && ActiveCells > 0) return;
             _lastCx = cx; _lastCz = cz;
 
-            _cells.Clear();
+            // Sel dipertahankan antar refresh: hanya sel BARU yang dibangun
+            // (mahal: ratusan TerrainH), sel yang JAUH yang dibuang.
+            _wanted.Clear();
             var n = Mathf.CeilToInt(Radius / CellSize);
             var r2 = Radius * Radius;
             for (var x = cx - n; x <= cx + n; x++)
@@ -237,10 +273,21 @@ namespace RPG.Runtime
                     var dx = (x + 0.5f) * CellSize - p.x;
                     var dz = (z + 0.5f) * CellSize - p.z;
                     if (dx * dx + dz * dz > r2) continue;
+                    var key = Key(x, z);
+                    _wanted.Add(key);
+                    if (_near.ContainsKey(key) || _far.ContainsKey(key)) continue;
+                    var near = Mathf.Sqrt(dx * dx + dz * dz) < LodDistance;
                     var cell = PlaceCell(x, z, p);
-                    if (cell.Length > 0) _cells[Key(x, z)] = cell;
+                    if (cell.Length > 0) (near ? _near : _far)[key] = cell;
                 }
             }
+
+            _drop.Clear();
+            foreach (var k in _near.Keys) if (!_wanted.Contains(k)) _drop.Add(k);
+            foreach (var k in _drop) _near.Remove(k);
+            _drop.Clear();
+            foreach (var k in _far.Keys) if (!_wanted.Contains(k)) _drop.Add(k);
+            foreach (var k in _drop) _far.Remove(k);
         }
 
         static long Key(int x, int z) => ((long)x << 32) | (uint)z;
@@ -249,8 +296,7 @@ namespace RPG.Runtime
         {
             /* Hamparan padat di dekat pemain lalu menipis ke arah tepi —
                caranya membagi anggaran instance yang SAMA, supaya kesan
-               "padang rumput" terbaca tanpa menambah biaya GPU. Bagian jauh
-               toh tenggelam oleh fade & kabut. */
+               "padang rumput" terbaca tanpa menambah biaya GPU. */
             var ccx = (cx + 0.5f) * CellSize;
             var ccz = (cz + 0.5f) * CellSize;
             var d = Vector3.Distance(new Vector3(ccx, 0f, ccz), new Vector3(focus.x, 0f, focus.z));
@@ -269,9 +315,6 @@ namespace RPG.Runtime
                 var x = ox + hx * CellSize;
                 var z = oz + hz * CellSize;
 
-                /* Tidak ada rumput di bawah permukaan air, dan tidak di
-                   tebing curam: selain aneh dilihat, bilah di tebing akan
-                   menonjol keluar dari lereng. */
                 var y = (float)WorldData.TerrainH(x, z);
                 if (y < WorldData.WaterLevel + 0.25f) continue;
                 var y2 = (float)WorldData.TerrainH(x + 1f, z);
@@ -280,7 +323,7 @@ namespace RPG.Runtime
 
                 var yaw   = hr * 360f;
                 var scale = 0.75f + Hash3(cx, cz, i * 5 + 1) * 0.65f;
-                var pos   = new Vector3(x, y - 0.04f, z);   // sedikit tenggelam supaya pangkal tidak mengambang
+                var pos   = new Vector3(x, y - 0.04f, z);
                 list.Add(Matrix4x4.TRS(pos, Quaternion.Euler(0f, yaw, 0f), new Vector3(scale, scale, scale)));
             }
             return list.ToArray();
@@ -296,11 +339,8 @@ namespace RPG.Runtime
             return v / (float)0x7fffffff;
         }
 
-        /* Satu rumpun = 3 bilah meruncing, masing-masing 3 penampang
-           (pangkal-lebar, tengah, ujung-runcing). 18 vertex, 12 segitiga:
-           cukup murah untuk ribuan instance, cukup berbentuk untuk dibaca
-           sebagai rumput. uv.y = tinggi normalized (0..1) untuk gradasi
-           warna dan amplitudo angin di shader. */
+        /* LOD DEKAT: rumpun 4 bilah meruncing (24 vertex, 16 segitiga).
+           uv.y = tinggi normalized untuk gradasi + amplitudo angin. */
         static Mesh BuildClump()
         {
             var verts  = new List<Vector3>();
@@ -319,7 +359,6 @@ namespace RPG.Runtime
                 var fwd   = rot * lean * Vector3.forward;
                 var side  = rot * Vector3.right;
 
-                /* penampang: (tinggi, lebar, lengkung ke depan) */
                 float[] ys = { 0f, h * 0.55f, h };
                 float[] ws = { w, w * 0.62f, 0.004f };
                 float[] cu = { 0f, 0.05f, 0.16f };
@@ -348,6 +387,46 @@ namespace RPG.Runtime
             mesh.vertices  = verts.ToArray();
             mesh.normals   = norms.ToArray();
             mesh.uv        = uvs.ToArray();
+            mesh.triangles = tris.ToArray();
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
+        /* LOD JAUH: 3 quad silang (12 vertex, 6 segitiga) — dari >14 m
+           bentuknya terbaca sama, biayanya 2,6x lebih kecil. Shader yang
+           sama (gradasi + angin dari uv.y), jadi transisinya mulus. */
+        static Mesh BuildFarClump()
+        {
+            var verts = new List<Vector3>();
+            var norms = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+
+            for (var b = 0; b < 3; b++)
+            {
+                var yaw = b * 60f + b * 13f;
+                var rot = Quaternion.Euler(0f, yaw, 0f);
+                var side = rot * Vector3.right;
+                var fwd = rot * Vector3.forward;
+                var w = 0.17f;
+                var h = 0.34f;
+                var baseIdx = verts.Count;
+
+                verts.Add(-side * w); verts.Add(side * w);
+                verts.Add(-side * w * 0.55f + Vector3.up * h);
+                verts.Add(side * w * 0.55f + Vector3.up * h);
+                for (var k = 0; k < 4; k++) norms.Add(fwd);
+                uvs.Add(new Vector2(0f, 0f)); uvs.Add(new Vector2(1f, 0f));
+                uvs.Add(new Vector2(0.2f, 1f)); uvs.Add(new Vector2(0.8f, 1f));
+                tris.Add(baseIdx); tris.Add(baseIdx + 1); tris.Add(baseIdx + 2);
+                tris.Add(baseIdx + 2); tris.Add(baseIdx + 1); tris.Add(baseIdx + 3);
+            }
+
+            var mesh = new Mesh();
+            mesh.name = "AureliaGrassFar";
+            mesh.vertices = verts.ToArray();
+            mesh.normals = norms.ToArray();
+            mesh.uv = uvs.ToArray();
             mesh.triangles = tris.ToArray();
             mesh.RecalculateBounds();
             return mesh;

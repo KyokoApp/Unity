@@ -20,7 +20,7 @@ namespace UnityEditor
     public static class EditorUtility { public static void SetDirty(Object o){}
         public static bool DisplayDialog(string t,string m,string ok)=>true;
         public static bool DisplayDialog(string t,string m,string ok,string cancel)=>true; }
-    public static class Selection { public static GameObject activeGameObject; }
+    public static class Selection { public static GameObject activeGameObject; public static Object[] objects; }
     public class SceneView { public static void FrameLastActiveSceneView(){} public static void RepaintAll(){} }
     public static class PrefabUtility { public static Object InstantiatePrefab(Object o)=>null; }
     public class AssetPostprocessor { public string assetPath; public AssetImporter assetImporter=>null; }
@@ -88,6 +88,7 @@ namespace UnityEngine.Rendering.Universal
 {
     public class UniversalRendererData : UnityEngine.Rendering.ScriptableRendererData {}
     public class UniversalRenderPipelineAsset : UnityEngine.Rendering.RenderPipelineAsset {
-        public static UniversalRenderPipelineAsset Create(UnityEngine.Rendering.ScriptableRendererData r)=>null; }
+        public static UniversalRenderPipelineAsset Create(UnityEngine.Rendering.ScriptableRendererData r)=>null;
+        public float renderScale; public float shadowDistance; public int shadowCascadeCount; }
 }
 namespace UnityEngine { public static class QualitySettings { public static UnityEngine.Rendering.RenderPipelineAsset renderPipeline; } }

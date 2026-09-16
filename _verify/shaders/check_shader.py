@@ -7,12 +7,18 @@ Apa yang bisa dibuktikan di sini:
   - kurung kurawal seimbang, HLSLPROGRAM/ENDHLSL berpasangan
   - setiap Pass punya #pragma vertex dan #pragma fragment
   - isi Properties{} dan CBUFFER_START(UnityPerMaterial) SAMA PERSIS
+    (kecuali properti tekstur — lihat di bawah)
 
 Poin terakhir itu yang penting. SRP Batcher menolak shader yang properti
 materialnya tidak seluruhnya berada di cbuffer UnityPerMaterial, dan penolakan
 itu tidak memunculkan error apa pun -- hanya tulisan kecil "not compatible" di
 Inspector sementara draw call membengkak. Membandingkan dua daftar secara
 mekanis jauh lebih andal daripada membacanya.
+
+PENGECUALIAN TEKSTUR (aturan Unity, bukan kelonggaran): properti bertipe
+2D/Cube/Rect/3D TIDAK BOLEH di dalam cbuffer. Mereka wajib dideklarasikan
+di luar cbuffer lewat TEXTURE2D(nama) + SAMPLER(sampler_nama), dan pemeriksa
+ini menuntut deklarasi itu ada.
 
 Apa yang TIDAK bisa dibuktikan di sini: sintaks HLSL, keberadaan include URP,
 dan hasil visual. Itu hanya bisa diuji di Unity.
@@ -22,16 +28,30 @@ import re, sys, glob, os
 HERE       = os.path.dirname(os.path.abspath(__file__))
 PROJECT    = os.path.abspath(os.path.join(HERE, "..", ".."))          # akar repo Unity
 SHADER_DIR = os.path.join(PROJECT, "Assets", "_Project", "Shaders")
-EXPECTED = {"AureliaTerrain.shader": "Aurelia/Terrain", "AureliaWater.shader": "Aurelia/Water"}
+EXPECTED = {"AureliaTerrain.shader": "Aurelia/Terrain", "AureliaWater.shader": "Aurelia/Water",
+            "AureliaToon.shader": "Aurelia/Toon", "AureliaToonLite.shader": "Aurelia/ToonLite",
+            "AureliaSky.shader": "Aurelia/Sky", "AureliaSparkle.shader": "Aurelia/Sparkle",
+            "AureliaGrass.shader": "Aurelia/Grass"}
+
+TEXTURE_TYPES = {"2D", "Cube", "Rect", "3D", "2DArray", "CubeArray"}
 
 def strip_comments(s):
     s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
     return re.sub(r"//[^\n]*", "", s)
 
 def properties_of(s):
+    """(properti_biasa, properti_tekstur). Atribut [..] di depan nama
+    diabaikan."""
     m = re.search(r"Properties\s*\{(.*?)\n\s*\}", s, re.S)
-    if not m: return []
-    return re.findall(r"^\s*(\w+)\s*\(", m.group(1), re.M)
+    if not m: return [], []
+    props, texs = [], []
+    for line in m.group(1).split("\n"):
+        mm = re.match(r"\s*(?:\[[^\]]*\]\s*)*(\w+)\s*\(\s*\"[^\"]*\"\s*,\s*(\w+)", line)
+        if not mm: continue
+        name, typ = mm.group(1), mm.group(2)
+        props.append(name)
+        if typ in TEXTURE_TYPES: texs.append(name)
+    return props, texs
 
 def resolve_includes(body):
     """Ganti #include "Assets/..." dengan isi filenya, kalau file itu ada di
@@ -102,12 +122,24 @@ def main():
         print(f"  [{'ok' if good else 'GAGAL'}] Pass={npass}, pragma vertex={nv}, fragment={nf}")
         ok &= good
 
-        props = properties_of(s)
+        props, texprops = properties_of(s)
+        resolved_all = resolve_includes(s)
         per_pass = cbuffer_per_pass(s)
         good = True
+        # Properti tekstur: wajib ada TEXTURE2D(nama), dan wajib TIDAK
+        # ada di dalam cbuffer.
+        for tp in texprops:
+            if not re.search(r"TEXTURE2D\s*\(\s*" + re.escape(tp) + r"\s*\)", resolved_all):
+                good = False
+                print(f"        tekstur {tp}: tidak ada deklarasi TEXTURE2D({tp})")
+        plain = [p for p in props if p not in texprops]
         for i, cbuf in enumerate(per_pass):
-            miss_cb = [p for p in props if p not in cbuf]
+            miss_cb = [p for p in plain if p not in cbuf]
             miss_pr = [c for c in cbuf if c not in props]
+            tex_in_cb = [t for t in texprops if t in cbuf]
+            if tex_in_cb:
+                good = False
+                print(f"        Pass {i+1}: tekstur {tex_in_cb} ada di cbuffer (harusnya TEXTURE2D di luar)")
             if miss_cb or miss_pr:
                 good = False
                 print(f"        Pass {i+1}: kurang di cbuffer {miss_cb}; berlebih {miss_pr}")
@@ -126,7 +158,7 @@ def main():
         # --- cek 7: nama parameter fungsi tidak boleh keyword HLSL (in/out) ---
         bad = [m.group(0) for m in re.finditer(r"(Attributes|Varyings)\s+(in|out)\s*\)", s)]
         if bad:
-            print(f"  [GAGAL] parameter fungsi memakai keyword HLSL: {bad} -- ganti nama (mis. i/v)")
+            print(f"  [GAGAL] parameter fungsi memakai keyword HLSL: {bad} -- ganti nama (mis. v)")
             ok = False
         else:
             print("  [ok] tidak ada parameter fungsi bernama keyword HLSL (in/out)")
