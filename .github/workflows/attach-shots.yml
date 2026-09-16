@@ -1,0 +1,31 @@
+# Utilitas sekali-pakai: memindahkan PNG dari artifact 'screenshots' sebuah run
+# ke halaman Release, supaya bisa diunduh tanpa akses artifact GitHub Actions.
+# Dipakai untuk run 35082152939 (sandbox tidak bisa menjangkau blob storage).
+name: Lampirkan Screenshot ke Release
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'ID run sumber artifact (mis. 35082152939)'
+        required: true
+      tag:
+        description: 'Tag release tujuan (mis. v0.3.0-tahap5b)'
+        required: true
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: screenshots
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: shots
+      - run: ls -la shots/
+      - name: Unggah PNG ke Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ inputs.tag }}" shots/*.png --clobber
