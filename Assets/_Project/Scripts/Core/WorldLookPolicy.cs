@@ -34,7 +34,7 @@ namespace RPG.Core
         public const double AmbientFloor = 0.28;
 
         /* Fog/MixFog tidak boleh menelan albedo di bawah ini. */
-        public const double KeepVisible = 0.12;
+        public const double KeepVisible = 0.40;
 
         public static bool UseSolidSky(bool mobilePlayer) => mobilePlayer;
 

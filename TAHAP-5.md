@@ -9,8 +9,8 @@
 1. Buka proyek di Unity 6000.0.32f1, pastikan paket URP + UniVRM terinstal.
 2. Menu **Tools > Aurelia > 4. Bangun scene Tahap 3** (scene ini sekarang
    sudah termasuk semua sistem Tahap 5: toon, volume, HUD, loading, VFX).
-3. Tekan Play: loading krem → dunia → HUD ala Genshin. Tombol `=` (kiri atas)
-   membuka panel PENGATURAN (kualitas, fps, bloom, bayangan, ...).
+3. Tekan Play: **langsung dunia** (loading screen dihapus di Tahap 5f) +
+   HUD ala Genshin. Tombol `=` (kiri atas) membuka panel PENGATURAN.
 
 Material permanen (properti/NPC/senjata): pilih material di Project →
 menu **Aurelia > Toon > Bake Selected Materials To Toon**.
@@ -156,4 +156,18 @@ Perbaikan:
    suasana default mati (F2), TouchJoystick IMGUI mundur kalau
    `GenshinHud` sudah ada (stik + ATK/JMP canvas yang dipakai).
 
-Kamera Genshin ~3,2 m dan boot 5d tetap. **Tahap 6 (golem) belum.**
+Kamera Genshin ~3,2 m dan boot 5d tetap.
+
+## 10. Tahap 5f — loading dihapus, tanah UNLIT
+
+User 2026-09-17: loading masih macet, dunia masih hitam. Keputusan:
+
+1. **Tidak ada loading screen.** `WorldBoot` masuk dunia di `Awake`.
+   Motor + kamera tidak pernah dimatikan. Overlay krem tidak dibuat.
+2. **Terrain UNLIT** (vertex color saja, tanpa `Lighting.hlsl` /
+   shadow / MixFog). Itu yang membuat HP hitam. Fog, bayangan, bloom,
+   rumput, post-process dimatikan. `WorldLookDriver` tiap LateUpdate
+   memaksa langit SolidColor biru.
+3. Rumput menyusul di Tahap 6, setelah tanah kelihatan.
+
+**Tahap 6 (golem) belum.**

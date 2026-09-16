@@ -27,7 +27,7 @@ half3 AureliaFill(half3 albedo, half boost)
 
 half3 AureliaKeepVisible(half3 lit, half3 albedo)
 {
-    return max(lit, albedo * 0.12);
+    return max(lit, albedo * 0.40);
 }
 
 #endif

@@ -110,7 +110,9 @@ namespace RPG.Runtime
 
         static void ApplyFog(GfxResolver.Resolved r)
         {
-            RenderSettings.fog = true;
+            /* Fog di HP + MixFog shader = dunia hitam (unity_FogColor
+               sering 0). Dunia harus kelihatan dulu. */
+            RenderSettings.fog = false;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogStartDistance = r.FogNear;
             RenderSettings.fogEndDistance = r.FogFar;
@@ -144,8 +146,8 @@ namespace RPG.Runtime
         {
             var vol = FindFirstObjectByType<StylizedVolume>();
             if (vol == null || vol.Volume == null) return;
-            vol.SetBloomLevel(r.BloomLevel);
-            vol.Volume.enabled = r.PostEnabled;
+            vol.SetBloomLevel(0);
+            vol.Volume.enabled = false;
         }
 
         static void ApplyShadows(GfxResolver.Resolved r)

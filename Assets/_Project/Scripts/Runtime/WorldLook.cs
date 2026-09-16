@@ -36,8 +36,8 @@ namespace RPG.Runtime
                 var data = cam.GetUniversalAdditionalCameraData();
                 if (data != null)
                 {
-                    data.renderPostProcessing = true;
-                    data.renderShadows = true;
+                    data.renderPostProcessing = false;
+                    data.renderShadows = false;
                 }
             }
             catch { /* stub / URP belum siap: kamera tetap jalan */ }
@@ -97,19 +97,59 @@ namespace RPG.Runtime
         public static void OnEnteredWorld()
         {
             HideDevChrome();
-            var cam = Camera.main;
+            ForceVisibleFrame();
+
+            var grass = Object.FindFirstObjectByType<GrassField>();
+            if (grass != null)
+            {
+                EnableInstancing(grass.GrassMaterial);
+                grass.enabled = false; // jangan spam instancing sampai dunia terlihat
+            }
+
+            var vfx = Object.FindFirstObjectByType<AnimeVFX>();
+            if (vfx != null) EnableInstancing(vfx.SparkleMaterial);
+        }
+
+        /* Dipanggil setiap LateUpdate oleh WorldLookDriver.
+           Menimpa fog/skybox/HDR/post/bayangan yang membuat HP hitam. */
+        public static void ForceVisibleFrame()
+        {
+            RenderSettings.fog = false;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            var amb = RenderSettings.ambientLight;
+            if (WorldLookPolicy.AmbientTooDark(amb.r, amb.g, amb.b))
+                RenderSettings.ambientLight = new Color(0.50f, 0.56f, 0.64f);
+
+            Camera cam = Camera.main;
             if (cam == null)
             {
                 var rig = Object.FindFirstObjectByType<CameraRig>();
                 if (rig != null) cam = rig.GetComponent<Camera>();
             }
-            PrepareCamera(cam);
+            if (cam != null)
+            {
+                cam.enabled = true;
+                cam.allowHDR = false;
+                cam.allowMSAA = false;
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = new Color(0.55f, 0.72f, 0.92f);
+                try
+                {
+                    var data = cam.GetUniversalAdditionalCameraData();
+                    if (data != null)
+                    {
+                        data.renderPostProcessing = false;
+                        data.renderShadows = false;
+                    }
+                }
+                catch { }
+            }
 
-            var grass = Object.FindFirstObjectByType<GrassField>();
-            if (grass != null) EnableInstancing(grass.GrassMaterial);
+            var light = Object.FindFirstObjectByType<Light>();
+            if (light != null) light.shadows = LightShadows.None;
 
-            var vfx = Object.FindFirstObjectByType<AnimeVFX>();
-            if (vfx != null) EnableInstancing(vfx.SparkleMaterial);
+            var vol = Object.FindFirstObjectByType<StylizedVolume>();
+            if (vol != null && vol.Volume != null) vol.Volume.enabled = false;
         }
     }
 }

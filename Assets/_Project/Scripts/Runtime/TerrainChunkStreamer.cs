@@ -167,6 +167,11 @@ namespace RPG.Runtime
                 var motor = FindFirstObjectByType<CharacterMotor>();
                 if (motor != null) Target = motor.transform;
             }
+            if (TerrainMaterial == null || TerrainMaterial.shader == null)
+            {
+                var sh = Shader.Find("Aurelia/Terrain");
+                if (sh != null) TerrainMaterial = new Material(sh) { name = "AureliaTerrainRuntime" };
+            }
             _holder = new GameObject("TerrainChunks").transform;
             _holder.SetParent(transform, false);
             StartWorker();
@@ -430,8 +435,8 @@ namespace RPG.Runtime
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var mr = go.AddComponent<MeshRenderer>();
             if (TerrainMaterial != null) mr.sharedMaterial = TerrainMaterial;
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-            mr.receiveShadows = true;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
 
             _active[key] = new Live { Go = go, Triangles = data.TriangleCount, Vertices = data.VertexCount };
             TotalTriangles += data.TriangleCount;

@@ -143,7 +143,6 @@ Shader "Aurelia/ToonLite"
                 col += _SpecColor.rgb * spec * atten * mainLight.color;
 
                 col += _EmissionColor.rgb * _EmissionStrength;
-                col = MixFog(col, v.fogFactor);
                 col = AureliaKeepVisible(col, albedo);
                 return half4(col, alpha);
             }

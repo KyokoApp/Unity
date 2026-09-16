@@ -105,7 +105,7 @@ namespace RPG.Tests
             Assert.Less(WorldLookPolicy.MinShadowAtten, 0.7);
             Assert.Greater(WorldLookPolicy.FillLight, 0.2);
             Assert.Greater(WorldLookPolicy.AmbientFloor, 0.2);
-            Assert.Greater(WorldLookPolicy.KeepVisible, 0.05);
+            Assert.Greater(WorldLookPolicy.KeepVisible, 0.3);
         }
 
         [Test]

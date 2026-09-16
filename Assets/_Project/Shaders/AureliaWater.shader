@@ -132,7 +132,7 @@ Shader "Aurelia/Water"
                 col += mainLight.color * glitter * _GlitterStrength;
 
                 col += SampleSH(N) * baseCol.rgb * 0.35;
-                col = MixFog(col, v.fogFactor);
+                col = AureliaKeepVisible(col, baseCol.rgb);
 
                 half alpha = saturate(baseCol.a + fres * 0.35);
                 return half4(col, alpha);

@@ -270,7 +270,7 @@ namespace RPG.Editor
             }
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.50f, 0.56f, 0.64f);
-            RenderSettings.fog = true;
+            RenderSettings.fog = false;
             RenderSettings.fogMode = FogMode.Linear;
             /* Terukur di _verify/terrain: jangkauan streaming radius 2 = 1.280 m,
                radius 3 = 1.792 m. Fog mulai sebelum tepi chunk terdekat habis
