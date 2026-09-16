@@ -110,10 +110,21 @@ jobs:
           df -h /
           sudo swapoff -a || true
           sudo rm -f /swapfile || true
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+          # Runner ubuntu-latest menyediakan ~35 GB; separuhnya dihabisi hal
+          # yang tidak dipakai build ini. TAPI: /usr/local/lib/android/sdk/
+          # build-tools dibiarkan utuh, karena di situlah apksigner + zipalign
+          # berada dan langkah 'Verifikasi + tanda tangani APK' membutuhkannya.
+          # Sisanya (platforms ~2 GB, emulator, ndk, platform-tools,
+          # cmdline-tools, sources, extras) dibuang -- Unity tidak memakai SDK
+          # runner, ia membawa SDK sendiri di dalam image unityci.
+          sudo find /usr/local/lib/android/sdk -maxdepth 1 -mindepth 1 \
+               ! -name build-tools -exec rm -rf {} + 2>/dev/null || true
+          sudo rm -rf /usr/local/lib/android/ndk /usr/share/dotnet /opt/ghc \
                       /opt/hostedtoolcache /usr/local/share/boost
           sudo apt-get clean || true
           sudo docker system prune -af || true
+          echo "build-tools yang tersisa (dipakai untuk verifikasi APK):"
+          ls /usr/local/lib/android/sdk/build-tools 2>/dev/null || echo "  TIDAK ADA -> verifikasi memakai pemindai python"
           df -h /
 
       # Cache Library/ -- tanpa ini setiap build mengimpor ulang semua aset
@@ -686,53 +697,141 @@ jobs:
       # di sini dan dikeluarkan sebagai anotasi: CN=yuki = kunci repo; kalau
       # muncul CN=Android Debug, berarti fallback debug yang kepakai.
       # ------------------------------------------------------------
-      - name: Verifikasi penandatangan APK
+      # -------------------------------------------------------------------
+      # APK yang tidak bertanda tangan tidak akan TERPASANG -- itulah gejala
+      # "app not installed" yang kamu alami, jadi langkah ini adalah hakim
+      # terakhir, bukan hiasan.
+      #
+      # Catatan penting (bug verifier versi sebelumnya): ia menghakimi dari
+      # keberadaan META-INF/*.RSA. Itu salah. Unity 6 + Gradle menandatangani
+      # dengan APK Signature Scheme v2/v3, yang letaknya di APK Signing Block
+      # dan TIDAK menulis META-INF sama sekali kalau v1 tidak diminta. Run
+      # v0.2.0-cel-fix16 dinyatakan "unsigned" oleh verifier padahal buildnya
+      # baru saja lulus signing -- satu jam lisensi terbuang untuk kesimpulan
+      # palsu. Sekarang: struktur berkas dibaca benar, dan kalau ada
+      # apksigner, jawaban resminya yang dipakai.
+      #
+      # Dan kalau memang unsigned, langkah ini MEMPERBAIKI sendiri (zipalign +
+      # apksigner dengan keystore repo) alih-alih cuma melapor: hasil akhirnya
+      # sama-sama APK yang bisa dipasang dan bisa ditimpa oleh build berikut.
+      # -------------------------------------------------------------------
+      - name: Verifikasi + tanda tangani APK
         run: |
           set +e
-          # Path ABSOLUT: langkah ini beberapa kali berpindah direktori, dan
-          # OLDPWD hanya menyimpan direktor SEBELUM cd terakhir -- mengandalkannya
-          # untuk "$OLDPWD/$APK" akan menunjuk ke /tmp dan diam-diam tidak
-          # menemukan apa-apa.
-          APK=$(find "$GITHUB_WORKSPACE/build" -name '*.apk' | head -1)
-          [ -f "$APK" ] || { echo "::warning::tidak ada APK untuk diverifikasi"; exit 0; }
-          cd /tmp && rm -rf sigchk && mkdir sigchk && cd sigchk
-          unzip -o -q "$APK" 'META-INF/*' 2>/dev/null
-          CERT=$(ls META-INF/*.RSA META-INF/*.DSA 2>/dev/null | head -1)
-          if [ -z "$CERT" ]; then
-            echo "::error::tidak ada blok sertifikat di APK -> kemungkinan unsigned; tidak akan bisa dipasang"
-            exit 1
+          APK=$(find "$GITHUB_WORKSPACE/release" -name '*.apk' | head -1)
+          if [ ! -f "$APK" ]; then
+            APK=$(find "$GITHUB_WORKSPACE/build" -name '*.apk' | head -1)
+            if [ -f "$APK" ]; then
+              mkdir -p "$GITHUB_WORKSPACE/release"
+              cp "$APK" "$GITHUB_WORKSPACE/release/aurelia-${VERSION}-arm64.apk"
+              APK="$GITHUB_WORKSPACE/release/aurelia-${VERSION}-arm64.apk"
+            fi
           fi
-          openssl pkcs7 -inform DER -in "$CERT" -print_certs -noout > c.pem 2>/dev/null
-          SUBJ=$(openssl x509 -in c.pem -noout -subject -issuer -dates 2>/dev/null | tr '\n' ' ')
-          echo "penandatangan: $SUBJ"
-          echo "::notice::APK ditandatangani: ${SUBJ:0:240}"
-          case "$SUBJ" in
-            *"Android Debug"*) echo "::error::APK ditandatangani debug key (CN=Android Debug) -> tiap build kunci baru -> install timpa akan DITOLAK. Isi secret ANDROID_KEYSTORE_* atau pastikan keystore/release.keystore terpakai.";;
-            *"CN = yuki"*|*"CN=yuki"*) echo "OK: kunci release repo dipakai; update antar build bisa dipasang tanpa uninstall.";;
-            *) echo "::warning::penandatangan bukan CN=yuki -- periksa langkah 'Siapkan keystore tetap' (output: pakai=repo/secret/debug).";;
-          esac
-          # Skema v2 = yang dipakai Android 11+; APK yang cuma punya META-INF (v1)
-          # sering ditolak diam-diam di Android baru. Magic 'APK Sig Block 42' duduk
-          # tepat sebelum Central Directory, jadi cukup dilihat di ekor berkas.
-          if tail -c 4096 "$APK" | grep -qa 'APK Sig Block 42'; then
-            echo "v2 signing block: ADA"
+          if [ ! -f "$APK" ]; then echo "::error::tidak ada APK untuk diverifikasi"; exit 1; fi
+          echo "berkas: $APK ($(stat -c%s "$APK") byte)"
+
+          scan() {
+            python3 - "$1" <<'PYEOF_INNER'
+          import struct, sys
+          path = sys.argv[1]
+          with open(path, 'rb') as f:
+              f.seek(0, 2); n = f.tell()
+              f.seek(max(0, n - 65557)); tail = f.read()
+              i = tail.rfind(b'PK\x05\x06')
+              if i < 0:
+                  print('EOCD=TIDAK'); sys.exit(2)
+              cd = struct.unpack('<I', tail[i + 16:i + 20])[0]
+              f.seek(cd - 16); magic = f.read(16)
+              if magic != b'APK Sig Block 42':
+                  print('SIGBLOCK=TIDAK'); sys.exit(1)
+              f.seek(cd - 24); size = struct.unpack('<Q', f.read(8))[0]
+              # ukuran = panjang(pair) + 8 (bidang ukuran kedua); jadi pair
+              # menempati [cd-16-size, cd-24) -- magic 16 byte + ukuran 8 byte
+              # berada setelahnya, tepat sebelum central directory.
+              f.seek(cd - 16 - size); blob = f.read(max(0, size - 8))
+          names = {0x7109871a: 'v2', 0xf05368c0: 'v3', 0x1b93ad61: 'v3.1'}
+          ids, o = [], 0
+          while o + 8 <= len(blob):
+              ln, = struct.unpack('<I', blob[o:o + 4]); o += 4
+              if ln < 4 or o + ln > len(blob): break
+              aid, = struct.unpack('<I', blob[o:o + 4]); ids.append(aid); o += ln
+          print('SIGBLOCK=ADA skema=' + (','.join(names.get(x, hex(x)) for x in ids) or '?') +
+                ' ukuran=' + str(size))
+          PYEOF_INNER
+          }
+          PINDAI=$(scan "$APK"); echo "$PINDAI"
+
+          BT=$(ls -d /usr/local/lib/android/sdk/build-tools/*/ 2>/dev/null | sort -V | tail -1)
+          APKSIGNER="${BT}apksigner"; ZIPALIGN="${BT}zipalign"
+          [ -x "$APKSIGNER" ] || APKSIGNER=$(find /usr /opt -maxdepth 6 -name apksigner -type f 2>/dev/null | head -1)
+          echo "apksigner: ${APKSIGNER:-TIDAK DITEMUKAN}"
+
+          # Status apksigner HARUS diselamatkan lewat variabel, bukan lewat
+          # pipeline: kalau ditulis `apksigner ... | sed`, yang keluar dari
+          # function adalah kode sed (selalu 0) -> APK unsigned dinyatakan
+          # lolos, dan gerbang ini jadi hiasan.
+          tanda() {
+            OUT=$("$APKSIGNER" verify --print-certs -v "$APK" 2>&1); RC=$?
+            printf '%s\n' "$OUT" | sed -n '1,14p'
+            return $RC
+          }
+          if [ -n "$APKSIGNER" ]; then
+            VERIF=$(tanda); KODE=$?
           else
-            echo "::warning::tidak ditemukan APK Signing Block -> hanya skema v1; di Android 11+ ini bisa ditolak"
+            VERIF=""; case "$PINDAI" in *SIGBLOCK=ADA*) KODE=0;; *) KODE=1;; esac
           fi
-          unzip -l "$APK" | grep -c 'META-INF' | xargs echo "entri META-INF:"
-          cd /tmp && rm -rf sigchk
-          openssl pkcs7 -inform DER -in "$CERT" -print_certs -noout > c.pem 2>/dev/null
-          SUBJ=$(openssl x509 -in c.pem -noout -subject -issuer -dates 2>/dev/null | tr '\n' ' ')
-          echo "penandatangan: $SUBJ"
-          echo "::notice::APK ditandatangani: ${SUBJ:0:240}"
-          case "$SUBJ" in
-            *"Android Debug"*) echo "::error::APK ditandatangani debug key (CN=Android Debug) -> tiap build kunci baru -> install timpa akan DITOLAK. Isi secret ANDROID_KEYSTORE_* atau pastikan keystore/release.keystore terpakai.";;
-            *"CN = yuki"*|*"CN=yuki"*) echo "OK: kunci release repo dipakai; update antar build bisa dipasang tanpa uninstall.";;
-            *) echo "::warning::penandatangan bukan CN=yuki -- periksa langkah 'Siapkan keystore tetap' (output: pakai=repo/secret/debug).";;
+          echo "--- hasil verifikasi ---"; echo "$VERIF"
+
+          if [ "$KODE" != "0" ]; then
+            echo "::warning::APK unsigned -> CI menandatanganinya sendiri dengan keystore repo"
+            KS="$GITHUB_WORKSPACE/${ANDROID_KEYSTORE_NAME:-keystore/release.keystore}"
+            if [ ! -f "$KS" ] || [ -z "$APKSIGNER" ]; then
+              echo "::error::perlu keystore ($KS) + apksigner ($APKSIGNER) untuk memperbaiki. Pindai: $PINDAI"
+              exit 1
+            fi
+            if [ -x "$ZIPALIGN" ]; then
+              "$ZIPALIGN" -f -p 4 "$APK" "$APK.z" && mv "$APK.z" "$APK"
+              echo "zipalign: selesai (kode $?)"
+            else
+              echo "::warning::zipalign tidak ada; lanjut tanpa alignment (Android 12+ tidak mewajibkannya)"
+            fi
+            "$APKSIGNER" sign \
+              --ks "$KS" \
+              --ks-key-alias "$ANDROID_KEYALIAS_NAME" \
+              --ks-pass "pass:${ANDROID_KEYSTORE_PASS}" \
+              --key-pass "pass:${ANDROID_KEYALIAS_PASS:-$ANDROID_KEYSTORE_PASS}" \
+              --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+              "$APK"
+            echo "apksigner sign: kode $?"
+            VERIF=$(tanda); KODE=$?
+            PINDAI=$(scan "$APK"); echo "$PINDAI"
+            echo "--- hasil verifikasi ulang ---"; echo "$VERIF"
+            if [ "$KODE" = "0" ]; then
+              echo "SUDAH DIPERBAIKI: APK ditandatangani CI (keystore repo, alias $ANDROID_KEYALIAS_NAME)."
+            else
+              echo "::error::tetap tidak bisa diverifikasi setelah signing CI. $VERIF"
+              exit 1
+            fi
+          fi
+
+          # CN=yuki = kunci release yang sama dipakai build berikutnya, jadi
+          # install menimpa (update) tanpa uninstall. 'Android Debug' = kunci
+          # acak per build -> harus uninstall dulu, itu bug aslinya.
+          SIG="$VERIF"
+          case "$SIG" in
+            *"CN=yuki"*|*"CN=yuki,"*|*"CN= yuki"*)
+              echo "::notice::APK DIVERIFIKASI: penandatangan CN=yuki, $PINDAI" ;;
+            *"Android Debug"*)
+              echo "::error::APK bertanda tangan debug key -> tiap build kunci baru -> install timpa DITOLAK." ;;
+            *)
+              # apksigner diam soal DN kalau hanya v2 dan --print-certs terpotong;
+              # percaya verifikasi (KODE=0) tapi laporkan DN apa adanya.
+              DN=$(echo "$VERIF" | grep -m1 -i "Signer #1 certificate DN")
+              echo "::notice::APK terverifikasi (skema dari pindai: $PINDAI). $DN" ;;
           esac
-          # Skema v2/v3 = yang dipakai Android 11+; kalau cuma ada META-INF (v1),
-          # instalasi di Android baru bisa gagal meski APK-nya "berhasil dibangun".
-          unzip -l "$APK" | grep -c "META-INF" | xargs echo "jumlah entri META-INF:"
+          unzip -l "$APK" | grep -c "META-INF" | xargs echo "entri META-INF (v1, boleh 0):"
+          stat -c "%n %s byte" "$APK"
+          exit ${KODE:-0}
 
       # Artifact hanya bisa diunduh orang yang punya akses repo.
       # Ini jalur unduh yang AMAN walau repo masih publik.
