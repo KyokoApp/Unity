@@ -119,7 +119,7 @@ namespace UnityEngine
     public enum TouchPhase { Began, Moved, Stationary, Ended, Canceled }
     public struct Touch { public int fingerId; public Vector2 position; public TouchPhase phase; }
     public class Camera : Behaviour { public CameraClearFlags clearFlags; public float nearClipPlane, farClipPlane, fieldOfView;
-        public Color backgroundColor; public float aspect; public static Camera main=>null;
+        public Color backgroundColor; public float aspect; public bool allowHDR; public bool allowMSAA; public static Camera main=>null;
         public RenderTexture targetTexture; public void Render(){}
         public void AddCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveAllCommandBuffers(){} }
     public enum CameraClearFlags { Skybox, SolidColor, Depth, Nothing }
@@ -136,6 +136,7 @@ namespace UnityEngine
         public void Apply(){} public void ReadPixels(Rect r,int x,int y){} public byte[] EncodeToPNG()=>null; }
     public enum TextureFormat { RGBA32, RGB24 } public enum TextureWrapMode { Repeat, Clamp } public enum FilterMode { Point, Bilinear, Trilinear }
     public class Material : Object { public Material(Shader s){} public Shader shader; public Color color; public Texture mainTexture; public int renderQueue;
+        public bool enableInstancing;
         public bool HasProperty(string n)=>false; public void SetColor(string n,Color c){} public void SetColor(int id,Color c){}
         public void SetFloat(string n,float v){} public void SetFloat(int id,float v){}
         public void SetInt(string n,int v){} public void SetInt(int id,int v){}

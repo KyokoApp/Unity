@@ -99,6 +99,9 @@ namespace RPG.Runtime
             if (urp == null) return;
             _baseScale = Mathf.Clamp((float)r.RenderScale, 0.5f, 1.5f);
             urp.renderScale = _baseScale;
+            // HDR di tile-GPU HP sering menghasilkan blit hitam. Dunia
+            // stylized tidak butuh HDR; bloom tetap jalan di LDR.
+            urp.supportsHDR = false;
             // Bayangan 80 m + 2 cascade (tinggi) / 1 cascade: cukup untuk
             // karakter + pohon dekat; jauhnya ditutup fog + bayangan toon.
             urp.shadowDistance = 80f;

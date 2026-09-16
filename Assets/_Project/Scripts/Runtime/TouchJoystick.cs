@@ -81,8 +81,21 @@ namespace RPG.Runtime
 
         public float RadiusPx => BaseRadiusPx * (float)_buttonScale * UiScale;
 
+        bool HudOwnsInput => GenshinHud.Instance != null;
+
         void Update()
         {
+            /* HUD Genshin (stik canvas + tombol ATK/JMP) adalah jalur
+               utama. Komponen ini mencuri sentuhan di zona yang sama
+               kalau tetap polling — tombol tumpang tindih. */
+            if (HudOwnsInput)
+            {
+                JumpPressed = false;
+                RunHeld = false;
+                IsActive = false;
+                Axis = new Locomotion.Axis(0, 0);
+                return;
+            }
             JumpPressed = false;
             PollStick();
             PollButtons();
@@ -194,7 +207,7 @@ namespace RPG.Runtime
         {
             // IMGUI selalu menggambar DI ATAS Canvas — jadi saat loading
             // tampil, stik harus sembunyi sendiri.
-            if (!Visible || LoadingScreen.IsShown) return;
+            if (!Visible || HudOwnsInput || LoadingScreen.IsShown) return;
             EnsureDot();
 
             if (ShowRunButton)

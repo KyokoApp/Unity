@@ -42,8 +42,8 @@ namespace RPG.Runtime
     public class PerfHud : MonoBehaviour
     {
         [Header("Tampilan")]
-        [Tooltip("Tampilkan HUD saat mulai. Matikan untuk build rilis.")]
-        public bool Visible = true;
+        [Tooltip("Tampilkan HUD saat mulai. Default mati: teks DIAG menumpuk potret party. F1 / ketuk sudut kanan-atas 3x.")]
+        public bool Visible = false;
 
         [Tooltip("Ukuran font. 26 cukup terbaca di layar HP 6 inci.")]
         [Range(14, 48)] public int FontSize = 26;

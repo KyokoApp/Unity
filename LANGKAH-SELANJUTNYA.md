@@ -1,68 +1,44 @@
-# Langkah Selanjutnya (handoff sesi 2026-09-16, Tahap 5d)
+# Langkah Selanjutnya (handoff sesi 2026-09-16, Tahap 5e)
 
-> Sesi ini = `arena/01a0aa20-unity`, bercabang dari `arena/01a0a964-unity`
-> (Tahap 5c). Jangan pindah branch.
+> Sesi ini = `arena/01a0aa20-unity`. Jangan pindah branch. Jangan mulai
+> Tahap 6 sebelum HP menampilkan dunia berwarna + HUD bersih.
 
 ## 1. Posisi sekarang
 
-- Branch kerja: `arena/01a0aa20-unity`
-- Isi **Tahap 5d** (yang dikerjakan sesi ini, sebelum APK):
-  1. **Loading tidak boleh macet.** `BootPolicy`: masuk setelah 1 chunk
-     dekat + 0,55 dtk, atau 1,15 dtk walau 0 chunk, dinding 4 dtk.
-     Overlay punya failsafe sendiri 4,5 dtk + "ketuk untuk masuk".
-     `HideImmediate` mematikan canvas. Streaming beranggaran 8 ms/frame
-     (bukan 4 chunk tanpa yield yang membekukan main thread).
-  2. **Kamera Genshin, rapat di belakang karakter.** Default ~3,2 m
-     (bukan 5–8 m). Screenshot CI memakai `CameraRig.PlaceBehind` yang
-     sama. Pitch positif = dari atas.
-  3. Pose idle di screenshot: `ApplyPose` dengan dt=0 sekarang SNAP
-     (dulu k=0 → T-pose salib).
-  4. Stik HUD Genshin dicari malas di `CharacterMotor` (dulu null
-     permanen karena HUD dibangun setelah Awake motor).
+- Branch: `arena/01a0aa20-unity` (dari 5c `arena/01a0a964-unity`)
+- **5d** (`v0.3.2-tahap5d`): boot tidak macet + kamera ~3,2 m. APK
+  `35095655337` sukses, tapi screenshot HP masih hitam + UI menumpuk
+  (sebagian shot masih 5c: "menabur rumput 92%").
+- **5e** (komit ini): dunia tidak hitam, rumput tidak melempar, HUD
+  tidak menumpuk chrome debug.
 
-- Build **v0.3.1-tahap5c** (run `35090571180`) SUKSES, tapi loading 5c
-  masih menunggu semua chunk — itulah alasan 5d.
+## 2. Yang harus dilakukan setelah push
 
-## 2. Yang harus dilakukan setelah push (berurutan)
-
-1. Push branch ini, lalu **tag** `v0.3.2-tahap5d` di komit 5d → workflow
-   Android APK jalan (~40 menit).
-2. Cek run: `gh run list -R KyokoApp/Unity --limit 5`.
-3. Kalau APK sukses: Release
-   `https://github.com/KyokoApp/Unity/releases/tag/v0.3.2-tahap5d`
-4. User install + main:
-   - Loading harus hilang ≤ ~2 detik, atau setelah ketuk.
-   - Kamera harus di belakang bahu, karakter besar di sepertiga bawah.
-   - Kalau kotak merah muncul: screenshot isinya.
-5. **Baru setelah user oke di HP**: mulai Tahap 6
-   (`RENCANA-TAHAP-6.md` — rumput lebat + golem raksasa).
+1. Push branch, tag `v0.3.3-tahap5e` → workflow Android APK.
+2. `gh run list -R KyokoApp/Unity --limit 5` — tunggu verify + APK.
+3. Install APK dari Release. Harus:
+   - Loading hilang ≤ ~2 detik / setelah ketuk, **tanpa kotak merah**.
+   - Dunia **berwarna** (tanah + langit), bukan hitam + HUD.
+   - Kamera di belakang bahu, karakter besar di sepertiga bawah.
+   - HUD Genshin saja: tanpa teks DIAG / tombol Pagi/Siang / stik IMGUI
+     "LARI/LOMPAT" menumpuk. F1 = PerfHud, F2 = tombol suasana.
+4. **Baru setelah itu** Tahap 6 (`RENCANA-TAHAP-6.md`).
 
 ## 3. Konsolidasi branch
 
-- PR #2 (`arena/01a0a964-unity` → `main`) masih OPEN berisi 5c.
-- Sesi ini **tidak** boleh push ke `main`. Merge PR #2 tetap lewat
-  user/HP, atau sesi yang terikat `main`.
-- Kerja 5d ada di `arena/01a0aa20-unity`. Jangan squash ke 5c.
+- PR #3 (`arena/01a0aa20-unity` → `main`) berisi 5d+5e. Jangan merge
+  ke `main` dari sesi Arena ini.
+- Jangan squash 5e ke 5c.
 
-## 4. Pengetahuan sandbox (jangan diulang)
-
-- Blob Azure DIBLOKIR → `gh run download` gagal; pakai `attach-shots.yml`
-  atau `gh api .../jobs/.../logs` + `fetch_page`.
-- Tidak ada .NET SDK di sandbox → tes NUnit/unitystub tidak bisa dijalankan
-  di sini. Review manual + API Unity yang dipakai harus API lama.
-- `.gitignore` memblokir `*.png`; `.gitattributes` memaksa LFS.
-- Jangan tulis + komit paralel dalam satu batch.
-- Build APK ±40 menit. Seat lisensi: kalau "no available seats", tunggu
-  ±30 menit.
-
-## 5. File kunci 5d
+## 4. File kunci 5e
 
 | File | Isi |
 |---|---|
-| `Assets/_Project/Scripts/Core/BootPolicy.cs` | Kapan loading WAJIB melepas pemain |
-| `Assets/_Project/Scripts/Core/CameraFraming.cs` | Zoom 3..8 → meter Genshin + orbit |
-| `Assets/_Project/Tests/EditMode/BootAndCameraTests.cs` | Tes murni (tanpa Unity) |
-| `Assets/_Project/Scripts/Runtime/WorldBoot.cs` | EnterWorld idempoten + anggaran waktu |
-| `Assets/_Project/Scripts/Runtime/LoadingScreen.cs` | Failsafe overlay + HideImmediate |
-| `Assets/_Project/Scripts/Runtime/CameraRig.cs` | Framing ~3,2 m di belakang bahu |
-| `RENCANA-TAHAP-6.md` | Rumput lebat + golem (belum jalan) |
+| `Assets/_Project/Scripts/Core/WorldLookPolicy.cs` | Lantai cahaya + log noisy + solid sky HP |
+| `Assets/_Project/Scripts/Runtime/WorldLook.cs` | Kamera URP, langit HP, hide chrome, instancing |
+| `Assets/_Project/Shaders/AureliaLitFill.hlsl` | Fill + min shadow (angka = policy) |
+| `Assets/_Project/Shaders/AureliaTerrain.shader` | Tidak pernah output hitam |
+| `Assets/_Project/Shaders/AureliaSky.shader` | Tanpa LightMode SRPDefaultUnlit |
+| `Assets/_Project/Scripts/Runtime/GrassField.cs` | enableInstancing + skip saat loading |
+| `Assets/_Project/Scripts/Runtime/TouchJoystick.cs` | Mundur kalau GenshinHud ada |
+| `Assets/_Project/Scripts/Runtime/PerfHud.cs` | Default `Visible = false` |

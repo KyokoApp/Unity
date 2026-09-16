@@ -153,6 +153,7 @@ namespace RPG.Editor
             cam.nearClipPlane = 0.05f;
             cam.farClipPlane = 1200f;
             cam.fieldOfView = 50f;
+            WorldLook.PrepareCamera(cam);
             camGo.AddComponent<AudioListener>();
             var rig = camGo.AddComponent<CameraRig>();
             if (charGo != null)
@@ -212,8 +213,8 @@ namespace RPG.Editor
                 grass = grassGo.AddComponent<GrassField>();
                 grass.Target = charGo != null ? charGo.transform : null;
                 grass.GrassMaterial = LoadOrCreateGrassMaterial(notes);
-                notes.Add("Rumput + siklus siang/malam terpasang. Tombol suasana Pagi/Siang/" +
-                          "Sore/Malam/Realtime ada di kiri-bawah layar.");
+                cycle.ShowButtons = false;
+                notes.Add("Rumput + siklus siang/malam terpasang. Tombol suasana (dev) default mati; F2 untuk tampilkan.");
             }
 
             // ---- volume, kualitas, VFX, boot (Tahap 5) ----------------------
@@ -243,8 +244,8 @@ namespace RPG.Editor
             hud.Water = water;
             hud.Grass = grass;
             hud.Cycle = cycle;
-            hud.Visible = withTerrain;
-            notes.Add("PerfHud terpasang. F1 (atau ketuk sudut kanan-atas 3x) untuk sembunyikan.");
+            hud.Visible = false;
+            notes.Add("PerfHud terpasang (default sembunyi). F1 / ketuk sudut kanan-atas 3x untuk DIAG.");
 
             // ---- langit & ambient ------------------------------------------
             /* EmptyScene TIDAK punya material skybox. ambientMode = Skybox
@@ -408,7 +409,11 @@ namespace RPG.Editor
             }
             var path = $"{RenderFolder}/AureliaGrass.mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                existing.enableInstancing = true;
+                return existing;
+            }
 
             var shader = Shader.Find("Aurelia/Grass");
             if (shader == null)
@@ -419,6 +424,7 @@ namespace RPG.Editor
             }
             var mat = new Material(shader);
             mat.name = "AureliaGrass";
+            mat.enableInstancing = true;
             AssetDatabase.CreateAsset(mat, path);
             AssetDatabase.SaveAssets();
             return mat;

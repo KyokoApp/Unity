@@ -97,5 +97,40 @@ namespace RPG.Tests
             var len = Math.Sqrt(x * x + y * y + z * z);
             Assert.AreEqual(CameraFraming.DefaultMeters, len, 1e-9);
         }
+
+        [Test]
+        public void Look_LantaiBayanganDanFill_TidakNol()
+        {
+            Assert.Greater(WorldLookPolicy.MinShadowAtten, 0.3);
+            Assert.Less(WorldLookPolicy.MinShadowAtten, 0.7);
+            Assert.Greater(WorldLookPolicy.FillLight, 0.2);
+            Assert.Greater(WorldLookPolicy.AmbientFloor, 0.2);
+            Assert.Greater(WorldLookPolicy.KeepVisible, 0.05);
+        }
+
+        [Test]
+        public void Look_HP_PakaiLangitWarnaDatar()
+        {
+            Assert.IsTrue(WorldLookPolicy.UseSolidSky(true));
+            Assert.IsFalse(WorldLookPolicy.UseSolidSky(false));
+        }
+
+        [Test]
+        public void Look_AmbientHitam_Terdeteksi()
+        {
+            Assert.IsTrue(WorldLookPolicy.AmbientTooDark(0, 0, 0));
+            Assert.IsFalse(WorldLookPolicy.AmbientTooDark(0.5, 0.56, 0.64));
+        }
+
+        [Test]
+        public void Look_InstancingError_BukanFatal()
+        {
+            Assert.IsTrue(WorldLookPolicy.IsNoisyLog(
+                "Material needs to enable instancing for DrawMeshInstanced"));
+            Assert.IsTrue(WorldLookPolicy.IsNoisyLog(
+                "InvalidOperationException: DrawMeshInstanced"));
+            Assert.IsFalse(WorldLookPolicy.IsNoisyLog("NullReferenceException: camera"));
+            Assert.IsFalse(WorldLookPolicy.IsNoisyLog(null));
+        }
     }
 }

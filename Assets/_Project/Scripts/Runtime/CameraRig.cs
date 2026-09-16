@@ -84,6 +84,7 @@ namespace RPG.Runtime
 
             _cam = GetComponent<Camera>();
             if (_cam == null) _cam = gameObject.AddComponent<Camera>();
+            WorldLook.PrepareCamera(_cam);
 
             Settings = SettingsStore.Load();
             Pitch = StartPitch;

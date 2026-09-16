@@ -42,7 +42,8 @@ namespace RPG.Runtime
         [HideInInspector] public float Hour;
 
         [Header("Tombol suasana (alat dev)")]
-        public bool ShowButtons = true;
+        [Tooltip("Default mati: tombol Pagi/Siang menumpuk kompas HUD. F2 untuk tampilkan.")]
+        public bool ShowButtons = false;
 
         /* Tabel keyframe: jam, warna matahari, intensitas, ambient, kabut,
            + warna langit (zenith & horizon). Enam suasana. */
@@ -127,6 +128,7 @@ namespace RPG.Runtime
 
         void Update()
         {
+            if (Input.GetKeyDown(KeyCode.F2)) ShowButtons = !ShowButtons;
             if (Realtime && DayMinutes > 0f)
             {
                 Hour += Time.deltaTime * (24f / (DayMinutes * 60f));
@@ -209,16 +211,11 @@ namespace RPG.Runtime
                         new Vector4(toSun.x, toSun.y, toSun.z, 0f));
                 }
             }
-            else
-            {
-                // Fallback scene lama tanpa langit: clear color = kabut.
-                if (_cam == null) _cam = Camera.main;
-                if (_cam != null)
-                {
-                    _cam.clearFlags = CameraClearFlags.SolidColor;
-                    _cam.backgroundColor = fog;
-                }
-            }
+
+            if (_cam == null) _cam = Camera.main;
+            /* HP: SolidColor horizon. Editor: skybox. backgroundColor
+               selalu diisi supaya clear Skybox yang gagal tidak hitam. */
+            WorldLook.ApplySky(_cam, SkyMaterial, hor);
         }
 
         void OnGUI()

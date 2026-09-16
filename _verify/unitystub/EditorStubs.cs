@@ -89,6 +89,19 @@ namespace UnityEngine.Rendering.Universal
     public class UniversalRendererData : UnityEngine.Rendering.ScriptableRendererData {}
     public class UniversalRenderPipelineAsset : UnityEngine.Rendering.RenderPipelineAsset {
         public static UniversalRenderPipelineAsset Create(UnityEngine.Rendering.ScriptableRendererData r)=>null;
-        public float renderScale; public float shadowDistance; public int shadowCascadeCount; }
+        public float renderScale; public float shadowDistance; public int shadowCascadeCount;
+        public bool supportsHDR; }
+    public class UniversalAdditionalCameraData : UnityEngine.MonoBehaviour {
+        public bool renderPostProcessing; public bool renderShadows; }
+    public static class CameraExtensions {
+        public static UniversalAdditionalCameraData GetUniversalAdditionalCameraData(this UnityEngine.Camera camera)
+        {
+            if (camera == null) return null;
+            var d = camera.GetComponent<UniversalAdditionalCameraData>();
+            if (d == null && camera.gameObject != null)
+                d = camera.gameObject.AddComponent<UniversalAdditionalCameraData>();
+            return d;
+        }
+    }
 }
 namespace UnityEngine { public static class QualitySettings { public static UnityEngine.Rendering.RenderPipelineAsset renderPipeline; } }

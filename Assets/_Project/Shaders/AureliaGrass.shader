@@ -60,6 +60,7 @@ Shader "Aurelia/Grass"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Assets/_Project/Shaders/AureliaLitFill.hlsl"
 
             struct Attributes
             {
@@ -106,8 +107,8 @@ Shader "Aurelia/Grass"
             Varyings vert(Attributes i)
             {
                 Varyings o;
-                UNITY_SETUP_INSTANCE_ID(in);
-                UNITY_TRANSFER_INSTANCE_ID(in, o);
+                UNITY_SETUP_INSTANCE_ID(i);
+                UNITY_TRANSFER_INSTANCE_ID(i, o);
 
                 /* Posisi dunia PANGKAL rumpun (titik origin instance). */
                 float3 originWS = TransformObjectToWorld(float3(0, 0, 0));
@@ -146,7 +147,7 @@ Shader "Aurelia/Grass"
 
             half4 frag(Varyings i) : SV_Target
             {
-                UNITY_SETUP_INSTANCE_ID(in);
+                UNITY_SETUP_INSTANCE_ID(i);
 
                 /* Gradasi pangkal->ujung: bagian paling terang ada di
                    ujung bilah, seperti rumput yang tersinari matahari. */
@@ -157,13 +158,16 @@ Shader "Aurelia/Grass"
                    pernah hitam pekat (murah, dan cocok untuk stylized). */
                 Light main = GetMainLight();
                 half  ndl  = dot(normalize(i.normalWS), main.direction) * 0.5 + 0.5;
-                half3 lit  = albedo * main.color * (ndl * 0.75 + 0.25) * main.shadowAttenuation;
+                half  atten = AureliaMinShadow(main.shadowAttenuation);
+                half3 lit  = albedo * main.color * (ndl * 0.75 + 0.25) * atten;
 
                 /* Ambient proyek (diatur DayNightCycle) masuk lewat SH. */
-                lit += albedo * SampleSH(normalize(i.normalWS));
+                lit += albedo * AureliaAmbientOrFloor(SampleSH(normalize(i.normalWS)), 1.0);
+                lit += AureliaFill(albedo, 1.0);
 
                 half4 col = half4(lit, 1.0);
                 col.rgb = MixFog(col.rgb, i.fogFactor);
+                col.rgb = AureliaKeepVisible(col.rgb, albedo);
                 return col;
             }
             ENDHLSL

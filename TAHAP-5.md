@@ -133,5 +133,27 @@ diperiksa CI tanpa membuka Unity.
 - Animasi: **Mixamo** (adobe.com, gratis), **Quaternius** (CC0).
 - Font: **Nunito / Quicksand** (OFL) — ganti satu baris di `UiKit.Font`.
 - Ikon/elemen UI: **Kenney UI Pack** (CC0), **Game-icons.net** (CC-BY).
-- Tekstur noise: sudah dibangkitkan (`tools/bake_
-...[truncated 1098 chars]
+- Tekstur noise: sudah dibangkitkan (`tools/bake_toon_textures.py`).
+
+## 9. Tahap 5e — dunia terlihat di HP, HUD tidak menumpuk
+
+Screenshot HP 2026-09-16: game **masuk**, 49 chunk, lampu ada, kamera di
+atas tanah — tapi dunia **hitam pekat**, HUD tertutup PerfHud + tombol
+Pagi/Siang, dan loading 5c macet di "menabur rumput 92%" karena
+`DrawMeshInstanced` tanpa `material.enableInstancing`.
+
+Perbaikan:
+
+1. **Tidak hitam.** Shader terrain/toon/rumput/air punya lantai
+   pencahayaan (`WorldLookPolicy` / `AureliaLitFill.hlsl`): shadow
+   attenuation ≥ 0,45, fill light, SH fallback, MixFog tidak menelan
+   albedo. HP memakai `CameraClearFlags.SolidColor` (warna horizon),
+   bukan skybox custom yang URP GLES sering skip. HDR URP dimatikan.
+2. **Tidak macet di rumput.** `GrassMaterial.enableInstancing = true`,
+   `LateUpdate` tidak menggambar saat loading, exception instancing
+   ditelan (bukan kotak merah). `BootLog` mengabaikan log noisy itu.
+3. **HUD bersih.** PerfHud default mati (F1 / ketuk sudut 3×), tombol
+   suasana default mati (F2), TouchJoystick IMGUI mundur kalau
+   `GenshinHud` sudah ada (stik + ATK/JMP canvas yang dipakai).
+
+Kamera Genshin ~3,2 m dan boot 5d tetap. **Tahap 6 (golem) belum.**

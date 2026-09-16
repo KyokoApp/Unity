@@ -119,7 +119,8 @@ Shader "Aurelia/ToonLite"
 
                 float4 shadowCoord = TransformWorldToShadowCoord(v.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
-                float atten = mainLight.shadowAttenuation * mainLight.distanceAttenuation;
+                float atten = AureliaMinShadow(mainLight.shadowAttenuation)
+                            * max(mainLight.distanceAttenuation, 0.5);
 
                 float ndl = dot(N, mainLight.direction);
                 float rampT = ndl * 0.5 + 0.5;
@@ -129,8 +130,9 @@ Shader "Aurelia/ToonLite"
                 half3 lightCol = AureliaToonLight(rampT, atten, _ToonSteps,
                     _ToonSoftness, _RampStrength, rampSample, _ShadowColor.rgb);
 
-                half3 ambient = SampleSH(N) * _AmbientBoost;
-                half3 col = albedo * (ambient + mainLight.color * lightCol);
+                half3 ambient = AureliaAmbientOrFloor(SampleSH(N), _AmbientBoost);
+                half3 col = albedo * (ambient + mainLight.color * lightCol)
+                          + AureliaFill(albedo, _AmbientBoost);
 
                 float rim = pow(1.0 - saturate(dot(N, V)), _RimPower) * _RimStrength;
                 col += _RimColor.rgb * rim * mainLight.color * (0.35 + 0.65 * atten);
@@ -142,6 +144,7 @@ Shader "Aurelia/ToonLite"
 
                 col += _EmissionColor.rgb * _EmissionStrength;
                 col = MixFog(col, v.fogFactor);
+                col = AureliaKeepVisible(col, albedo);
                 return half4(col, alpha);
             }
             ENDHLSL

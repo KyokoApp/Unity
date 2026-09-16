@@ -66,6 +66,7 @@ namespace RPG.Runtime
         int _lastCx = int.MinValue, _lastCz;
         int _perCell;
         bool _on;
+        bool _instancingOk = true;
 
         static readonly int WindNoiseId = Shader.PropertyToID("_WindNoise");
         static readonly int WindNoiseStrId = Shader.PropertyToID("_WindNoiseStrength");
@@ -90,6 +91,8 @@ namespace RPG.Runtime
 
             _clump = BuildClump();
             _farClump = BuildFarClump();
+
+            WorldLook.EnableInstancing(GrassMaterial);
 
             if (GrassMaterial != null && WindNoise != null &&
                 GrassMaterial.HasProperty("_WindNoise"))
@@ -129,8 +132,14 @@ namespace RPG.Runtime
             return c;
         }
 
-        /* Dipanggil tiap frame saat bermain: gambar semua sel yang terlihat. */
-        void LateUpdate() => DrawNow();
+        /* Dipanggil tiap frame saat bermain: gambar semua sel yang terlihat.
+           Selama loading: JANGAN DrawMeshInstanced — material tanpa
+           enableInstancing melempar tiap frame dan menempel kotak merah. */
+        void LateUpdate()
+        {
+            if (LoadingScreen.IsShown) return;
+            DrawNow();
+        }
 
         /* Diagnosa ringkas — dipakai SceneShots lewat log CI. */
         public string InitState =>
@@ -147,8 +156,10 @@ namespace RPG.Runtime
         public void DrawNow()
         {
             EnsureInit();
-            if (!_on || _clump == null || GrassMaterial == null || Target == null) return;
+            if (!_on || !_instancingOk || _clump == null || GrassMaterial == null || Target == null)
+                return;
 
+            WorldLook.EnableInstancing(GrassMaterial);
             RefreshCells(Target.position, false);
 
             ActiveClumps = 0; NearClumps = 0; FarClumps = 0;
@@ -158,6 +169,7 @@ namespace RPG.Runtime
 
         void FlushSet(Dictionary<long, Matrix4x4[]> set, Mesh mesh, bool near)
         {
+            if (!_instancingOk || mesh == null || GrassMaterial == null) return;
             var n = 0;
             var count = 0;
             foreach (var kv in set)
@@ -168,18 +180,33 @@ namespace RPG.Runtime
                     _batch[n++] = arr[i];
                     if (n == 1023)
                     {
-                        Graphics.DrawMeshInstanced(mesh, 0, GrassMaterial, _batch, n);
+                        if (!DrawBatch(mesh, n)) return;
                         count += n; n = 0;
                     }
                 }
             }
             if (n > 0)
             {
-                Graphics.DrawMeshInstanced(mesh, 0, GrassMaterial, _batch, n);
+                if (!DrawBatch(mesh, n)) return;
                 count += n;
             }
             ActiveClumps += count;
             if (near) NearClumps = count; else FarClumps = count;
+        }
+
+        bool DrawBatch(Mesh mesh, int n)
+        {
+            try
+            {
+                Graphics.DrawMeshInstanced(mesh, 0, GrassMaterial, _batch, n);
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                _instancingOk = false;
+                BootLog.Add("[noise] rumput instancing mati: " + e.GetType().Name + ": " + e.Message);
+                return false;
+            }
         }
 
         /* KHUSUS SCREENSHOT (dipakai Editor/SceneShots): gabungan SEMUA

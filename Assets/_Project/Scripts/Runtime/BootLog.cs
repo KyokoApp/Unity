@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using RPG.Core;
 
 namespace RPG.Runtime
 {
@@ -49,6 +50,13 @@ namespace RPG.Runtime
         {
             if (type != LogType.Error && type != LogType.Exception && type != LogType.Warning)
                 return;
+            /* Instancing tanpa flag material: spam tiap frame, bukan
+               alasan kotak merah di loading. */
+            if (WorldLookPolicy.IsNoisyLog(msg))
+            {
+                Add("[noise] " + msg);
+                return;
+            }
             var line = $"[{type}] {msg}";
             if ((type == LogType.Error || type == LogType.Exception) && !string.IsNullOrEmpty(stack))
             {

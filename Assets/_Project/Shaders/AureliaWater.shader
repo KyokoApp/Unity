@@ -61,6 +61,7 @@ Shader "Aurelia/Water"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Assets/_Project/Shaders/AureliaLitFill.hlsl"
 
             struct Attributes
             {
@@ -124,7 +125,7 @@ Shader "Aurelia/Water"
                 half3 H = normalize(mainLight.direction + V);
                 float spec = pow(saturate(dot(N, H)), _Shininess);
                 float specBand = smoothstep(0.25, 0.75, spec);
-                col += mainLight.color * specBand * _Specular * mainLight.shadowAttenuation;
+                col += mainLight.color * specBand * _Specular * AureliaMinShadow(mainLight.shadowAttenuation);
 
                 float cell = Hash21(floor(wp * 2.5) + floor(t * 2.0) * 0.37);
                 float glitter = step(0.985 - specBand * 0.05, cell) * specBand;

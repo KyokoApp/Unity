@@ -58,6 +58,7 @@ Shader "Aurelia/Terrain"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Assets/_Project/Shaders/AureliaLitFill.hlsl"
 
             struct Attributes
             {
@@ -141,11 +142,15 @@ Shader "Aurelia/Terrain"
                     diffuse = tb / _ToonSteps;
                 }
 
-                half3 ambient = SampleSH(N) * _AmbientBoost;
-                half3 lit = albedo * (ambient + mainLight.color * (mainLight.distanceAttenuation
-                            * mainLight.shadowAttenuation) * diffuse);
+                // Lantai HP: SH 0 + shadow map gagal tidak boleh = hitam.
+                half atten = AureliaMinShadow(mainLight.shadowAttenuation)
+                           * max(mainLight.distanceAttenuation, 0.5);
+                half3 ambient = AureliaAmbientOrFloor(SampleSH(N), _AmbientBoost);
+                half3 lit = albedo * (ambient + mainLight.color * atten * diffuse)
+                          + AureliaFill(albedo, _AmbientBoost);
 
                 lit = MixFog(lit, IN.fogFactor);
+                lit = AureliaKeepVisible(lit, albedo);
                 return half4(lit, 1.0);
             }
             ENDHLSL

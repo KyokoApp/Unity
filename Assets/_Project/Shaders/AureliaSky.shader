@@ -27,6 +27,7 @@ Shader "Aurelia/Sky"
         Tags
         {
             "Queue" = "Background"
+            "RenderType" = "Background"
             "RenderPipeline" = "UniversalPipeline"
             "PreviewType" = "Skybox"
             "IgnoreProjector" = "True"
@@ -35,11 +36,12 @@ Shader "Aurelia/Sky"
         Pass
         {
             Name "Skybox"
-            Tags { "LightMode" = "SRPDefaultUnlit" }
+            // Tanpa LightMode: URP menggambar skybox lewat jalur khusus.
+            // SRPDefaultUnlit membuat langit HITAM di GLES/Vulkan HP.
 
             ZWrite Off
             ZTest LEqual
-            Cull Front
+            Cull Off
             Fog { Mode Off }
 
             HLSLPROGRAM

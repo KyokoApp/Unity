@@ -146,6 +146,7 @@ namespace RPG.Editor
                 focusHeight: (float)CameraFraming.DefaultFocusHeight,
                 shoulder: (float)CameraFraming.DefaultShoulder);
             cam.fieldOfView = 50f;
+            RPG.Runtime.WorldLook.PrepareCamera(cam);
         }
 
         static bool RenderToPng(Camera cam, string path, int w, int h)

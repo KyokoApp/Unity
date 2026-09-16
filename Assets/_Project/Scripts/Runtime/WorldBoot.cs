@@ -156,6 +156,7 @@ namespace RPG.Runtime
                 }
             }
             catch { }
+            try { WorldLook.OnEnteredWorld(); } catch { }
             BootLog.Add($"boot selesai dalam {_elapsed:F2} detik.");
             Debug.Log($"[WorldBoot] dunia siap dalam {_elapsed:F2} detik.");
         }
@@ -181,6 +182,7 @@ namespace RPG.Runtime
                 if (c != null) { c.enabled = true; c.SnapNow(); }
             }
             catch { }
+            try { WorldLook.OnEnteredWorld(); } catch { }
         }
     }
 }

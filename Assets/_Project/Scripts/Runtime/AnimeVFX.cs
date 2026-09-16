@@ -79,6 +79,7 @@ namespace RPG.Runtime
                 var sh = Shader.Find("Aurelia/Sparkle");
                 if (sh != null) SparkleMaterial = new Material(sh) { name = "AnimeSparkle" };
             }
+            WorldLook.EnableInstancing(SparkleMaterial);
             _cam = Camera.main;
         }
 
@@ -137,8 +138,17 @@ namespace RPG.Runtime
                 n++;
             }
             if (n == 0) return;
+            WorldLook.EnableInstancing(SparkleMaterial);
             _block.SetVectorArray(InstColorId, _cols);
-            Graphics.DrawMeshInstanced(_quad, 0, SparkleMaterial, _mats, n, _block);
+            try
+            {
+                Graphics.DrawMeshInstanced(_quad, 0, SparkleMaterial, _mats, n, _block);
+            }
+            catch (Exception e)
+            {
+                SparkleMaterial = null; // jangan spam exception tiap frame
+                BootLog.Add("[noise] sparkle instancing mati: " + e.GetType().Name + ": " + e.Message);
+            }
         }
 
         void Tick(float dt)

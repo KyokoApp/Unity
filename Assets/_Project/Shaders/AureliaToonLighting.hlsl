@@ -34,4 +34,6 @@ half3 AureliaToonLight(float rampT, float atten,
     return lerp(procedural, rampSample, saturate(rampStrength));
 }
 
+#include "Assets/_Project/Shaders/AureliaLitFill.hlsl"
+
 #endif

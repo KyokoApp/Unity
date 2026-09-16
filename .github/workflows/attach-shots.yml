@@ -12,9 +12,9 @@ on:
       tag:
         description: 'Tag release tujuan (mis. v0.3.1-tahap5c)'
         required: false
-        default: 'v0.3.1-tahap5c'
+        default: 'v0.3.3-tahap5e'
   push:
-    branches: ['arena/01a0a964-unity']
+    branches: ['arena/01a0aa20-unity']
     paths: ['.github/workflows/attach-shots.yml']
 jobs:
   attach:
@@ -29,7 +29,7 @@ jobs:
           IN_TAG: ${{ inputs.tag }}
         run: |
           echo "run_id=${IN_RUN:-35090571180}" >> "$GITHUB_OUTPUT"
-          echo "tag=${IN_TAG:-v0.3.1-tahap5c}" >> "$GITHUB_OUTPUT"
+          echo "tag=${IN_TAG:-v0.3.3-tahap5e}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
