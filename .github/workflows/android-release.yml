@@ -599,7 +599,12 @@ jobs:
             if [ -f "$SC" ]; then
               grep -rhoE 'guid: [0-9a-f]{32}' --include='*.meta' Assets Packages Library/PackageCache 2>/dev/null \
                 | awk '{print $2}' | sort -u > /tmp/have.txt
-              grep -oE 'guid: [0-9a-f]{32}' "$SC" | awk '{print $2}' | sort -u > /tmp/want.txt
+              # guid all-zero adalah 'unity built-in resources' -- ia TIDAK punya
+              # .meta, jadi selalu terlihat menggantung. Run fix19 melaporkan
+              # "1 menggantung" dan satu-satunya kandidat adalah 0000...f000...,
+              # yaitu artefak pengecekan, bukan materi yang hilang. Dikecualikan
+              # supaya angka ini berarti: menggantung > 0 = benar-benar hilang.
+              grep -oE 'guid: [0-9a-f]{32}' "$SC" | awk '{print $2}' | grep -vE '^0+([a-f]0*)?$' | sort -u > /tmp/want.txt
               TOT=$(wc -l < /tmp/want.txt); DAM=0
               while read -r g; do
                 grep -qs -- "$g" /tmp/have.txt || { DAM=$((DAM+1)); echo "    DAMLING $g"; }
