@@ -54,6 +54,12 @@ jobs:
         working-directory: _verify/terrain
         run: dotnet run -c Release
 
+      # Pembaca PNG dipakai untuk MEMBUKTIKAN render, jadi logikanya ikut
+      # diuji di sini: kalau dekode filter/sub/paeth salah, yang salah adalah
+      # pengukurnya -- dan pengukur yang salah lebih mahal daripada tidak ada.
+      - name: Selftest pengukur rata-rata PNG
+        run: python3 _verify/shots/read_png_mean.py --selftest
+
       - name: Cek SRP Batcher shader
         run: python3 _verify/shaders/check_shader.py
 

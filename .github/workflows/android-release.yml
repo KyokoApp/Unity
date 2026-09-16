@@ -730,6 +730,33 @@ jobs:
             exit 1
           fi
 
+      # ------------------------------------------------------------
+      # UKUR, JANGAN TEBAK. SceneShots.cs merender tiga suasana DI EDITOR
+      # saat build berjalan dan menulis PNG ke shots/. Kalau rata-rata
+      # warnanya (0,0,0), dunia hitam itu BUKAN urusan player/ProjectSettings
+      # -- tapi scene/shader yang salah sejak di editor, dan seluruh teori
+      # "GraphicsSettings tidak ikut ke build" bisa dibuang. Satu angka ini
+      # memotong setengah dari kemungkinan yang selama ini kutebak-tebak
+      # lewat screenshot HP.
+      # ------------------------------------------------------------
+      - name: Ukur hasil render editor (bukti, bukan dugaan)
+        if: always()
+        run: |
+          set +e
+          OUT=$(python3 _verify/shots/read_png_mean.py 2>&1)
+          echo "$OUT"
+          mkdir -p logs && printf '%s\n' "$OUT" > logs/render-mean.txt
+          cp shots/*.png logs/ 2>/dev/null
+          while IFS= read -r l; do
+            case "$l" in
+              *"-> HITAM"*)   echo "::error::$l" ;;
+              *"-> KOSONG"*)  echo "::error::$l" ;;
+              *"-> ADA"*)     echo "::notice::$l" ;;
+              *"SHOT=TIDAK-ADA"*) echo "::warning::$l" ;;
+              *"GAGAL BACA"*)     echo "::warning::$l" ;;
+            esac
+          done <<< "$OUT"
+
       # AureliaBuildPreprocessor membangun scene + mendaftarkannya sebelum
       # build. Kalau ia gagal, APK-nya kosong -- jadi periksa di sini.
       - name: Pastikan APK ada dan tidak kosong
