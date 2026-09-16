@@ -6,13 +6,13 @@ on:
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'ID run sumber artifact (mis. 35082152939)'
+        description: 'ID run sumber artifact (mis. 35090571180)'
         required: false
-        default: '35082152939'
+        default: '35090571180'
       tag:
-        description: 'Tag release tujuan (mis. v0.3.0-tahap5b)'
+        description: 'Tag release tujuan (mis. v0.3.1-tahap5c)'
         required: false
-        default: 'v0.3.0-tahap5b'
+        default: 'v0.3.1-tahap5c'
   push:
     branches: ['arena/01a0a964-unity']
     paths: ['.github/workflows/attach-shots.yml']
@@ -28,8 +28,8 @@ jobs:
           IN_RUN: ${{ inputs.run_id }}
           IN_TAG: ${{ inputs.tag }}
         run: |
-          echo "run_id=${IN_RUN:-35082152939}" >> "$GITHUB_OUTPUT"
-          echo "tag=${IN_TAG:-v0.3.0-tahap5b}" >> "$GITHUB_OUTPUT"
+          echo "run_id=${IN_RUN:-35090571180}" >> "$GITHUB_OUTPUT"
+          echo "tag=${IN_TAG:-v0.3.1-tahap5c}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
