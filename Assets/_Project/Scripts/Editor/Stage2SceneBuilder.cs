@@ -149,6 +149,7 @@ namespace RPG.Editor
             // peduli pada aksesibilitas tipe, jadi skrip ini tetap kompilasi di URP 14,
             // 15, 17 dan seterusnya -- sementara akses bertipe akan pecah tiap kali URP
             // memindahkan atau menyembunyikan kelasnya.
+            UnityEngine.Object globalForRegister = null;
             try
             {
                 var basePath = "Assets/UniversalRenderPipelineGlobalSettings.asset";
@@ -184,11 +185,16 @@ namespace RPG.Editor
                     }
                 }
                 if (global != null) EditorUtility.SetDirty(global);
+                globalForRegister = global;
             }
             catch (System.Exception e)
             {
                 Debug.LogWarning($"[Aurelia] GlobalSettings ensure gagal: {e.Message}");
             }
+
+            // Sengaja DI LUAR try/catch di atas: kegagalan pendaftaran harus
+            // menghentikan build, bukan jadi peringatan yang tenggelam.
+            RegisterGlobalSettings(globalForRegister, notes);
 
             // --- 4. Pasang ke GraphicsSettings & SEMUA Quality Level ---
             GraphicsSettings.defaultRenderPipeline = urp;
@@ -218,6 +224,102 @@ namespace RPG.Editor
 
             var hasGlobal = GraphicsSettings.GetSettingsForRenderPipeline<UniversalRenderPipeline>() != null ? "ada" : "akan dibuat validator";
             Debug.Log("[Aurelia] URP asset siap:\n  " + urpPath + "\n  " + rendererPath + "\n  GlobalSettings: " + hasGlobal + "\nCatatan: cel-shading aktif via shader Aurelia/*Cel");
+        }
+
+        /* MENDAFTARKAN bukan sama dengan MEMBUAT. Unity 6, doc RenderPipelineGlobalSettings:
+           "On Editor we must make sure the Global Settings Asset is registered into the
+           GraphicsSettings -- Graphics Settings will make sure the asset is available on
+           player builds." Artinya tanpa pendaftaran ini, asetnya ADA di proyek tapi TIDAK
+           ikut dibungkus ke player. Di editor itu tidak kelihatan karena URP punya Ensure()
+           yang membuat+mendaftarkan on the fly -- dan itulah warning yang sudah tiga run
+           kita tercetak diam-diam:
+
+               "URP Global Settings Asset has been created for you. If you want to modify it..."
+
+           Di player tidak ada Ensure(): UniversalRenderPipelineGlobalSettings.instance ==
+           null, shader resource / postProcess data tidak terisi, dan URP berhenti SEBELUM
+           pass pertama. Konsekuensi persis gejala HP: tidak ada yang digambar, backbuffer
+           tidak pernah di-clear, teks IMGUI menumpuk antar frame ("jejak"), dan warna
+           latar kamera yang biru-abu terang tidak pernah terlihat.
+
+           Nama API berubah antar versi (6000.x: EditorGraphicsSettings
+           .SetRenderPipelineGlobalSettingsAsset; sebelumnya GraphicsSettings
+           .RegisterRenderPipelineSettings, kini obsolete), jadi keduanya dicari lewat
+           refleksi -- pola yang sama seperti tipe global settings-nya sendiri. */
+        static void RegisterGlobalSettings(UnityEngine.Object global, List<string> notes)
+        {
+            var settingsType = typeof(UnityEngine.Rendering.RenderPipelineGlobalSettings);
+            var pipelineType = typeof(UniversalRenderPipeline);
+            var via = (string)null;
+
+            /* Empat bentuk, urut dari yang paling baru. Unity memindahkan API ini di
+               tengah siklus 6000.x (yang lama ditandai obsolete, bukan dihapus); salah
+               tebak signature = satu jam build terbuang, jadi dicoba satu-satu lewat
+               refleksi -- yang tidak ada hanya dilewati, tidak menggagalkan kompilasi
+               di versi Unity lain. */
+            var editorGs = typeof(UnityEditor.Rendering.EditorGraphicsSettings);
+            var coreGs = typeof(UnityEngine.Rendering.GraphicsSettings);
+            var attempts = new[]
+            {
+                new { Owner = editorGs, Method = "SetRenderPipelineGlobalSettingsAsset",
+                      Sig = new[] { settingsType },
+                      Label = "EditorGraphicsSettings.SetRenderPipelineGlobalSettingsAsset(settings)" },
+                new { Owner = editorGs, Method = "SetRenderPipelineGlobalSettingsAsset",
+                      Sig = new[] { pipelineType, settingsType },
+                      Label = "EditorGraphicsSettings.SetRenderPipelineGlobalSettingsAsset(type, settings)" },
+                new { Owner = coreGs, Method = "RegisterRenderPipelineSettings",
+                      Sig = new[] { settingsType },
+                      Label = "GraphicsSettings.RegisterRenderPipelineSettings(settings)" },
+                new { Owner = coreGs, Method = "RegisterRenderPipelineSettings",
+                      Sig = new[] { pipelineType, settingsType },
+                      Label = "GraphicsSettings.RegisterRenderPipelineSettings(type, settings)" },
+            };
+
+            if (global != null)
+            {
+                foreach (var a in attempts)
+                {
+                    try
+                    {
+                        var m = a.Owner.GetMethod(a.Method,
+                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+                            null, a.Sig, null);
+                        if (m == null) continue;
+                        var args = a.Sig.Length == 2
+                            ? new object[] { pipelineType, global }
+                            : new object[] { global };
+                        m.Invoke(null, args);
+                        via = a.Label;
+                        break;
+                    }
+                    catch (System.Exception e)
+                    {
+                        notes.Add("pendaftaran lewat " + a.Label + " gagal: " + e.GetType().Name + " " + e.Message);
+                    }
+                }
+            }
+            else
+            {
+                notes.Add("GAGAL: URP Global Settings tidak ada di proyek -> tidak bisa didaftarkan.");
+            }
+
+            /* Verifikasi pakai API PUBLIK, bukan rasa percaya. Kalau pendaftaran
+               tidak terbaca DAN tidak ada satu pun API yang berhasil dipanggil,
+               build harus mati: tanpa GlobalSettings, URP di player berhenti
+               sebelum pass pertama -> APK hitam tanpa satu baris error pun. */
+            var back = GraphicsSettings.GetSettingsForRenderPipeline<UniversalRenderPipeline>();
+            notes.Add("URP GlobalSettings: " + (back != null
+                ? "TERDAFTAR (" + (via ?? "sudah terdaftar sebelumnya") + ")"
+                : "TIDAK TERDAFTAR"));
+            Debug.Log("[Aurelia] URP GlobalSettings " + (back != null ? "terdaftar" : "TIDAK terdaftar") +
+                      (via != null ? " via " + via : "") +
+                      (global != null ? "" : " (aset tidak ditemukan)"));
+
+            if (back == null && via == null)
+                throw new System.Exception(
+                    "UniversalRenderPipelineGlobalSettings tidak terdaftar dan tidak ada API pendaftarnya yang cocok. " +
+                    "Player akan berhenti sebelum pass render pertama (layar hitam, tanpa clear, teks HUD menumpuk). " +
+                    "Build dihentikan di sini: mengirim APK yang hitam sekali lagi bukan hasil yang diterima.");
         }
 
         /* Unity menyimpan render pipeline di ProjectSettings/GraphicsSettings.asset
