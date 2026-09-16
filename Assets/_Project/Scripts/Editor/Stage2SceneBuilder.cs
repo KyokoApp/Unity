@@ -819,6 +819,20 @@ namespace RPG.Editor
                         notes.Add($"AureliaGrass.mat: shader NULL -> dipasang ulang ({heal.name}).");
                     }
                 }
+                /* Graphics.DrawMeshInstanced menolak material yang tidak
+                   menyalakan dukungan instancing, dan aset .mat warisan runner
+                   tersimpan dengan m_EnableInstancingVariants: 0 (terbaca di
+                   berkasnya). Kegagalannya senyap: tidak ada error di console,
+                   tidak ada magenta -- rumputnya saja yang tidak pernah ada,
+                   yang persis sulit dibedakan dari "scene kosong" di screenshot
+                   HP. Maka dinyalakan di sini, bukan diharapkan manual. */
+                if (!existing.enableInstancing)
+                {
+                    existing.enableInstancing = true;
+                    EditorUtility.SetDirty(existing);
+                    AssetDatabase.SaveAssets();
+                    notes.Add("AureliaGrass.mat: enableInstancing mati -> dinyalakan (DrawMeshInstanced).");
+                }
                 return existing;
             }
 
@@ -831,6 +845,8 @@ namespace RPG.Editor
             }
             var mat = new Material(shader);
             mat.name = "AureliaGrass";
+            /* lihat catatan di cabang atas: tanpa ini DrawMeshInstanced diam. */
+            mat.enableInstancing = true;
             AssetDatabase.CreateAsset(mat, path);
             AssetDatabase.SaveAssets();
             return mat;

@@ -159,6 +159,7 @@ namespace UnityEngine
     public enum TextureFormat { RGBA32, RGB24 } public enum TextureWrapMode { Repeat, Clamp } public enum FilterMode { Point, Bilinear, Trilinear }
     public class Material : Object { public Material(Shader s){} public bool HasProperty(string n)=>false;
         public Shader shader;   // Material.shader ada di Unity asli (get/set)
+        public bool enableInstancing;   // UnityEngine.Material.enableInstancing (get/set), asli
         public void SetColor(string n,Color c){} public Color GetColor(string n)=>default;
         public void SetTexture(string n,Texture t){} public Texture GetTexture(string n)=>null;
         public void SetFloat(string n,float v){} public float GetFloat(string n)=>0f;
