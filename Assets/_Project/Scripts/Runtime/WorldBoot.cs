@@ -76,66 +76,58 @@ namespace RPG.Runtime
             BootLog.Add("boot mulai.");
             var streamerDead = false;
 
+            /* HUD di luar try/yield: C# menolak yield di dalam try-catch. */
             try
             {
-                try
-                {
-                    GenshinHud.Create();
-                    GenshinHud.SetVisible(false);
-                }
-                catch (Exception e)
-                {
-                    BootLog.Add("[FATAL-sub] HUD: " + e.GetType().Name + ": " + e.Message);
-                }
-
-                while (!_entered)
-                {
-                    _elapsed = Time.realtimeSinceStartup - wallStart;
-
-                    var chunks = 0;
-                    string status = "menyiapkan";
-                    if (_streamer != null && !streamerDead)
-                    {
-                        try
-                        {
-                            chunks = _streamer.StreamBudgeted(StreamBudgetMs);
-                            status = chunks > 0
-                                ? $"memuat dunia ({chunks} chunk)"
-                                : "memuat dunia";
-                        }
-                        catch (Exception e)
-                        {
-                            streamerDead = true;
-                            BootLog.Add("[FATAL-sub] streamer: " + e.GetType().Name + ": " + e.Message);
-                        }
-                    }
-
-                    var prog = _streamer != null && !streamerDead
-                        ? Mathf.Clamp01(0.15f + _streamer.Progress01 * 0.75f)
-                        : Mathf.Clamp01((float)(_elapsed / BootPolicy.SoftEnterSec));
-                    try { LoadingScreen.SetProgress(prog, status); }
-                    catch { /* overlay rusak: tetap masuk */ }
-                    if (BootLog.HasErrors)
-                    {
-                        try { LoadingScreen.ShowError(BootLog.Tail()); }
-                        catch { }
-                    }
-
-                    var gone = _streamer == null || streamerDead;
-                    if (BootPolicy.ShouldEnter(_elapsed, chunks, gone) || LoadingScreen.WantSkip)
-                        break;
-
-                    yield return null;
-                }
+                GenshinHud.Create();
+                GenshinHud.SetVisible(false);
             }
             catch (Exception e)
             {
-                BootLog.Add("[FATAL] boot: " + e.GetType().Name + ": " + e.Message);
+                BootLog.Add("[FATAL-sub] HUD: " + e.GetType().Name + ": " + e.Message);
             }
-            finally
+
+            while (!_entered)
             {
-                EnterWorld();
+                _elapsed = Time.realtimeSinceStartup - wallStart;
+
+                var chunks = 0;
+                string status = "menyiapkan";
+                if (_streamer != null && !streamerDead)
+                {
+                    try
+                    {
+                        chunks = _streamer.StreamBudgeted(StreamBudgetMs);
+                        status = chunks > 0
+                            ? $"memuat dunia ({chunks} chunk)"
+                            : "memuat dunia";
+                    }
+                    catch (Exception e)
+                    {
+                        streamerDead = true;
+                        BootLog.Add("[FATAL-sub] streamer: " + e.GetType().Name + ": " + e.Message);
+                    }
+                }
+
+                var prog = _streamer != null && !streamerDead
+                    ? Mathf.Clamp01(0.15f + _streamer.Progress01 * 0.75f)
+                    : Mathf.Clamp01((float)(_elapsed / BootPolicy.SoftEnterSec));
+                try { LoadingScreen.SetProgress(prog, status); }
+                catch { /* overlay rusak: tetap masuk */ }
+                if (BootLog.HasErrors)
+                {
+                    try { LoadingScreen.ShowError(BootLog.Tail()); }
+                    catch { }
+                }
+
+                var gone = _streamer == null || streamerDead;
+                if (BootPolicy.ShouldEnter(_elapsed, chunks, gone) || LoadingScreen.WantSkip)
+                    break;
+
+                yield return null;
             }
+
+            EnterWorld();
         }
 
         /* Idempoten. Dipanggil dari coroutine, finally, dan
