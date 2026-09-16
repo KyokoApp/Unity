@@ -141,3 +141,56 @@ dan stubnya diberi decoy `UnityEngine.Rendering.Universal.ShadowQuality` supaya
 CS0104 kelas ini SELALU terlihat di `verify.yml` (60 detik) dan tidak pernah lagi
 butuh 7 build Unity untuk ketemu. Build `v0.2.0-cel-fix11` = verifikasi pertama
 dengan rantai bukti lengkap: kran log Unity -> `Logs/AureliaUnity.log` -> anotasi.
+
+## 2026-09-16 — HIJAU: APK release terverifikasi bertanda tangan CN=yuki (v0.2.0-cel-fix17)
+
+Rantai penyebab, dari gejala "harus uninstall dulu" sampai build yang lulus:
+
+1. **fix7–fix10**: .yml$ rusak dirinya sendiri (stub dobel) -> tidak ada satu pun
+   pemeriksaan kompilasi C# yang jalan. .cs(83)$ CS0104 ($
+   ambigu) dan $ CS0122 ($
+   tidak bisa diakses bertipe di URP 17) lolos ke build Unity dan membakarnya 20 menit
+   tiap percobaan. Kedua-duanya sekarang diperbaiki, dan harness dikompilasi
+   per-.asmdef supaya kesalahan lintas-assembly tidak bisa sembunyi lagi.
+2. **fix11–fix12**: : latest$ mati di API GitHub (403) -> dipin .1.65$.
+3. **fix13–fix14**: $: Can not sign the application$. Penyebab:
+   $ diberikan ABSOLUT; Unity menaruh current directory di
+   depannya -> /github/workspace/github/workspace/keystore/... -> "keystore file not
+   found". Bukti bahwa keystore sehat: keytool baca OK + jarsigner menandatangani OK
+   di JDK runner yang sama.
+4. **fix15**: path direlatifkan -> error berubah menjadi "please provide
+   passwords!". Jadi isinya benar, jalurnya yang bocor: password dikirim sebagai
+   argumen baris perintah ke skrip build game-ci dan hilang diam-diam.
+5. **fix16**: CI menulis /ci-signing.txt$ (relatif, tidak di-commit) dan
+   .ApplyAndroidSigningFromCi()$ memasang
+   PlayerSettings.Android.{useCustomKeystore,keystoreName,keystorePass,keyaliasName,
+   keyaliasPass} sendiri di OnPreprocessBuild (callbackOrder -100), BEBERAPA DETIK
+   sebelum Unity menandatangani, lalu membaca balik nilainya sebagai bukti. Build
+   Android LULUS untuk pertama kalinya. Yang gagal tinggal verifier-ku sendiri.
+6. **fix17**: verifier sebelumnya menghakimi dari META-INF/*.RSA — salah, karena
+   skema v2/v3 tidak menulis META-INF; dan  -c 4096$ tidak pernah mencapai APK
+   Signing Block (central directory APK ini ratusan KB). Diganti  verify
+   --print-certs$ (build-tools disisakan dari pembersihan disk) + pemindai struktur
+   APK yang dites terhadap APK sintetik; kalau unsigned, CI menandatanganinya sendiri.
+   Bug lain yang ditebas di langkah yang sama:  | sed$ di dalam function
+   mengembalikan kode $ (0), jadi APK unsigned akan dinyatakan lolos.
+
+Hasil (run 35048608918, semua 20 langkah success):
+
+- Release: .2.0-cel-fix17$ -> -0.2.0-cel-fix17-arm64.apk$ (50.641.822 byte;
+  ambang "scene tidak kosong" 30 MB, karakter VRM ikut).
+- Bukti penandatangan, dari apksigner (bukan dugaan): =yuki$ dan
+  =ADA$ (APK Signing Block hadir, jadi skema v2/v3 aktif) -> install
+  menimpa build berikut tanpa uninstall, selama kunci tetap dan versionCode naik
+  (versionCode = run_number + 1000).
+- Unity TIDAK perlu ditambal CI untuk signing: jalur Unity sendiri yang menandatangani.
+- Kosmetik yang ditinggalkan: =?$ di anotasi (walker pair tidak memetakan ID
+  milik Unity; $ sudah menjawab resmi), dan dua baris
+  "Addressable Asset Settings does not exist" (paket di-referensi .Runtime.asmdef$
+  tapi tidak dipakai kode mana pun -> bisa dilepas untuk memangkas waktu impor).
+
+Kebocoran lisensi Personal: tiap run diakhiri "Failed to return the Personal license
+seat after 4 attempts". -ci/unity-return-license@v2$ TIDAK menolong (entrypoint-nya
+hanya jalan kalau $ ada; Personal tidak punya serial). Kalau nanti kena
+"no available seats": lepas aktivasi di https://id.unity.com -> My Account -> My Seats
+-> "Remove selected activations" (bukan halaman Security; di situ tidak ada apa-apa).
