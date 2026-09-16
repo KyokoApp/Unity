@@ -112,10 +112,28 @@ namespace RPG.Editor
             {
                 var so = new SerializedObject(urp);
                 var rendererList = so.FindProperty("m_RendererDataList");
-                if (rendererList != null && rendererList.arraySize > 0)
+                if (rendererList != null)
                 {
+                    /* Daftar renderer KOSONG adalah cara paling sunyi untuk
+                       mematikan gambar: URP terpilih, tidak ada error, tidak ada
+                       magenta -- hanya tidak ada satu pun pass yang digambar,
+                       jadi backbuffer juga tidak pernah di-clear. Gejala di HP
+                       (v0.2.0-cel-fix17): layar hitam + teks HUD tampak
+                       "berjejak", dan camera.backgroundColor yang biru-abu
+                       terang TIDAK terlihat sama sekali. Kode lama menulis
+                       index 0 "kalau list sudah berisi" -> list kosong dibiarkan
+                       kosong selamanya. Jadi: tambahkan elemennya. */
+                    if (rendererList.arraySize == 0) rendererList.arraySize = 1;
                     rendererList.GetArrayElementAtIndex(0).objectReferenceValue = renderer;
+                    var idx = so.FindProperty("m_DefaultRendererIndex");
+                    if (idx != null) idx.intValue = 0;
                     so.ApplyModifiedPropertiesWithoutUndo();
+                    Debug.Log($"[Aurelia] URP renderer list: size={rendererList.arraySize}, defaultIdx={(idx != null ? idx.intValue.ToString() : "n/a")}");
+                }
+                else
+                {
+                    Debug.LogError("[Aurelia] m_RendererDataList tidak ditemukan di URP asset " +
+                                   "(perbedaan versi URP?) -> tidak ada jaminan renderer terdaftar.");
                 }
             }
 
@@ -340,6 +358,9 @@ namespace RPG.Editor
             RenderSettings.fogEndDistance = withTerrain ? 1150f : 600f;
             RenderSettings.fogColor = cam.backgroundColor;
 
+            // ---- jangan kirim dunia yang tidak tergambar -------------------
+            RepairMissingMaterials(notes);
+
             // ---- simpan ----------------------------------------------------
             var dir = Path.GetDirectoryName(scenePath);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
@@ -406,12 +427,51 @@ namespace RPG.Editor
             notes.Add("Air: satu quad 1400 m di y = WaterLevel.");
         }
 
+        /* Renderer tanpa material tidak meledak dan tidak magenta: ia tidak
+           digambar. Di scene hasil script (bukan adegan yang diedit manusia)
+           itu mudah terjadi -- satu CreateAsset gagal diam-diam, dan dunia
+           jadi kosong di HP. Jadi setiap renderer yang sampai di titik ini
+           tanpa material diberi material cadangan PROYEK (bukan dibuat
+           runtime: Material hasil new Material() TIDAK ikut tersimpan ke
+           scene, jadi ia justru mengulang kesalahan yang sama di build
+           berikutnya), dan jumlahnya dicatat ke log build. */
+        static void RepairMissingMaterials(List<string> notes)
+        {
+            var fallback = LoadOrCreateShaderMaterial("AureliaTerrain", "Aurelia/Terrain", notes);
+            var rs = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+            var fixed_ = 0, still = 0;
+            for (var i = 0; i < rs.Length; i++)
+            {
+                var r = rs[i];
+                if (r == null) continue;
+                var mats = r.sharedMaterials;
+                if (mats == null || mats.Length == 0 || (mats.Length == 1 && mats[0] == null))
+                {
+                    if (fallback == null) { still++; continue; }
+                    r.sharedMaterial = fallback;
+                    fixed_++;
+                }
+            }
+            if (fixed_ > 0 || still > 0)
+                notes.Add($"materi cadangan dipasang di {fixed_} renderer" +
+                          (still > 0 ? $", {still} TETAP tanpa materi (shader cadangan gagal)" : ""));
+            else notes.Add("census renderer: semua sudah punya material.");
+        }
+
         static Material LoadOrCreateShaderMaterial(string assetName, string shaderName, List<string> notes)
         {
             if (!AssetDatabase.IsValidFolder(ShaderFolder))
             {
-                notes.Add($"Folder {ShaderFolder} tidak ada");
-                return null;
+                /* Bukan peringatan: renderer dengan material NULL tidak
+                   menampilkan magenta di URP, ia diam-diam tidak digambar.
+                   Build yang "berhasil" lalu mengirim APK berisi dunia kosong
+                   adalah kegagalan yang paling mahal di proyek ini (satu putaran
+                   = ~1 jam lisensi + satu screenshot HP untuk sadar). */
+                VrmPrefabBuilder.EnsureAssetFolder(ShaderFolder);
+                if (!AssetDatabase.IsValidFolder(ShaderFolder))
+                    throw new System.Exception(
+                        $"{ShaderFolder} tidak ada dan tidak bisa dibuat -> material terrain/air/rumput mustahil terbentuk. " +
+                        "Build dihentikan di sini, bukan diteruskan sampai APK-nya hitam.");
             }
             var path = $"{ShaderFolder}/{assetName}.mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -419,10 +479,10 @@ namespace RPG.Editor
 
             var shader = Shader.Find(shaderName);
             if (shader == null)
-            {
-                notes.Add($"Shader '{shaderName}' tidak ditemukan.");
-                return null;
-            }
+                throw new System.Exception(
+                    $"Shader '{shaderName}' tidak ditemukan padahal berkasnya ada di {ShaderFolder}: " +
+                    "artinya shader tidak ter-import (Library basi?) atau nama di dalam berkas " +
+                    "berbeda dari yang dipakai kode. Melanjutkan build = mengirim APK dengan objek tak tergambar.");
             var m = new Material(shader) { name = assetName };
             AssetDatabase.CreateAsset(m, path);
             AssetDatabase.SaveAssets();

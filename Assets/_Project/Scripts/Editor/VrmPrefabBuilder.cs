@@ -285,7 +285,9 @@ namespace RPG.Editor
            OnPreprocessBuild membunuh seluruh build APK dengan exit code 1.
            Helper ini menelan semua kegagalan sendiri: gagal bikin folder tidak boleh
            lebih fatal daripada gagal build. */
-        static void EnsureAssetFolder(string folder)
+        /* Dipakai Stage2SceneBuilder juga (census materi): dulu private, dan
+          调用 dari assembly yang sama tetap butuh visibilitas eksplisit. */
+        internal static void EnsureAssetFolder(string folder)
         {
             try
             {
