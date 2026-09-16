@@ -8,9 +8,15 @@ tiga suasana di EDITOR saat build CI berjalan dan menulisnya ke shots/,
 jadi angkanya bisa diambil dari sana -- tanpa perlu menunggu screenshot HP.
 
 Klasifikasi yang dipakai (0..255, rata-rata semua kanal):
-  max < 24            -> HITAM  : tidak ada satu pun pass yang menggambar
-  warna ~ clear color -> KOSONG : kamera meng-clear, tapi tidak ada objek
-  selain itu            -> ADA    : dunia tergambar di editor
+  max < 24            -> HITAM   : tidak ada satu pun pass yang menggambar
+  warna ~ clear color -> KOSONG  : kamera meng-clear, tapi tidak ada objek
+  R dan B tinggi, G rendah -> MAGENTA : material tidak menemukan shader
+  selain itu            -> ADA     : dunia tergambar di editor
+
+MAGENTA bukan kosmetik: itu warna yang Unity pakai untuk "shader gagal/tidak
+ada", jadi dunia boleh saja tergambar bentuknya tapi tidak akan pernah terlihat
+benar di player. Angka (225,55,233) dari run v0.2.0-cel-fix20 adalah contoh
+aslinya -- dan "ADA: dunia tergambar" yang lama menolaknya, itu bug alat ukur.
 
 Ditulis dengan stdlib saja karena runner tidak punya PIL, dan hasil apa
 pun yang gagal didekode dilaporkan, tidak pernah menggagalkan build.
@@ -112,10 +118,20 @@ def classify(rgb, clear_hint=None):
     if mx < 24:
         return "HITAM: tidak ada yang digambar (backbuffer tidak pernah di-clear?)"
     if clear_hint:
+        # camera.backgroundColor ditulis kode dalam 0..1, screenshot dalam 0..255.
+        # Tanpa normalisasi ini jaraknya selalu ~500 dan aturan KOSONG tidak
+        # pernah aktif: aturan yang tampaknya menjaga padahal tidak berjalan
+        # (tertangkep oleh selftest -- itu gunanya).
+        if max(clear_hint) <= 1.0:
+            clear_hint = tuple(int(round(c * 255)) for c in clear_hint)
         dr = sum(abs(a - b) for a, b in zip(rgb, clear_hint))
         if dr < 40:
             return ("KOSONG: hasilnya = warna clear kamera, jadi tidak ada "
                     "satu pun objek yang tergambar")
+    r, g, b = rgb
+    if min(r, b) > 140 and g < 0.55 * min(r, b):
+        return ("MAGENTA: yang tergambar adalah material error Unity (shader "
+                "tidak ditemukan/tidak di-compile untuk target), bukan dunia")
     return "ADA: dunia tergambar"
 
 
@@ -165,7 +181,18 @@ def _selftest():
             os.unlink(path)
         assert (got[0], got[1]) == (w, h), got
         assert got[2] == exp, ("filter", ft, got[2], exp)
+    # Klasifikasinya sendiri juga diuji, bukan cuma dekodernya: kasus-kasus ini
+    # adalah angka nyata yang pernah keluar dari CI, dan salah satu di antaranya
+    # (magenta) dulu lolos sebagai "ADA" -- itu artinya penjaga, bukan bukti.
+    cases = [((0, 0, 0), "HITAM"), ((21, 24, 32), "ADA"),
+             ((225, 55, 233), "MAGENTA"), ((181, 7, 185), "MAGENTA"),
+             ((158, 178, 199), "KOSONG"), ((175, 185, 155), "ADA"),
+             ((160, 115, 73), "ADA")]
+    for rgb_, want in cases:
+        got = classify(rgb_, clear_hint=(0.62, 0.70, 0.78))
+        assert got.startswith(want), (rgb_, want, got)
     print("selftest OK: filter NONE + UP didekode identik, rata-rata", exp)
+    print("selftest OK: 7 kasus klasifikasi warna, termasuk magenta-fix20")
 
 
 if __name__ == "__main__":

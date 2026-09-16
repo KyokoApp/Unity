@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: AureliaTerrain
-  m_Shader: {fileID: 4800000, guid: 477b2e6eedf38b426a50666d6edb8a7e, type: 3}
+  m_Shader: {fileID: 4800000, guid: efdf818aa36211785b7e3b20a4d28a84, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []

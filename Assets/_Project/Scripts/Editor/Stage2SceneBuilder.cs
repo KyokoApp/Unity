@@ -52,7 +52,13 @@ namespace RPG.Editor
         //   - GlobalSettings tidak ada -> resource URP tidak ke-load
         //   - Camera clearFlags Skybox tanpa skybox -> tidak clear
         // Perbaikan: buat asset dengan postProcessData dari package, set SEMUA quality level.
+        /* Unity menolak parameter opsional selain MenuCommand pada metode [MenuItem]:
+           build fix20 mencatat "EnsureUrpAsset has invalid parameters" dan item
+           menu-nya tidak pernah terdaftar. Dipisah supaya jalur CI (berparameter)
+           dan jalur manusia di editor sama-sama hidup. */
         [MenuItem("Tools/Aurelia/1. Buat URP Asset (kalau belum ada)")]
+        static void EnsureUrpAssetMenu() { EnsureUrpAsset(); }
+
         public static void EnsureUrpAsset(List<string> notes = null)
         {
             notes ??= new List<string>();
@@ -285,6 +291,18 @@ namespace RPG.Editor
                             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
                             null, a.Sig, null);
                         if (m == null) continue;
+                        /* API ini GENERIK: SetRenderPipelineGlobalSettingsAsset<T> /
+                           RegisterRenderPipelineSettings<T> dengan T = jenis pipeline.
+                           Invoke pada definition yang belum di-instantiate melempar
+                           "Late bound operations cannot be performed on types or
+                           methods for which ContainsGenericParameters is true" -- itu
+                           persis error yang dicatat build fix20, jadi dulu keempat
+                           percobaan tidak ada yang benar-benar memanggil Unity. */
+                        if (m.IsGenericMethodDefinition)
+                        {
+                            if (m.GetGenericArguments().Length != 1) continue;
+                            m = m.MakeGenericMethod(pipelineType);
+                        }
                         var args = a.Sig.Length == 2
                             ? new object[] { pipelineType, global }
                             : new object[] { global };
@@ -308,12 +326,86 @@ namespace RPG.Editor
                build harus mati: tanpa GlobalSettings, URP di player berhenti
                sebelum pass pertama -> APK hitam tanpa satu baris error pun. */
             var back = GraphicsSettings.GetSettingsForRenderPipeline<UniversalRenderPipeline>();
+
+            /* PENDAFTARAN DI MEMORI BUKAN BUKTI UNTUK PLAYER. Fix20 melaporkan
+               "TERDAFTAR (sudah terdaftar sebelumnya)" -- itu Unity sendiri yang
+               mendaftarkan saat editor load -- sementara berkasnya tetap kosong,
+               dan APK tetap hitam. Yang masuk ke build adalah ProjectSettings/
+               GraphicsSettings.asset, jadi setelah memanggil API-nya: paksa
+               container-nya diserialisasi, lalu BERKASNYA yang dibaca. */
+            if (back != null)
+            {
+                foreach (var saveName in new[] { "SaveAllGraphicsSettings", "Save" })
+                {
+                    var sm = coreGs.GetMethod(saveName,
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+                        null, System.Type.EmptyTypes, null);
+                    if (sm == null) continue;
+                    try { sm.Invoke(null, null); notes.Add("graphics settings disimpan lewat " + saveName + "()"); break; }
+                    catch (System.Exception e) { notes.Add("simpan via " + saveName + " gagal: " + e.GetType().Name); }
+                }
+                AssetDatabase.SaveAssets();
+            }
+
+            /* Di mana seharusnya tercatat? Tidak ditulis dari ingatan: Unity 6
+               memindahkan banyak hal render pipeline ke container, jadi yang
+               dicari adalah GUID aset global settings itu sendiri, di SEMUA
+               berkas ProjectSettings/*.asset. Ketemu di berkas mana pun =
+               player akan membawanya; tidak ketemu di mana pun = tidak. */
+            var gsFile = "ProjectSettings/GraphicsSettings.asset";
+            var gsGuid = AssetDatabase.AssetPathToGUID("Assets/UniversalRenderPipelineGlobalSettings.asset");
+            bool bisaDiperiksa = false;
+            bool tertulis = false;
+            var tempat = "";
+            var cuplikan = "";
+            if (!string.IsNullOrEmpty(gsGuid))
+            {
+                try
+                {
+                    bisaDiperiksa = true;
+                    var scan = new System.Collections.Generic.List<string>();
+                    foreach (var f in System.IO.Directory.GetFiles("ProjectSettings", "*.asset"))
+                    {
+                        scan.Add(System.IO.Path.GetFileName(f));
+                        if (tertulis) continue;
+                        if (System.IO.File.ReadAllText(f).Replace("\r", "").Contains(gsGuid))
+                        {
+                            tertulis = true;
+                            tempat = System.IO.Path.GetFileName(f);
+                        }
+                    }
+                    if (!tertulis && System.IO.File.Exists(gsFile))
+                    {
+                        var lines = System.IO.File.ReadAllText(gsFile).Replace("\r", "").Split('\n');
+                        int ambil = System.Math.Min(8, lines.Length);
+                        cuplikan = string.Join(" ~ ", lines, lines.Length - ambil, ambil).Trim() +
+                                   " [dipindai: " + string.Join(",", scan) + "]";
+                    }
+                }
+                catch (System.Exception e)
+                {
+                    notes.Add("scan ProjectSettings untuk guid global settings gagal: " + e.GetType().Name + " " + e.Message);
+                }
+            }
             notes.Add("URP GlobalSettings: " + (back != null
-                ? "TERDAFTAR (" + (via ?? "sudah terdaftar sebelumnya") + ")"
-                : "TIDAK TERDAFTAR"));
-            Debug.Log("[Aurelia] URP GlobalSettings " + (back != null ? "terdaftar" : "TIDAK terdaftar") +
+                      ? "TERDAFTAR di memori (" + (via ?? "oleh Unity sendiri, tidak lewat API yang dicoba") + ")"
+                      : "TIDAK TERDAFTAR") + " | di ProjectSettings: " + (
+                      !bisaDiperiksa ? "tidak bisa diperiksa"
+                      : (tertulis ? "ADA di " + tempat + " (" + gsGuid.Substring(0, 8) + ")" : "TIDAK ADA di berkas mana pun")));
+            Debug.Log("[Aurelia] URP GlobalSettings: memori=" + (back != null ? "terdaftar" : "KOSONG") +
+                      ", tercatat di " + (tertulis ? tempat : "TIDAK ADA berkas ProjectSettings yang memuatnya") +
                       (via != null ? " via " + via : "") +
                       (global != null ? "" : " (aset tidak ditemukan)"));
+
+            /* Kalau Unity bilang terdaftar tapi berkasnya tidak memuat GUID aset
+               itu, player tidak punya apa pun untuk dimuat: build harus berhenti
+               dan meninggalkan jejak sejauh mungkin, bukan mengirim APK hitam lagi. */
+            if (bisaDiperiksa && !tertulis && back != null)
+                throw new System.Exception(
+                    "UniversalRenderPipelineGlobalSettings (guid " + gsGuid + ") terdaftar di memori editor " +
+                    "tetapi tidak tercatat di BERKAS ProjectSettings mana pun. Player dibangun dari berkas-berkas " +
+                    "itu, jadi APK-nya akan hitam meski editor terlihat normal -- inilah kegagalan yang sedang " +
+                    "dikejar, dan build dihentikan supaya tidak ada APK hitam lagi. Ujung " + gsFile + ": " + cuplikan);
 
             if (back == null && via == null)
                 throw new System.Exception(
@@ -668,7 +760,29 @@ namespace RPG.Editor
             }
             var path = $"{ShaderFolder}/{assetName}.mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                /* Material ADA tapi m_Shader-nya tidak resolve -> renderer diam:
+                   bukan magenta di player, bukan error di console, hanya tidak
+                   ada apa pun. Ini persis yang terjadi di fix20: .mat ikut
+                   di-commit sedangkan .shader.meta tidak pernah ada di repo, jadi
+                   Unity mengacak ulang GUID shader tiap import dan referensi di
+                   .mat menunjuk ke masa lalu (buktinya: screenshot editor jadi
+                   magenta 225/55/233). Shader dipasang ulang, lalu dilaporkan. */
+                if (existing.shader == null)
+                {
+                    var heal = Shader.Find(shaderName);
+                    if (heal == null)
+                        throw new System.Exception(
+                            $"{path} tidak punya shader, dan '{shaderName}' juga tidak ditemukan " +
+                            "saat build -> material ini akan menggambar objek kosong. Build dihentikan.");
+                    existing.shader = heal;
+                    EditorUtility.SetDirty(existing);
+                    AssetDatabase.SaveAssets();
+                    notes.Add($"{assetName}.mat: shader NULL -> dipasang ulang ({shaderName}).");
+                }
+                return existing;
+            }
 
             var shader = Shader.Find(shaderName);
             if (shader == null)
@@ -690,7 +804,23 @@ namespace RPG.Editor
             }
             var path = $"{RenderFolder}/AureliaGrass.mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                if (existing.shader == null)
+                {
+                    var heal = Shader.Find("Aurelia/GrassCel");
+                    if (heal == null) heal = Shader.Find("Aurelia/Grass");
+                    if (heal == null) notes.Add("AureliaGrass.mat: shader NULL dan Aurelia/Grass* tidak ketemu");
+                    else
+                    {
+                        existing.shader = heal;
+                        EditorUtility.SetDirty(existing);
+                        AssetDatabase.SaveAssets();
+                        notes.Add($"AureliaGrass.mat: shader NULL -> dipasang ulang ({heal.name}).");
+                    }
+                }
+                return existing;
+            }
 
             var shader = Shader.Find("Aurelia/GrassCel");
             if (shader == null) shader = Shader.Find("Aurelia/Grass");

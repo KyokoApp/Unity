@@ -756,6 +756,13 @@ jobs:
             case "$l" in
               *"-> HITAM"*)   echo "::error::$l" ;;
               *"-> KOSONG"*)  echo "::error::$l" ;;
+              # MAGENTA = material error Unity (shader tidak resolve). Run
+              # v0.2.0-cel-fix20 punya angka ini (225,55,233) dan tidak ada yang
+              # menandai: pemilah lama hanya kenal HITAM/KOSONG, jadi "ADA: dunia
+              # tergambar" menutupi dunia yang seluruhnya material error. Sekarang
+              # ia merah, dan merah di sini lebih murah satu siklus daripada
+              # screenshot HP.
+              *"-> MAGENTA"*) echo "::error::$l" ;;
               *"-> ADA"*)     echo "::notice::$l" ;;
               *"SHOT=TIDAK-ADA"*) echo "::warning::$l" ;;
               *"GAGAL BACA"*)     echo "::warning::$l" ;;

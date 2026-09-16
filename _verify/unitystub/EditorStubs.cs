@@ -11,6 +11,7 @@ namespace UnityEditor
         public static void CreateAsset(Object o,string p){} public static void SaveAssets(){}
         public static string[] FindAssets(string f,string[] folders)=>new string[0]; public static string[] FindAssets(string f)=>new string[0];
         public static string GUIDToAssetPath(string g)=>null;
+        public static string AssetPathToGUID(string p)=>null;
         public static T LoadAssetAtPath<T>(string p) where T:Object => default;
         public static Object[] LoadAllAssetsAtPath(string p)=>null; public static void ImportAsset(string p){}
         public static void ImportAsset(string p, ImportAssetOptions o){} public static void StartAssetEditing(){} public static void StopAssetEditing(){}

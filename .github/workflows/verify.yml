@@ -63,6 +63,19 @@ jobs:
       - name: Cek SRP Batcher shader
         run: python3 _verify/shaders/check_shader.py
 
+      # Gerbang BARU, dan ia menggating. Unity menyimpan GUID aset di berkas
+      # .meta, BUKAN di dalam berkas asetnya. .meta yang tidak di-repo berarti
+      # GUID-nya diacak ulang setiap import -- dan setiap build CI adalah import
+      # baru, jadi scene -> komponen dan material -> shader patah tanpa satu
+      # baris error pun. Run v0.2.0-cel-fix20 membayarnya dengan satu jam lisensi:
+      # tiga .mat di-commit tanpa .shader.meta -> screenshot editor jadi magenta
+      # (225,55,233) dan APK akan menggambar material error. Selftest dulu supaya
+      # penjaganya sendiri tidak busuk, baru periksa repo.
+      - name: Setiap aset punya .meta (GUID stabil antar build)
+        run: |
+          python3 _verify/check_asset_meta.py --selftest
+          git ls-files Assets | python3 _verify/check_asset_meta.py
+
       # Diagnostik BARU, sengaja TIDAK menggating (continue-on-error): sampai
       # terbukti stabil, kegagalan di sini boleh kuning, bukan merah -- tapi
       # pesannya tetap dibaca. Kegunaannya: harness _verify/unitystub melebur

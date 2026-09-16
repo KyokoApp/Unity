@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: AureliaGrass
-  m_Shader: {fileID: 4800000, guid: 02fa5a44a7cdb7c1dbafdfd1115d75f8, type: 3}
+  m_Shader: {fileID: 4800000, guid: e3f815f5c9754bd05ada2e9fa6689136, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
