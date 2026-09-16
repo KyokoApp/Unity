@@ -182,12 +182,22 @@ jobs:
               echo "::error::$KS bukan keystore DER (size=${SZ}, byte0=0x${B0}). Kemungkinan ini LFS pointer: jalankan 'git lfs pull' / cek .gitattributes."
               exit 1
             fi
-            # Path ABSOLUT seperti yang dilihat container: dockerWorkspacePath
-            # default /github/workspace (docker.ts: --volume "$workspace":/github/workspace),
-            # jadi inilah jalan sebenarnya ke berkas yang sama. PlayerSettings.Android.keystoreName
-            # hanya menyimpan string dan diteruskan apa adanya ke Gradle -- kalau relatif,
-            # ia diresolve terhadap folder yang bukan workspace Unity di dalam container.
-            echo "ANDROID_KEYSTORE_NAME=/github/workspace/keystore/release.keystore" >> "$GITHUB_ENV"
+            # RELATIF terhadap folder project -- BUKAN absolut. Ini bukan selera:
+            # Unity menaruh current directory di depan nilai ini, jadi path absolut
+            # menghasilkan double-root yang tidak ada:
+            #     cwd   = /github/workspace
+            #     nilai = /github/workspace/keystore/release.keystore
+            #     dibaca = /github/workspace/github/workspace/keystore/release.keystore
+            # -> "Unable to sign the application; keystore file not found!"
+            # -> UnityException: Can not sign the application
+            # (persis fix13 & fix14: 30 menit, mati di baris paling terakhir)
+            # Forum Unity, jawaban atas error yang sama: "The path Unity was putting
+            # together included the current directory by default ... $PWD\$Path ...
+            # This becomes invalid when the current directory is added to the
+            # beginning." Bentuk relatif juga yang diuji langkah pre-flight (cwd
+            # runner = root repo = posisi projectPath di container), jadi tes dan
+            # build memakai resolusi yang sama -- bukan dua model berbeda.
+            echo "ANDROID_KEYSTORE_NAME=keystore/release.keystore" >> "$GITHUB_ENV"
           fi
           # Logs/ = tempat Unity menulis lognya (lihat -logfile di langkah build).
           # Harus ada SEBELUM container jalan; editor tidak membuat foldernya.
@@ -400,7 +410,7 @@ jobs:
                   -validity 9125 -keyalg RSA -keysize 2048 -sigalg SHA256withRSA \
                   -alias yuki -keystore "$ALT" -storepass yuki123 -keypass yuki123 > /tmp/gen.txt 2>&1
             if [ -s "$ALT" ] && "$KT" -list -keystore "$ALT" -storepass yuki123 -alias yuki > /dev/null 2>&1; then
-              echo "ANDROID_KEYSTORE_NAME=/github/workspace/$ALT" >> "$GITHUB_ENV"
+              echo "ANDROID_KEYSTORE_NAME=$ALT" >> "$GITHUB_ENV"
               echo "ANDROID_KEYSTORE_PASS=yuki123" >> "$GITHUB_ENV"
               echo "ANDROID_KEYALIAS_NAME=yuki" >> "$GITHUB_ENV"
               echo "ANDROID_KEYALIAS_PASS=yuki123" >> "$GITHUB_ENV"
@@ -507,7 +517,7 @@ jobs:
           df -h /
           set +e
           mkdir -p logs
-          PAT='\] (Error|Exception|Assert):|error CS[0-9]|Scripts have compiler errors|Shader error|extra field|BuildFailedException|Error building player|keystore password|no available seats|Gradle build|FAILURE: Build|Aborting batchmode'
+          PAT='\] (Error|Exception|Assert):|error CS[0-9]|Scripts have compiler errors|Shader error|extra field|BuildFailedException|Error building player|Unable to sign the application|keystore file not found|please provide passwords|keystore password|no available seats|Gradle build|FAILURE: Build|Aborting batchmode'
 
           emit() {  # $1=prefix $2=baris -> satu anotasi, dibersihkan dari karakter perintah workflow
             safe=$(printf '%s' "$2" | tr -d '\r\n' | cut -c1-460 | sed -e 's/::/-:/g' -e 's/%/25/g')
