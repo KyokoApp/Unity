@@ -3,6 +3,7 @@
     "rootNamespace": "RPG.Runtime",
     "references": [
         "RPG.Core",
+        "Unity.RenderPipelines.Core.Runtime",
         "Unity.RenderPipelines.Universal.Runtime",
         "glTFast",
         "Unity.Addressables",

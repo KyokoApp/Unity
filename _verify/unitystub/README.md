@@ -54,3 +54,13 @@ asli itu error kompilasi. Sekarang sudah `.Length`.
 
 Yang benar-benar menjalankan kode adalah `_verify/nunit/` (untuk `RPG.Core`)
 dan Test Runner di dalam Unity (untuk semuanya).
+
+## Titik buta: referensi antar-assembly (pelajaran 2026-09-16)
+Harness ini mengkompilasi SEMUA skrip jadi SATU assembly, jadi ia TIDAK BISA
+menangkap referensi asmdef yang kurang. Contoh nyata: `StylizedVolume.cs`
+memakai `Volume`/`VolumeProfile` (assembly `Unity.RenderPipelines.Core.Runtime`)
+padahal `RPG.Runtime.asmdef` hanya mereferensikan URP Runtime — stub hijau,
+tapi build Unity gagal dengan `error CS0246`. Referensi asmdef TIDAK transitif:
+tipe dari paket Core RP butuh `"Unity.RenderPipelines.Core.Runtime"` eksplisit
+di setiap asmdef yang memakainya. Kalau menambah `using` ke namespace paket
+baru, selalu cek juga daftar `references` di asmdef yang bersangkutan.
