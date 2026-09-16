@@ -66,7 +66,7 @@ namespace RPG.Editor
                Juga pastikan GlobalSettings ada. */
             try
             {
-                Stage2SceneBuilder.EnsureUrpAsset();
+                Stage2SceneBuilder.EnsureUrpAsset(log);
                 log.Add("URP asset dipastikan (fix postProcessData + all quality levels + GlobalSettings).");
             }
             catch (System.Exception e)

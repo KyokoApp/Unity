@@ -53,8 +53,9 @@ namespace RPG.Editor
         //   - Camera clearFlags Skybox tanpa skybox -> tidak clear
         // Perbaikan: buat asset dengan postProcessData dari package, set SEMUA quality level.
         [MenuItem("Tools/Aurelia/1. Buat URP Asset (kalau belum ada)")]
-        public static void EnsureUrpAsset()
+        public static void EnsureUrpAsset(List<string> notes = null)
         {
+            notes ??= new List<string>();
             if (!AssetDatabase.IsValidFolder(RenderFolder))
             {
                 AssetDatabase.CreateFolder("Assets/_Project", "Rendering");
@@ -211,10 +212,99 @@ namespace RPG.Editor
 
             EditorUtility.SetDirty(urp);
             if (renderer != null) EditorUtility.SetDirty(renderer);
+
+            WriteRenderPipelineIntoProjectSettings(urpPath, notes);
             AssetDatabase.SaveAssets();
 
             var hasGlobal = GraphicsSettings.GetSettingsForRenderPipeline<UniversalRenderPipeline>() != null ? "ada" : "akan dibuat validator";
             Debug.Log("[Aurelia] URP asset siap:\n  " + urpPath + "\n  " + rendererPath + "\n  GlobalSettings: " + hasGlobal + "\nCatatan: cel-shading aktif via shader Aurelia/*Cel");
+        }
+
+        /* Unity menyimpan render pipeline di ProjectSettings/GraphicsSettings.asset
+           (m_CustomRenderPipeline) dan per-level di QualitySettings.asset. Assign
+           lewat API (GraphicsSettings.defaultRenderPipeline = urp) mengubah STATE
+           DI MEMORY editor -- dan itu tidak terbukti tertulis ke DISK sebelum
+           player dibangun. Buktinya ada di cabang bukti run v0.2.0-cel-fix18:
+           berkas GraphicsSettings.asset hasil runner masih berbunyi
+
+               m_CustomRenderPipeline: {fileID: 0}
+
+           dan tidak satu pun dari enam quality level punya `renderPipeline:`.
+           Dengan kata lain: di atas disk, proyek ini TIDAK punya render pipeline.
+           Itu menjelaskan gejala HP secara utuh -- tidak ada pass render yang jalan,
+           jadi backbuffer tidak pernah di-clear (warna latar kamera yang biru-abu
+           terang tidak terlihat sama sekali) dan teks IMGUI menumpuk antar frame,
+           yang dilaporkan sebagai "jejak".
+
+           Jadi ditulis TERSURAT ke berkasnya, dengan GUID dari .meta (satu-satunya
+           sumber kebenaran yang tidak bisa berubah di tengah jalan). Kalau quality
+           level tidak punya override, Unity memakai nilai default ini -- jadi cukup
+           satu tempat. Setelah di-commit, run berikutnya MEMBACA berkas ini saat
+           startup editor, jadi nilai di memory dan di disk akhirnya sama. */
+        static void WriteRenderPipelineIntoProjectSettings(string urpPath, List<string> notes)
+        {
+            if (notes == null) notes = new List<string>();
+            try
+            {
+                var metaPath = urpPath + ".meta";
+                if (!File.Exists(metaPath))
+                {
+                    notes.Add("GAGAL: " + metaPath + " belum ada -> guid URP tidak terbaca; jalankan Refresh lalu build ulang.");
+                    return;
+                }
+                var guid = "";
+                foreach (var raw in File.ReadAllLines(metaPath))
+                {
+                    var l = raw.Trim();
+                    if (l.StartsWith("guid:")) { guid = l.Substring(5).Trim(); break; }
+                }
+                if (guid.Length < 20)
+                {
+                    notes.Add("GAGAL: baris guid di " + metaPath + " tidak wajar -> tidak menulis GraphicsSettings.");
+                    return;
+                }
+
+                var gsPath = "ProjectSettings/GraphicsSettings.asset";
+                if (!File.Exists(gsPath))
+                {
+                    notes.Add("GAGAL: " + gsPath + " tidak ada -> tidak ada yang bisa ditambal.");
+                    return;
+                }
+
+                const string key = "m_CustomRenderPipeline:";
+                var lines = new List<string>(File.ReadAllLines(gsPath));
+                var found = false;
+                var want = "  " + key + " {fileID: 11400000, guid: " + guid + ", type: 2}";
+                for (var i = 0; i < lines.Count; i++)
+                {
+                    if (!lines[i].TrimStart().StartsWith(key)) continue;
+                    found = true;
+                    lines[i] = want;
+                    break;
+                }
+                if (!found)
+                {
+                    // Berkas tanpa kunci = Unity belum pernah menyimpannya; tambahkan
+                    // sebelum kunci lain yang selalu ada supaya tetap satu dokumen YAML.
+                    var at = lines.FindIndex(l => l.TrimStart().StartsWith("m_PreloadedShaders:"));
+                    if (at < 0) at = 1;
+                    lines.Insert(at, want);
+                }
+                File.WriteAllText(gsPath, string.Join("\n", lines) + "\n");
+                Debug.Log("[Aurelia] menambal " + gsPath + " -> " + want);
+                var back = File.ReadAllLines(gsPath).FirstOrDefault(l => l.TrimStart().StartsWith(key));
+                notes.Add("GraphicsSettings.m_CustomRenderPipeline -> guid " + guid.Substring(0, 8) +
+                          " | dibaca balik: " + (back != null ? "TERPASANG" : "HILANG"));
+                if (back == null || !back.Contains(guid))
+                    throw new System.Exception(
+                        "Penulisan GraphicsSettings.asset tidak bertahan (guid tidak terbaca balik). " +
+                        "Kalau ini dibiarkan, player dibangun tanpa render pipeline -> layar hitam.");
+            }
+            catch (System.Exception e) when (!(e is System.OperationCanceledException))
+            {
+                Debug.LogError("[Aurelia] " + e.Message);
+                throw;
+            }
         }
 
         // ============================================================ 2
@@ -233,7 +323,7 @@ namespace RPG.Editor
 
             if (GraphicsSettings.defaultRenderPipeline == null)
             {
-                EnsureUrpAsset();
+                EnsureUrpAsset(notes);
                 if (GraphicsSettings.defaultRenderPipeline == null)
                     notes.Add("URP asset gagal dibuat - layar mungkin magenta. Buat manual: Assets > Create > Rendering > URP Asset");
             }

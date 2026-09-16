@@ -204,7 +204,7 @@ namespace RPG.Runtime
             else
             {
                 var cp = cam.transform.position;
-                _sb.Append($"kamera : ({cp.x:F1}; {cp.y:F1}; {cp.z:F1}) clear={cam.clearFlags} aktif={cam.cameraActive}\n");
+                _sb.Append($"kamera : ({cp.x:F1}; {cp.y:F1}; {cp.z:F1}) clear={cam.clearFlags} aktif={cam.isActiveAndEnabled}\n");
                 if (Streamer != null && Streamer.Target != null)
                 {
                     var tp = Streamer.Target.position;

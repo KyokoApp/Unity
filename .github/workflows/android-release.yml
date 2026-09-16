@@ -947,57 +947,77 @@ jobs:
       # keystore/ci-signing.txt, dan ProjectSettings/ProjectSettings.asset
       # (itu dinaikkan langkah versionCode; menyimpannya = balap versi).
       # ------------------------------------------------------------
-      - name: Simpan aset build ke branch
-        if: always() && github.event_name == 'push'
+      # ------------------------------------------------------------
+      # CABANG BUKTI (ci-evidence). Run v0.2.0-cel-fix18 menghasilkan
+      # penemuan yang mengubah cara kerja kita: **file** yang dibuat runner
+      # bisa DIBACA dari sini, sedangkan artifact tidak bisa diambil dari
+      # lingkungan ini sama sekali (blob storage diblokir). Jadi setiap run
+      # sekarang meninggalkan salinan teks dari keadaan sebenarnya:
+      #
+      #   ProjectSettings/{Graphics,Quality,TagManager}.asset
+      #       -> bukti apakah m_CustomRenderPipeline benar-benar tertulis,
+      #          bukan cuma diset di memory editor.
+      #   Assets/_Project/Scenes/Tahap3.unity + Assets/_Project/Shaders/*.mat
+      #       -> GUID yang dirujuk scene bisa kuresolvekan sendiri: kalau
+      #          menggantung, materi NULL, dan dunia tidak tergambar.
+      #   logs/unity-tail.txt, probe-build.txt, render-mean.txt, shots/*.png
+      #       -> log Unity (yang terpotong 300 KB terakhir, tempat error hari
+      #          ini ada), hasil build-probe, dan screenshot editor mentah.
+      #
+      # Ditulis dengan --force ke satu commit: cabangnya tidak menumpuk
+      # sejarah, dan yang lama tidak pernah dibutuhkan lagi.
+      # Yang TIDAK pernah ikut: Library/, Temp/, build/, keystore/ci-signing.txt
+      # (berisi password!), dan ProjectSettings/ProjectSettings.asset (naik
+      # versi tiap run; menyimpannya = balap commit).
+      # ------------------------------------------------------------
+      - name: Simpan bukti build ke cabang ci-evidence
+        if: always()
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
           cd "$GITHUB_WORKSPACE"
-          BR="${GITHUB_REF_NAME}"
+          mkdir -p logs
+          # Ekor log Unity, bukan seluruhnya: berkasnya bisa puluhan MB dan yang
+          # dibutuhkan adalah bagian terakhir + baris [Aurelia].
+          if [ -f Logs/AureliaUnity.log ]; then
+            tail -c 300000 Logs/AureliaUnity.log > logs/unity-tail.txt
+            grep -a "\[Aurelia\]" Logs/AureliaUnity.log | tail -40 > logs/aurelia-lines.txt
+          fi
           CAND="ProjectSettings/GraphicsSettings.asset ProjectSettings/QualitySettings.asset \
                 ProjectSettings/TagManager.asset Assets/_Project/Scenes/Tahap3.unity \
-                $(find Assets \( -name '*.mat' -o -name '*Pipeline*.asset' -o -name '*Renderer*.asset' \
-                   -o -name '*GlobalSettings*.asset' \) 2>/dev/null | tr '\n' ' ')"
+                logs/probe-build.txt logs/render-mean.txt logs/unity-tail.txt logs/aurelia-lines.txt \
+                $(find Assets \( -name '*.mat' -o -name '*URP*.asset' -o -name '*Renderer*.asset' \) 2>/dev/null | tr '\n' ' ')"
+          for f in shots/*.png; do [ -f "$f" ] && CAND="$CAND $f"; done
           FILES=""
           for f in $CAND; do
             [ -f "$f" ] || continue
             FILES="$FILES $f"
             [ -f "$f.meta" ] && FILES="$FILES $f.meta"
           done
-          if [ -z "$FILES" ]; then echo "tidak ada aset build untuk disimpan"; exit 0; fi
-          echo "calon: $FILES"
+          if [ -z "$FILES" ]; then echo "tidak ada bukti untuk disimpan"; exit 0; fi
+          echo "bukti: $FILES"
           git config user.name "aurelia-ci"
           git config user.email "ci@kyoko.invalid"
-          # -f: sebagian path ini mungkin dicakup .gitignore template Unity.
           git add -f $FILES
-          if git diff --cached --quiet; then echo "aset build sudah identik dengan repo"; exit 0; fi
-          # Pesan commit disusun dengan printf, BUKAN string multi-baris di dalam
-          # blok YAML: baris yang mulai di kolom 0 keluar dari blok `run: |` dan
-          # merusak seluruh workflow ( ScannerError di GH Actions, bukan di git).
+          if git diff --cached --quiet; then echo "bukti identik dengan repo"; exit 0; fi
           printf '%s\n' \
-            "ci($BR): simpan aset yang dibuat runner" \
+            "ci: cabang bukti run ${{ github.run_number }} (${{ github.ref_name }})" \
             "" \
-            "ProjectSettings + URP asset + material + scene, semuanya diciptakan editor" \
-            "script di tengah build ${{ github.run_number }} dan tidak pernah masuk git." \
-            "Dikembalikan supaya (a) GUID material/asset tetap, jadi referensi scene tidak" \
-            "bisa menggantung diam-diam; (b) build berikutnya mulai dari state yang sama;" \
-            "(c) konfigurasi render pipeline player bisa DIBACA, bukan didugakan." \
-            "" \
-            "Co-Authored-By: Claude <noreply@anthropic.com>" > /tmp/seedmsg.txt
-          git commit -q -F /tmp/seedmsg.txt || { echo "::warning::commit aset build gagal"; exit 0; }
+            "ProjectSettings + scene + material + URP asset seperti yang DILIHAT \
+            runner, plus ekor log Unity, keluaran build-probe, rata-rata warna \
+            screenshot editor, dan PNG-nya sendiri. Bukan artefak: berkas ini bisa \
+            dibaca siapa pun dengan akses repo, termasuk dari alat yang tidak bisa \
+            mengambil artefak Actions." > /tmp/seedmsg.txt
+          git commit -q -F /tmp/seedmsg.txt || { echo "::warning::commit bukti gagal"; exit 0; }
           SHA=$(git rev-parse --short HEAD)
-          for i in 1 2 3; do
-            if git push -q "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" \
-                 "HEAD:refs/heads/${BR}" 2>/tmp/push.err; then
-              echo "::notice::aset build ($SHA) disimpan ke $BR"
-              exit 0
-            fi
-            echo "push percobaan $i gagal: $(tr '\n' ' ' < /tmp/push.err | cut -c1-200)"
-            sleep $((i * 10))
-          done
-          echo "::warning::aset build tidak bisa di-push (izin token? proteksi branch?) -- build tetap sah, tapi self-seeding tidak terjadi"
+          if git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" \
+               "HEAD:refs/heads/ci-evidence" 2>/tmp/push.err; then
+            echo "::notice::bukti build ($SHA) ada di cabang ci-evidence"
+          else
+            echo "::warning::push ci-evidence gagal: $(tr '\n' ' ' < /tmp/push.err | cut -c1-220)"
+          fi
 
       # Artifact hanya bisa diunduh orang yang punya akses repo.
       # Ini jalur unduh yang AMAN walau repo masih publik.

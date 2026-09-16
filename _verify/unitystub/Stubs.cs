@@ -47,7 +47,7 @@ namespace UnityEngine
         public static T[] FindObjectsByType<T>(FindObjectsSortMode s) where T:Object => new T[0]; }
     public class Component : Object { public Transform transform=>null; public GameObject gameObject=>null;
         public T GetComponent<T>()=>default; public T GetComponentInChildren<T>()=>default; public T[] GetComponentsInChildren<T>(bool x)=>null; }
-    public class Behaviour : Component { public bool enabled; }
+    public class Behaviour : Component { public bool enabled; public bool isActiveAndEnabled=>false; }
     public class Transform : Component { public Vector3 position; public Vector3 localPosition; public Quaternion rotation; public Quaternion localRotation;
         public Vector3 eulerAngles; public Vector3 localScale; public Transform parent=>null; public int childCount=>0;
         public Transform GetChild(int i)=>null;
@@ -136,7 +136,11 @@ namespace UnityEngine
     public enum TouchPhase { Began, Moved, Stationary, Ended, Canceled }
     public struct Touch { public int fingerId; public Vector2 position; public TouchPhase phase; }
     public class Camera : Behaviour { public CameraClearFlags clearFlags; public float nearClipPlane, farClipPlane, fieldOfView;
-        public int cullingMask; public bool cameraActive=>false;
+        public int cullingMask;
+        // SENGAJA tidak ada `cameraActive`: properti itu TIDAK ada di Unity,
+        // dan stub yang lebih murah hati dari Unity mengirim satu putaran build
+        // penuh untuk CS1061 (v0.2.0-cel-fix18: harness hijau, Unity merah,
+        // 45 menit + satu lisensi terbuang). Yang nyata: Behaviour.isActiveAndEnabled.
         public Color backgroundColor; public static Camera main=>null;
         public RenderTexture targetTexture; public void Render(){}
         public void AddCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveAllCommandBuffers(){} }
