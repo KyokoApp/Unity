@@ -589,7 +589,7 @@ jobs:
               P="ProjectSettings/$f.asset"
               if [ -f "$P" ]; then
                 echo "probe settings: $f ADA ($(stat -c%s "$P") byte)"
-                grep -E "m_CustomRenderPipeline|renderPipeline|  name:|m_Shadows|m_Fog" "$P" | head -6 | sed 's/^/    /'
+                grep -E "m_CustomRenderPipeline|renderPipeline|m_Settings|m_SettingObject|  name:|m_Shadows|m_Fog" "$P" | head -8 | sed 's/^/    /'
               else
                 echo "probe settings: $f TIDAK ADA -> player pakai bawaan Unity (tanpa URP!)"
               fi
@@ -988,7 +988,8 @@ jobs:
           CAND="ProjectSettings/GraphicsSettings.asset ProjectSettings/QualitySettings.asset \
                 ProjectSettings/TagManager.asset Assets/_Project/Scenes/Tahap3.unity \
                 logs/probe-build.txt logs/render-mean.txt logs/unity-tail.txt logs/aurelia-lines.txt \
-                $(find Assets \( -name '*.mat' -o -name '*URP*.asset' -o -name '*Renderer*.asset' \) 2>/dev/null | tr '\n' ' ')"
+                $(find Assets \( -name '*.mat' -o -name '*URP*.asset' -o -name '*Renderer*.asset' \) 2>/dev/null | tr '\n' ' ') \
+                $(find Assets -maxdepth 2 -name '*GlobalSettings*.asset' 2>/dev/null | tr '\n' ' ')"
           for f in shots/*.png; do [ -f "$f" ] && CAND="$CAND $f"; done
           FILES=""
           for f in $CAND; do
