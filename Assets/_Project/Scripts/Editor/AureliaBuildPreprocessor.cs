@@ -72,6 +72,15 @@ namespace RPG.Editor
             catch (System.Exception e)
             {
                 log.Add("URP ensure gagal: " + e.Message);
+                /* Dulu blok ini cukup mencatat lalu jalan terus, dan hasilnya
+                   adalah build HIJAU dengan APK hitam: render pipeline adalah
+                   satu-satunya hal yang membuat dunia ADA, jadi kegagalannya
+                   tidak boleh diredam jadi peringatan. Cetak semua catatan
+                   lebih dulu (baris 140 tidak akan pernah tercapai kalau kita
+                   lempar di sini), lalu hentikan build. */
+                Debug.Log("[Aurelia] Preprocess build (SEBELUM DIHENTIKAN):\n  - " + string.Join("\n  - ", log));
+                Debug.LogError("[Aurelia] build dihentikan: render pipeline tidak bisa dipastikan -> " + e.Message);
+                throw;
             }
 
             // Pastikan app ID benar (com.yuki.natsuki) — cegah template ID ke-build lagi
