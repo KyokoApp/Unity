@@ -40,4 +40,4 @@ jobs:
       - name: Unggah PNG ke Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ steps.cfg.outputs.tag }}" shots/*.png --clobber
+        run: gh release upload "${{ steps.cfg.outputs.tag }}" shots/*.png --clobber -R "$GITHUB_REPOSITORY"
