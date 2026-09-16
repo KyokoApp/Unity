@@ -16,6 +16,7 @@ namespace UnityEngine
         public static Vector3 operator -(Vector3 a)=>default;
         public float magnitude=>0f; public Vector3 normalized=>this; public static Vector3 zero=>default;
         public static float Distance(Vector3 a,Vector3 b)=>0f;
+        public static Vector3 MoveTowards(Vector3 current,Vector3 target,float maxDelta)=>default;
         public static Vector3 operator*(Vector3 a,float k)=>default; public static Vector3 operator*(float k,Vector3 a)=>default;
         public static Vector3 operator/(Vector3 a,float k)=>default; public static Vector3 operator+(Vector3 a,Vector3 b)=>default;
         public static Vector3 operator-(Vector3 a,Vector3 b)=>default;
@@ -110,7 +111,7 @@ namespace UnityEngine
         public static bool GetKeyDown(KeyCode c)=>false; public static bool GetMouseButton(int b)=>false;
         public static bool GetMouseButtonDown(int b)=>false; public static Vector3 mousePosition=>default; public static bool touchSupported=>false; public static int touchCount=>0;
         public static Touch GetTouch(int i)=>default; }
-    public enum KeyCode { Space, LeftShift, RightShift, F1, F2, Escape }
+    public enum KeyCode { Space, LeftShift, RightShift, LeftControl, F1, F2, Escape }
     public enum TouchPhase { Began, Moved, Stationary, Ended, Canceled }
     public struct Touch { public int fingerId; public Vector2 position; public TouchPhase phase; }
     public class Camera : Behaviour { public CameraClearFlags clearFlags; public float nearClipPlane, farClipPlane, fieldOfView;
