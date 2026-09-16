@@ -159,16 +159,28 @@ jobs:
       - name: Siapkan keystore tetap
         id: ks
         env:
-          KS_B64:        ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KS_PASS_S:     ${{ secrets.ANDROID_KEYSTORE_PASS }}
-          KS_ALIAS_S:    ${{ secrets.ANDROID_KEYALIAS_NAME }}
-          KS_ALIAS_PASS_S: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+          # Nama secret diterima dua gaya, supaya tidak perlu tebak-tebakan:
+          #   ANDROID_KEYSTORE_*        (konvensi repo ini)
+          #   UNITY_ANDROID_KEYSTORE_*  (konvensi unity-build CLI / banyak tutorial;
+          #      BASE64-nya muat file .keystore supaya tidak perlu di-commit)
+          # `a || b` di ekspresi GitHub mengembalikan yang pertama tidak kosong.
+          KS_B64:        ${{ secrets.UNITY_ANDROID_KEYSTORE_BASE64 || secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS_S:     ${{ secrets.UNITY_ANDROID_KEYSTORE_PASS || secrets.ANDROID_KEYSTORE_PASS }}
+          KS_ALIAS_S:    ${{ secrets.UNITY_ANDROID_KEYALIAS_NAME || secrets.ANDROID_KEYALIAS_NAME }}
+          KS_ALIAS_PASS_S: ${{ secrets.UNITY_ANDROID_KEYALIAS_PASS || secrets.ANDROID_KEYALIAS_PASS }}
         run: |
           set -e
           KS=keystore/release.keystore
           if [ -n "$KS_B64" ]; then
             mkdir -p keystore
             printf '%s' "$KS_B64" | base64 -d > "$KS"
+            # Secret yang HADIR tapi KOSONG lebih berbahaya daripada tidak ada:
+            # ia menimpa default, lalu Unity gagal di baris terakhir dengan
+            # "please provide passwords!" tanpa menyebut secret mana yang kosong.
+            # Jadi isi yang kurang dari repo, dan laporkan apa yang diisi.
+            [ -n "$KS_PASS_S" ]      || { KS_PASS_S=yuki123;      echo "::notice::keystore dari secret, tapi password kosong -> pakai default repo"; }
+            [ -n "$KS_ALIAS_S" ]     || KS_ALIAS_S=yuki
+            [ -n "$KS_ALIAS_PASS_S" ] || KS_ALIAS_PASS_S="$KS_PASS_S"
             echo "ANDROID_KEYSTORE_PASS=$KS_PASS_S"       >> "$GITHUB_ENV"
             echo "ANDROID_KEYALIAS_NAME=$KS_ALIAS_S"      >> "$GITHUB_ENV"
             echo "ANDROID_KEYALIAS_PASS=$KS_ALIAS_PASS_S" >> "$GITHUB_ENV"
