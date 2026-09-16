@@ -1,7 +1,15 @@
-# Usulan desain — Aurelia di Unity (tanpa mobil)
+# Usulan desain — Aurelia (three.js → ~~Unity~~ → **Godot 4**)
 
-Repo target: `github.com/KyokoApp/Unity` (sudah ada, masih kosong — 0 ref)
-Referensi: `KyokoApp/rpg` (three.js). Semua angka di bawah diukur dari repo itu.
+> **Status 2026-09-16:** proyek FTT bermigrasi penuh dari Unity ke
+> **Godot 4** (GDScript) — lihat `MIGRASI-GODOT.md` untuk peta
+> implementasinya. Dokumen ini tetap dokumen desain: semua angka
+> di bawah masih berlaku dan menjadi kontrak numerik port Godot —
+> hanya nama enginenya yang berganti.
+
+Repo: `github.com/KyokoApp/Unity` (history Unity dipertahankan di git,
+working tree-nya sekarang proyek Godot).
+Referensi gameplay: `site/` (three.js asli). Semua angka di bawah diukur
+dari game itu.
 
 ---
 

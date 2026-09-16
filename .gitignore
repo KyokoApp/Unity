@@ -1,72 +1,36 @@
-# Unity
-/[Ll]ibrary/
-/[Tt]emp/
-/[Oo]bj/
-/[Bb]uild/
-/[Bb]uilds/
-/[Ll]ogs/
-/[Uu]ser[Ss]ettings/
-/[Mm]emoryCaptures/
-/[Rr]ecordings/
-/Assets/AssetStoreTools*
-/Assets/Plugins/Editor/JetBrains*
-/Assets/StreamingAssets/aa.meta
-/Assets/StreamingAssets/aa/
+# ============================================================
+# .gitignore — proyek Godot 4
+# ============================================================
 
-# IDE
-.vs/
-.idea/
-.consulo/
-# CATATAN: tiga pola di bawah ini untuk file yang DIHASILKAN Unity
-# (Assembly-CSharp.csproj, Project.sln, dst) -- memang jangan ikut di repo.
-# Tapi harness di _verify/ menulis .csproj-nya sendiri dengan tangan; itu
-# kode sumber. Pengecualiannya ada di bagian "_verify" di bawah file ini.
-*.csproj
-*.unityproj
-*.sln
-*.suo
-*.user
-*.userprefs
-*.pidb
-*.booproj
-*.svd
-*.pdb
-*.mdb
-*.opendb
-*.VC.db
+# ---- Godot 4 ----
+.godot/
+android/
+addons/
+*.translation
 
-# OS
+# Hasil ekspor
+build/
+exports/
+*.apk
+*.aab
+*.ipa
+*.app
+*.dmg
+*.zip
+
+# Data pengguna (perangkat lokal)
+user/
+
+# ---- model karakter (lihat models/LISENSI.md) ----
+# AureliaChar.vrm-nya licenseName=Redistribution_Prohibited — file tidak
+# pernah di-commit, konversi lokal menjadi GLB pun tidak.
+models/*.vrm
+models/*.glb
+models/*.glb.import
+models/*.tscn
+
+# ---- sisa konsumsi lain ----
+*.tmp
+*.swp
 .DS_Store
-Thumbs.db
-
-# Aset besar: pakai Git LFS
-*.glb
-*.fbx
-*.png
-*.jpg
-*.tga
-*.psd
-*.wav
-*.mp3
-*.ogg
-
-# ============================================================
-# Model karakter berlisensi "Redistribution_Prohibited"
-# JANGAN masuk git — repo ini publik. File-nya cuma ada di
-# disk lokal tiap orang yang punya lisensinya.
-# Lihat Assets/Art/Characters/LISENSI.md
-# ============================================================
-/Assets/Art/Characters/*.vrm
-/Assets/Art/Characters/*.vrm.meta
-/Assets/Art/Characters/*.glb
-/Assets/Art/Characters/*.fbx
-/Assets/Art/Characters/Textures/
-/Assets/Art/Characters/*.prefab
-/Assets/Art/Characters/*.prefab.meta
-
-# Hasil build harness verifikasi (dotnet)
-_verify/**/bin/
-_verify/**/obj/
-# ...tapi .csproj harness BUKAN hasil generate Unity, jadi jangan di-ignore.
-# Tanpa baris ini verify.yml gagal di CI: "project file not found".
-!_verify/**/*.csproj
+__pycache__/
