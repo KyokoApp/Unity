@@ -12,14 +12,16 @@
     <NoWarn>CS0169;CS0414;CS0649;CS0067</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Stubs.cs" />
+    <!-- SEMUA .cs di folder ini = daftar stub, pakai glob, BUKAN satu-satu:
+         csproj ini punya EnableDefaultCompileItems=false, jadi berkas stub baru
+         yang tidak didaftarkan tidak memberi error "stub hilang" -- ia memberi
+         CS0246 di KODE GAME (satu putaran verify terbuang; itu persis yang
+         terjadi pada ProbeStubs.cs). Jangan balik ke daftar satu-satu. -->
+    <Compile Include="*.cs" />
     <!-- Harness ini memeriksa kompilasi skrip Unity DI LUAR Unity.
          Lihat README.md di folder ini untuk apa yang ia buktikan dan tidak. -->
-    <Compile Include="Attrs.cs" />
-    <Compile Include="EditorStubs.cs" />
     <!-- Tiruan API UniVRM v0.131.2 untuk VrmPrefabBuilder.cs. Tanda tangan
          disalin dari sumber aslinya; lihat header UniVrmStubs.cs. -->
-    <Compile Include="UniVrmStubs.cs" />
     <Compile Include="../../Assets/_Project/Scripts/Editor/*.cs" />
     <Compile Include="../../Assets/_Project/Scripts/Core/*.cs" />
     <Compile Include="../../Assets/_Project/Scripts/Runtime/*.cs" />
