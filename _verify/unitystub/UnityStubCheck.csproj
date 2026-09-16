@@ -14,7 +14,7 @@
   <ItemGroup>
     <!-- SEMUA .cs di folder ini = daftar stub, pakai glob, BUKAN satu-satu:
          csproj ini punya EnableDefaultCompileItems=false, jadi berkas stub baru
-         yang tidak didaftarkan tidak memberi error "stub hilang" -- ia memberi
+         yang tidak didaftarkan tidak memberi error "stub hilang", ia memberi
          CS0246 di KODE GAME (satu putaran verify terbuang; itu persis yang
          terjadi pada ProbeStubs.cs). Jangan balik ke daftar satu-satu. -->
     <Compile Include="*.cs" />
