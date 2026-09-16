@@ -34,6 +34,7 @@ namespace RPG.Runtime
         RectTransform _barFill;
         Text _barLabel;
         Text _tipsLabel;
+        Text _errorText;
         RectTransform _spinner;
         bool _shown;
         float _tipT;
@@ -161,6 +162,20 @@ namespace RPG.Runtime
             if (_canvas != null) _canvas.enabled = v;
         }
 
+        /* Kotak merah untuk pesan error (didorong BootLog via WorldBoot).
+           Dibangun malas: tidak ada biaya kalau tidak ada error. */
+        void EnsureErrorBox()
+        {
+            if (_errorText != null || _canvas == null) return;
+            var panel = UiKit.Rect("ErrorBox", _canvas.transform,
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0f, -16f), new Vector2(1400f, 250f));
+            UiKit.Image(panel, UiKit.Round, new Color(0.45f, 0.08f, 0.08f, 0.93f));
+            var t = UiKit.Rect("T", panel, Vector2.zero, Vector2.one,
+                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(-28f, -28f));
+            _errorText = UiKit.Label(t, "", 22, Color.white, TextAnchor.UpperLeft);
+        }
+
         // ---- API statis ----
         public static void Show()
         {
@@ -196,6 +211,19 @@ namespace RPG.Runtime
                 Instance._group.interactable = false;
                 Instance._group.blocksRaycasts = false;
             }
+        }
+
+        /* Menampilkan teks error di kotak merah. Tidak pernah melempar:
+           kalau UI-nya sendiri yang rusak, diam adalah pilihan terbaik. */
+        public static void ShowError(string text)
+        {
+            try
+            {
+                var ls = Instance ?? Create();
+                ls.EnsureErrorBox();
+                if (ls._errorText != null) ls._errorText.text = text ?? "";
+            }
+            catch { /* sengaja ditelan — lihat komentar */ }
         }
     }
 }

@@ -176,11 +176,22 @@ namespace RPG.Editor
                dan matahari sebagai sumber cahaya utama. */
             DayNightCycle cycle = null;
             GrassField grass = null;
+            Material skyMat = null;
             if (withTerrain)
             {
                 var cycleGo = new GameObject("DayNightCycle");
                 cycle = cycleGo.AddComponent<DayNightCycle>();
                 cycle.Sun = light;
+
+                /* Langit gradien + piringan matahari. Material-nya aset
+                   scene (ikut build -> shader tidak di-strip). */
+                skyMat = LoadOrCreateShaderMaterial("AureliaSky", "Aurelia/Sky", notes);
+                if (skyMat != null)
+                {
+                    cycle.SkyMaterial = skyMat;
+                    notes.Add("Langit gradien Aurelia/Sky dipasang (skybox + DayNightCycle).");
+                }
+                else notes.Add("Shader Aurelia/Sky tidak ketemu — dipakai langit warna datar.");
 
                 var grassGo = new GameObject("GrassField");
                 grass = grassGo.AddComponent<GrassField>();
@@ -228,8 +239,19 @@ namespace RPG.Editor
                Sampai langit sungguhan dikerjakan, pakai warna datar yang
                sama dengan fog: cakrawala menyatu dengan kabut dan ambient
                tidak pernah nol. */
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.62f, 0.70f, 0.78f);
+            if (skyMat != null)
+            {
+                /* Langit gradien AureliaSky; warnanya digerakkan
+                   DayNightCycle per jam. Ambient tetap Flat (bukan
+                   Skybox) supaya tidak bergantung pada skybox. */
+                RenderSettings.skybox = skyMat;
+                cam.clearFlags = CameraClearFlags.Skybox;
+            }
+            else
+            {
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = new Color(0.62f, 0.70f, 0.78f);
+            }
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.50f, 0.56f, 0.64f);
             RenderSettings.fog = true;
@@ -239,7 +261,7 @@ namespace RPG.Editor
                supaya chunk tidak muncul tiba-tiba di ujung pandang. */
             RenderSettings.fogStartDistance = 220f;
             RenderSettings.fogEndDistance = withTerrain ? 1150f : 600f;
-            RenderSettings.fogColor = cam.backgroundColor;
+            RenderSettings.fogColor = new Color(0.62f, 0.70f, 0.78f);
 
             // ---- simpan ----------------------------------------------------
             /* Pakai scenePath (parameter), bukan ScenePath (konstanta Tahap 2).
@@ -333,6 +355,32 @@ namespace RPG.Editor
             return m;
         }
 
+        /* Shader yang dipakai HANYA saat runtime (toon karakter, sparkle
+           VFX) tidak dirujuk material scene mana pun, jadi Unity
+           men-strip-nya dari build dan Shader.Find mengembalikan null
+           di HP. Material acuan di folder Resources/ SELALU ikut build,
+           jadi shader-nya selamat. (Terrain/Air/Rumput/Langit tidak
+           perlu: dirujuk langsung oleh scene.) */
+        static void EnsureRuntimeShadersIncluded(List<string> notes)
+        {
+            const string resFolder = "Assets/_Project/Resources";
+            if (!AssetDatabase.IsValidFolder(resFolder))
+                AssetDatabase.CreateFolder("Assets/_Project", "Resources");
+            foreach (var sh in new[] { "Aurelia/Toon", "Aurelia/ToonLite", "Aurelia/Sparkle" })
+            {
+                var path = $"{resFolder}/{sh.Replace('/', '_')}_Ref.mat";
+                if (AssetDatabase.LoadAssetAtPath<Material>(path) != null) continue;
+                var shader = Shader.Find(sh);
+                if (shader == null)
+                {
+                    notes.Add($"Shader '{sh}' tidak ketemu — efeknya mati saat runtime.");
+                    continue;
+                }
+                AssetDatabase.CreateAsset(new Material(shader), path);
+            }
+            AssetDatabase.SaveAssets();
+        }
+
         /* Material rumput dibuat sekali dan di-commit ke Library lewat
            CreateAsset, sama seperti material debug lain. Kalau shader
            Aurelia/Grass tidak ketemu, lebih baik rumput tanpa material
@@ -406,6 +454,8 @@ namespace RPG.Editor
             instance.AddComponent<AnimatorBridge>().enabled = false;
             notes.Add("Toon: material karakter dikonversi ke cel shading saat bermain " +
                       "(outline hanya untuk opaque; transparan/cutout tanpa outline).");
+
+            EnsureRuntimeShadersIncluded(notes);
 
             if (prefab != null) rig.Bind();
 

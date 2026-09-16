@@ -33,6 +33,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+      - name: Tunggu build sumber selesai
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run watch "${{ steps.cfg.outputs.run_id }}" --exit-status -R "$GITHUB_REPOSITORY"
       - uses: actions/download-artifact@v4
         with:
           name: screenshots

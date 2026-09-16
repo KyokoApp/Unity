@@ -25,6 +25,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using RPG.Core;
 
 namespace RPG.Editor
 {
@@ -57,6 +58,19 @@ namespace RPG.Editor
 
                 Directory.CreateDirectory(Folder);
                 var jadi = 0;
+
+                /* Karakter di-pose idle prosedural LEWAT JALUR RUNTIME YANG
+                   SAMA (Locomotion -> RigMapping -> ApplyPose), supaya
+                   screenshot mewakili tampilan in-game — bukan bind pose
+                   T-pose yang membuat karakter terlihat seperti salib. */
+                var rig = UnityEngine.Object.FindFirstObjectByType<RPG.Runtime.CharacterRig>();
+                if (rig != null)
+                {
+                    if (!rig.IsBound) rig.Bind();
+                    var idle = Locomotion.SamplePose(
+                        new Locomotion.PoseInput(0, 1.0, 0, 0, 0, false, false, null));
+                    rig.ApplyPose(RigMapping.Resolve(idle));
+                }
 
                 for (var i = 0; i < Jam.Length; i++)
                 {
@@ -99,6 +113,10 @@ namespace RPG.Editor
                         if (baked != null) UnityEngine.Object.DestroyImmediate(baked);
                     }
                 }
+
+                /* Kembalikan tulang ke bind pose supaya scene terbuka sama
+                   seperti sebelum screenshot; runtime me-bind ulang sendiri. */
+                if (rig != null) rig.ResetToBind();
 
                 /* Kembalikan realtime supaya build player (dan game-nya
                    nanti) mulai dengan jam berjalan, bukan jam beku. */

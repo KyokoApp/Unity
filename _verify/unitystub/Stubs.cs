@@ -14,8 +14,9 @@ namespace UnityEngine
     public struct Vector3 { public float x,y,z; public Vector3(float x,float y,float z){this.x=x;this.y=y;this.z=z;}
         public static Vector3 forward=>default; public static Vector3 right=>default; public static Vector3 up=>default;
         public static Vector3 operator -(Vector3 a)=>default;
-        public float magnitude=>0f; public Vector3 normalized=>this; public static Vector3 zero=>default;
+        public float magnitude=>0f; public float sqrMagnitude=>0f; public Vector3 normalized=>this; public static Vector3 zero=>default;
         public static float Distance(Vector3 a,Vector3 b)=>0f;
+        public static float Angle(Vector3 a,Vector3 b)=>0f;
         public static Vector3 MoveTowards(Vector3 current,Vector3 target,float maxDelta)=>default;
         public static Vector3 operator*(Vector3 a,float k)=>default; public static Vector3 operator*(float k,Vector3 a)=>default;
         public static Vector3 operator/(Vector3 a,float k)=>default; public static Vector3 operator+(Vector3 a,Vector3 b)=>default;
@@ -25,7 +26,8 @@ namespace UnityEngine
         public static Quaternion Euler(float x,float y,float z)=>default; public static Quaternion Euler(Vector3 v)=>default;
         public static Quaternion LookRotation(Vector3 f,Vector3 u)=>default; public static Quaternion Slerp(Quaternion a,Quaternion b,float t)=>default;
         public static Quaternion operator*(Quaternion a,Quaternion b)=>default;
-        public static Vector3 operator*(Quaternion q,Vector3 v)=>default; }
+        public static Vector3 operator*(Quaternion q,Vector3 v)=>default;
+        public static Quaternion FromToRotation(Vector3 a,Vector3 b)=>default; public static Quaternion Inverse(Quaternion q)=>default; }
     public struct Color { public float r,g,b,a; public Color(float r,float g,float b){this.r=r;this.g=g;this.b=b;}
         public static Color Lerp(Color a,Color b,float t)=>default;
         public Color(float r,float g,float b,float a){this.r=r;this.g=g;this.b=b;this.a=a;}
@@ -52,7 +54,7 @@ namespace UnityEngine
     public class Behaviour : Component { public bool enabled; }
     public class Transform : Component { public Vector3 position; public Vector3 localPosition; public Quaternion rotation; public Quaternion localRotation;
         public Vector3 eulerAngles; public Vector3 localScale; public Transform parent=>null; public int childCount=>0;
-        public Transform GetChild(int i)=>null;
+        public Transform GetChild(int i)=>null; public Vector3 InverseTransformDirection(Vector3 d)=>default;
         public void SetParent(Transform p){} public void SetParent(Transform p,bool worldPositionStays){} }
     public enum PrimitiveType { Sphere, Capsule, Cylinder, Cube, Plane, Quad }
     public class GameObject : Object { public GameObject(){} public GameObject(string n){} public Transform transform=>null;
@@ -102,7 +104,9 @@ namespace UnityEngine
     public enum ScreenOrientation { Portrait, PortraitUpsideDown, LandscapeLeft, LandscapeRight, AutoRotation }
     public static class Screen { public static int width=>0; public static int height=>0; public static ScreenOrientation orientation; }
     public static class Application { public static bool isPlaying=>false; public static bool isBatchMode=>false;
-        public static bool isEditor=>false; public static string platform=>null; public static void Quit(){} public static int targetFrameRate; }
+        public static bool isEditor=>false; public static string platform=>null; public static void Quit(){} public static int targetFrameRate; public static string persistentDataPath=>null;
+        public delegate void LogCallback(string condition,string stackTrace,LogType type); public static event LogCallback logMessageReceivedThreaded; }
+    public enum LogType { Error, Assert, Warning, Log, Exception }
     public static class PlayerPrefs { public static bool HasKey(string k)=>false; public static float GetFloat(string k)=>0f;
         public static int GetInt(string k)=>0; public static string GetString(string k)=>null; public static void SetFloat(string k,float v){}
         public static void SetInt(string k,int v){} public static void SetString(string k,string v){} public static void DeleteKey(string k){}
@@ -152,7 +156,7 @@ namespace UnityEngine
     public static class Gizmos { public static Color color; public static void DrawWireSphere(Vector3 c,float r){} public static void DrawLine(Vector3 a,Vector3 b){} }
     public static class RenderSettings { public static UnityEngine.Rendering.AmbientMode ambientMode;
         public static bool fog; public static FogMode fogMode; public static float fogStartDistance, fogEndDistance, fogDensity;
-        public static Color fogColor; public static Color ambientLight; }
+        public static Color fogColor; public static Color ambientLight; public static Material skybox; }
     public enum FogMode { Linear, Exponential, ExponentialSquared }
     public class GUIStyle { public GUIStyle(){} public GUIStyle(GUIStyle o){} public TextAnchor alignment; public int fontSize; public GUIStyleState normal=new GUIStyleState(); }
     public class GUIStyleState { public Color textColor; }

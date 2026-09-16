@@ -64,3 +64,19 @@ tapi build Unity gagal dengan `error CS0246`. Referensi asmdef TIDAK transitif:
 tipe dari paket Core RP butuh `"Unity.RenderPipelines.Core.Runtime"` eksplisit
 di setiap asmdef yang memakainya. Kalau menambah `using` ke namespace paket
 baru, selalu cek juga daftar `references` di asmdef yang bersangkutan.
+
+## Pelajaran Tahap 5c (macet-di-loading, 2026-09-16)
+- Harness tidak bisa jalan di sandbox ini (tidak ada .NET SDK dan egress
+  dibatasi) — verifikasi kompilasi murni review + penambahan stub API.
+  API baru yang dipakai dan di-stub: `Application.logMessageReceivedThreaded`,
+  `RuntimeInitializeOnLoadMethod`, `Quaternion.FromToRotation/Inverse`,
+  `Vector3.Angle/sqrMagnitude`, `Transform.InverseTransformDirection`,
+  `RenderSettings.skybox` — semuanya API Unity lama, bukan karangan.
+- Shader yang hanya dipakai runtime (`Shader.Find` + `new Material`) WAJIB
+  dirujuk aset yang ikut build (scene/Resources/Always Included), kalau
+  tidak di-strip dan Find mengembalikan null di player. Builder sekarang
+  membuat material acuan di `Resources/` untuk Toon/ToonLite/Sparkle.
+- Langit `Aurelia/Sky` + `DayNightCycle.SkyMaterial` sudah ada tapi tidak
+  pernah dipasang builder — game memakai warna datar. Sekarang dipasang.
+- Boot di-HP dibungkus try/catch per subsistem + failsafe jam dinding +
+  BootLog (kotak merah di loading): tidak ada lagi macet diam-diam.

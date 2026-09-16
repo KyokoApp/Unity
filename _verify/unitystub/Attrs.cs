@@ -12,6 +12,8 @@ namespace UnityEngine
     [AttributeUsage(AttributeTargets.Class)]   public class RequireComponent : Attribute { public RequireComponent(Type t){} }
     [AttributeUsage(AttributeTargets.Class)]   public class ExecuteAlways : Attribute {}
     [AttributeUsage(AttributeTargets.Method)]  public class ContextMenu : Attribute { public ContextMenu(string n){} }
+    public enum RuntimeInitializeLoadType { AfterSceneLoad, BeforeSceneLoad, AfterAssembliesLoaded, BeforeSplashScreen, SubsystemRegistration }
+    [AttributeUsage(AttributeTargets.Method)] public class RuntimeInitializeOnLoadMethodAttribute : Attribute { public RuntimeInitializeOnLoadMethodAttribute(){} public RuntimeInitializeOnLoadMethodAttribute(RuntimeInitializeLoadType t){} }
 }
 namespace UnityEditor
 {

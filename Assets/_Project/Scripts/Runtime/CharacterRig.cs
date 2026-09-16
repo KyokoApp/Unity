@@ -68,6 +68,9 @@ namespace RPG.Runtime
         readonly Dictionary<Joint, Transform> _bones = new Dictionary<Joint, Transform>();
         readonly Dictionary<Joint, Quaternion> _bind = new Dictionary<Joint, Quaternion>();
         readonly Dictionary<Joint, Locomotion.Vec3> _prev = new Dictionary<Joint, Locomotion.Vec3>();
+        /* Koreksi lengan-turun per sendi (dihitung di Bind, lihat ComputeArmFix).
+           Sendi yang tidak ada di sini = tanpa koreksi (identitas). */
+        readonly Dictionary<Joint, Quaternion> _armFix = new Dictionary<Joint, Quaternion>();
         Animator _animator;
         float _lean;
         float _leanTarget;
@@ -89,6 +92,7 @@ namespace RPG.Runtime
             _bones.Clear();
             _bind.Clear();
             _prev.Clear();
+            _armFix.Clear();
 
             _animator = CharacterRoot.GetComponentInChildren<Animator>();
             var missing = new List<string>();
@@ -126,6 +130,10 @@ namespace RPG.Runtime
                 .Select(kv => new BindEntry { Joint = kv.Key, Bone = kv.Value,
                                               LocalRotation = _bind[kv.Key] })
                 .ToArray();
+
+            /* Tulang saat ini di bind pose (fresh build = prefab perawan;
+               editor = dipulihkan dari _serializedBind di atas). */
+            ComputeArmFix();
 
             /* Animator hanya dimatikan di jalur prosedural. Jalur Animator
                (animasi jadi) membutuhkannya menyala. */
@@ -169,6 +177,47 @@ namespace RPG.Runtime
 
         static HumanBodyBones HumanBoneFromVrm(string vrmBone) =>
             HumanMap.TryGetValue(vrmBone, out var b) ? b : HumanBodyBones.LastBone;
+
+        /* Koreksi lengan: bind pose VRM = T-pose (lengan horizontal),
+           sementara SEMUA pose Locomotion ditulis untuk bind berlengan
+           turun (rig JS aslinya). Tanpa koreksi, karakter idle/jalan
+           dengan lengan terbuka seperti salib — di screenshot maupun
+           in-game.
+
+           Bebas sumbu (tidak menebak axis lokal tulang): arah lengan
+           diukur di ruang karakter, lalu diputar ke arah rileks
+           (bawah + sedikit keluar + sedikit depan) lewat
+           FromToRotation, dan dinyatakan sebagai premultiply
+           bone-local. Kalau modelnya memang sudah A-pose, sudutnya
+           ~0 dan koreksinya otomatis identitas. */
+        void ComputeArmFix()
+        {
+            _armFix.Clear();
+            if (CharacterRoot == null) return;
+            FixArm(Joint.LeftUpperArm, Joint.LeftLowerArm);
+            FixArm(Joint.RightUpperArm, Joint.RightLowerArm);
+        }
+
+        void FixArm(Joint upper, Joint lower)
+        {
+            if (!_bones.TryGetValue(upper, out var u)) return;
+            if (!_bones.TryGetValue(lower, out var e)) return;
+            if (u.parent == null) return;
+            var span = e.position - u.position;
+            if (span.sqrMagnitude < 1e-10f) return;
+            var dirChar = CharacterRoot.InverseTransformDirection(span.normalized);
+            var wantChar = new Vector3(Mathf.Sign(dirChar.x) * 0.16f, -1f, 0.10f).normalized;
+            if (Vector3.Angle(dirChar, wantChar) < 1f) return;
+            var qChar = Quaternion.FromToRotation(dirChar, wantChar);
+            // char-space -> world -> parent-space, lalu ke bone-local:
+            // local' = qParent * bind = bind * (bind^-1 * qParent * bind).
+            var rootQ = CharacterRoot.rotation;
+            var qWorld = rootQ * qChar * Quaternion.Inverse(rootQ);
+            var parentQ = u.parent.rotation;
+            var qParent = Quaternion.Inverse(parentQ) * qWorld * parentQ;
+            var bindQ = _bind[upper];
+            _armFix[upper] = Quaternion.Inverse(bindQ) * qParent * bindQ;
+        }
 
         static Transform FindDeep(Transform root, string name)
         {
@@ -235,7 +284,8 @@ namespace RPG.Runtime
                     (float)((v.X + ex) * sx * Mathf.Rad2Deg),
                     (float)((v.Y + ey) * sy * Mathf.Rad2Deg),
                     (float)(v.Z * sz * Mathf.Rad2Deg));
-                kv.Value.localRotation = _bind[kv.Key] * q;
+                if (!_armFix.TryGetValue(kv.Key, out var fix)) fix = Quaternion.identity;
+                kv.Value.localRotation = _bind[kv.Key] * fix * q;
             }
         }
 
