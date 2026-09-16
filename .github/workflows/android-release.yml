@@ -375,7 +375,22 @@ jobs:
                   -alias "$ANDROID_KEYALIAS_NAME" > /tmp/keytool.txt 2>&1; then
             KS_OK=1
             echo "=== keytool menerima ==="; head -4 /tmp/keytool.txt
-            echo "::notice::baca OK. unityAkanPakai: androidKeystoreName=${ANDROID_KEYSTORE_NAME} alias=${ANDROID_KEYALIAS_NAME}"
+            echo "::notice::baca OK. unityAkanPakai: androidKeystoreName=${ANDROID_KEYSTORE_NAME} alias=${ANDROID_KEYALIAS_NAME} passLen=${#ANDROID_KEYSTORE_PASS} aliasPassLen=${#ANDROID_KEYALIAS_PASS}"
+          # Tulis konfigurasi signing yang DIPAKAI UNITY ke berkas di workspace.
+          # Alasan: password yang dikirim lewat argumen baris perintah game-ci
+          # sudah hilang diam-diam ("please provide passwords!") padahal kunci +
+          # password terbukti sehat. AureliaBuildPreprocessor membaca berkas ini
+          # dan memasang PlayerSettings.Android sendiri, tepat sebelum Unity
+          # menandatangani. Berkas ini TIDAK pernah di-commit (.gitignore).
+          mkdir -p keystore
+          {
+            echo "# dibuat oleh CI -- jangan di-commit"
+            echo "keystoreName=${ANDROID_KEYSTORE_NAME}"
+            echo "keystorePass=${ANDROID_KEYSTORE_PASS}"
+            echo "keyaliasName=${ANDROID_KEYALIAS_NAME}"
+            echo "keyaliasPass=${ANDROID_KEYALIAS_PASS}"
+          } > keystore/ci-signing.txt
+          wc -c keystore/ci-signing.txt | sed 's/^/::notice::berkas signing ditulis: /'
           else
             echo "=== keytool MENOLAK ==="; head -14 /tmp/keytool.txt
             echo "::error::JDK menolak keystore: $(head -3 /tmp/keytool.txt | tr '\n' ' ' | cut -c1-240)"

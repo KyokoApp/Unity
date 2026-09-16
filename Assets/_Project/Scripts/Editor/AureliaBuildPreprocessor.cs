@@ -42,6 +42,23 @@ namespace RPG.Editor
         {
             var log = new List<string>();
 
+            /* 0. Signing APK. Unity sempat menolak dengan
+                  "Unable to sign the application; please provide passwords!"
+                  padahal kunci + password terbukti sehat (keytool dan jarsigner
+                  lulus di runner yang sama, fix14). Yang bocor adalah jalurnya:
+                  password dikirim sebagai argumen baris perintah ke skrip build
+                  game-ci, dan satu langkah yang salah di situ cukup untuk
+                  menghilangkannya tanpa jejak sama sekali. Jadi build ini tidak
+                  percaya jalur itu: CI menulis konfigurasi ke berkas di
+                  workspace, dan kita pasang sendiri ke PlayerSettings -- tepat
+                  sebelum Unity menandatangani, beberapa detik sebelumnya.
+                  Penting: keystoreName HARUS relatif terhadap folder proyek.
+                  Unity menggabungkannya dengan current directory, jadi path
+                  absolut berubah menjadi "/github/workspace/github/workspace/…"
+                  dan build mati dengan "keystore file not found" (fix13). */
+            try { ApplyAndroidSigningFromCi(log); }
+            catch (System.Exception e) { log.Add("konfigurasi signing gagal dipasang: " + e.Message); }
+
             /* 1. URP asset. Tanpa ini semua material jadi magenta, dan
                   gejalanya baru terlihat setelah APK terpasang di HP.
                FIX 2026-09-15: Selalu panggil EnsureUrpAsset, bukan cuma kalau null,
@@ -205,6 +222,89 @@ namespace RPG.Editor
                             "TIDAK diubah di sini -- ubah di ProjectSettings/ProjectSettings.asset.");
                     break;
             }
+        }
+
+        /* Baca keystore/ci-signing.txt (dibuat oleh CI, tidak pernah di-commit)
+              dan pasang konfigurasi signing Android kita sendiri.
+           Aturan main:
+           - berkas tidak ada  -> biarkan apa adanya (build lokal/dev; debug key).
+           - berkas tidak lengkap -> log keras, JANGAN menimpa sebagian: mencampur
+             sumber (nama dari Unity, pass dari kita) persis yang menghasilkan
+             "please provide passwords!".
+           - password tidak pernah dicetak; hanya panjangnya, sebagai bukti. */
+        static void ApplyAndroidSigningFromCi(List<string> log)
+        {
+            const string cfgPath = "keystore/ci-signing.txt";
+            if (!File.Exists(cfgPath))
+            {
+                log.Add("signing: tidak ada " + cfgPath + " -> pakai konfigurasi proyek apa adanya.");
+                return;
+            }
+
+            var vals = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+            foreach (var raw in File.ReadAllLines(cfgPath))
+            {
+                var line = raw.Trim();
+                if (line.Length == 0 || line[0] == '#') continue;
+                int eq = line.IndexOf('=');
+                if (eq <= 0) continue;
+                vals[line.Substring(0, eq).Trim()] = line.Substring(eq + 1).Trim();
+            }
+
+            string Get(string key) => vals.TryGetValue(key, out var v) ? v : null;
+            var name = Get("keystoreName");
+            var pass = Get("keystorePass");
+            var alias = Get("keyaliasName");
+            var aliasPass = Get("keyaliasPass");
+
+            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(pass) ||
+                string.IsNullOrEmpty(alias))
+            {
+                log.Add("GALAG " + cfgPath + " tidak lengkap (butuh keystoreName, keystorePass, " +
+                        "keyaliasName) -> PlayerSettings TIDAK diubah. Isi yang terbaca: " +
+                        string.Join(",", vals.Keys));
+                return;
+            }
+
+            // Paksa relatif terhadap folder proyek (lihat komentar di OnPreprocessBuild).
+            if (Path.IsPathRooted(name))
+            {
+                var root = Directory.GetCurrentDirectory();
+                var full = Path.GetFullPath(name);
+                if (full.StartsWith(root + Path.DirectorySeparatorChar))
+                    name = full.Substring(root.Length + 1);
+            }
+
+            PlayerSettings.Android.useCustomKeystore = true;
+            PlayerSettings.Android.keystoreName = name;
+            PlayerSettings.Android.keystorePass = pass;
+            PlayerSettings.Android.keyaliasName = alias;
+            // keyaliasPass boleh kosong: keystore ini memakai store == key
+            // (PKCS12 satu password) -> pakai pass.
+            PlayerSettings.Android.keyaliasPass =
+                string.IsNullOrEmpty(aliasPass) ? pass : aliasPass;
+
+            // Baca balik: kalau Unity menolak menyimpan nilainya, ini yang membuktikannya.
+            var storedPass = PlayerSettings.Android.keystorePass;
+            var storedAliasPass = PlayerSettings.Android.keyaliasPass;
+            var resolved = Path.Combine(Directory.GetCurrentDirectory(), name);
+
+            log.Add(string.Format(
+                "signing dipasang: keystoreName={0} berkas={1} alias={2} useCustomKeystore={3} " +
+                "passLen={4}->{5} aliasPassLen={6}->{7}",
+                name,
+                File.Exists(resolved) ? "ADA" : "TIDAK KETEMU",
+                PlayerSettings.Android.keyaliasName,
+                PlayerSettings.Android.useCustomKeystore,
+                pass.Length,
+                storedPass == null ? -1 : storedPass.Length,
+                (aliasPass ?? pass).Length,
+                storedAliasPass == null ? -1 : storedAliasPass.Length));
+
+            if (!File.Exists(resolved))
+                log.Add("GALAG: keystore tidak ada di " + resolved);
+            if (string.IsNullOrEmpty(storedPass))
+                log.Add("GALAG: Unity tidak menyimpan keystorePass -> signing pasti gagal.");
         }
     }
 }

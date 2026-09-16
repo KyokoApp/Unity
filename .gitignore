@@ -73,3 +73,6 @@ _verify/**/obj/
 
 # hasil generation _verify/asmdef/split_asmdefs.py (dibangun ulang tiap CI, jangan ikut commit)
 _verify/asmdef/.generated/
+
+# ditulis CI berisi password signing; tidak pernah di-commit
+keystore/ci-signing.txt

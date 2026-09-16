@@ -107,3 +107,22 @@ namespace UnityEngine.SceneManagement
         public static Scene CreateScene(string n)=>default; }
 }
 namespace UnityEditor.Rendering { public static class EditorGraphicsSettings { public static void PopulateRenderPipelineGraphicsSettings(UnityEngine.Rendering.RenderPipelineGlobalSettings s){} } }
+
+namespace UnityEditor
+{
+    // PlayerSettings.Android adalah satu-satunya jalan memasang konfigurasi
+    // signing APK. Di Unity nyata properti ini getter/setter yang menyimpan ke
+    // EditorPrefs per proyek; di sini cukup properti statis — yang mau dicek
+    // adalah kode pemakainya (nullable + urutan tulis), bukan perilakunya.
+    public sealed class PlayerSettings
+    {
+        public static class Android
+        {
+            public static bool useCustomKeystore { get; set; }
+            public static string keystoreName { get; set; }
+            public static string keystorePass { get; set; }
+            public static string keyaliasName { get; set; }
+            public static string keyaliasPass { get; set; }
+        }
+    }
+}
