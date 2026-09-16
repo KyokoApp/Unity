@@ -453,9 +453,9 @@ namespace RPG.Editor
                     diperbaiki++;
                 }
             }
-            if (fixed_ > 0 || still > 0)
-                notes.Add($"materi cadangan dipasang di {fixed_} renderer" +
-                          (still > 0 ? $", {still} TETAP tanpa materi (shader cadangan gagal)" : ""));
+            if (diperbaiki > 0 || masih > 0)
+                notes.Add($"materi cadangan dipasang di {diperbaiki} renderer" +
+                          (masih > 0 ? $", {masih} TETAP tanpa materi (shader cadangan gagal)" : ""));
             else notes.Add("census renderer: semua sudah punya material.");
         }
 
