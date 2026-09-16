@@ -22,6 +22,9 @@ namespace RPG.Runtime
        paritas (Sensitivity 0,4..2, CameraDistance 3..8, dst) berlaku
        di sini juga. PlayerPrefs yang rusak/asing tidak bisa
        menghasilkan setelan di luar batas.
+
+       CameraDistance 3..8 adalah tingkat zoom menu. Meter di dunia
+       dipetakan CameraFraming (default ~3,2 m, bukan 5 m).
        ============================================================ */
     public static class SettingsStore
     {

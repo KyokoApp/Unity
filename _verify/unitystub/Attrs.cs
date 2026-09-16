@@ -9,6 +9,7 @@ namespace UnityEngine
     [AttributeUsage(AttributeTargets.Field)]   public class SerializeField : Attribute {}
     [AttributeUsage(AttributeTargets.Field)]   public class HideInInspector : Attribute {}
     [AttributeUsage(AttributeTargets.Class)]   public class DisallowMultipleComponent : Attribute {}
+    [AttributeUsage(AttributeTargets.Class)]   public class DefaultExecutionOrder : Attribute { public DefaultExecutionOrder(int order){} }
     [AttributeUsage(AttributeTargets.Class)]   public class RequireComponent : Attribute { public RequireComponent(Type t){} }
     [AttributeUsage(AttributeTargets.Class)]   public class ExecuteAlways : Attribute {}
     [AttributeUsage(AttributeTargets.Method)]  public class ContextMenu : Attribute { public ContextMenu(string n){} }

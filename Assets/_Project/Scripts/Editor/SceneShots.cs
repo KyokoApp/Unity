@@ -132,16 +132,20 @@ namespace RPG.Editor
             }
         }
 
-        /* Komposisi: sedikit di belakang dan di atas karakter, menatap
-           ke arahnya -- sudut yang sama dengan kamera bermain, supaya
-           screenshot mewakili apa yang akan dilihat pemain. */
+        /* Framing SAMA dengan CameraRig in-game (Genshin, ~3 m di
+           belakang bahu). Dulu offset (-4.2, 2.6, -6.4) = 8 m — karakter
+           sebesar semut, tidak mewakili permainan. */
         static void ComposeCamera(Camera cam, Transform target)
         {
-            if (target == null) return;
-            var p = target.position;
-            var offset = new Vector3(-4.2f, 2.6f, -6.4f);
-            cam.transform.position = p + offset;
-            cam.transform.rotation = Quaternion.LookRotation((p + new Vector3(0f, 1.5f, 0f) - cam.transform.position).normalized, Vector3.up);
+            if (target == null || cam == null) return;
+            RPG.Runtime.CameraRig.PlaceBehind(
+                cam.transform, target.position,
+                yawDeg: 12f,
+                pitchDeg: (float)CameraFraming.DefaultPitchDeg,
+                dist: (float)CameraFraming.DefaultMeters,
+                focusHeight: (float)CameraFraming.DefaultFocusHeight,
+                shoulder: (float)CameraFraming.DefaultShoulder);
+            cam.fieldOfView = 50f;
         }
 
         static bool RenderToPng(Camera cam, string path, int w, int h)

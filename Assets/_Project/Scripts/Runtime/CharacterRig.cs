@@ -250,7 +250,10 @@ namespace RPG.Runtime
             if (FreezeAtBindPose) { ResetToBind(); return; }
 
             var dt = Time.deltaTime;
-            var k = 1f - Mathf.Exp(-PoseSmoothRate * Mathf.Max(0f, dt));
+            /* dt==0 di batchmode (SceneShots): tanpa ini k=0, pose tidak
+               pernah tertulis, screenshot tetap T-pose salib. */
+            var k = dt <= 1e-5f ? 1f
+                : 1f - Mathf.Exp(-PoseSmoothRate * dt);
             _lean += (_leanTarget - _lean) * (1f - Mathf.Exp(-8f * Mathf.Max(0f, dt)));
             _crouch *= Mathf.Exp(-6f * Mathf.Max(0f, dt));
             if (_crouch < 0.001f) _crouch = 0f;

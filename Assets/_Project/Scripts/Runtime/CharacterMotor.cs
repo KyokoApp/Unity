@@ -335,7 +335,11 @@ namespace RPG.Runtime
                 iz = (float)a.Y;
                 analog = true;
             }
-            // Stik uGUI (HUD Genshin) menang atas stik IMGUI lama.
+            // Stik uGUI (HUD Genshin) dibangun WorldBoot SETELAH Awake motor,
+            // jadi dicari malas di sini. Tanpa ini stik yang terlihat di HUD
+            // tidak menggerakkan karakter.
+            if (Stick == null) Stick = FindFirstObjectByType<VirtualJoystick>();
+            if (Camera == null) Camera = FindFirstObjectByType<CameraRig>();
             if (Stick != null && Stick.IsActive)
             {
                 var a = Stick.Axis;

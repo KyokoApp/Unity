@@ -4,49 +4,51 @@ using RPG.Core;
 namespace RPG.Runtime
 {
     /* ============================================================
-       CAMERA RIG — kamera orang ketiga mengorbit.
+       CAMERA RIG — orang ketiga rapat di belakang karakter.
 
-       Jarak dan sensitivitas TIDAK punya default sendiri: keduanya
-       diambil dari GameSettings, yang batasnya sudah dipatok di
-       SettingsNormalizer (CameraDistance 3..8 default 5,
-       Sensitivity 0,4..2 default 1).
+       Jarak visual TIDAK memakai CameraDistance (3..8 m) mentah:
+       angka itu tingkat zoom menu (paritas JS). Dipetakan ke
+       2,35..4,40 m oleh CameraFraming supaya framing-nya Genshin
+       (karakter mengisi ~1/3 bawah layar), bukan semut di padang.
 
-       Perbaikan Tahap 5:
-       [1] BUG MULTI-SENTUH: dulu hanya Input.GetTouch(0) yang dibaca,
-           jadi kamera TIDAK BISA diputar sambil berjalan (jari 0
-           dipegang stik). Sekarang semua jari dipindai.
-       [2] Kamera bisa masuk ke dalam bukit. Sekarang dijepit di atas
-           terrain (+ TerrainClearance).
-       [3] FOV menendang saat sprint + screen-shake halus untuk
-           tebasan/dash/mendarat (rasa RPG).
+       Perbaikan Tahap 5 / 5d:
+       [1] BUG MULTI-SENTUH: semua jari dipindai, bukan cuma GetTouch(0).
+       [2] Kamera dijepit di atas terrain.
+       [3] FOV menendang saat sprint + screen-shake.
+       [4] Pitch positif = kamera DI ATAS (dulu rumus spherical
+           menaruh kamera DI BAWAH fokus — sudut aneh + jarak terasa
+           jauh). Sekarang Quaternion.Euler ala Unity/Genshin.
+       [5] SnapNow saat OnEnable: tidak damping dari 8 m jauhnya.
        ============================================================ */
     [DisallowMultipleComponent]
     public class CameraRig : MonoBehaviour
     {
         [Header("Target")]
         public Transform Target;
-        [Tooltip("Tinggi titik fokus di atas kaki karakter.")]
-        public float FocusHeight = 1.35f;
+        [Tooltip("Tinggi titik fokus di atas kaki karakter (dada/leher).")]
+        public float FocusHeight = (float)CameraFraming.DefaultFocusHeight;
+        [Tooltip("Geser ke kanan bahu, meter. 0 = tepat di belakang.")]
+        public float ShoulderOffset = (float)CameraFraming.DefaultShoulder;
         [Tooltip("Dibaca untuk FOV sprint. Kosong = cari sendiri.")]
         public CharacterMotor Motor;
 
-        [Header("Batas pitch (derajat)")]
-        public float MinPitch = -35f;
-        public float MaxPitch = 70f;
-        public float StartPitch = 12f;
+        [Header("Batas pitch (derajat, positif = dari atas)")]
+        public float MinPitch = -8f;
+        public float MaxPitch = 55f;
+        public float StartPitch = (float)CameraFraming.DefaultPitchDeg;
 
         [Header("Penghalusan")]
-        public float PositionDamp = 12f;
-        public float RotationDamp = 18f;
+        public float PositionDamp = 18f;
+        public float RotationDamp = 22f;
 
         [Header("Terrain")]
-        [Tooltip("Jarak minimum kamera di atas tanah (m). Mencegah kamera masuk bukit.")]
-        public float TerrainClearance = 0.4f;
+        [Tooltip("Jarak minimum kamera di atas tanah (m).")]
+        public float TerrainClearance = 0.35f;
 
         [Header("Rasa (game feel)")]
-        public float BaseFov = 60f;
+        public float BaseFov = 50f;
         [Tooltip("FOV saat sprint penuh.")]
-        public float SprintFov = 67f;
+        public float SprintFov = 56f;
 
         [Header("Sentuh / mouse")]
         [Tooltip("Kalau true, menyeret di mana pun memutar kamera (untuk HP). " +
@@ -56,12 +58,16 @@ namespace RPG.Runtime
         public float Yaw { get; private set; }
         public float Pitch { get; private set; }
         public GameSettings Settings { get; private set; }
+        public float FramingMeters =>
+            (float)CameraFraming.MetersFromSettings(
+                Settings != null ? Settings.CameraDistance : CameraFraming.SettingsDefault);
 
         Camera _cam;
         int _dragId = int.MinValue;
         Vector2 _lastMouse;
         Vector2 _lastTouch;
         float _shake;
+        bool _snap = true;
 
         void Awake()
         {
@@ -87,7 +93,10 @@ namespace RPG.Runtime
                 if (motor != null) Target = motor.transform;
             }
             if (Motor == null) Motor = FindFirstObjectByType<CharacterMotor>();
+            _snap = true;
         }
+
+        void OnEnable() { _snap = true; }
 
         public void SetDistance(double meters)
         {
@@ -110,68 +119,104 @@ namespace RPG.Runtime
             _shake = Mathf.Clamp(_shake + amount, 0f, 1f);
         }
 
+        /* Paksa kamera ke posisi target TANPA damping. Dipakai boot
+           (OnEnable setelah loading) dan SceneShots. */
+        public void SnapNow()
+        {
+            _snap = true;
+            if (Target == null) return;
+            ComputeWant(out var pos, out var rot);
+            transform.position = pos;
+            transform.rotation = rot;
+            _snap = false;
+        }
+
+        /* Dipakai SceneShots + builder supaya screenshot = framing in-game. */
+        public static void PlaceBehind(Transform cam, Vector3 targetPos,
+            float yawDeg, float pitchDeg, float dist, float focusHeight, float shoulder)
+        {
+            if (cam == null) return;
+            CameraFraming.OrbitOffset(yawDeg, pitchDeg, dist,
+                out var ox, out var oy, out var oz);
+            var focus = targetPos + Vector3.up * focusHeight;
+            var yawRad = yawDeg * Mathf.Deg2Rad;
+            var right = new Vector3(Mathf.Cos(yawRad), 0f, -Mathf.Sin(yawRad));
+            var pos = focus + new Vector3((float)ox, (float)oy, (float)oz) + right * shoulder;
+            var look = targetPos + Vector3.up * (focusHeight + 0.06f);
+            cam.position = pos;
+            var dir = look - pos;
+            if (dir.sqrMagnitude > 1e-8f)
+                cam.rotation = Quaternion.LookRotation(dir, Vector3.up);
+        }
+
         void LateUpdate()
         {
             ReadLookInput();
-
             if (Target == null) return;
 
-            var focus = Target.position + Vector3.up * FocusHeight;
-            var dist = (float)Settings.CameraDistance;
+            ComputeWant(out var wantPos, out var wantRot);
 
-            var pitchRad = Pitch * Mathf.Deg2Rad;
-            var yawRad = Yaw * Mathf.Deg2Rad;
-            var offset = new Vector3(
-                Mathf.Sin(yawRad) * Mathf.Cos(pitchRad),
-                Mathf.Sin(pitchRad),
-                Mathf.Cos(yawRad) * Mathf.Cos(pitchRad)) * -dist;
-
-            var wantPos = focus + offset;
-
-            // Jepit di atas terrain supaya tidak masuk bukit.
-            var groundY = (float)WorldData.TerrainH(wantPos.x, wantPos.z)
-                          + TerrainClearance;
-            if (wantPos.y < groundY) wantPos.y = groundY;
-
-            var wantRot = Quaternion.LookRotation(focus - wantPos, Vector3.up);
-
-            /* Damp dari Locomotion, bukan SmoothDamp: laju penghalusan harus
-               sama dengan yang dipakai karakter supaya kamera dan badan tidak
-               terasa seperti dua sistem berbeda. */
-            var dt = Time.deltaTime;
-            transform.position = new Vector3(
-                (float)Locomotion.Damp(transform.position.x, wantPos.x, PositionDamp, dt),
-                (float)Locomotion.Damp(transform.position.y, wantPos.y, PositionDamp, dt),
-                (float)Locomotion.Damp(transform.position.z, wantPos.z, PositionDamp, dt));
-            transform.rotation = Quaternion.Slerp(transform.rotation, wantRot,
-                1f - Mathf.Exp(-RotationDamp * dt));
-
-            // Shake: getaran sinus dua frekuensi, meluruh cepat.
-            if (_shake > 0.001f && dt > 0f)
+            if (_snap)
             {
-                _shake *= Mathf.Exp(-7f * dt);
+                transform.position = wantPos;
+                transform.rotation = wantRot;
+                _snap = false;
+            }
+            else
+            {
+                var dt = Time.deltaTime;
+                transform.position = new Vector3(
+                    (float)Locomotion.Damp(transform.position.x, wantPos.x, PositionDamp, dt),
+                    (float)Locomotion.Damp(transform.position.y, wantPos.y, PositionDamp, dt),
+                    (float)Locomotion.Damp(transform.position.z, wantPos.z, PositionDamp, dt));
+                transform.rotation = Quaternion.Slerp(transform.rotation, wantRot,
+                    1f - Mathf.Exp(-RotationDamp * dt));
+            }
+
+            var shakeDt = Time.deltaTime;
+            if (_shake > 0.001f && shakeDt > 0f)
+            {
+                _shake *= Mathf.Exp(-7f * shakeDt);
                 var t = Time.time;
                 transform.position += new Vector3(
-                    Mathf.Sin(t * 91f) * _shake * 0.06f,
-                    Mathf.Sin(t * 113f + 1.7f) * _shake * 0.06f, 0f);
+                    Mathf.Sin(t * 91f) * _shake * 0.05f,
+                    Mathf.Sin(t * 113f + 1.7f) * _shake * 0.05f, 0f);
             }
             else _shake = 0f;
 
-            // FOV menendang saat sprint/dash.
             if (_cam != null)
             {
                 var run = Motor != null ? (float)Motor.Run01 : 0f;
-                var dashKick = (Motor != null && Motor.IsDashing) ? 4f : 0f;
+                var dashKick = (Motor != null && Motor.IsDashing) ? 3f : 0f;
                 var wantFov = BaseFov + (SprintFov - BaseFov) * run + dashKick;
-                _cam.fieldOfView = (float)Locomotion.Damp(_cam.fieldOfView, wantFov, 6.0, dt);
+                _cam.fieldOfView = (float)Locomotion.Damp(_cam.fieldOfView, wantFov, 6.0, Time.deltaTime);
             }
+        }
+
+        void ComputeWant(out Vector3 wantPos, out Quaternion wantRot)
+        {
+            var dist = FramingMeters;
+            CameraFraming.OrbitOffset(Yaw, Pitch, dist, out var ox, out var oy, out var oz);
+            var focus = Target.position + Vector3.up * FocusHeight;
+            var yawRad = Yaw * Mathf.Deg2Rad;
+            var right = new Vector3(Mathf.Cos(yawRad), 0f, -Mathf.Sin(yawRad));
+            wantPos = focus + new Vector3((float)ox, (float)oy, (float)oz)
+                      + right * ShoulderOffset;
+
+            var groundY = (float)WorldData.TerrainH(wantPos.x, wantPos.z) + TerrainClearance;
+            if (wantPos.y < groundY) wantPos.y = groundY;
+
+            var look = Target.position + Vector3.up * (FocusHeight + 0.06f);
+            var dir = look - wantPos;
+            wantRot = dir.sqrMagnitude > 1e-8f
+                ? Quaternion.LookRotation(dir, Vector3.up)
+                : transform.rotation;
         }
 
         void ReadLookInput()
         {
-            var sens = (float)Settings.Sensitivity;
+            var sens = Settings != null ? (float)Settings.Sensitivity : 1f;
 
-            // ---- mouse (Editor & PC) ----
             if (Input.GetMouseButtonDown(1) || (DragAnywhere && Input.GetMouseButtonDown(0)
                 && !IsPointerOverUi()))
             {
@@ -189,7 +234,6 @@ namespace RPG.Runtime
                 else _dragId = int.MinValue;
             }
 
-            // ---- sentuh (Android): SEMUA jari, bukan cuma jari 0 ----
             for (var i = 0; i < Input.touchCount; i++)
             {
                 var t = Input.GetTouch(i);
@@ -217,15 +261,13 @@ namespace RPG.Runtime
             if (Input.touchCount == 0 && _dragId >= 0) _dragId = int.MinValue;
         }
 
-        /* Zona stik kiri-bawah (koordinat sentuh: Y ke atas). Sentuhan yang
-           mulai di sini milik joystick, bukan kamera. */
         static bool InStickZone(Vector2 p) =>
             p.x < Screen.width * 0.45f && p.y < Screen.height * 0.7f;
 
         void ApplyLook(float dx, float dy, float sens)
         {
             Yaw += dx * 0.12f * sens;
-            Pitch = Mathf.Clamp(Pitch + dy * 0.10f * sens, MinPitch, MaxPitch);
+            Pitch = Mathf.Clamp(Pitch - dy * 0.10f * sens, MinPitch, MaxPitch);
             if (Yaw > 360f) Yaw -= 360f;
             else if (Yaw < -360f) Yaw += 360f;
         }

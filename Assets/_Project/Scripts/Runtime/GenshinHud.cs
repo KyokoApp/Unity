@@ -416,7 +416,7 @@ namespace RPG.Runtime
                 ? ql : s.Quality;
             _vFps.text = s.Fps.ToString();
             _vSens.text = s.Sensitivity.ToString("F1");
-            _vDist.text = s.CameraDistance.ToString("F1");
+            _vDist.text = CameraFraming.MetersFromSettings(s.CameraDistance).ToString("F1") + " m";
             _vShadow.text = s.Shadows ? "ON" : "OFF";
             _vBloom.text = QualityPresets.LevelLabel[
                 Mathf.Clamp(s.Gfx.Bloom, 0, 3)];

@@ -262,6 +262,7 @@ namespace RPG.Runtime
             UseBackgroundThread = false;
             try
             {
+                DrainResults();
                 for (var i = 0; i < maxBuilds; i++)
                 {
                     var p = Target.position;
@@ -281,6 +282,38 @@ namespace RPG.Runtime
             {
                 UseBackgroundThread = prevThread;
             }
+        }
+
+        /* Boot: bangun chunk TERDEKAT sampai anggaran waktu habis, lalu
+           kembalikan kendali ke coroutine (supaya failsafe bisa jalan).
+           Mengembalikan jumlah chunk aktif. */
+        public int StreamBudgeted(float maxMs)
+        {
+            if (Target == null) return ActiveChunks;
+            if (maxMs < 1f) maxMs = 1f;
+            var prevThread = UseBackgroundThread;
+            UseBackgroundThread = false;
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                DrainResults();
+                var p = Target.position;
+                var cx = TerrainMesh.ChunkIndex(p.x);
+                var cz = TerrainMesh.ChunkIndex(p.z);
+                if (cx != _lastCx || cz != _lastCz || _wantedCount == 0)
+                {
+                    _lastCx = cx; _lastCz = cz;
+                    RefreshPlan(cx, cz);
+                }
+                while (_pending.Count > 0 && sw.Elapsed.TotalMilliseconds < maxMs)
+                    BuildBudgetedSync();
+                ActiveChunks = _active.Count;
+            }
+            finally
+            {
+                UseBackgroundThread = prevThread;
+            }
+            return ActiveChunks;
         }
 
         void RefreshPlan(int cx, int cz)

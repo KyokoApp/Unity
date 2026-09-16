@@ -1,22 +1,25 @@
 using UnityEngine;
 using UnityEngine.UI;
+using RPG.Core;
 
 namespace RPG.Runtime
 {
     /* ============================================================
-       LOADING SCREEN — ala Genshin: layar terang + spinner + tips,
-       tampil SEBELUM dunia dirender, hilang setelah chunk awal
-       selesai di-stream (lihat WorldBoot).
+       LOADING SCREEN — ala Genshin: layar terang + spinner + tips.
 
-       Kenapa perlu: 25 chunk pertama + rumput + material toon butuh
-       ~1-3 detik. Tanpa loading, pemain melihat dunia "tumbuh" dan
-       mengira game rusak. Dengan loading, itu jadi pengalaman.
+       Tahap 5d: overlay punya nyawa SENDIRI. Kalau WorldBoot tidak
+       Start() atau coroutine membeku, Update di sini tetap jalan
+       (kecuali main thread benar-benar hang — itu dicegah anggaran
+       waktu di streamer) dan setelah OverlayFailsafeSec memaksa
+       masuk. HideImmediate mematikan canvas, bukan cuma fade yang
+       bergantung Update.
        ============================================================ */
     [DisallowMultipleComponent]
     public class LoadingScreen : MonoBehaviour
     {
         public static LoadingScreen Instance { get; private set; }
         public static bool IsShown => Instance != null && Instance._shown;
+        public static bool WantSkip { get; private set; }
 
         static readonly string[] Tips =
         {
@@ -35,12 +38,15 @@ namespace RPG.Runtime
         Text _barLabel;
         Text _tipsLabel;
         Text _errorText;
+        Text _skipHint;
         RectTransform _spinner;
         bool _shown;
         float _tipT;
         int _tipIdx;
         float _progress;
         string _status = "";
+        float _shownAt;
+        bool _failsafeFired;
 
         public static LoadingScreen Create()
         {
@@ -68,13 +74,11 @@ namespace RPG.Runtime
             _canvas.transform.SetParent(transform, false);
             _group = _canvas.GetComponent<CanvasGroup>();
 
-            // Latar krem terang (khas loading Genshin).
             var bg = UiKit.Rect("Bg", _canvas.transform,
                 Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
                 Vector2.zero, Vector2.zero);
-            UiKit.Image(bg, null, new Color(0.93f, 0.91f, 0.87f, 1f));
+            UiKit.Image(bg, null, new Color(0.93f, 0.91f, 0.87f, 1f), true);
 
-            // Spinner cincin emas.
             _spinner = UiKit.Rect("Spinner", _canvas.transform,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                 new Vector2(0f, 60f), new Vector2(150f, 150f));
@@ -90,7 +94,6 @@ namespace RPG.Runtime
                 new Vector2(0f, -160f), new Vector2(800f, 40f));
             UiKit.Label(sub, "menyiapkan dunia ...", 30, new Color(0.4f, 0.38f, 0.35f, 1f));
 
-            // Bar kemajuan bawah.
             var barBg = UiKit.Rect("BarBg", _canvas.transform,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f),
                 new Vector2(0f, 150f), new Vector2(640f, 14f));
@@ -110,6 +113,11 @@ namespace RPG.Runtime
                 new Vector2(0f, 60f), new Vector2(1200f, 36f));
             _tipsLabel = UiKit.Label(tip, Tips[0], 26, new Color(0.4f, 0.38f, 0.35f, 1f));
 
+            var skip = UiKit.Rect("Skip", _canvas.transform,
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 24f), new Vector2(900f, 32f));
+            _skipHint = UiKit.Label(skip, "", 22, new Color(0.45f, 0.42f, 0.38f, 1f));
+
             SetVisibleImmediate(false);
         }
 
@@ -119,27 +127,48 @@ namespace RPG.Runtime
                 _spinner.localRotation = Quaternion.Euler(0f, 0f,
                     -Time.unscaledTime * 160f % 360f);
 
-            // Fadeopacity menuju target.
             var target = _shown ? 1f : 0f;
             if (_group != null && Mathf.Abs(_group.alpha - target) > 0.001f)
             {
-                var d = Time.unscaledDeltaTime * 2.5f;
+                var d = Time.unscaledDeltaTime * 4f;
                 _group.alpha = Mathf.Clamp(_group.alpha + Mathf.Sign(target - _group.alpha) * d,
                                            0f, 1f);
                 if (_group.alpha <= 0f && !_shown && _canvas != null)
-                    _canvas.enabled = false;   // mati total: hemat fill-rate
+                    _canvas.enabled = false;
             }
 
-            if (_shown)
+            if (!_shown) return;
+
+            _tipT += Time.unscaledDeltaTime;
+            if (_tipT > 4f)
             {
-                _tipT += Time.unscaledDeltaTime;
-                if (_tipT > 4f)
-                {
-                    _tipT = 0f;
-                    _tipIdx = (_tipIdx + 1) % Tips.Length;
-                    if (_tipsLabel != null) _tipsLabel.text = Tips[_tipIdx];
-                }
+                _tipT = 0f;
+                _tipIdx = (_tipIdx + 1) % Tips.Length;
+                if (_tipsLabel != null) _tipsLabel.text = Tips[_tipIdx];
             }
+
+            var shownFor = Time.realtimeSinceStartup - _shownAt;
+            if (_skipHint != null)
+                _skipHint.text = shownFor > 0.7f ? "ketuk untuk masuk" : "";
+
+            if (shownFor > 0.4f && Tapped())
+                WantSkip = true;
+
+            if (!_failsafeFired && shownFor >= BootPolicy.OverlayFailsafeSec)
+            {
+                _failsafeFired = true;
+                BootLog.Add("[LoadingScreen] FAILSAFE overlay — paksa masuk.");
+                HideImmediate();
+                WorldBoot.ForceEnter();
+            }
+        }
+
+        static bool Tapped()
+        {
+            if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)) return true;
+            for (var i = 0; i < Input.touchCount; i++)
+                if (Input.GetTouch(i).phase == TouchPhase.Began) return true;
+            return false;
         }
 
         void RefreshBar()
@@ -162,8 +191,6 @@ namespace RPG.Runtime
             if (_canvas != null) _canvas.enabled = v;
         }
 
-        /* Kotak merah untuk pesan error (didorong BootLog via WorldBoot).
-           Dibangun malas: tidak ada biaya kalau tidak ada error. */
         void EnsureErrorBox()
         {
             if (_errorText != null || _canvas == null) return;
@@ -176,13 +203,15 @@ namespace RPG.Runtime
             _errorText = UiKit.Label(t, "", 22, Color.white, TextAnchor.UpperLeft);
         }
 
-        // ---- API statis ----
         public static void Show()
         {
             var ls = Instance ?? Create();
             ls._progress = 0f;
             ls._status = "memuat";
             ls._tipT = 0f;
+            ls._shownAt = Time.realtimeSinceStartup;
+            ls._failsafeFired = false;
+            WantSkip = false;
             ls._shown = true;
             if (ls._group != null)
             {
@@ -205,7 +234,7 @@ namespace RPG.Runtime
         public static void Hide()
         {
             if (Instance == null) return;
-            Instance._shown = false;   // fade-out dikerjakan Update
+            Instance._shown = false;
             if (Instance._group != null)
             {
                 Instance._group.interactable = false;
@@ -213,8 +242,16 @@ namespace RPG.Runtime
             }
         }
 
-        /* Menampilkan teks error di kotak merah. Tidak pernah melempar:
-           kalau UI-nya sendiri yang rusak, diam adalah pilihan terbaik. */
+        /* Matikan overlay SEKARANG. Dipakai EnterWorld: fade yang
+           menunggu Update tidak boleh jadi alasan overlay nempel. */
+        public static void HideImmediate()
+        {
+            Hide();
+            if (Instance == null) return;
+            if (Instance._group != null) Instance._group.alpha = 0f;
+            if (Instance._canvas != null) Instance._canvas.enabled = false;
+        }
+
         public static void ShowError(string text)
         {
             try
@@ -223,7 +260,7 @@ namespace RPG.Runtime
                 ls.EnsureErrorBox();
                 if (ls._errorText != null) ls._errorText.text = text ?? "";
             }
-            catch { /* sengaja ditelan — lihat komentar */ }
+            catch { }
         }
     }
 }

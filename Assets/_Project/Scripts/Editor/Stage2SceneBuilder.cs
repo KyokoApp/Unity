@@ -152,10 +152,25 @@ namespace RPG.Editor
             cam.clearFlags = CameraClearFlags.Skybox;
             cam.nearClipPlane = 0.05f;
             cam.farClipPlane = 1200f;
+            cam.fieldOfView = 50f;
             camGo.AddComponent<AudioListener>();
             var rig = camGo.AddComponent<CameraRig>();
-            if (charGo != null) rig.Target = charGo.transform;
-            camGo.transform.position = new Vector3(SpawnX, groundY + 2.5f, SpawnZ - 6f);
+            if (charGo != null)
+            {
+                rig.Target = charGo.transform;
+                CameraRig.PlaceBehind(
+                    camGo.transform, charGo.transform.position,
+                    yawDeg: 0f,
+                    pitchDeg: rig.StartPitch,
+                    dist: (float)CameraFraming.DefaultMeters,
+                    focusHeight: rig.FocusHeight,
+                    shoulder: rig.ShoulderOffset);
+            }
+            else
+            {
+                camGo.transform.position = new Vector3(
+                    SpawnX, groundY + 2.2f, SpawnZ - (float)CameraFraming.DefaultMeters);
+            }
             camGo.tag = "MainCamera";
 
             // ---- EventSystem (dipakai CameraRig.IsPointerOverUi) ----------

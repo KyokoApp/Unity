@@ -90,8 +90,15 @@ diperiksa CI tanpa membuka Unity.
   minimap + fps, bar stamina (muncul hanya saat terkuras), klaster aksi
   ATK/E/Q/JMP/DSH dengan cooldown radial + cincin energi ultimate, stik
   virtual kiri-bawah, dan panel PENGATURAN lengkap.
-- `LoadingScreen` + `WorldBoot`: splash krem + spinner + progress bar + tips,
-  streaming 25 chunk sinkron di baliknya, lalu fade dan input dinyalakan.
+- `LoadingScreen` + `WorldBoot` (Tahap 5d): splash krem + spinner + progress
+  + tips. **Tidak menunggu 25–49 chunk.** Satu chunk dekat + 0,55 dtk splash
+  = masuk (`BootPolicy`). Streaming beranggaran 8 ms/frame supaya main thread
+  tidak membeku. Overlay punya failsafe sendiri 4,5 dtk + "ketuk untuk masuk".
+  `HideImmediate` mematikan canvas, bukan fade yang bisa nempel selamanya.
+- Kamera orang ketiga (Tahap 5d): `CameraFraming` memetakan zoom menu 3..8
+  (paritas JS, default 5) ke **2,35..4,40 m** (default ~3,2 m) di belakang
+  bahu, FOV 50°, pitch positif = dari atas. Screenshot CI memakai framing
+  yang sama — bukan offset 8 m yang membuat karakter sebesar semut.
 - Semua memakai sprite prosedural (`UiKit`: lingkaran/cincin/panel) + font
   bawaan — tanpa aset luar. Kalau mau ikon beneran: ganti `UiKit.Font` dengan
   font berlisensi bebas (mis. **Nunito** — OFL, mirip font Genshin) dan
