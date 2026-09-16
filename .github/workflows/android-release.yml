@@ -198,9 +198,11 @@ jobs:
         with:
           unityVersion: ${{ env.UNITY_VERSION }}
           targetPlatform: Android
-          androidBuildAppBundle: false      # APK, bukan .aab (.aab untuk Play Store)
+          # v6 mengganti androidBuildAppBundle → androidExportType.
+          androidExportType: androidPackage
           androidTargetSdkVersion: AndroidApiLevelAuto
           allowDirtyBuild: true             # folder VRM hasil unduhan membuat tree kotor
+          enableBuildRetry: true            # seat Personal kadang gagal di percobaan pertama
           customParameters: >-
             -scriptingBackend IL2CPP
             -androidBuildSystem Gradle
