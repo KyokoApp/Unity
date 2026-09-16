@@ -9,7 +9,7 @@ namespace UnityEngine
     public struct Vector2 { public float x,y; public Vector2(float x,float y){this.x=x;this.y=y;}
         public float magnitude=>0f; public Vector2 normalized=>this; public static Vector2 zero=>default;
         public static Vector2 operator-(Vector2 a,Vector2 b)=>default; public static Vector2 operator+(Vector2 a,Vector2 b)=>default;
-        public static Vector2 operator*(Vector2 a,float k)=>default; public static Vector2 operator*(float k,Vector2 a)=>default;
+        public static Vector2 operator*(Vector2 a,float k)=>default; public static Vector2 operator*(float k,Vector2 a)=>default; public static Vector2 operator/(Vector2 a,float k)=>default;
         public static implicit operator Vector3(Vector2 v)=>default; }
     public struct Vector3 { public float x,y,z; public Vector3(float x,float y,float z){this.x=x;this.y=y;this.z=z;}
         public static Vector3 forward=>default; public static Vector3 right=>default; public static Vector3 up=>default;
@@ -125,7 +125,7 @@ namespace UnityEngine
     public enum HumanBodyBones { Hips,Spine,Chest,Neck,Head,LeftUpperLeg,LeftLowerLeg,LeftFoot,LeftToes,
         RightUpperLeg,RightLowerLeg,RightFoot,RightToes,LeftUpperArm,LeftLowerArm,LeftHand,
         RightUpperArm,RightLowerArm,RightHand,LastBone }
-    public class Texture : Object { public int width=>0; public int height=>0; }
+    public class Texture : Object { public int width=>0; public int height=>0; public FilterMode filterMode; }
     public class Texture2D : Texture { public Texture2D(int w,int h,TextureFormat f,bool mip){}
         public TextureWrapMode wrapMode; public void SetPixels32(Color32[] c){} public void Apply(bool a,bool b){}
         public void Apply(){} public void ReadPixels(Rect r,int x,int y){} public byte[] EncodeToPNG()=>null; }
@@ -191,6 +191,8 @@ namespace UnityEngine
         public Rect rect; }
     public static class RectTransformUtility { public static bool ScreenPointToLocalPointInRectangle(RectTransform rect, Vector2 screenPoint, Camera cam, out Vector2 localPoint){localPoint=default;return false;} }
     public enum FontStyle { Normal, Bold, Italic, BoldAndItalic }
+    public enum HorizontalWrapMode { Wrap, Overflow }
+    public enum VerticalWrapMode { Truncate, Overflow }
     public class Font : Object {}
     public class Sprite : Object { public Rect rect; public static Sprite Create(Texture2D texture, Rect rect, Vector2 pivot)=>null; }
     public class MaterialPropertyBlock { public void SetColor(int nameID, Color value){} public void SetColor(string name, Color value){}
@@ -200,19 +202,22 @@ namespace UnityEngine
 namespace UnityEngine.UI
 {
     public enum RenderMode { ScreenSpaceOverlay, ScreenSpaceCamera, WorldSpace }
-    public enum ScaleMode { ConstantPixelSize, ScaleWithScreenSize, ConstantPhysicalSize }
+    /* ScaleMode tinggal di dalam CanvasScaler, seperti Unity asli. */
     public class Canvas : Behaviour { public RenderMode renderMode; public int sortingOrder; public float scaleFactor; public bool overrideSorting; }
-    public class CanvasScaler : Behaviour { public ScaleMode uiScaleMode; public Vector2 referenceResolution; public float matchWidthOrHeight; }
+    public class CanvasScaler : Behaviour { public enum ScaleMode { ConstantPixelSize, ScaleWithScreenSize, ConstantPhysicalSize }
+        public ScaleMode uiScaleMode; public Vector2 referenceResolution; public float matchWidthOrHeight; public float scaleFactor; }
     public class Graphic : Behaviour { public Color color; public Material material; public bool raycastTarget; }
     public class MaskableGraphic : Graphic {}
     public class Image : MaskableGraphic { public Sprite sprite; public Type type; public FillMethod fillMethod;
         public float fillAmount; public bool fillClockwise; public int fillOrigin;
         public enum Type { Simple, Sliced, Tiled, Filled }
         public enum FillMethod { Horizontal, Vertical, Radial90, Radial180, Radial360 } }
-    public class Text : MaskableGraphic { public string text; public Font font; public int fontSize; public FontStyle fontStyle; public TextAnchor alignment; }
+    public class Text : MaskableGraphic { public string text; public Font font; public int fontSize; public FontStyle fontStyle; public TextAnchor alignment;
+        public HorizontalWrapMode horizontalOverflow; public VerticalWrapMode verticalOverflow; }
     public class Button : Behaviour { public ButtonClickedEvent onClick = new ButtonClickedEvent();
         public class ButtonClickedEvent : UnityEngine.Events.UnityEvent {} }
     public class CanvasGroup : Behaviour { public float alpha; public bool interactable; public bool blocksRaycasts; }
+    public class GraphicRaycaster : Behaviour {}
 }
 namespace UnityEngine.Events
 {
