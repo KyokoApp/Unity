@@ -1,9 +1,9 @@
 # Model karakter — status lisensi & catatan impor
 
-> **File `.vrm` di folder ini sengaja di-`.gitignore`.** Repo `KyokoApp/Unity`
-> statusnya **publik**, dan model ini menandai dirinya
-> `licenseName: Redistribution_Prohibited`. Meng-unggahnya ke repo publik =
-> redistribusi. Jadi file-nya hanya hidup di disk lokal, tidak pernah di-commit.
+> **File `.vrm` di folder ini sengaja di-`.gitignore`.** Model ini menandai
+> dirinya `licenseName: Redistribution_Prohibited`, jadi file-nya hanya
+> hidup di disk lokal / Drive build, tidak pernah di-commit. (Repo ini
+> sekarang privat, tapi aturan gitignore tetap dipertahankan.)
 >
 > Sudah diverifikasi:
 > ```
