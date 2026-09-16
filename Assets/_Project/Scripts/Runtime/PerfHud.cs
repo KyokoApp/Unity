@@ -132,6 +132,13 @@ namespace RPG.Runtime
             }
         }
 
+        [Tooltip("Probe render dijalankan tiap sekian detik (bukan tiap frame): murah tapi tidak gratis, dan angkanya untuk dibaca manusia.")]
+        public float ProbeInterval = 1.5f;
+
+        float _nextProbe;
+        string _probe = "";
+        bool  _verdictBad;
+
         GUIStyle Style
         {
             get
@@ -179,31 +186,176 @@ namespace RPG.Runtime
                total di HP, dan tidak ada cara melihat logcat tanpa PC.
                Dengan angka ini, satu screenshot cukup untuk membedakan
                "kamera terkubur di dalam tanah", "tidak ada lampu", dan
-               "tidak ada langit". */
+               "tidak ada langit".
+
+               v0.2.0-cel-fix18: ditambah PROBE (di bawah) dan kotak latar.
+               Kotaknya bukan hiasan: SettingsPanel menggambar tombolnya di
+               Rect(12,12,110,44) -- tepat di atas blok teks ini -- sehingga
+               keduanya bertumpuk dan tidak ada satu pun baris yang bisa
+               dibaca. Laporan "jejak" di HP adalah itu, bukan motion blur:
+               angka `terrain:` dan `spike:` di screenshot v0.2.0-cel-fix17
+               literally tidak terbaca, jadi yang kita butuhkan adalah HUD
+               yang bisa dibaca, bukan HUD yang lebih banyak. */
             var cam = Camera.main;
             if (cam == null)
             {
-                _sb.Append("DIAG: MainCamera TIDAK ADA -- tag MainCamera belum diset?\n");
+                _sb.Append("kamera : MainCamera TIDAK ADA -- tag MainCamera belum diset?\n");
             }
             else
             {
                 var cp = cam.transform.position;
-                _sb.Append($"DIAG cam : ({cp.x:F1}; {cp.y:F1}; {cp.z:F1}) clear={cam.clearFlags}\n");
+                _sb.Append($"kamera : ({cp.x:F1}; {cp.y:F1}; {cp.z:F1}) clear={cam.clearFlags} aktif={cam.cameraActive}\n");
                 if (Streamer != null && Streamer.Target != null)
                 {
                     var tp = Streamer.Target.position;
-                    _sb.Append($"DIAG tgt : ({tp.x:F1}; {tp.y:F1}; {tp.z:F1})\n");
+                    _sb.Append($"target : ({tp.x:F1}; {tp.y:F1}; {tp.z:F1})\n");
                 }
                 var h  = (float)WorldData.TerrainH(cp.x, cp.z);
                 var dy = cp.y - h;
-                _sb.Append($"DIAG tnh : tinggi={h:F1}, cam.y-tinggi={dy:F1}" +
+                _sb.Append($"tanah  : tinggi={h:F1}, cam.y-tinggi={dy:F1}" +
                            (dy < 0f ? "  <-- KAMERA DI DALAM TANAH" : "") + "\n");
-                _sb.Append("DIAG lain: lampu=" +
+                _sb.Append("lainnya: lampu=" +
                            (Object.FindFirstObjectByType<Light>() != null ? "ada" : "TIDAK ADA") +
                            $", ambient={RenderSettings.ambientMode}, fog={(RenderSettings.fog ? "ya" : "tidak")}\n");
             }
 
-            GUI.Label(new Rect(12, 12, Screen.width - 24, Screen.height), _sb.ToString(), Style);
+            AppendProbe();
+
+            /* Kotak latar digambar dulu, lalu teksnya; tingginya dihitung dari
+               jumlah baris yang benar-benar tersusun, bukan perkiraan tetap.
+               Dimulai di y=56 supaya tidak bertumpuk dengan tombol Setting. */
+            var lines = 1;
+            for (var i = 0; i < _sb.Length; i++) if (_sb[i] == '\n') lines++;
+            var w = Mathf.Min(Screen.width - 24, 640);
+            var hgt = 8 + lines * (Style.fontSize + 4);
+            var prev = GUI.color;
+            GUI.color = Color.white;
+            GUI.DrawTexture(new Rect(8, 56, w + 12, hgt), Backdrop);
+            GUI.color = _verdictBad ? new Color(1f, 0.56f, 0.5f) : Color.white;
+            GUI.Label(new Rect(14, 60, w, hgt), _sb.ToString(), Style);
+            GUI.color = prev;
+        }
+
+        /* ── PROBE RENDER ───────────────────────────────────────────────
+           Empat dugaan "dunia hitam" yang selama ini cuma bisa dituduh,
+           dan tiap tuduhan koszt satu build Unity ~1 jam:
+
+             rp      : tidak ada RenderPipeline di player -> tidak ada yang
+                       menggambar, backbuffer tidak di-clear -> teks lama
+                       tertinggal. Mencurigakan karena ProjectSettings/
+                       GraphicsSettings.asset TIDAK ada di repo: pipeline
+                       dipasang editor script SAAT build.
+             shader  : Shader.Find() di player hanya mengenal shader yang ikut
+                       dibungkus. NULL di sini = kepingnya di-strip.
+             materi  : renderer ada tapi materialnya NULL -> di URP tidak ada
+                       "magenta" untuk ini; hasilnya diam-diam tidak tergambar.
+             chunk   : 0 chunk = worker terrain tidak pernah mengunggah Mesh.
+
+           Semua dibungkus try/catch: HUD yang melempar akan mengubah diagnosis
+           menjadi bencana, dan itu pernah terjadi di tempat lain di proyek ini. */
+        void AppendProbe()
+        {
+            if (Time.unscaledTime >= _nextProbe)
+            {
+                _nextProbe = Time.unscaledTime + ProbeInterval;
+                _probe = BuildProbe();
+            }
+            _sb.Append(_probe);
+        }
+
+        string BuildProbe()
+        {
+            var sb = new StringBuilder(420);
+            try
+            {
+                var rp  = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline;
+                var rpq = QualitySettings.renderPipeline;
+                _verdictBad = rp == null && rpq == null;
+                sb.Append("probe rp     : ")
+                  .Append(rp != null ? rp.name : rpq != null ? "hanya-di-quality: " + rpq.name : "TIDAK ADA")
+                  .Append(" | kualitas ").Append(QualitySettings.GetQualityLevel())
+                  .Append(" | dev ").Append(SystemInfo.graphicsDeviceType)
+                  .Append(" shaderLvl ").Append(SystemInfo.graphicsShaderLevel).Append('\n');
+
+                sb.Append("probe shader : ")
+                  .Append(HasShader("Aurelia/Terrain")).Append(' ')
+                  .Append(HasShader("Aurelia/TerrainCel")).Append(' ')
+                  .Append(HasShader("Aurelia/GrassCel")).Append(' ')
+                  .Append(HasShader("Aurelia/Water")).Append(' ')
+                  .Append(HasShader("Aurelia/CharCel")).Append('\n');
+
+                var chunk = Streamer != null ? Streamer.ActiveChunks : -1;
+                sb.Append("probe terrain: chunk=").Append(chunk)
+                  .Append(" antre=").Append(Streamer != null ? Streamer.QueuedChunks : -1)
+                  .Append(" err=").Append(Streamer != null ? Streamer.BuildErrors : -1)
+                  .Append(" materi=").Append(Streamer != null && Streamer.TerrainMaterial != null
+                                                ? Streamer.TerrainMaterial.name : "NULL").Append('\n');
+                if (Streamer != null && Streamer.LastError != null)
+                    sb.Append("   err: ").Append(OneLine(Streamer.LastError)).Append('\n');
+
+                sb.Append("probe rumput: ")
+                  .Append(Grass != null ? Grass.InitState : "GrassField tidak ada")
+                  .Append(" aktif=").Append(Grass != null ? Grass.ActiveClumps : -1)
+                  .Append(" materi=").Append(Grass != null && Grass.GrassMaterial != null
+                                              ? Grass.GrassMaterial.name : "NULL").Append('\n');
+
+                var rs = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+                var tot = 0; var aktif = 0; var tanpaMat = 0;
+                for (var i = 0; i < rs.Length; i++)
+                {
+                    if (rs[i] == null) continue;
+                    tot++;
+                    if (rs[i].enabled) aktif++;
+                    if (rs[i].sharedMaterial == null) tanpaMat++;
+                }
+                sb.Append("probe render : ").Append(tot).Append(" renderer, ").Append(aktif)
+                  .Append(" aktif, ").Append(tanpaMat).Append(" tanpa materi\n");
+
+                if (rp == null && rpq == null)
+                    sb.Append("=> PLAYER TANPA RENDER PIPELINE. Tidak ada yang menggambar apa pun dan backbuffer tidak pernah di-clear (itulah \"jejak\").\n");
+                else if (chunk == 0)
+                    sb.Append("=> pipeline ADA tapi 0 chunk terunggah -> lihat \"err=\" di atas; kalau err=0 berarti worker tidak pernah diberi pekerjaan.\n");
+                else if (tot > 0 && tanpaMat == tot)
+                    sb.Append("=> SEMUA renderer tanpa materi -> material .mat tidak ikut terbungkus build.\n");
+                else if (chunk > 0 && tot > 0 && tanpaMat < tot)
+                    sb.Append("=> pipeline ADA, chunk ADA, materi ADA. Kalau masih hitam, yang salah adalah SHADER-nya saat digambar (varian/keyword/target), bukan build-nya.\n");
+                else
+                    sb.Append("=> belum conclusif; screenshot ini sudah memangkas setengah kemungkinan.\n");
+            }
+            catch (System.Exception e)
+            {
+                _verdictBad = true;
+                sb.Append("probe GAGAL: ").Append(e.GetType().Name).Append(' ').Append(e.Message).Append('\n');
+            }
+            return sb.ToString();
+        }
+
+        static string HasShader(string shaderName)
+        {
+            var cut = shaderName.IndexOf('/');
+            var shortName = cut >= 0 ? shaderName.Substring(cut + 1) : shaderName;
+            return shortName + (Shader.Find(shaderName) == null ? "=NULL" : "=ada");
+        }
+
+        static string OneLine(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Replace('\n', ' ').Replace('\r', ' ');
+        }
+
+        static Texture2D _backdrop;
+        static Texture2D Backdrop
+        {
+            get
+            {
+                if (_backdrop == null)
+                {
+                    _backdrop = new Texture2D(1, 1);
+                    _backdrop.SetPixels32(new[] { new Color32(6, 6, 9, 185) });
+                    _backdrop.Apply();
+                }
+                return _backdrop;
+            }
         }
 
         /* Supaya angka ini bisa ditempel ke laporan, bukan cuma dibaca di layar. */

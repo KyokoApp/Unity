@@ -43,7 +43,8 @@ namespace UnityEngine
         public static float Round(float v)=>v;
         public static int Clamp(int v,int a,int b)=>v;  public static int CeilToInt(float v)=>0; public static int FloorToInt(float v)=>0; public static float Lerp(float a,float b,float t)=>0f;}
     public class Object { public string name; public static void Destroy(Object o){} public static void DestroyImmediate(Object o){}
-        public static T FindFirstObjectByType<T>() where T:Object => default; }
+        public static T FindFirstObjectByType<T>() where T:Object => default;
+        public static T[] FindObjectsByType<T>(FindObjectsSortMode s) where T:Object => new T[0]; }
     public class Component : Object { public Transform transform=>null; public GameObject gameObject=>null;
         public T GetComponent<T>()=>default; public T GetComponentInChildren<T>()=>default; public T[] GetComponentsInChildren<T>(bool x)=>null; }
     public class Behaviour : Component { public bool enabled; }
@@ -129,6 +130,7 @@ namespace UnityEngine
     public enum TouchPhase { Began, Moved, Stationary, Ended, Canceled }
     public struct Touch { public int fingerId; public Vector2 position; public TouchPhase phase; }
     public class Camera : Behaviour { public CameraClearFlags clearFlags; public float nearClipPlane, farClipPlane, fieldOfView;
+        public int cullingMask; public bool cameraActive=>false;
         public Color backgroundColor; public static Camera main=>null;
         public RenderTexture targetTexture; public void Render(){}
         public void AddCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveCommandBuffer(Rendering.CameraEvent e,Rendering.CommandBuffer c){} public void RemoveAllCommandBuffers(){} }

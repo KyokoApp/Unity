@@ -100,6 +100,15 @@ namespace RPG.Runtime
         public int ActiveChunks { get; private set; }
         public int QueuedChunks => _pending.Count + _inFlight.Count;
         public int PooledMeshes => _pool.Count;
+
+        /* Build yang gagal di thread TIDAK mengubah DiscardedBuilds, jadi
+           "chunk 0" di HUD bisa berarti dua hal yang sangat berbeda: worker
+           tidak pernah menghasilkan apa pun, atau menghasilkan lalu membuang
+           error. Tanpa pemisah ini keduanya identik di layar -- dan hanya yang
+           kedua yang ada kaitannya dengan crash/exception (lihat v0.2.0-cel-fix17,
+           di mana angka terrain tidak terbaca karena teks HUD bertumpuk). */
+        public int BuildErrors { get; private set; }
+        public string LastError { get; private set; }
         public long TotalTriangles { get; private set; }
         public long TotalVertices { get; private set; }
         public float LastBuildMs { get; private set; }
@@ -319,6 +328,8 @@ namespace RPG.Runtime
 
                 if (d.Error != null)
                 {
+                    BuildErrors++;
+                    LastError = d.Error;
                     Debug.LogError($"[TerrainChunkStreamer] build chunk gagal: {d.Error}");
                     continue;
                 }

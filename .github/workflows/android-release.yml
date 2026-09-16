@@ -83,6 +83,10 @@ jobs:
   build:
     name: Build APK (ARM64, IL2CPP)
     runs-on: ubuntu-latest
+    # Hanya untuk langkah 'Simpan aset build ke branch' (di bawah). Tidak ada
+    # langkah lain yang menulis ke repo.
+    permissions:
+      contents: write
     timeout-minutes: 120
     outputs:
       # "vrmDipakai" = karakter BENAR-BENAR ada di APK (prefab terbentuk),
@@ -562,6 +566,58 @@ jobs:
             echo "::error::$1 $safe"
           }
 
+          note() {  # sama, tapi ::notice:: -- untuk baris yang informatif
+            safe=$(printf '%s' "$2" | tr -d '\r\n' | cut -c1-460 | sed -e 's/::/-:/g' -e 's/%/25/g')
+            echo "::notice::$1 $safe"
+          }
+
+          # --- PROBE BUILD: apa yang BENAR-BENAR masuk ke player ----------
+          # Dua hal tidak tercatat di log Unity, dan keduanya adalah kandidat
+          # "dunia hitam tapi HUD hidup":
+          #   (a) apakah render pipeline sempat dicatat di ProjectSettings SEBELUM
+          #       player dibangun -- berkas GraphicsSettings.asset TIDAK ada di repo,
+          #       jadi ia baru diciptakan editor script di tengah build;
+          #   (b) apakah referensi aset di scene hasil build menunjuk ke berkas yang
+          #       ada. Scene, .mat, dan URP asset semuanya dibuat DI RUNNER dan tidak
+          #       pernah di-commit -> guid yang menggantung berarti materi NULL di
+          #       runtime, yang di URP TIDAK menampilkan magenta, hanya tidak
+          #       menggambar apa pun.
+          # Dipisahkan ke berkas sendiri supaya bisa dibaca utuh.
+          PROBE=logs/probe-build.txt
+          {
+            for f in GraphicsSettings QualitySettings TagManager; do
+              P="ProjectSettings/$f.asset"
+              if [ -f "$P" ]; then
+                echo "probe settings: $f ADA ($(stat -c%s "$P") byte)"
+                grep -E "m_CustomRenderPipeline|renderPipeline|  name:|m_Shadows|m_Fog" "$P" | head -6 | sed 's/^/    /'
+              else
+                echo "probe settings: $f TIDAK ADA -> player pakai bawaan Unity (tanpa URP!)"
+              fi
+            done
+            echo "probe aset: $(find Assets \( -name '*.mat' -o -name '*Pipeline*.asset' -o -name '*Renderer*.asset' \) 2>/dev/null | tr '\n' ' ')"
+            SC=Assets/_Project/Scenes/Tahap3.unity
+            if [ -f "$SC" ]; then
+              grep -rhoE 'guid: [0-9a-f]{32}' --include='*.meta' Assets Packages Library/PackageCache 2>/dev/null \
+                | awk '{print $2}' | sort -u > /tmp/have.txt
+              grep -oE 'guid: [0-9a-f]{32}' "$SC" | awk '{print $2}' | sort -u > /tmp/want.txt
+              TOT=$(wc -l < /tmp/want.txt); DAM=0
+              while read -r g; do
+                grep -qs -- "$g" /tmp/have.txt || { DAM=$((DAM+1)); echo "    DAMLING $g"; }
+              done < /tmp/want.txt
+              echo "probe scene: $TOT guid dirujuk, $DAM menggantung"
+            else
+              echo "probe scene: $SC TIDAK ADA di workspace"
+            fi
+          } > "$PROBE" 2>&1
+          sed 's/^/  /' "$PROBE"
+          cp "$PROBE" logs/ 2>/dev/null
+          while IFS= read -r l; do
+            case "$l" in
+              *"TIDAK ADA"*|*"DAMLING"*|*"probe scene:"*|*"probe aset:"*) emit "buildprobe:" "$l";;
+              *"probe settings:"*) note "buildprobe:" "$l";;
+            esac
+          done < "$PROBE"
+
           TAP=Logs/AureliaUnity.log
           if [ -f "$TAP" ]; then
             echo "=== kran log Unity: $(stat -c%s "$TAP") byte, $(wc -l < "$TAP") baris ==="
@@ -844,6 +900,77 @@ jobs:
           unzip -l "$APK" | grep -c "META-INF" | xargs echo "entri META-INF (v1, boleh 0):"
           stat -c "%n %s byte" "$APK"
           exit ${KODE:-0}
+
+      # ------------------------------------------------------------
+      # Self-seeding: kembalikan aset yang DICIPTAKAN RUNNER ke branch.
+      #
+      # Scene Tahap3, material .mat, URP asset, dan ProjectSettings/
+      # {Graphics,Quality,TagManager}.asset semuanya dibuat oleh editor script
+      # DI TENGAH build dan tidak pernah masuk git. Dua akibat:
+      #   1. tiap build mengulang pembuatannya, dan kalau salah satu langkah
+      #      gagal diam-diam, APK-nya bolong diam-diam (materi NULL tidak
+      #      menampilkan magenta di URP -- hanya tidak menggambar apa pun);
+      #   2. setelah build, tidak ada yang bisa DIPERIKSA. Pertanyaan "apakah
+      #      m_CustomRenderPipeline ikut ke player?" cuma bisa dijawab dengan
+      #      membangun lagi -- satu jam lisensi per dugaan.
+      # Disimpan kembali -> GUID material/URP asset menjadi tetap (referensi
+      # scene tidak bisa menggantung), build berikutnya mulai dari state yang
+      # sama, dan berkas-berkas itu bisa dibaca siapa saja.
+      # Yang TIDAK pernah ikut: Library/, Temp/, build/, Logs/, shots/,
+      # keystore/ci-signing.txt, dan ProjectSettings/ProjectSettings.asset
+      # (itu dinaikkan langkah versionCode; menyimpannya = balap versi).
+      # ------------------------------------------------------------
+      - name: Simpan aset build ke branch
+        if: always() && github.event_name == 'push'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          cd "$GITHUB_WORKSPACE"
+          BR="${GITHUB_REF_NAME}"
+          CAND="ProjectSettings/GraphicsSettings.asset ProjectSettings/QualitySettings.asset \
+                ProjectSettings/TagManager.asset Assets/_Project/Scenes/Tahap3.unity \
+                $(find Assets \( -name '*.mat' -o -name '*Pipeline*.asset' -o -name '*Renderer*.asset' \
+                   -o -name '*GlobalSettings*.asset' \) 2>/dev/null | tr '\n' ' ')"
+          FILES=""
+          for f in $CAND; do
+            [ -f "$f" ] || continue
+            FILES="$FILES $f"
+            [ -f "$f.meta" ] && FILES="$FILES $f.meta"
+          done
+          if [ -z "$FILES" ]; then echo "tidak ada aset build untuk disimpan"; exit 0; fi
+          echo "calon: $FILES"
+          git config user.name "aurelia-ci"
+          git config user.email "ci@kyoko.invalid"
+          # -f: sebagian path ini mungkin dicakup .gitignore template Unity.
+          git add -f $FILES
+          if git diff --cached --quiet; then echo "aset build sudah identik dengan repo"; exit 0; fi
+          # Pesan commit disusun dengan printf, BUKAN string multi-baris di dalam
+          # blok YAML: baris yang mulai di kolom 0 keluar dari blok `run: |` dan
+          # merusak seluruh workflow ( ScannerError di GH Actions, bukan di git).
+          printf '%s\n' \
+            "ci($BR): simpan aset yang dibuat runner" \
+            "" \
+            "ProjectSettings + URP asset + material + scene, semuanya diciptakan editor" \
+            "script di tengah build ${{ github.run_number }} dan tidak pernah masuk git." \
+            "Dikembalikan supaya (a) GUID material/asset tetap, jadi referensi scene tidak" \
+            "bisa menggantung diam-diam; (b) build berikutnya mulai dari state yang sama;" \
+            "(c) konfigurasi render pipeline player bisa DIBACA, bukan didugakan." \
+            "" \
+            "Co-Authored-By: Claude <noreply@anthropic.com>" > /tmp/seedmsg.txt
+          git commit -q -F /tmp/seedmsg.txt || { echo "::warning::commit aset build gagal"; exit 0; }
+          SHA=$(git rev-parse --short HEAD)
+          for i in 1 2 3; do
+            if git push -q "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" \
+                 "HEAD:refs/heads/${BR}" 2>/tmp/push.err; then
+              echo "::notice::aset build ($SHA) disimpan ke $BR"
+              exit 0
+            fi
+            echo "push percobaan $i gagal: $(tr '\n' ' ' < /tmp/push.err | cut -c1-200)"
+            sleep $((i * 10))
+          done
+          echo "::warning::aset build tidak bisa di-push (izin token? proteksi branch?) -- build tetap sah, tapi self-seeding tidak terjadi"
 
       # Artifact hanya bisa diunduh orang yang punya akses repo.
       # Ini jalur unduh yang AMAN walau repo masih publik.
