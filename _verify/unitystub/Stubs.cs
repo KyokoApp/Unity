@@ -60,7 +60,12 @@ namespace UnityEngine
         // di stub, supaya 'SetActive tidak ada' dikira bug kode padahal bug harness.
         public void SetActive(bool v){} public bool activeSelf=>true; public bool activeInHierarchy=>true;
         public static GameObject CreatePrimitive(PrimitiveType t)=>null; }
-    public class Renderer : Component { public Material sharedMaterial; public Material[] sharedMaterials; }
+    public class Renderer : Component { public Material sharedMaterial; public Material[] sharedMaterials;
+        // Renderer.enabled dan Renderer.isVisible memang milik Renderer sendiri
+        // (bukan Behaviour) -- keduanya terdokumentasi di Unity 6.5. isVisible
+        // adalah satu-satunya jalan bertanya "objek ini ditolak kamera atau
+        // memang tidak digambar" dari dalam player.
+        public bool enabled; public bool isVisible=>false; }
     public class MeshRenderer : Renderer { public bool receiveShadows; public UnityEngine.Rendering.ShadowCastingMode shadowCastingMode; }
     public class SkinnedMeshRenderer : Renderer { public Transform[] bones; public Mesh sharedMesh; }
     public class Mesh : Object { public int vertexCount=>0; public int subMeshCount=>0; public int blendShapeCount=>0;
@@ -100,6 +105,7 @@ namespace UnityEngine
         public static void DrawMeshInstanced(Mesh m,int sub,Material mat,
             Matrix4x4[] matrices,int count){} }
     public static class Time { public static float deltaTime=>0f; public static float unscaledDeltaTime=>0f;
+        public static float unscaledTime=>0f;
         public static float time=>0f; public static float realtimeSinceStartup=>0f; public static int frameCount=>0; public static float timeScale=1f; }
     public enum ScreenOrientation { Portrait, PortraitUpsideDown, LandscapeLeft, LandscapeRight, AutoRotation }
     public static class Screen { public static int width=>0; public static int height=>0; public static ScreenOrientation orientation; }

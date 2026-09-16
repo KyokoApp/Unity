@@ -300,16 +300,18 @@ namespace RPG.Runtime
                                               ? Grass.GrassMaterial.name : "NULL").Append('\n');
 
                 var rs = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-                var tot = 0; var aktif = 0; var tanpaMat = 0;
+                var tot = 0; var aktif = 0; var tanpaMat = 0; var terlihat = 0;
                 for (var i = 0; i < rs.Length; i++)
                 {
                     if (rs[i] == null) continue;
                     tot++;
                     if (rs[i].enabled) aktif++;
                     if (rs[i].sharedMaterial == null) tanpaMat++;
+                    if (rs[i].isVisible) terlihat++;
                 }
                 sb.Append("probe render : ").Append(tot).Append(" renderer, ").Append(aktif)
-                  .Append(" aktif, ").Append(tanpaMat).Append(" tanpa materi\n");
+                  .Append(" aktif, ").Append(tanpaMat).Append(" tanpa materi, ").Append(terlihat)
+                  .Append(" terlihat kamera\n");
 
                 if (rp == null && rpq == null)
                     sb.Append("=> PLAYER TANPA RENDER PIPELINE. Tidak ada yang menggambar apa pun dan backbuffer tidak pernah di-clear (itulah \"jejak\").\n");
@@ -317,8 +319,10 @@ namespace RPG.Runtime
                     sb.Append("=> pipeline ADA tapi 0 chunk terunggah -> lihat \"err=\" di atas; kalau err=0 berarti worker tidak pernah diberi pekerjaan.\n");
                 else if (tot > 0 && tanpaMat == tot)
                     sb.Append("=> SEMUA renderer tanpa materi -> material .mat tidak ikut terbungkus build.\n");
+                else if (chunk > 0 && terlihat == 0)
+                    sb.Append("=> chunk ADA tapi NOL terlihat kamera -> yang salah adalah culling: cullingMask, near/far clip, atau posisi. Bukan materi, bukan shader.\n");
                 else if (chunk > 0 && tot > 0 && tanpaMat < tot)
-                    sb.Append("=> pipeline ADA, chunk ADA, materi ADA. Kalau masih hitam, yang salah adalah SHADER-nya saat digambar (varian/keyword/target), bukan build-nya.\n");
+                    sb.Append("=> pipeline ADA, chunk ADA, materi ADA, ada yang terlihat. Kalau masih hitam, yang salah adalah SHADER-nya saat digambar (varian/keyword/target), bukan build-nya.\n");
                 else
                     sb.Append("=> belum conclusif; screenshot ini sudah memangkas setengah kemungkinan.\n");
             }
