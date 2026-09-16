@@ -72,7 +72,7 @@ namespace RPG.Runtime
             ApplyUrp(r);
             ApplyFog(r);
             ApplyTerrain(r);
-            ApplyGrass(r);
+            ApplyGrass(r, settings);
             ApplyPost(r);
             ApplyShadows(r);
             ApplyOutline(r);
@@ -125,14 +125,14 @@ namespace RPG.Runtime
                 streamer.SetQuality(quads, radius);
         }
 
-        static void ApplyGrass(GfxResolver.Resolved r)
+        static void ApplyGrass(GfxResolver.Resolved r, GameSettings s)
         {
             var grass = FindFirstObjectByType<GrassField>();
             if (grass == null) return;
             grass.enabled = r.GrassEnabled;
             if (r.GrassEnabled)
             {
-                grass.Radius = 18f + r.Grass * 5f;   // 23/28/33 m
+                grass.Radius = 18f + s.Gfx.Grass * 5f;   // 23/28/33 m
                 grass.RefreshSettings();
             }
         }

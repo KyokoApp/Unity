@@ -7,7 +7,7 @@ using System.Collections.Generic;
 namespace UnityEngine
 {
     public struct Vector2 { public float x,y; public Vector2(float x,float y){this.x=x;this.y=y;}
-        public float magnitude=>0f; public Vector2 normalized=>this; public static Vector2 zero=>default;
+        public float magnitude=>0f; public Vector2 normalized=>this; public static Vector2 zero=>default; public static Vector2 one=>default;
         public static Vector2 operator-(Vector2 a,Vector2 b)=>default; public static Vector2 operator+(Vector2 a,Vector2 b)=>default;
         public static Vector2 operator*(Vector2 a,float k)=>default; public static Vector2 operator*(float k,Vector2 a)=>default; public static Vector2 operator/(Vector2 a,float k)=>default;
         public static implicit operator Vector3(Vector2 v)=>default; }
@@ -39,7 +39,7 @@ namespace UnityEngine
         public static float DeltaAngle(float a,float b)=>0f; public static int RoundToInt(float v)=>0; public static float SmoothStep(float a,float b,float t)=>0f; public static float Exp(float v)=>0f;
         public static float Atan2(float y,float x)=>0f;
         public static int Max(int a,int b)=>a; public static int Min(int a,int b)=>a;
-        public static float Round(float v)=>v;
+        public static float Round(float v)=>v; public static float Sign(float v)=>0f;
         /* Unity punya overload terpisah untuk int dan float. Tanpa yang int,
            Mathf.Clamp(x, 8, 64) di sini mengembalikan float dan menyembunyikan
            perbedaan tipe yang Unity asli tolak. */
@@ -196,7 +196,8 @@ namespace UnityEngine
     public class Font : Object {}
     public class Sprite : Object { public Rect rect; public static Sprite Create(Texture2D texture, Rect rect, Vector2 pivot)=>null; }
     public class MaterialPropertyBlock { public void SetColor(int nameID, Color value){} public void SetColor(string name, Color value){}
-        public void SetFloat(int nameID, float value){} public void SetFloat(string name, float value){} public void Clear(){} }
+        public void SetFloat(int nameID, float value){} public void SetFloat(string name, float value){}
+        public void SetVectorArray(int nameID, Vector4[] values){} public void SetVectorArray(string name, Vector4[] values){} public void Clear(){} }
     public class RuntimeAnimatorController : Object {}
 }
 namespace UnityEngine.UI
