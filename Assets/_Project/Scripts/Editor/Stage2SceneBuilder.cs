@@ -439,7 +439,8 @@ namespace RPG.Editor
         {
             var fallback = LoadOrCreateShaderMaterial("AureliaTerrain", "Aurelia/Terrain", notes);
             var rs = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-            var fixed_ = 0, still = 0;
+            var diperbaiki = 0;
+            var masih = 0;
             for (var i = 0; i < rs.Length; i++)
             {
                 var r = rs[i];
@@ -447,9 +448,9 @@ namespace RPG.Editor
                 var mats = r.sharedMaterials;
                 if (mats == null || mats.Length == 0 || (mats.Length == 1 && mats[0] == null))
                 {
-                    if (fallback == null) { still++; continue; }
+                    if (fallback == null) { masih++; continue; }
                     r.sharedMaterial = fallback;
-                    fixed_++;
+                    diperbaiki++;
                 }
             }
             if (fixed_ > 0 || still > 0)
