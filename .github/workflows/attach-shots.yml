@@ -1,16 +1,21 @@
-# Utilitas sekali-pakai: memindahkan PNG dari artifact 'screenshots' sebuah run
-# ke halaman Release, supaya bisa diunduh tanpa akses artifact GitHub Actions.
-# Dipakai untuk run 35082152939 (sandbox tidak bisa menjangkau blob storage).
+# Utilitas: memindahkan PNG dari artifact 'screenshots' sebuah run build
+# ke halaman Release, supaya bisa diunduh tanpa akses artifact Actions.
+# Berjalan otomatis saat file ini di-push (atau manual via workflow_dispatch).
 name: Lampirkan Screenshot ke Release
 on:
   workflow_dispatch:
     inputs:
       run_id:
         description: 'ID run sumber artifact (mis. 35082152939)'
-        required: true
+        required: false
+        default: '35082152939'
       tag:
         description: 'Tag release tujuan (mis. v0.3.0-tahap5b)'
-        required: true
+        required: false
+        default: 'v0.3.0-tahap5b'
+  push:
+    branches: ['arena/01a0a964-unity']
+    paths: ['.github/workflows/attach-shots.yml']
 jobs:
   attach:
     runs-on: ubuntu-latest
@@ -18,14 +23,21 @@ jobs:
       actions: read
       contents: write
     steps:
+      - id: cfg
+        env:
+          IN_RUN: ${{ inputs.run_id }}
+          IN_TAG: ${{ inputs.tag }}
+        run: |
+          echo "run_id=${IN_RUN:-35082152939}" >> "$GITHUB_OUTPUT"
+          echo "tag=${IN_TAG:-v0.3.0-tahap5b}" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           name: screenshots
-          run-id: ${{ inputs.run_id }}
+          run-id: ${{ steps.cfg.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: shots
       - run: ls -la shots/
       - name: Unggah PNG ke Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ inputs.tag }}" shots/*.png --clobber
+        run: gh release upload "${{ steps.cfg.outputs.tag }}" shots/*.png --clobber
