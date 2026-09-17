@@ -1,4 +1,4 @@
-name: ci-screenshot
+name: ci-screenshot  # v3 script-fix
 
 ## ==============================================================
 ## CI SCREENSHOT — menjalankan game di runner (xvfb + llvmpipe),
