@@ -29,7 +29,7 @@ class _Glyph:
 	var scale01 := 0.82
 
 	func _draw() -> void:
-		var s: float = min(size.x, size.y) * scale01
+		var s: float = minf(size.x, size.y) * scale01
 		var ox: float = (size.x - s) * 0.5
 		var oy: float = (size.y - s) * 0.5
 		var p := func(x: float, y: float) -> Vector2:
@@ -48,7 +48,7 @@ class _Glyph:
 
 	## Pedang diagonal: bilah panjang, gagang emas, garis pelindung.
 	func _sword(p: Callable) -> void:
-		var lw := 0.07 * min(size.x, size.y) * scale01
+		var lw := 0.07 * minf(size.x, size.y) * scale01
 		draw_line(p.call(0.30, 0.70), p.call(0.70, 0.30),
 			HudIcons.WHITE, lw, true)
 		# ujung bilah (segitiga kecil)
