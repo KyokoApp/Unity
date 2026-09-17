@@ -51,13 +51,13 @@ signal attack_started(combo: int)
 
 @export_group("Rujukan")
 @export var camera_target: CameraRig
-@export var stick: control_ref
+@export var stick: VirtualJoystick
 @export var rig: CharacterRig
 @export var vfx: AnimeVfx
 
 ## ---- keadaan yang dibaca komponen lain ----
 var velocity: Vector3 = Vector3.ZERO
-var speed:
+var speed: float:
 	get: return Vector2(velocity.x, velocity.z).length()
 var grounded := true
 var phase: float = 0.0

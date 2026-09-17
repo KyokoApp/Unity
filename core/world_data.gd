@@ -93,7 +93,7 @@ static func region_at(x: float, z: float) -> Dictionary:
 	var result: Dictionary = REGIONS[0]
 	var best := INF
 	for r in REGIONS:
-		var d := (x - r["x"]) * (x - r["x"]) + (z - r["z"]) * (z - r["z"])
+		var d: float = (x - r["x"]) * (x - r["x"]) + (z - r["z"]) * (z - r["z"])
 		if d < best:
 			best = d
 			result = r

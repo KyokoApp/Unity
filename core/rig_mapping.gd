@@ -105,7 +105,7 @@ const KNUCKLE_WEIGHT := 1.0
 ## (-swing*.09 dan sign*.035) jadi dilipat penuh ke lengan atas.
 const SHOULDER_WEIGHT := 1.0
 
-static func _get(pose: Dictionary, key: String) -> Vector3:
+static func at_pose(pose: Dictionary, key: String) -> Vector3:
 	return pose.get(key, Vector3.ZERO)
 
 ## Resolve: 25 sendi abstrak -> 23 slot tulang konkret.
@@ -116,11 +116,11 @@ static func _get(pose: Dictionary, key: String) -> Vector3:
 ##   LOWLEG ->  ShinTwistA/B dibagi SHIN_TWIST_SPLIT
 static func resolve(pose: Dictionary) -> Dictionary:
 	var o := {}
-	o[J_HIPS] = _get(pose, "PELVIS")
-	o[J_SPINE] = _get(pose, "BELLY")
-	o[J_CHEST] = _get(pose, "CHEST")
-	o[J_NECK] = _get(pose, "NECK")
-	o[J_HEAD] = _get(pose, "HEAD")
+	o[J_HIPS] = at_pose(pose, "PELVIS")
+	o[J_SPINE] = at_pose(pose, "BELLY")
+	o[J_CHEST] = at_pose(pose, "CHEST")
+	o[J_NECK] = at_pose(pose, "NECK")
+	o[J_HEAD] = at_pose(pose, "HEAD")
 	_apply_side(o, _left_slots(), "L", pose)
 	_apply_side(o, _right_slots(), "R", pose)
 	return o
@@ -140,16 +140,16 @@ static func _right_slots() -> Dictionary:
 			"hand": J_RIGHT_HAND}
 
 static func _apply_side(o: Dictionary, s: Dictionary, side: String, pose: Dictionary) -> void:
-	var thigh := _get(pose, "THIGH" + side)
-	var knee := _get(pose, "KNEE" + side)
-	var lowleg := _get(pose, "LOWLEG" + side)
-	var foot := _get(pose, "FOOT" + side)
-	var toe := _get(pose, "TOE" + side)
-	var shoulder := _get(pose, "SHOULDER" + side)
-	var arm := _get(pose, "ARM" + side)
-	var forearm := _get(pose, "FOREARM" + side)
-	var hand := _get(pose, "HAND" + side)
-	var knuckle := _get(pose, "KNUCLE" + side)
+	var thigh := at_pose(pose, "THIGH" + side)
+	var knee := at_pose(pose, "KNEE" + side)
+	var lowleg := at_pose(pose, "LOWLEG" + side)
+	var foot := at_pose(pose, "FOOT" + side)
+	var toe := at_pose(pose, "TOE" + side)
+	var shoulder := at_pose(pose, "SHOULDER" + side)
+	var arm := at_pose(pose, "ARM" + side)
+	var forearm := at_pose(pose, "FOREARM" + side)
+	var hand := at_pose(pose, "HAND" + side)
+	var knuckle := at_pose(pose, "KNUCLE" + side)
 
 	o[s["upper_leg"]] = thigh
 	o[s["lower_leg"]] = knee
