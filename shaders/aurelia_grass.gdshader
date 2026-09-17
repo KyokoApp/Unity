@@ -87,7 +87,7 @@ void light() {
 	if (LIGHT_IS_DIRECTIONAL) {
 		// Half-Lambert dari matahari: sisi membelakangi tetap terang.
 		float ndl = dot(normalize(NORMAL), LIGHT) * 0.5 + 0.5;
-		vec3 lit = ALBEDO * LIGHT_COLOR * (ndl * 0.75 + 0.25) * SHADOW * ATTENUATION;
+		vec3 lit = ALBEDO * LIGHT_COLOR * (ndl * 0.75 + 0.25) * ATTENUATION;
 
 		// Kabut linear manual (konsisten lintas shader).
 		float depth = -VERTEX.z;

@@ -58,7 +58,7 @@ void fragment() {
 void light() {
 	if (LIGHT_IS_DIRECTIONAL) {
 		vec3 n = normalize(NORMAL);
-		float atten = SHADOW.r * ATTENUATION;
+		float atten = ATTENUATION;
 
 		float ndl = dot(n, LIGHT);
 		float ramp_t = ndl * 0.5 + 0.5;

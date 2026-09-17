@@ -94,8 +94,8 @@ void light() {
 										  0.5 + toon_softness, fract(tx));
 		diffuse = tb / toon_steps;
 
-		// SHADOW (vec3) = pengali bayangan; ATTENUATION = atenuasi jarak.
-		DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * diffuse * SHADOW * ATTENUATION;
+		// ATTENUATION di Godot 4 sudah memuat faktor bayangan.
+		DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * diffuse * ATTENUATION;
 
 		// Kabut linear manual (jarak pandang dari GfxResolver):
 		// DIFFUSE diganti warna kabut (EMISSION sudah dilipat 1-fog di

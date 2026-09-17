@@ -68,7 +68,7 @@ void fragment() {
 void light() {
 	if (LIGHT_IS_DIRECTIONAL) {
 		vec3 n = normalize(NORMAL);
-		float atten = SHADOW.r * ATTENUATION;
+		float atten = ATTENUATION;
 
 		// Half-lambert: sisi membelakangi cahaya jatuh ke tingkat
 		// bayangan dengan lembut, tidak pernah hitam mendadak.

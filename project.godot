@@ -40,6 +40,10 @@ pointing/emulate_touch_from_mouse=false
 
 [rendering]
 
+; light() custom tidak berjalan kalau force-vertex-shading aktif
+; (Arie mobile default true) — paksa false supaya toon shader jalan.
+shading/overrides/force_vertex_shading=false
+
 textures/vram_compression/import_etc2_astc=true
 
 ; Renderer Mobile: satu langkah maju di atas "compatibility" untuk

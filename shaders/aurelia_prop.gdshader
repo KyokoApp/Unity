@@ -49,7 +49,7 @@ void light() {
 										  0.5 + toon_softness, fract(tx));
 		diffuse = tb / toon_steps;
 
-		vec3 lit = ALBEDO * LIGHT_COLOR * diffuse * SHADOW * ATTENUATION;
+		vec3 lit = ALBEDO * LIGHT_COLOR * diffuse * ATTENUATION;
 
 		float depth = -VERTEX.z;
 		float fog = clamp((depth - aurelia_fog_near)
