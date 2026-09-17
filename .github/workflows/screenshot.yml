@@ -6,7 +6,7 @@ name: screenshot
 ## menyimpannya ke branch ci-logs (pola aditif). Kanal ini dipilih
 ## karena sandbox dev tidak punya GPU + melarang binary Godot,
 ## sementara blob artefak Actions tidak bisa diunduh dari sandbox.
-## Jepretan mentah PNG dibaca kembali lewat `git show`. (r5)
+## Jepretan mentah PNG dibaca kembali lewat `git show`. (r6)
 ##
 ## Trigger: manual (setelah merged ke default) — selama branch
 ## dev, edit file ini / tests/screenshot_probe.gd memicu run.
@@ -104,7 +104,14 @@ jobs:
             echo ""
             tail -60 /tmp/shotlog.txt 2>/dev/null || true
           } > screenshot-log.txt
-          git add -A shot1_idle.png shot2_face.png shot3_run.png shot4_attack.png shot5_idle.png screenshot-log.txt
+          set +e
+          for f in shot1_idle shot2_face shot3_run shot4_attack shot5_idle2; do
+            if [ -f "$f.png" ]; then
+              git add "$f.png"
+            fi
+          done
+          set -e
+          git add screenshot-log.txt
           git commit -m "ci: jepretan game run $GITHUB_RUN_ID" \
             || echo "tidak ada perubahan"
           for i in 1 2 3; do
