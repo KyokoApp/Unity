@@ -595,9 +595,11 @@ public partial class MainCharacter : CharacterBody3D
 	protected void UpdateCamera(float deltaFloat)
 	{
 #if GODOT_ANDROID
-			//if (touchInputManager == null) {GD.Print("wtf"); return;}
+		if (touchInputManager != null)
+		{
 			CameraRotationAxis.X = touchInputManager.CameraRotationAxis.X;
-			CameraRotationAxis.Y= touchInputManager.CameraRotationAxis.Y;
+			CameraRotationAxis.Y = touchInputManager.CameraRotationAxis.Y;
+		}
 #endif
 		float targetFov = 75;
 		float fovLerpTime = 0.5f; // adjust this value to control the speed of the FOV change

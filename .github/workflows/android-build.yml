@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - main
+      - 'arena/**'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -26,12 +30,15 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android Command Line Tools and Build Tools
+      - name: Setup Android SDK Environment
         run: |
-          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest"
+          ANDROID_PATH="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$ANDROID_PATH" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_PATH" >> $GITHUB_ENV
+          echo "$ANDROID_PATH/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_PATH/platform-tools" >> $GITHUB_PATH
+          yes | "$ANDROID_PATH/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_PATH/cmdline-tools/latest/bin/sdkmanager" --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
 
       - name: Setup Godot Engine Mono & Export Templates
         run: |
@@ -39,20 +46,21 @@ jobs:
           RELEASE_TAG="4.5.1-stable"
           
           echo "Downloading Godot Mono..."
-          wget -q https://github.com/godotengine/godot/releases/download/${RELEASE_TAG}/Godot_v${RELEASE_TAG}_mono_linux_x86_64.zip
-          unzip -q Godot_v${RELEASE_TAG}_mono_linux_x86_64.zip -d godot_mono
+          curl -fL "https://github.com/godotengine/godot/releases/download/${RELEASE_TAG}/Godot_v${RELEASE_TAG}_mono_linux_x86_64.zip" -o godot_mono.zip
+          unzip -q godot_mono.zip -d godot_mono
           sudo mv godot_mono/Godot_v${RELEASE_TAG}_mono_linux_x86_64/Godot_v${RELEASE_TAG}_mono_linux.x86_64 /usr/local/bin/godot
           sudo mv godot_mono/Godot_v${RELEASE_TAG}_mono_linux_x86_64/GodotSharp /usr/local/bin/
           sudo chmod +x /usr/local/bin/godot
           
           echo "Downloading Godot Export Templates..."
-          wget -q https://github.com/godotengine/godot/releases/download/${RELEASE_TAG}/Godot_v${RELEASE_TAG}_mono_export_templates.tpz
-          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
-          unzip -q Godot_v${RELEASE_TAG}_mono_export_templates.tpz -d export_templates_temp
-          mv export_templates_temp/templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
-          cp -r ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono
+          curl -fL "https://github.com/godotengine/godot/releases/download/${RELEASE_TAG}/Godot_v${RELEASE_TAG}_mono_export_templates.tpz" -o export_templates.tpz
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono"
+          unzip -q export_templates.tpz -d export_templates_temp
+          cp -r export_templates_temp/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+          cp -r export_templates_temp/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono/"
           
-          rm -rf Godot_v${RELEASE_TAG}_mono_linux_x86_64.zip Godot_v${RELEASE_TAG}_mono_export_templates.tpz godot_mono export_templates_temp
+          rm -rf godot_mono.zip export_templates.tpz godot_mono export_templates_temp
 
       - name: Create debug keystore and configure Godot editor settings
         run: |
@@ -62,15 +70,25 @@ jobs:
           
           EDITOR_SETTINGS_DIR="$HOME/.config/godot"
           mkdir -p "$EDITOR_SETTINGS_DIR"
-          cat << EOF > "$EDITOR_SETTINGS_DIR/editor_settings-4.5.tres"
-          [gd_resource type="EditorSettings" format=3]
+          cat << EOF > "$EDITOR_SETTINGS_DIR/editor_settings-4.tres"
+[gd_resource type="EditorSettings" format=3]
 
-          [resource]
-          export/android/android_sdk_path = "$ANDROID_HOME"
-          export/android/debug_keystore = "$DEBUG_KEYSTORE"
-          export/android/debug_keystore_user = "androiddebugkey"
-          export/android/debug_keystore_pass = "android"
-          EOF
+[resource]
+export/android/android_sdk_path = "$ANDROID_HOME"
+export/android/java_sdk_path = "$JAVA_HOME"
+export/android/debug_keystore = "$DEBUG_KEYSTORE"
+export/android/debug_keystore_user = "androiddebugkey"
+export/android/debug_keystore_pass = "android"
+EOF
+          cp "$EDITOR_SETTINGS_DIR/editor_settings-4.tres" "$EDITOR_SETTINGS_DIR/editor_settings-4.5.tres"
+
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$DEBUG_KEYSTORE" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> $GITHUB_ENV
+
+      - name: Initialize Godot Project and Import Resources
+        run: |
+          godot --headless --editor --quit || true
 
       - name: Build C# Solution
         run: |
@@ -79,7 +97,15 @@ jobs:
       - name: Export Android APK
         run: |
           mkdir -p build/android
-          godot --headless --export-debug "Android" build/android/InfiniteRunner.apk
+          godot --headless --verbose --export-debug "Android" build/android/InfiniteRunner.apk
+
+      - name: Verify APK
+        run: |
+          if [ ! -s build/android/InfiniteRunner.apk ]; then
+            echo "Error: build/android/InfiniteRunner.apk was not generated or is empty!"
+            exit 1
+          fi
+          echo "APK generated successfully. Size: $(stat -c%s build/android/InfiniteRunner.apk) bytes"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -98,5 +124,5 @@ jobs:
             echo "Creating release android-apk..."
             gh release create android-apk build/android/InfiniteRunner.apk \
               --title "Android APK" \
-              --notes "Latest Android build of Procedural Infinite Runner"
+              --notes "Latest Android build of Procedural Infinite Runner. Download and install InfiniteRunner.apk."
           fi
