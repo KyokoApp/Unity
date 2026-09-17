@@ -138,7 +138,6 @@ func _test_scatter() -> void:
 	assert_true(a["props"].size() <= 20, "near <= 2x count_near")
 	var orbs := WorldScatter.place_orbs()
 	assert_eq(orbs.size(), 12, "12 orb episode 1")
-	var seen_0: bool = false
 	for o in orbs:
 		assert_true(o.has("x") and o.has("y") and o.has("z") and o.has("base_y"), "orb punya posisi")
 	var o0: Dictionary = orbs[0]

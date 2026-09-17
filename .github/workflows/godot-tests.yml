@@ -28,23 +28,12 @@ jobs:
 
       - name: Jalankan runner uji
         run: |
-          set -o pipefail
           /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
             --headless --path . --script tests/run_tests.gd 2>&1 | tee /tmp/testlog.txt
-          EC=${PIPESTATUS[0]}
-          {
-            echo "### Log runner uji (arena/01a0ac44-unity)"
-            echo ""
-            echo '```'
-            cat /tmp/testlog.txt
-            echo '```'
-            echo ""
-            echo "exit code: $EC"
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit $EC
+          exit ${PIPESTATUS[0]}
 
       - name: Unggah log uji ke branch ci-logs
-        if: always() && !cancelled()
+        if: failure()
         run: |
           git config user.email "ci-debug@users.noreply.github.com"
           git config user.name "ci-debug"

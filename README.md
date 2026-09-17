@@ -84,12 +84,8 @@ resolver kualitas) — kode keluar `0` = semua lulus.
 | Kamera| seret sisi kanan layar / tombol kanan   |
 | Menu  | tombol "=" kiri atas → pengaturan       |
 
-## Catatan push otomatis (Arena)
+## Status CI
 
-Sandbox menandai token GitHub URL push sedang invalid — `git push origin
-arena/01a0ac44-unity` akan gagal dengan "remote: Invalid username or token".
-
-Untuk menyelesaikan: hubungkan kembali GitHub di Arena (link berkemarin),
-lalu commit ini akan ter-push berikutnya:
-
-    git push origin arena/01a0ac44-unity
+`godot-tests` (GitHub Actions) berjalan headless di setiap push ke
+`arena/01a0ac44-unity`: mengunduh Godot 4.5.1, mengimpor proyek, lalu
+menjalankan `tests/run_tests.gd`. Status terkini: **157/157 lulus**.
