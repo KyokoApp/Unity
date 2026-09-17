@@ -13,8 +13,7 @@ name: ci-screenshot  # v3 script-fix
 on:
   workflow_dispatch: {}
   push:
-    paths:
-      - ".github/workflows/ci-screenshot.yml"
+    branches: [arena/01a0ad77-unity]
 
 permissions:
   contents: write
