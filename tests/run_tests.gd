@@ -206,6 +206,10 @@ func _test_facing_flip() -> void:
 	a.free()
 	b.free()
 
+func _test_motor_misc() -> void:
+	assert_aproks(CharacterMotor.damp_angle(180.0, -180.0, 1.0, 0.5), 180.0, 1e-4,
+		"damp_angle merangkum sudut ekstrem")
+
 func _test_anim_map() -> void:
 	# resolve: prioritas exact -> match_begins -> substring, case-robust.
 	var m := AnimMap.resolve(["Tea Time", "WALK Forward", "run", "Slash2", "attack1"])
