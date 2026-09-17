@@ -139,7 +139,9 @@ func _test_scatter() -> void:
 	assert_eq(a["props"].size(), b["props"].size(), "scatter deterministik jumlah")
 	if a["props"].size() > 0:
 		assert_eq(a["props"][0]["x"], b["props"][0]["x"], "scatter deterministik posisi")
-	assert_true(a["props"].size() <= 20, "near <= 2x count_near")
+	# Kanopi 3-lobus menambah 2 prop per pohon -> batas tumbuh 3x
+	# (trade visual sengaja; tetap linear pada count yang diminta).
+	assert_true(a["props"].size() <= 30, "near <= 3x count_near (dengan lobus)")
 	var orbs := WorldScatter.place_orbs()
 	assert_eq(orbs.size(), 12, "12 orb episode 1")
 	for o in orbs:
