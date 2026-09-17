@@ -47,8 +47,12 @@ jobs:
       - name: Ekspor APK
         run: |
           mkdir -p build
+          export ANDROID_HOME="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME" 2>/dev/null | head
           /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
-            --headless --path . --export-debug "Android" build/aurelia-debug.apk \
+            --headless --verbose --path . --export-debug "Android" build/aurelia-debug.apk \
             2>&1 | tee /tmp/exportlog.txt
           test -s build/aurelia-debug.apk
 
