@@ -70,16 +70,7 @@ jobs:
           
           EDITOR_SETTINGS_DIR="$HOME/.config/godot"
           mkdir -p "$EDITOR_SETTINGS_DIR"
-          cat << EOF > "$EDITOR_SETTINGS_DIR/editor_settings-4.tres"
-[gd_resource type="EditorSettings" format=3]
-
-[resource]
-export/android/android_sdk_path = "$ANDROID_HOME"
-export/android/java_sdk_path = "$JAVA_HOME"
-export/android/debug_keystore = "$DEBUG_KEYSTORE"
-export/android/debug_keystore_user = "androiddebugkey"
-export/android/debug_keystore_pass = "android"
-EOF
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\nexport/android/debug_keystore = "%s"\nexport/android/debug_keystore_user = "androiddebugkey"\nexport/android/debug_keystore_pass = "android"\n' "$ANDROID_HOME" "$JAVA_HOME" "$DEBUG_KEYSTORE" > "$EDITOR_SETTINGS_DIR/editor_settings-4.tres"
           cp "$EDITOR_SETTINGS_DIR/editor_settings-4.tres" "$EDITOR_SETTINGS_DIR/editor_settings-4.5.tres"
 
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$DEBUG_KEYSTORE" >> $GITHUB_ENV
