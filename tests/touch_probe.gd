@@ -66,7 +66,9 @@ func _run() -> void:
 	# ---- 2) stik merespons sentuhan di zona stik
 	var stick = hud.stick
 	_chk(stick != null, "StickZone ada")
-	var stick_pos := Vector2(vs.x * 0.22, vs.y * 0.82)
+	# Kanvas headless bisa persegi (1920x1920) — posisi zona stik dihitung
+	# dari BAWAH layar (offset -340..-34 piksel kanvas), bukan fraksi tinggi.
+	var stick_pos := Vector2(vs.x * 0.22, vs.y - 100.0)
 	root.push_input(_touch(0, stick_pos, true), false)
 	await process_frame
 	await process_frame
@@ -117,7 +119,7 @@ func _run() -> void:
 
 	# ---- 6) panggung drag DI zona stik tidak memutar kamera
 	yaw0 = w.camera_rig.yaw
-	var zc: Vector2 = Vector2(vs.x * 0.25, vs.y * 0.85)
+	var zc: Vector2 = Vector2(vs.x * 0.25, vs.y - 80.0)
 	w.camera_rig._drag_id = -2147483648
 	root.push_input(_touch(9, zc, true), false)
 	await process_frame
