@@ -401,18 +401,13 @@ static func droop_sec_bones(skel: Skeleton3D) -> int:
 	for i in skel.get_bone_count():
 		nama[i] = skel.get_bone_name(i)
 		idx[nama[i].to_lower()] = i
-	# posisi rest dunia per tulang (komposisi induk) untuk arah segmen.
-	var gpos := {}
-	var grot := {}
+	# rest dunia per tulang (komposisi induk) untuk arah segmen.
+	var gxf := {}
 	for i in skel.get_bone_count():
 		var pn_idx := skel.get_bone_parent(i)
 		var rest: Transform3D = skel.get_bone_rest(i)
-		if pn_idx >= 0:
-			gpos[i] = (gpos[pn_idx] * rest).origin
-			grot[i] = (grot[pn_idx] * rest).basis.get_rotation_quaternion()
-		else:
-			gpos[i] = rest.origin
-			grot[i] = rest.basis.get_rotation_quaternion()
+		var px: Transform3D = gxf.get(pn_idx, Transform3D())
+		gxf[i] = px * rest
 	var digerakkan := 0
 	for i in skel.get_bone_count():
 		var nm_l: String = nama[i].to_lower()
@@ -429,20 +424,20 @@ static func droop_sec_bones(skel: Skeleton3D) -> int:
 				break
 		if anak < 0:
 			continue
-		var d0: Vector3 = (gpos[anak] - gpos[i])
+		var d0: Vector3 = (gxf[anak] as Transform3D).origin - (gxf[i] as Transform3D).origin
 		if d0.length() < 1e-4:
 			continue
 		d0 = d0.normalized()
 		# arah target: menjuntai ke bawah + sedikit keluar (x mengikuti
 		# sisi posisi root), kroni membawa lekuk manis ikatan aslinya.
-		var arah := Vector3(0.25 * signf((gpos[i] as Vector3).x), -0.96, 0.0).normalized()
+		var arah := Vector3(0.25 * signf((gxf[i] as Transform3D).origin.x), -0.96, 0.0).normalized()
 		var r := Quaternion(d0, arah)
 		var rest_l: Transform3D = skel.get_bone_rest(i)
-		var rest_g: Quaternion = grot[i]
+		var rest_g: Quaternion = (gxf[i] as Transform3D).basis.get_rotation_quaternion()
 		var g_new: Quaternion = (r * rest_g).normalized()
 		var plah: Quaternion = Quaternion.IDENTITY
 		if pn2 >= 0:
-			plah = grot[pn2]
+			plah = (gxf[pn2] as Transform3D).basis.get_rotation_quaternion()
 		var lokal_abs: Quaternion = (plah.inverse() * g_new).normalized()
 		var rest_lq: Quaternion = rest_l.basis.get_rotation_quaternion()
 		var pose: Quaternion = (rest_lq.inverse() * lokal_abs).normalized()

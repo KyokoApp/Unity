@@ -44,6 +44,7 @@ func _init() -> void:
 	_test_anim_map()
 	_test_live_retarget()
 	_test_facing_flip()
+	_test_droop_sec()
 	print("selesai: %d lulus, %d gagal" % [_passed, _failed])
 	for f in _failures:
 		print("  - " + f)
@@ -205,6 +206,35 @@ func _test_facing_flip() -> void:
 		"flip benar-benar memutar vektor hadap")
 	a.free()
 	b.free()
+
+func _test_droop_sec() -> void:
+	# Kerangka mini: kepala + 2 rantai pita j_sec mendarah naik.
+	var s := Skeleton3D.new()
+	root.add_child(s)
+	var h := s.add_bone("Head")
+	var l1 := s.add_bone("J_Sec_HairL1")
+	var l2 := s.add_bone("J_Sec_HairL2")
+	var r1 := s.add_bone("J_Sec_HairR1")
+	s.set_bone_parent(l1, h)
+	s.set_bone_parent(l2, l1)
+	s.set_bone_parent(r1, h)
+	s.set_bone_rest(h, Transform3D(Basis(), Vector3(0, 1.6, 0)))
+	# Pita ke-1: segmen awal masih mendongak (pose bind VRoid).
+	s.set_bone_rest(l1, Transform3D(Basis.from_euler(Vector3(-1.1, 0, 0)), Vector3(-0.09, 0.10, 0)))
+	s.set_bone_rest(l2, Transform3D(Basis(), Vector3(0, -0.10, 0)))
+	s.set_bone_rest(r1, Transform3D(Basis(), Vector3(0.09, 0.10, 0)))
+	var n := AnimMap.droop_sec_bones(s)
+	assert_eq(n, 2, "dua root pita diputar (l2_i bukan root -> di-skip)")
+	var p1: Quaternion = s.get_bone_pose_rotation(l1)
+	assert_true(p1.is_finite(), "pose pita finit")
+	assert_aproks(p1.length(), 1.0, 1e-3, "pose pita unit-normal")
+	# Arah segmen pertama SETELAH droop harus cenderung ke bawah.
+	if s.has_method("force_update_all_bone_transforms"):
+		s.call("force_update_all_bone_transforms")
+	var g1 := s.get_bone_global_pose(l1).origin
+	var g2 := s.get_bone_global_pose(l2).origin
+	assert_true((g2 - g1).y < 0.0, "segmen pertama menjuntai setelah droop")
+	s.free()
 
 func _test_motor_misc() -> void:
 	assert_aproks(CharacterMotor.damp_angle(180.0, -180.0, 1.0, 0.5), 180.0, 1e-4,
