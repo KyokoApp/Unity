@@ -41,9 +41,13 @@ func _visual(nama: String, style: StyleBox, diameter: float) -> Control:
 	c.name = nama
 	c.custom_minimum_size = Vector2(diameter, diameter)
 	c.size = Vector2(diameter, diameter)
+	# Dekoratif: JANGAN pernah menelan sentuhan — sentuhan harus tetap
+	# jatuh ke _gui_input zona stik (Base/Knob tak punya logika).
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var p := Panel.new()
 	p.add_theme_stylebox_override("panel", style)
 	p.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	c.add_child(p)
 	add_child(c)
 	return c

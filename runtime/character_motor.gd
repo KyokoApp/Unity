@@ -91,9 +91,14 @@ func _ready() -> void:
 	snap_to_ground()
 
 func snap_to_ground() -> void:
-	var p := global_position
+	# RIG (induk) yang dipindah ke tanah, bukan motor anaknya — rig adalah
+	# target kamera/streamer dan membawa visual karakter. (Di versi Unity
+	# motor & visual menempati transform yang SAMA; pemisahan node di Godot
+	# ini sempat membuat visual terkubur di y=0.)
+	var p := rig.global_position
 	p.y = ground_height(p.x, p.z) + ground_offset
-	global_position = p
+	rig.global_position = p
+	position = Vector3.ZERO
 	_vy = 0.0
 	grounded = true
 	_yaw = 0.0
@@ -112,7 +117,7 @@ func _process(dt: float) -> void:
 
 	# ---- 2. arah relatif kamera --------------------------------------
 	var cam_yaw := camera_target.yaw_deg() if camera_target != null \
-		else rad_to_deg(rotation.y)
+		else rad_to_deg(rig.rotation.y)
 	var wish := camera_relative(inp.x, inp.z, cam_yaw)
 	var mag: float = clampf(wish.length(), 0.0, 1.0)
 	if wish.length() > 1.0:
@@ -135,7 +140,8 @@ func _process(dt: float) -> void:
 		else:
 			_dash_dir = Vector3(sin(deg_to_rad(_yaw)), 0.0, cos(deg_to_rad(_yaw)))
 		_yaw = rad_to_deg(atan2(_dash_dir.x, _dash_dir.z))
-		rotation.y = deg_to_rad(_yaw)
+		if rig != null:
+			rig.rotation.y = deg_to_rad(_yaw)
 		if vfx != null:
 			vfx.spawn_dash(global_position + Vector3.UP * 0.6)
 		if camera_target != null:
@@ -148,7 +154,8 @@ func _process(dt: float) -> void:
 		attack_started.emit(combat.combo)
 		var face_yaw := rad_to_deg(atan2(wish.x, wish.z)) if mag > 0.05 else cam_yaw
 		_yaw = face_yaw
-		rotation.y = deg_to_rad(_yaw)
+		if rig != null:
+			rig.rotation.y = deg_to_rad(_yaw)
 		var fwd := Vector3(sin(deg_to_rad(_yaw)), 0.0, cos(deg_to_rad(_yaw)))
 		if vfx != null:
 			vfx.spawn_attack(global_position + Vector3.UP * 1.1 + fwd * 0.9,
@@ -168,7 +175,8 @@ func _process(dt: float) -> void:
 	velocity = Vector3(_vel_sm.x, 0.0, _vel_sm.z)
 
 	# ---- 6. integrasi horizontal + batas dunia ---------------------------
-	var p := global_position
+	# Posisi dipegang RIG (target kamera + pembawa visual).
+	var p := rig.global_position
 	p.x += _vel_sm.x * dt
 	p.z += _vel_sm.z * dt
 	var limit: float = WorldData.WORLD_LIMIT
@@ -204,17 +212,20 @@ func _process(dt: float) -> void:
 	else:
 		grounded = false
 
-	global_position = p
+	# RIG yang berpindah (motor lokal tetap di titik nol => global motor
+	# selalu sama dengan global rig).
+	rig.global_position = p
+	position = Vector3.ZERO
 
 	# ---- 8. hadap arah jalan ----------------------------------------------
 	var tr := turn_rate * 0.3 if combat.is_attacking() else turn_rate
 	if mag > 0.05:
 		var want_yaw := rad_to_deg(atan2(wish.x, wish.z))
 		_yaw = damp_angle(_yaw, want_yaw, tr, dt)
-		rotation.y = deg_to_rad(_yaw)
+		rig.rotation.y = deg_to_rad(_yaw)
 	elif combat.is_attacking():
 		_yaw = damp_angle(_yaw, cam_yaw, tr, dt)
-		rotation.y = deg_to_rad(_yaw)
+		rig.rotation.y = deg_to_rad(_yaw)
 
 	# lean badan saat berputar tajam (dibaca character_rig)
 	if rig != null and dt > 0.0:

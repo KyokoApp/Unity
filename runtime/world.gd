@@ -113,6 +113,7 @@ func _build() -> void:
 	camera_rig.target = rig
 	camera_rig.motor = motor
 	add_child(camera_rig)
+	motor.camera_target = camera_rig   ## yaw relatif-kamera (dash/attack/ilook)
 
 	# ---- dunia streaming ----
 	streamer = TerrainChunkStreamer.new()
@@ -266,6 +267,9 @@ func _boot_sync() -> void:
 ## HUD/ikomponen tombol menangkap event-nya sendiri, jadi di sana
 ## tidak sampai ke _unhandled_input.
 func _unhandled_input(event: InputEvent) -> void:
+	# Di HP, sentuhan diemulasikan sebagai klik kiri — jangan jadikan serangan.
+	if DisplayServer.is_touchscreen_available():
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:

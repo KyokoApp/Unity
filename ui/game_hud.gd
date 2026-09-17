@@ -71,6 +71,10 @@ func _build() -> void:
 	var root := Control.new()
 	root.name = "HudRoot"
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# PENTING (mobile): IGNORE supaya sentuhan di area kosong menembus
+	# ke _unhandled_input kamera. Interactive widget (tombol/stik) tetap
+	# menangkap lewat panel anaknya sendiri (filter STOP di sana).
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 
 	_build_party(root)
@@ -106,6 +110,8 @@ func _build_party(root: Control) -> void:
 		UiKit.label(p, str(i + 1), 34, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER, true)
 		var hp := UiKit.bar(root, "Hp%d" % i, Vector2(0, 1), Vector2(0, 1),
 			Vector2(px + 2, -52), Vector2(80, 10), Color(0, 0, 0, 0.55), UiKit.HP_GREEN)
+		(hp["outer"] as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		(hp["fill"] as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 		UiKit.set_bar(hp, 1.0)
 
 func _build_compass(root: Control) -> void:
@@ -186,8 +192,11 @@ func _build_stamina(root: Control) -> void:
 	root.add_child(holder)
 	_stam_group = holder
 	_stam_group.modulate.a = 0.0
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var outer := UiKit.bar(holder, "Stamina", Vector2(0.5, 0), Vector2(0.5, 0),
 		Vector2(-220, -54), Vector2(440, 14), Color(0, 0, 0, 0.55), UiKit.STAMINA)
+	(outer["outer"] as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	(outer["fill"] as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stam_fill = outer
 
 func _build_actions(root: Control) -> void:
