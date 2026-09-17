@@ -282,6 +282,8 @@ func _test_live_retarget() -> void:
 	# rest-relative milik engine) lalu salin delta dunia ke target.
 	var q_anim := Quaternion(Basis.from_euler(Vector3(0.7854, 0, 0)))
 	a.set_bone_pose_rotation(ac, q_anim)
+	if a.has_method("force_update_all_bone_transforms"):
+		a.call("force_update_all_bone_transforms")
 	AnimMap.live_apply(prep)
 
 	# Verifikasi analitik: D = g_sumber * rest_sumber^-1

@@ -414,6 +414,14 @@ static func live_apply(prep: Dictionary) -> void:
 	var to_skel: Skeleton3D = prep["to_skel"]
 	var ctx_t: Dictionary = prep["ctx_t"]
 	var per_bone: Dictionary = prep["per_bone"]
+	## Wajib segarkan cache tulang sumber: tanpa ini get_bone_global_pose
+	## baru mengetahui pose pada notifikasi berikut (di game = beda satu
+	## frame, di uji headless langsung SALAH BESAR — tulang induk
+	## dianggap tak pernah berpose).
+	if from_skel.has_method("force_update_all_bone_transforms"):
+		from_skel.call("force_update_all_bone_transforms")
+	elif from_skel.has_method("force_update_all_dirty_bones"):
+		from_skel.call("force_update_all_dirty_bones")
 	var gt := {}
 	for b in ctx_t["order"]:
 		var pn: String = ctx_t["p"].get(b, "")
