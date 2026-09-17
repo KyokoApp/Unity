@@ -32,6 +32,18 @@ jobs:
             --headless --path . --script tests/run_tests.gd 2>&1 | tee /tmp/testlog.txt
           exit ${PIPESTATUS[0]}
 
+      - name: Smoke-run game asli (600 frame, tangkap SCRIPT ERROR)
+        run: |
+          set +e
+          timeout 120 /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
+            --headless --path . --quit-after 600 2>&1 | tee /tmp/bootlog.txt
+          EC=$?
+          echo "exit=$EC" >> /tmp/bootlog.txt
+          # crash/timeout (124) atau ada SCRIPT ERROR di log -> gagal
+          if [ "$EC" -ne 0 ] || grep -q "SCRIPT ERROR" /tmp/bootlog.txt; then
+            exit 1
+          fi
+
       - name: Unggah log uji ke branch ci-logs
         if: failure()
         run: |
@@ -42,6 +54,7 @@ jobs:
           git rm -rf . >/dev/null 2>&1 || true
           echo "commit=$GITHUB_SHA run=$GITHUB_RUN_ID" > run-log.txt
           cat /tmp/testlog.txt >> run-log.txt
-          git add run-log.txt
+          cp /tmp/bootlog.txt boot-log.txt 2>/dev/null || echo "bootlog tidak ada" > boot-log.txt
+          git add run-log.txt boot-log.txt
           git commit -m "ci log $(date -u '+%Y-%m-%d %H:%M UTC')" >/dev/null
           git push --force origin ci-logs
