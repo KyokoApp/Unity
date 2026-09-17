@@ -113,7 +113,7 @@ static func normalize(raw) -> Dictionary:
 
 	return {
 		"sensitivity": _clamp_num(s.get("sensitivity"), 0.4, 2.0, 1.0),
-		"camera_distance": _clamp_num(s.get("camera_distance"), 3.0, 8.0, 5.0),
+		"camera_distance": _clamp_num(s.get("camera_distance"), 3.0, 14.0, 7.0),
 		"quality": quality,
 		"shadows": s.get("shadows") if s.get("shadows") is bool else true,
 		"sound": s.get("sound") if s.get("sound") is bool else true,

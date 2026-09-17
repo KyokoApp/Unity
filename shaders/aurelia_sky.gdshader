@@ -18,8 +18,8 @@ uniform vec4 horizon_color : source_color = vec4(0.75, 0.82, 0.88, 1.0);
 uniform vec4 bottom_color : source_color = vec4(0.55, 0.58, 0.62, 1.0);
 uniform vec4 sun_color : source_color = vec4(1.0, 0.95, 0.85, 1.0);
 uniform vec3 sun_direction = vec3(0.0, 1.0, 0.3);
-uniform float sun_size : hint_range(0.001, 0.05) = 0.0035;
-uniform float sun_glow : hint_range(0.0, 1.0) = 0.14;
+uniform float sun_size : hint_range(0.001, 0.05) = 0.0015;
+uniform float sun_glow : hint_range(0.0, 1.0) = 0.12;
 
 void sky() {
 	vec3 d = normalize(EYEDIR);
@@ -40,7 +40,7 @@ void sky() {
 	float disc = smoothstep(1.0 - sun_size, 1.0 - sun_size * 0.45, s);
 	// Halo dibuat rapat (pangkat 32) — tanpa ini kabur glow memenuhi
 	// langit seperti matahari raksasa (keluhan visual awal).
-	float glow = pow(clamp(s, 0.0, 1.0), 32.0) * sun_glow;
+	float glow = pow(clamp(s, 0.0, 1.0), 64.0) * sun_glow;
 	col += sun_color.rgb * (disc * 1.6 + glow);
 
 	COLOR = col;

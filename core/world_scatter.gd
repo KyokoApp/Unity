@@ -82,13 +82,37 @@ static func build(cx: int, cz: int, near: bool, props_near: int, props_far: int)
 		var type_yaw := random.next() * 6.28
 		var sy := scale if pine else .85 * scale
 		props.append({"kind": PROP_PINE if pine else PROP_LEAF,
-					  "x": x, "y": y + 8.0 * scale, "z": z,
-					  "sx": scale, "sy": sy, "sz": scale,
-					  "yaw": type_yaw, "foliage": region["foliage"], "has_foliage": true})
+				  "x": x, "y": y + 8.0 * scale, "z": z,
+				  "sx": scale, "sy": sy, "sz": scale,
+				  "yaw": type_yaw, "foliage": region["foliage"], "has_foliage": true})
+		# Kanopi Genshin bukan SATU bola — mahkota dibuat 3 lobus:
+		# 1 utama + 2 pendamping di sekeliling puncak. Offset diturunkan
+		# dari hash integer POSISI (bukan dari stream `random` — jumlah
+		# konsumsi RNG tetap, layout chunk lama tidak bergeser).
+		if not pine:
+			for k in 2:
+				var frak := _lohash(int(wx * 7.0 + wz * 13.0), i * 3 + k)
+				var ox2 := (frak - 0.5) * 2.4 * scale
+				var oz2 := (_lohash(int(wz * 9.0 - wx * 5.0), i * 5 + k)
+					- 0.5) * 2.4 * scale
+				var s2 := scale * (0.42 + 0.30
+					* _lohash(int(wx * 11.0 + wz * 3.0), i * 7 + k))
+				props.append({"kind": PROP_LEAF,
+						  "x": x + ox2, "y": y + (7.1 + 1.5 * float(k)) * scale,
+						  "z": z + oz2, "sx": s2, "sy": 0.78 * s2, "sz": s2,
+						  "yaw": frak * 6.28, "foliage": region["foliage"],
+						  "has_foliage": true})
 		if near:
 			colliders.append({"x": wx, "z": wz, "r": .65 * scale})
 
 	return {"props": props, "colliders": colliders}
+
+## Hash deterministik bebas-struktur (salah satu putaran mix-murmur
+## ringan) — dipakai offset lobus kanopi TANPA menyentuh ChunkRng.
+static func _lohash(a: int, b: int) -> float:
+	var n: int = (a * 374761393 + b * 668265263) & 0xFFFFFFFF
+	n = ((n ^ (n >> 13)) * 1274126177) & 0xFFFFFFFF
+	return float((n ^ (n >> 16)) & 0xFFFFFFFF) / 4294967296.0
 
 ## WAYPOINTS.some(w => hypot(wx-w.x, wz-w.z) < r)
 static func _any_waypoint_within(wx: float, wz: float, r: float) -> bool:

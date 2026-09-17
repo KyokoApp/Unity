@@ -273,7 +273,7 @@ class BuildClumpMesh:
 			var yaw := deg_to_rad(b * 90.0 + b * 17.0)
 			var tilt := deg_to_rad(14.0 + b * 5.0)
 			var h: float = 0.30 + b * 0.05
-			var w := 0.035
+			var w := 0.024
 			var rot := Basis.from_euler(Vector3(0, yaw, 0))
 			var lean := Basis.from_euler(Vector3(0, 0, tilt))
 			var fwd := rot * lean * Vector3.FORWARD

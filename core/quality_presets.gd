@@ -94,7 +94,7 @@ static func gfx_same_values(a: Dictionary, b: Dictionary) -> bool:
 static func default_settings() -> Dictionary:
 	return {
 		"sensitivity": 1.0,
-		"camera_distance": 5.0,
+		"camera_distance": 7.0,
 		"quality": "balanced",
 		"shadows": true,
 		"sound": true,
