@@ -83,3 +83,13 @@ resolver kualitas) — kode keluar `0` = semua lulus.
 | Skill | tombol E · Ultimate tombol Q (HUD)      |
 | Kamera| seret sisi kanan layar / tombol kanan   |
 | Menu  | tombol "=" kiri atas → pengaturan       |
+
+## Catatan push otomatis (Arena)
+
+Sandbox menandai token GitHub URL push sedang invalid — `git push origin
+arena/01a0ac44-unity` akan gagal dengan "remote: Invalid username or token".
+
+Untuk menyelesaikan: hubungkan kembali GitHub di Arena (link berkemarin),
+lalu commit ini akan ter-push berikutnya:
+
+    git push origin arena/01a0ac44-unity
