@@ -3,7 +3,7 @@ name: godot-tests
 # Uji headless proyek Godot 4 (pengganti verify.yml era Unity).
 on:
   push:
-    branches: [arena/01a0ac44-unity, arena/01a0ad77-unity]
+    branches: [main, arena/01a0ad77-unity]
   pull_request:
 
 permissions:
