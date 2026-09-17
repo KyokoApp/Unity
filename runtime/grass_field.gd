@@ -273,7 +273,7 @@ class BuildClumpMesh:
 			var yaw := deg_to_rad(b * 90.0 + b * 17.0)
 			var tilt := deg_to_rad(14.0 + b * 5.0)
 			var h: float = 0.30 + b * 0.05
-			var w := 0.05
+			var w := 0.035
 			var rot := Basis.from_euler(Vector3(0, yaw, 0))
 			var lean := Basis.from_euler(Vector3(0, 0, tilt))
 			var fwd := rot * lean * Vector3.FORWARD
@@ -281,7 +281,10 @@ class BuildClumpMesh:
 
 			var ys := [0.0, h * 0.55, h]
 			var ws := [w, w * 0.62, 0.004]
-			var cu := [0.0, 0.05, 0.16]
+			# Bilah dibuat lebih langsing: lengkung 0,16 terlihat seperti
+			# anak panah ramai (keluhan "rumput jelek") — 0,11 tetap
+			# menyapu angin tanpa kesan rambut kotak.
+			var cu := [0.0, 0.04, 0.11]
 			var tv := [0.0, 0.55, 1.0]
 
 			var base: Array = []

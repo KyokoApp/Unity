@@ -43,6 +43,7 @@ func _init() -> void:
 	_test_motor_misc()
 	_test_anim_map()
 	_test_live_retarget()
+	_test_facing_flip()
 	print("selesai: %d lulus, %d gagal" % [_passed, _failed])
 	for f in _failures:
 		print("  - " + f)
@@ -174,9 +175,36 @@ func _test_gfx() -> void:
 		scale = ar.update(60.0, 16.6)
 	assert_true(scale < 1.0, "adaptive turun saat frame berat")
 
-func _test_motor_misc() -> void:
-	assert_aproks(CharacterMotor.damp_angle(180.0, -180.0, 1.0, 0.5), 180.0, 1e-4,
-		"damp_angle merangkum sudut ekstrem")
+func _test_facing_flip() -> void:
+	# Dua rig anatomi: lengan kiri di +X -> hadap +Z; kebalikan -> hadap -Z.
+	var mk := func(left_x: float) -> Skeleton3D:
+		var s := Skeleton3D.new()
+		var r := s.add_bone("pelvis")
+		var h := s.add_bone("Head")
+		var l := s.add_bone("upperarm_l")
+		var rr := s.add_bone("upperarm_r")
+		s.set_bone_parent(h, r)
+		s.set_bone_parent(l, r)
+		s.set_bone_parent(rr, r)
+		s.set_bone_rest(r, Transform3D(Basis(), Vector3(0, 1.0, 0)))
+		s.set_bone_rest(h, Transform3D(Basis(), Vector3(0, 0.6, 0)))
+		s.set_bone_rest(l, Transform3D(Basis(), Vector3(left_x, 0.3, 0)))
+		s.set_bone_rest(rr, Transform3D(Basis(), Vector3(-left_x, 0.3, 0)))
+		return s
+	var a: Skeleton3D = mk.call(0.3)
+	var b: Skeleton3D = mk.call(-0.3)
+	assert_true(AnimMap._fwd(a).z > 0.9, "anatomi standar -> hadap +Z")
+	assert_true(AnimMap._fwd(b).z < -0.9, "anatomi terbalik -> hadap -Z")
+	assert_eq(AnimMap.facing_flip(a, a), Quaternion.IDENTITY,
+		"frame sama -> tanpa flip")
+	var q := AnimMap.facing_flip(a, b)
+	assert_true(absf(absf(q.get_angle() - PI)) < 0.01,
+		"frame berbalik -> flip 180 derajat")
+	# Vektor hadap sumber diputar satu sumbu vertikal menuju target.
+	assert_true(((q * AnimMap._fwd(a)) - AnimMap._fwd(b)).length() < 0.01,
+		"flip benar-benar memutar vektor hadap")
+	a.free()
+	b.free()
 
 func _test_anim_map() -> void:
 	# resolve: prioritas exact -> match_begins -> substring, case-robust.

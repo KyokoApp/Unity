@@ -94,8 +94,9 @@ func setup(model_root: Node3D, libs: Array, skel_prefix: String) -> int:
 		if active:
 			current_role = ""
 			_mainkan_peran(_peran_lokomosi(0.0, true, false, false), 0.0, true)
-		last_report = "%s | live=%d map=%d" % [AnimMap.report(mapping),
-			1 if _live else 0, _live_prep.get("count", 0)]
+		last_report = "%s | live=%d map=%d flip=%d" % [AnimMap.report(mapping),
+			1 if _live else 0, _live_prep.get("count", 0),
+			_live_prep.get("flip", 0)]
 		return mapping.size()
 
 	## ---- jalur klasik (skeleton sama / aset virtual) -------------

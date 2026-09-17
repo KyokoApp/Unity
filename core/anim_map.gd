@@ -312,6 +312,79 @@ static func rest_ctx(skel: Skeleton3D) -> Dictionary:
 ## pose sumber dijamin engine; yang kita hitung hanya delta dunia.
 ## -------------------------------------------------------------
 
+## ------------------------------------------------------------
+## TAKSIR ARAH HADAP — dua skeleton bisa menatap sumbu-Z berbalikan
+## (mis. konvensi ekspor UE vs VRM). Bila ya, delta dunia sumber
+## dikonjugasikan oleh 180° sumbu-atas sebelum ditransplantasikan —
+## tanpa ini gerak tampak terbalik (keluhan "animasi malah mundur",
+## lengan naik bukan turun).
+## ------------------------------------------------------------
+
+## Posisi rest tulang dalam ruang skeleton (komposisi induk).
+static func rest_pos_ctx(skel: Skeleton3D) -> Dictionary:
+	var out := {}
+	var g := {}
+	var idx := {}
+	for i in skel.get_bone_count():
+		idx[skel.get_bone_name(i).to_lower()] = i
+	for i in skel.get_bone_count():
+		var b := skel.get_bone_name(i).to_lower()
+		var pi := skel.get_bone_parent(i)
+		var pn := ""
+		if pi >= 0:
+			pn = skel.get_bone_name(pi).to_lower()
+		var rest: Transform3D = skel.get_bone_rest(i)
+		var xf: Transform3D = (g.get(pn, Transform3D()) if pn != ""
+			else Transform3D()) * rest
+		g[b] = xf
+		out[b] = xf.origin
+	return out
+
+## Vektor hadap skeleton dari posisi anatomi: lengan kiri-kanan untuk
+## arah lateral, pelvis->kepala untuk vertikal. ZERO bila tulang tak
+## cukup dikenali (jangan pernah menebak).
+static func _fwd(skel: Skeleton3D) -> Vector3:
+	var pos := rest_pos_ctx(skel)
+	var pl := Vector3.ZERO
+	var pr := Vector3.ZERO
+	var p_hips := Vector3.ZERO
+	var p_head := Vector3.ZERO
+	var punya := 0
+	for nm in pos:
+		var c := _bone_core(nm)
+		match [c["core"], c["side"]]:
+			["upperarm", "l"]:
+				pl = pos[nm]
+				punya |= 1
+			["upperarm", "r"]:
+				pr = pos[nm]
+				punya |= 2
+			["hips", _]:
+				p_hips = pos[nm]
+				punya |= 4
+			["head", _]:
+				p_head = pos[nm]
+				punya |= 8
+	if punya != 15:
+		return Vector3.ZERO
+	var lat: Vector3 = pl - pr
+	var up: Vector3 = p_head - p_hips
+	if lat.length() < 1e-4 or up.length() < 1e-4:
+		return Vector3.ZERO
+	# karakter menghadap lateral x atas (aturan tangan kanan):
+	# (kiri - kanan) x atas. Uji anatomi (kiri di +X) -> +Z. Benar.
+	return lat.cross(up).normalized()
+
+## Quaternion flip arah hadap (180° sumbu atas) bila keduanya berbalikan.
+static func facing_flip(from_skel: Skeleton3D, to_skel: Skeleton3D) -> Quaternion:
+	var f := _fwd(from_skel)
+	var t := _fwd(to_skel)
+	if f == Vector3.ZERO or t == Vector3.ZERO:
+		return Quaternion.IDENTITY
+	if f.dot(t) < -0.2:
+		return Quaternion(Vector3.UP, PI)
+	return Quaternion.IDENTITY
+
 ## Persiapan rest + daftar tulang terpetakan (dihitung SEKALI).
 static func prepare_live(from_skel: Skeleton3D, to_skel: Skeleton3D,
 		ctx_f: Dictionary, ctx_t: Dictionary, bone_map: Dictionary) -> Dictionary:
@@ -329,8 +402,10 @@ static func prepare_live(from_skel: Skeleton3D, to_skel: Skeleton3D,
 			"rest_f_inv": rest_f.inverse(),
 			"rest_t": ctx_t["rg"].get(tb_low, Quaternion.IDENTITY),
 		}
+	var flip := facing_flip(from_skel, to_skel)
 	return {"from_skel": from_skel, "to_skel": to_skel,
-		"ctx_t": ctx_t, "per_bone": per_bone, "count": per_bone.size()}
+		"ctx_t": ctx_t, "per_bone": per_bone, "count": per_bone.size(),
+		"flip_q": flip, "flip": 1 if flip != Quaternion.IDENTITY else 0}
 
 ## Salin delta dunia per frame (dipanggil SETELAH AnimationPlayer
 ## menyelesaikan frame-nya — driver menjamin urutan lewat _process).
@@ -349,6 +424,10 @@ static func live_apply(prep: Dictionary) -> void:
 			var e: Dictionary = per_bone[b]
 			var qa: Quaternion = from_skel.get_bone_global_pose(e["fi"]).basis.get_rotation_quaternion().normalized()
 			var d: Quaternion = (qa * e["rest_f_inv"]).normalized()
+			## Konjugasi flip arah hadap (identity bila sepakat).
+			var fq: Quaternion = prep["flip_q"]
+			if fq != Quaternion.IDENTITY:
+				d = (fq * d * fq.inverse()).normalized()
 			var g_abs: Quaternion = (d * e["rest_t"]).normalized()
 			local_abs = (pg.inverse() * g_abs).normalized()
 			## set_bone_pose_rotation = pose (rest-relative):
