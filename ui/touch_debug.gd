@@ -201,8 +201,10 @@ func _refresh_text() -> void:
 		zona = str(r)
 		_zone_tag.position = r.position + Vector2(8, 4)
 	var anim_txt := "anim:kosong"
+	var rig_txt := "rig:kosong"
 	if rig != null:
 		anim_txt = rig.anim_debug_line()
+		rig_txt = rig.last_bind_report
 	_strip.text = "DBG %s | layar %.0fx%.0f kanvas %.0fx%.0f x%.2f\n" % [
 			BuildStamp.id(), vs.x, vs.y, kanvas.x, kanvas.y, sk] \
 		+ "os turun %d seret %d | stikGUI %d | kamera %d | stik:%s\n" % [
@@ -210,7 +212,7 @@ func _refresh_text() -> void:
 		+ "zona %s | layar-sentuh=%s | %s\n" % [
 			zona, "YA" if DisplayServer.is_touchscreen_available() else "tidak",
 			anim_txt] \
-		+ "%s | %s" % [device, _last_note]
+		+ "%s\n%s | %s" % [rig_txt, device, _last_note]
 
 func _on_dots_draw() -> void:
 	var now := Time.get_ticks_msec() / 1000.0

@@ -90,6 +90,11 @@ static func apply(root: Node3D, opts: Dictionary = {}) -> void:
 			## pastell (keluhan user: warna hilang). Iklim EMISSION di
 			## 0,32 menjaga warna asli + toon ramp tetap bertugas.
 			mat.set_shader_parameter("ambient_boost", 0.32)
+			## Sisi bayang karakter: indigo muda — remote-probing pertama
+			## menunjukkan sisi membelakangi matahari bisa terlalu gelap
+			## (keluhan visual menyusul) + rim sedikit lebih kuat.
+			mat.set_shader_parameter("shadow_color", Color(0.55, 0.50, 0.66))
+			mat.set_shader_parameter("rim_strength", 0.30)
 			var n := src_name
 			if n.find("hair") >= 0 or n.find("rambut") >= 0:
 				mat.set_shader_parameter("rim_strength", 0.35)

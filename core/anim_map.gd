@@ -291,9 +291,9 @@ static func rest_ctx(skel: Skeleton3D) -> Dictionary:
 			pn = skel.get_bone_name(pi).to_lower()
 		p[b] = pn
 		var rest: Transform3D = skel.get_bone_rest(i)
-		var q: Quaternion = rest.basis.get_rotation_quaternion()
+		var q: Quaternion = rest.basis.get_rotation_quaternion().normalized()
 		rl[b] = q
-		rg[b] = (rg.get(pn, Quaternion.IDENTITY) if pn != "" else Quaternion.IDENTITY) * q
+		rg[b] = ((rg.get(pn, Quaternion.IDENTITY) if pn != "" else Quaternion.IDENTITY) * q).normalized()
 	return {"order": order, "p": p, "rl": rl, "rg": rg}
 
 ## Sample sebuah track rotasi pada waktu t (slerp antar kunci).
@@ -301,18 +301,18 @@ static func _sample_quat(anim: Animation, ti: int, t: float) -> Quaternion:
 	var n := anim.track_get_key_count(ti)
 	if n == 0:
 		return Quaternion.IDENTITY
-	var v0: Quaternion = anim.track_get_key_value(ti, 0)
+	var v0: Quaternion = (anim.track_get_key_value(ti, 0) as Quaternion).normalized()
 	if n == 1 or t <= anim.track_get_key_time(ti, 0):
 		return v0
 	for k in range(1, n):
 		var tk: float = anim.track_get_key_time(ti, k)
 		if t <= tk:
 			var ta: float = anim.track_get_key_time(ti, k - 1)
-			var qa: Quaternion = anim.track_get_key_value(ti, k - 1)
-			var qb: Quaternion = anim.track_get_key_value(ti, k)
+			var qa: Quaternion = (anim.track_get_key_value(ti, k - 1) as Quaternion).normalized()
+			var qb: Quaternion = (anim.track_get_key_value(ti, k) as Quaternion).normalized()
 			var f := 0.0 if tk <= ta else (t - ta) / (tk - ta)
-			return qa.slerp(qb, clampf(f, 0.0, 1.0))
-	return anim.track_get_key_value(ti, n - 1)
+			return qa.slerp(qb, clampf(f, 0.0, 1.0)).normalized()
+	return (anim.track_get_key_value(ti, n - 1) as Quaternion).normalized()
 
 ## Retarget klip humanoid (tulang beda nama): pindahkan delta rotasi
 ## dunia per tulang yang terpetakan. Mengembalikan Animation BARU
@@ -361,7 +361,7 @@ static func retarget_humanoid(anim: Animation, from_ctx: Dictionary,
 			if track_of.has(b):
 				lq = _sample_quat(anim, track_of[b], t)
 			var pn: String = from_ctx["p"].get(b, "")
-			gf[b] = gf.get(pn, Quaternion.IDENTITY) * lq
+			gf[b] = (gf.get(pn, Quaternion.IDENTITY) * lq).normalized()
 		# 2) latih global target: delta dunia ditransplantasi ke rest target
 		var gt := {}
 		for b2 in to_ctx["order"]:
@@ -371,14 +371,14 @@ static func retarget_humanoid(anim: Animation, from_ctx: Dictionary,
 			if rev.has(b2):
 				var sb: String = rev[b2]
 				var rest_from: Quaternion = from_ctx["rg"].get(sb, Quaternion.IDENTITY)
-				var d: Quaternion = gf.get(sb, rest_from) * rest_from.inverse()
-				lq2 = pg.inverse() * (d * to_ctx["rg"].get(b2, Quaternion.IDENTITY))
+				var d: Quaternion = (gf.get(sb, rest_from) * rest_from.inverse()).normalized()
+				lq2 = (pg.inverse() * (d * to_ctx["rg"].get(b2, Quaternion.IDENTITY))).normalized()
 				if not rows.has(b2):
 					rows[b2] = []
 				rows[b2].append([t, lq2])
 			else:
 				lq2 = to_ctx["rl"].get(b2, Quaternion.IDENTITY)
-			gt[b2] = pg * lq2
+			gt[b2] = (pg * lq2).normalized()
 
 	# 3) tulis track rotasi per tulang terpetakan
 	for b2 in rows:
