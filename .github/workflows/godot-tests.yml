@@ -40,6 +40,7 @@ jobs:
             echo '```'
             echo ""
             echo "exit code: $EC"
+          } >> "$GITHUB_STEP_SUMMARY"
           exit $EC
 
       - name: Unggah log uji ke branch ci-logs
