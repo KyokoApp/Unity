@@ -90,6 +90,37 @@ func _init() -> void:
 		w.rig.anim.mapping["idle"] = cadangan
 		w.rig.anim.current_role = ""
 
+	## == KONTROL ILMIAH: kebenaran klip pada skeleton aslinya ==
+	## AureliaAnim.glb = mannequin UAL2 + 43 klip pada NAMA TULANG
+	## ASLI (prefix mode 0% kerugian) — klip diputar nativ di
+	## AnimationPlayer bawaan, BUKAN retarget. Perbandingan pixel-ke-
+	## pixel dengan jepretan humanoid menentukan salah-pihak.
+	if ResourceLoader.exists("res://models/AureliaAnim.glb"):
+		var aset: Node = (load("res://models/AureliaAnim.glb") as PackedScene).instantiate()
+		# skalakan ke ±1,6 m & jangkar kaki — helper rig yang sama.
+		var mres := CharacterRig._measure_aabb(aset, Transform3D(), AABB(), false)
+		if mres[1]:
+			var bb: AABB = mres[0]
+			var th: float = maxf(0.01, bb.size.y)
+			var sc := clampf(1.6 / th, 0.02, 30.0)
+			aset.scale = Vector3.ONE * sc
+			aset.position = w.rig.global_position
+			aset.position.y = w.rig.global_position.y - bb.position.y * sc
+		w.add_child(aset)
+		w.rig.root_model().visible = false
+		var ap := AnimMap.find_player(aset)
+		for varian in [["Idle_No", "truth_idleno"],
+				["A_TPose", "truth_tpose"],
+				["Walk_Carry", "truth_walk"]]:
+			ap.play(varian[0], 0.1)
+			for i in 55:
+				await process_frame
+			await _shoot(varian[1] + ".png")
+		aset.queue_free()
+		w.rig.root_model().visible = true
+		for i in 20:
+			await process_frame
+
 	print("== jepretan tersimpan: %d ==" % _saved)
 	quit(0 if _saved >= 4 else 1)
 
