@@ -6,7 +6,7 @@ name: screenshot
 ## menyimpannya ke branch ci-logs (pola aditif). Kanal ini dipilih
 ## karena sandbox dev tidak punya GPU + melarang binary Godot,
 ## sementara blob artefak Actions tidak bisa diunduh dari sandbox.
-## Jepretan mentah PNG dibaca kembali lewat `git show`. (r4)
+## Jepretan mentah PNG dibaca kembali lewat `git show`. (r5)
 ##
 ## Trigger: manual (setelah merged ke default) — selama branch
 ## dev, edit file ini / tests/screenshot_probe.gd memicu run.
