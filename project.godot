@@ -16,6 +16,7 @@ config_version=5
 config/name="Aurelia"
 config/description="RPG open-world anime — dunia 3x3 km dengan 7 region, dimigrasi penuh dari Unity ke Godot 4."
 run/main_scene="res://scenes/world.tscn"
+config/icon="res://icon.svg"
 config/features=PackedStringArray("4.5", "Mobile")
 
 [bootstrap]
