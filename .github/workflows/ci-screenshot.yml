@@ -68,7 +68,7 @@ jobs:
           set -e
           xvfb-run -a -s "-screen 0 1280x720x24" \
             /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
-            --path . --rendering-driver opengl3_32 \
+            --path . --rendering-driver opengl3 \
             --audio-driver Dummy --script tests/ci_screenshot.gd \
             > /tmp/shotlog.txt 2>&1 || true
           grep -E "CSI |SCRIPT ERROR|ERROR" /tmp/shotlog.txt | head -20 || true
