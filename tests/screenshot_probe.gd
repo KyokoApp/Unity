@@ -74,8 +74,22 @@ func _init() -> void:
 		await process_frame
 	await _shoot("shot4_attack.png")
 
+	## Varian siaga ke-2 (pilih nanti): paksa mapping idle ke
+	## Idle_Lantern lalu tenangkan 45 frame — membantu memilih
+	## kandidat siaga final paket UAL2 tanpa menebak.
+	if w.rig.anim != null and w.rig.anim.mapping.has("idle"):
+		var cadangan: String = w.rig.anim.mapping["idle"]
+		if w.rig.anim.player.has_animation("Idle_Lantern"):
+			w.rig.anim.mapping["idle"] = "Idle_Lantern"
+			w.rig.anim.current_role = ""
+			for i in 50:
+				await process_frame
+			await _shoot("shot5_idle2.png")
+			w.rig.anim.mapping["idle"] = cadangan
+			w.rig.anim.current_role = ""
+
 	print("== jepretan tersimpan: %d ==" % _saved)
-	quit(0 if _saved == 4 else 1)
+	quit(0 if _saved >= 4 else 1)
 
 func _shoot(nama: String) -> void:
 	# frame_post_draw = kandungan viewport sudah final di renderer.
