@@ -65,6 +65,7 @@ jobs:
           echo "commit=$GITHUB_SHA run=$GITHUB_RUN_ID" > run-log.txt
           cat /tmp/testlog.txt >> run-log.txt
           cp /tmp/bootlog.txt boot-log.txt 2>/dev/null || echo "bootlog tidak ada" > boot-log.txt
-          git add run-log.txt boot-log.txt probe-log.txt 2>/dev/null || git add -f run-log.txt boot-log.txt
+          cp /tmp/probelog.txt probe-log.txt 2>/dev/null || echo "probelog tidak ada" > probe-log.txt
+          git add run-log.txt boot-log.txt probe-log.txt
           git commit -m "ci log $(date -u '+%Y-%m-%d %H:%M UTC')" >/dev/null
           git push --force origin ci-logs

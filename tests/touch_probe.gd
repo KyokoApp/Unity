@@ -41,7 +41,6 @@ func _initialize() -> void:
 func _run() -> void:
 	print("== touch probe ==")
 	var w = load("res://scenes/world.tscn").instantiate()
-	w.skips_loading_screen = true
 	root.add_child(w)
 
 	# Tunggu boot selesai (batas 3000 frame).
