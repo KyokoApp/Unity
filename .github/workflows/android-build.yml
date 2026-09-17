@@ -1,0 +1,59 @@
+name: android-build
+
+# Bangun APK debug lewat Godot 4.5.1 headless (pengganti android-release.yml
+# era Unity). Push hanya ke branch kerja arena — merge ke main melewati PR.
+on:
+  push:
+    branches: [arena/01a0ac44-unity]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unduh Godot 4.5.1 + export templates
+        run: |
+          GODOT_VER=4.5.1
+          curl -fL "https://github.com/godotengine/godot/releases/download/${GODOT_VER}-stable/Godot_v${GODOT_VER}-stable_linux.x86_64.zip" \
+               -o /tmp/godot.zip
+          unzip -o /tmp/godot.zip -d /tmp/godot-bin
+          chmod +x /tmp/godot-bin/Godot_v${GODOT_VER}-stable_linux.x86_64
+          curl -fL "https://github.com/godotengine/godot/releases/download/${GODOT_VER}-stable/Godot_v${GODOT_VER}-stable_export_templates.tpz" \
+               -o /tmp/tpl.tpz
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VER}.stable"
+          unzip -o /tmp/tpl.tpz -d /tmp/tpl
+          cp /tmp/tpl/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VER}.stable/"
+
+      - name: Siapkan debug keystore (APK pratinjau)
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 >/dev/null 2>&1 || true
+
+      - name: Impor resource sekali
+        run: |
+          /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
+            --headless --path . --import || true
+
+      - name: Ekspor APK
+        run: |
+          mkdir -p build
+          /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
+            --headless --path . --export-debug "Android" build/aurelia-debug.apk \
+            2>&1 | tee /tmp/exportlog.txt
+          test -s build/aurelia-debug.apk
+
+      - name: Unggah artifact APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurelia-debug
+          path: build/aurelia-debug.apk
+          retention-days: 14
