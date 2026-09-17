@@ -32,6 +32,7 @@ uniform float toon_steps : hint_range(2.0, 5.0) = 3.0;
 uniform float toon_softness : hint_range(0.0, 0.5) = 0.30;
 
 varying vec3 world_pos;
+varying float view_depth;
 varying vec3 vertex_albedo;
 
 // hash & value noise murah, tanpa tekstur
@@ -59,6 +60,7 @@ void vertex() {
 }
 
 void fragment() {
+	view_depth = -VERTEX.z;
 	// dua lapis variasi dari posisi dunia XZ: halus & kasar.
 	vec2 wp = world_pos.xz;
 	float fine = value_noise(wp * detail_scale) - 0.5;
@@ -100,7 +102,7 @@ void light() {
 		// Kabut linear manual (jarak pandang dari GfxResolver):
 		// DIFFUSE diganti warna kabut (EMISSION sudah dilipat 1-fog di
 		// fragment, jadi totalnya mix penuh persis MixFog Unity).
-		float depth = -VERTEX.z;
+		float depth = view_depth;
 		float fog = clamp((depth - aurelia_fog_near)
 						  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
 		DIFFUSE_LIGHT = mix(DIFFUSE_LIGHT, aurelia_fog_color.rgb, fog);

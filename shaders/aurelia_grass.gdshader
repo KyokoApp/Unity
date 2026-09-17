@@ -41,6 +41,8 @@ float hash21(vec2 p) {
 	return fract(p.x * p.y);
 }
 
+varying float view_depth;
+
 void vertex() {
 	// Posisi dunia PANGKAL rumpun (titik origin instance).
 	vec3 origin_ws = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
@@ -74,6 +76,7 @@ void vertex() {
 }
 
 void fragment() {
+	view_depth = -VERTEX.z;
 	ALBEDO = albedo_v;
 	// Ambient datar proyek. EMISSION hanya bisa diubah di fragment —
 	// lipat (1-fog) di sini supaya total fog persis MixFog Unity.
@@ -90,7 +93,7 @@ void light() {
 		vec3 lit = ALBEDO * LIGHT_COLOR * (ndl * 0.75 + 0.25) * ATTENUATION;
 
 		// Kabut linear manual (konsisten lintas shader).
-		float depth = -VERTEX.z;
+		float depth = view_depth;
 		float fog = clamp((depth - aurelia_fog_near)
 						  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
 		lit = mix(lit, aurelia_fog_color.rgb, fog);

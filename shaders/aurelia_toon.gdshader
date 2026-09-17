@@ -38,12 +38,14 @@ uniform float emission_strength : hint_range(0.0, 4.0) = 0.0;
 uniform float alpha_cutoff : hint_range(0.0, 1.0) = 0.0;
 
 varying vec3 world_pos;
+varying float view_depth;
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
 void fragment() {
+	view_depth = -VERTEX.z;
 	vec4 tex = texture(base_map, UV);
 	vec3 albedo = tex.rgb * base_color.rgb;
 	float alpha = tex.a * base_color.a;
@@ -99,7 +101,7 @@ void light() {
 		DIFFUSE_LIGHT += spec_color.rgb * spec * atten * LIGHT_COLOR;
 
 		// Kabut linear manual (konsisten dengan shader lain).
-		float depth = -VERTEX.z;
+		float depth = view_depth;
 		float fog = clamp((depth - aurelia_fog_near)
 						  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
 		DIFFUSE_LIGHT = mix(DIFFUSE_LIGHT, aurelia_fog_color.rgb, fog);

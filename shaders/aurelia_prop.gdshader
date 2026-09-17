@@ -24,12 +24,15 @@ uniform float toon_softness : hint_range(0.0, 0.5) = 0.30;
 
 varying vec3 albedo_v;
 
+varying float view_depth;
+
 void vertex() {
 	// Warna instance MultiMesh (putih untuk batang/batu).
 	albedo_v = COLOR.rgb * albedo_tint.rgb;
 }
 
 void fragment() {
+	view_depth = -VERTEX.z;
 	ALBEDO = albedo_v;
 	float depth = -VERTEX.z;
 	float fogf = clamp((depth - aurelia_fog_near)
@@ -51,7 +54,7 @@ void light() {
 
 		vec3 lit = ALBEDO * LIGHT_COLOR * diffuse * ATTENUATION;
 
-		float depth = -VERTEX.z;
+		float depth = view_depth;
 		float fog = clamp((depth - aurelia_fog_near)
 						  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
 		DIFFUSE_LIGHT += mix(lit, aurelia_fog_color.rgb, fog);
