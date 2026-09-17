@@ -37,10 +37,10 @@ func _run() -> void:
 	_ambil("shot_a")
 
 	# Close-up karakter dari depan.
-	var rig := _w.get("camera_rig")
+	var rig: Node = _w.get("camera_rig")
 	if rig != null:
 		rig.call("set_distance", 3.1)
-		rig.set("yaw", rig.get("yaw") + 170.0)
+		rig.set("yaw", float(rig.get("yaw")) + 170.0)
 	for i in 45:
 		await process_frame
 	_ambil("shot_b")
@@ -48,7 +48,7 @@ func _run() -> void:
 	# Kembali ke sudut bermain.
 	if rig != null:
 		rig.call("set_distance", 5.0)
-		rig.set("yaw", rig.get("yaw") - 170.0)
+		rig.set("yaw", float(rig.get("yaw")) - 170.0)
 	for i in 45:
 		await process_frame
 	_ambil("shot_c")
