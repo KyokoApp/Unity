@@ -32,6 +32,15 @@ func _init() -> void:
 	for i in 90:
 		await process_frame
 
+	# Bukti faktual ke log: nama klip PERSIS seperti yang Godot lihat
+	# + peta peran + laporan bind (model/kalibrasi/tekstur).
+	print("REPORTB %s" % w.rig.last_bind_report)
+	if w.rig.anim != null:
+		print("REPORTA %s" % w.rig.anim.last_report)
+		print("REPORTM mapping=%s" % str(w.rig.anim.mapping))
+	print("REPORTT tex=%d/%d" % [ToonCharacterSetup.last_tex,
+		ToonCharacterSetup.last_hadir])
+
 	await _shoot("shot1_idle.png")
 
 	## Balik karakter menghadap kamera (motor hanya memutar rig saat

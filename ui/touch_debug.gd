@@ -204,7 +204,7 @@ func _refresh_text() -> void:
 	var rig_txt := "rig:kosong"
 	if rig != null:
 		anim_txt = rig.anim_debug_line()
-		rig_txt = rig.last_bind_report
+		rig_txt = rig.debug_bind_line
 	_strip.text = "DBG %s | layar %.0fx%.0f kanvas %.0fx%.0f x%.2f\n" % [
 			BuildStamp.id(), vs.x, vs.y, kanvas.x, kanvas.y, sk] \
 		+ "os turun %d seret %d | stikGUI %d | kamera %d | stik:%s\n" % [

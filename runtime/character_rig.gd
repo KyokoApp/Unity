@@ -74,6 +74,9 @@ var poses: Dictionary:
 ## Jalur animasi GLB (non-prosedural). aktif = anim_active.
 var anim: CharacterAnimDriver
 var anim_active := false
+## Baris diagnostik ringkas untuk strip debug (versi panjang = last_bind_report).
+var debug_bind_line := ""
+var _calib_h := 0.0
 
 var _skel: MannequinSkeleton
 var _poses: Dictionary = {}         ## joint(String) -> Vector3 ter-smooth
@@ -157,6 +160,15 @@ func bind() -> void:
 	last_bind_report = " & ".join(_bind_report_parts) \
 		+ " | tekstur %d/%d surface bertuan" % [ToonCharacterSetup.last_tex,
 			maxi(1, ToonCharacterSetup.last_hadir)]
+	var model_short := "?"
+	for prt in _bind_report_parts:
+		if prt.begins_with("model="):
+			model_short = prt.trim_prefix("model=").get_file()
+	var jml_peran := anim.mapping.size() if anim != null else 0
+	debug_bind_line = "%s h=%.2f | tex=%d/%d | anim=%d" % [
+		model_short, _calib_h,
+		ToonCharacterSetup.last_tex,
+		maxi(1, ToonCharacterSetup.last_hadir), jml_peran]
 	BootLog.add(last_bind_report)
 	BootLog.add(anim.last_report if anim != null else "anim: nonaktif")
 
@@ -181,6 +193,7 @@ func _calibrate_model(model: Node3D) -> void:
 	model.position.y = -bb.position.y * s
 	if model_yaw_deg != 0.0:
 		model.rotation_degrees.y = model_yaw_deg
+	_calib_h = h
 	if s != 1.0 or model_yaw_deg != 0.0:
 		_bind_report_parts.append("kalibr h=%.2f s=%.2f yaw=%.0f" % [h, s, model_yaw_deg])
 	else:
