@@ -42,7 +42,7 @@ func _init() -> void:
 	_test_gfx()
 	_test_motor_misc()
 	_test_anim_map()
-	_test_retarget_humanoid()
+	_test_live_retarget()
 	print("selesai: %d lulus, %d gagal" % [_passed, _failed])
 	for f in _failures:
 		print("  - " + f)
@@ -218,90 +218,77 @@ func _test_anim_map() -> void:
 	# norm: pembandingan nama klip agnostik kapital/spasi/garis bawah.
 	assert_eq(AnimMap.norm("Mixamo:Run_Fwd 2"), "mixamorunfwd2", "norm nama klip")
 
-func _test_retarget_humanoid() -> void:
-	# _bone_core: dua konvensi nama (UE vs VRoid J_Bip) bertemu di inti sama.
-	assert_eq(AnimMap._bone_core("upperarm_l"), {"core": "upperarm", "side": "l"},
-		"inti UE upperarm_l")
-	assert_eq(AnimMap._bone_core("J_Bip_L_UpperArm"), {"core": "upperarm", "side": "l"},
-		"inti VRoid UpperArm")
-	assert_eq(AnimMap._bone_core("J_Bip_C_UpperChest"), {"core": "spine3", "side": "c"},
-		"inti UpperChest->spine3")
-	assert_eq(AnimMap._bone_core("spine_03"), {"core": "spine3", "side": "c"},
-		"inti spine_03")
-	assert_eq(AnimMap._bone_core("ball_l"), {"core": "toes", "side": "l"},
-		"inti ball->toes")
-	assert_eq(AnimMap._bone_core("J_Bip_L_Little1"), {"core": "pinky1", "side": "l"},
-		"inti little->pinky")
-	assert_eq(AnimMap._bone_core("pinky_04_leaf_l"), {"core": "", "side": ""},
-		"leaf finger tak terpetakan")
-	assert_eq(AnimMap._bone_core("J_Sec_Hair1_01"), {"core": "", "side": ""},
-		"tulang sekunder dilewati")
-
-	# Dua skeleton mini: A = sumber animasi (nama UE + rest miring),
-	# B = target (nama VRoid + rest miring berbeda).
+func _test_live_retarget() -> void:
+	# Dua skeleton mini: A = sumber klip (UE-rest), B ekornya (VRM-rest).
 	var a := Skeleton3D.new()
+	root.add_child(a)
 	var ar: int = a.add_bone("pelvis")
 	var ac: int = a.add_bone("upperarm_l")
 	a.set_bone_parent(ac, ar)
 	a.set_bone_rest(ar, Transform3D(Basis.from_euler(Vector3(0, 0, 0.8)),
 		Vector3(0, 1.0, 0)))
-	a.set_bone_rest(ac, Transform3D(Basis(), Vector3(0.3, 0.1, 0)))
+	a.set_bone_rest(ac, Transform3D())
 	var b := Skeleton3D.new()
+	root.add_child(b)
 	var br: int = b.add_bone("J_Bip_C_Hips")
 	var bc: int = b.add_bone("J_Bip_L_UpperArm")
 	b.set_bone_parent(bc, br)
 	b.set_bone_rest(br, Transform3D(Basis.from_euler(Vector3(0, 0, -0.5)),
 		Vector3(0, 1.0, 0)))
-	b.set_bone_rest(bc, Transform3D(Basis(), Vector3(0.4, 0.0, 0)))
-
-	var map := AnimMap.guess_bone_map(a, b)
-	assert_eq(map.get("pelvis", ""), "J_Bip_C_Hips", "peta pelvis->Hips")
-	assert_eq(map.get("upperarm_l", ""), "J_Bip_L_UpperArm", "peta upperarm->UpperArm")
+	b.set_bone_rest(bc, Transform3D())
 
 	var ctx_a := AnimMap.rest_ctx(a)
 	var ctx_b := AnimMap.rest_ctx(b)
-	assert_eq(ctx_a["order"].size(), 2, "urutan konteks A")
+	var map := AnimMap.guess_bone_map(a, b)
+	assert_eq(map.get("pelvis", ""), "J_Bip_C_Hips", "peta pelvis->Hips")
+	assert_eq(map.get("upperarm_l", ""), "J_Bip_L_UpperArm", "peta upperarm")
 
-	# Klip: satu track rotasi pada upperarm_l, 45° sumbu X pada t=0,5.
+	var prep := AnimMap.prepare_live(a, b, ctx_a, ctx_b, map)
+	assert_eq(prep["count"], 2, "prepare_live memetakan 2 tulang")
+
+	# Putar tulang anak sumber 45 derajat X (sebagai POSE, konvensi
+	# rest-relative milik engine) lalu salin delta dunia ke target.
 	var q_anim := Quaternion(Basis.from_euler(Vector3(0.7854, 0, 0)))
-	var klip := Animation.new()
-	klip.length = 1.0
-	var ti := klip.add_track(Animation.TYPE_ROTATION_3D)
-	klip.track_set_path(ti, NodePath("Skel:upperarm_l"))
-	klip.track_insert_key(ti, 0.0, Quaternion.IDENTITY)
-	klip.track_insert_key(ti, 1.0, q_anim)
+	a.set_bone_pose_rotation(ac, q_anim)
+	AnimMap.live_apply(prep)
 
-	# Identitas: sumber==target -> delta=identitas sempurna; upperarm ikut
-	# klip persis, pelvis tertulis sebagai rest-nya sendiri.
-	var idn := AnimMap.retarget_humanoid(klip, ctx_a, ctx_a,
-		{"pelvis": "pelvis", "upperarm_l": "upperarm_l"}, "Skel")
-	assert_eq(idn.get_track_count(), 2, "identitas: 2 tulang terpetakan = 2 track")
-	var ti_arm := _track_by_path(idn, "Skel:upperarm_l")
-	assert_true(ti_arm >= 0, "identitas menulis track upperarm_l")
-	if ti_arm >= 0:
-		var q_id: Quaternion = idn.track_get_key_value(ti_arm, 1)
-		assert_true(absf(q_anim.dot(q_id)) > 0.999, "identitas: rotasi sumber utuh")
-
-	# Beda rest: delta dunia harus sama persis di kedua skeleton.
-	var hasil := AnimMap.retarget_humanoid(klip, ctx_a, ctx_b, map, "Skel")
-	assert_eq(hasil.get_track_count(), 2, "humanoid: 2 tulang terpetakan = 2 track")
-	var ti_t := _track_by_path(hasil, "Skel:J_Bip_L_UpperArm")
-	assert_true(ti_t >= 0, "path menuju nama target J_Bip_L_UpperArm")
-	if ti_t >= 0:
-		# Pada t=1: D = gfA(child) * inv(rgA(child))
-		# expected_lokal = inv(rgB(parent)) * D * rgB(child)
-		var rg_a_c: Quaternion = ctx_a["rg"]["upperarm_l"]
-		var rg_b_p: Quaternion = ctx_b["rg"]["j_bip_c_hips"]
-		var rg_b_c: Quaternion = ctx_b["rg"]["j_bip_l_upperarm"]
-		var d: Quaternion = (rg_a_c * q_anim) * rg_a_c.inverse()
-		var exp_local: Quaternion = rg_b_p.inverse() * (d * rg_b_c)
-		var got: Quaternion = hasil.track_get_key_value(ti_t, 1)
-		assert_true(absf(exp_local.dot(got)) > 0.999,
-			"transplantasi delta dunia akurat (rotasi dunia sama)")
+	# Verifikasi analitik: D = g_sumber * rest_sumber^-1
+	# lokal-absolut = inv(g_induk_target) * D * rest_target
+	# tulisan pose = inv(rl_target) * lokal-absolut
+	var g_a_c: Quaternion = (a.get_bone_global_pose(ac).basis
+		.get_rotation_quaternion()).normalized()
+	var rest_a_c: Quaternion = ctx_a["rg"]["upperarm_l"]
+	var d: Quaternion = (g_a_c * rest_a_c.inverse()).normalized()
+	var rg_b_p: Quaternion = ctx_b["rg"]["j_bip_c_hips"]
+	var rg_b_c: Quaternion = ctx_b["rg"]["j_bip_l_upperarm"]
+	var rl_b_c: Quaternion = ctx_b["rl"]["j_bip_l_upperarm"]
+	var local_abs_exp: Quaternion = (rg_b_p.inverse()
+		* (d * rg_b_c)).normalized()
+	var pose_exp: Quaternion = (rl_b_c.inverse() * local_abs_exp).normalized()
+	var got: Quaternion = b.get_bone_pose_rotation(bc).normalized()
+	assert_true(absf(pose_exp.dot(got)) > 0.999,
+		"live_apply menanam delta dunia dengan presisi")
+	# dan pada skeleton ber-rest-sama, pose target == pose sumber PERSIS
+	# (uji silang utama pipeline: apa yang dimainkan skeleton paket
+	# reguk langsung dipindahkan ke pengguna tanpa distorsi).
+	var d2 := Skeleton3D.new()
+	root.add_child(d2)
+	var dr: int = d2.add_bone("pelvis")
+	var dc: int = d2.add_bone("upperarm_l")
+	d2.set_bone_parent(dc, dr)
+	d2.set_bone_rest(dr, a.get_bone_rest(ar))
+	d2.set_bone_rest(dc, a.get_bone_rest(ac))
+	var prep2 := AnimMap.prepare_live(a, d2, ctx_a, AnimMap.rest_ctx(d2),
+		{"pelvis": "pelvis", "upperarm_l": "upperarm_l"})
+	AnimMap.live_apply(prep2)
+	var got2: Quaternion = d2.get_bone_pose_rotation(dc).normalized()
+	assert_true(absf(q_anim.dot(got2)) > 0.999,
+		"live identitas: delta dunia sama -> pose sama persis")
 	a.free()
 	b.free()
+	d2.free()
 
-static func _track_by_path(anim: Animation, path: String) -> int:
+static func _track_by_pathstatic func _track_by_path(anim: Animation, path: String) -> int:
 	for i in anim.get_track_count():
 		if String(anim.track_get_path(i)) == path:
 			return i

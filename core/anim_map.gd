@@ -299,106 +299,66 @@ static func rest_ctx(skel: Skeleton3D) -> Dictionary:
 		rg[b] = ((rg.get(pn, Quaternion.IDENTITY) if pn != "" else Quaternion.IDENTITY) * q).normalized()
 	return {"order": order, "p": p, "rl": rl, "rg": rg}
 
-## Sample sebuah track rotasi pada waktu t (slerp antar kunci).
-static func _sample_quat(anim: Animation, ti: int, t: float) -> Quaternion:
-	var n := anim.track_get_key_count(ti)
-	if n == 0:
-		return Quaternion.IDENTITY
-	var v0: Quaternion = (anim.track_get_key_value(ti, 0) as Quaternion).normalized()
-	if n == 1 or t <= anim.track_get_key_time(ti, 0):
-		return v0
-	for k in range(1, n):
-		var tk: float = anim.track_get_key_time(ti, k)
-		if t <= tk:
-			var ta: float = anim.track_get_key_time(ti, k - 1)
-			var qa: Quaternion = (anim.track_get_key_value(ti, k - 1) as Quaternion).normalized()
-			var qb: Quaternion = (anim.track_get_key_value(ti, k) as Quaternion).normalized()
-			var f := 0.0 if tk <= ta else (t - ta) / (tk - ta)
-			return qa.slerp(qb, clampf(f, 0.0, 1.0)).normalized()
-	return (anim.track_get_key_value(ti, n - 1) as Quaternion).normalized()
+## ------------------------------------------------------------
+## LIVE RETARGET — arsitektur definitif untuk dua skeleton beda
+## nama (UE -> VRoid): file animasi dijalankan NATIV di skeleton
+## paketnya sendiri (AnimationPlayer menguasai — seratus persen
+## benar), lalu DELTA ROTASI DUNIA tiap tulang terpetakan
+## disalin per-frame ke skeleton pengguna.
+##
+## Kenapa bukan bake (klip ditulis ulang): klip GLT Godot
+## memakai konvensi pose-rest yang rumit bila diteliti manual —
+## dengan menyalin dari skeleton yang SEDANG reguler bermain,
+## pose sumber dijamin engine; yang kita hitung hanya delta dunia.
+## -------------------------------------------------------------
+
+## Persiapan rest + daftar tulang terpetakan (dihitung SEKALI).
+static func prepare_live(from_skel: Skeleton3D, to_skel: Skeleton3D,
+		ctx_f: Dictionary, ctx_t: Dictionary, bone_map: Dictionary) -> Dictionary:
+	var per_bone := {}
+	for fb in bone_map:
+		var fi := from_skel.find_bone(String(fb))
+		var ti := to_skel.find_bone(String(bone_map[fb]))
+		if fi < 0 or ti < 0:
+			continue
+		var fb_low := String(fb).to_lower()
+		var tb_low := String(bone_map[fb]).to_lower()
+		var rest_f: Quaternion = ctx_f["rg"].get(fb_low, Quaternion.IDENTITY)
+		per_bone[tb_low] = {
+			"fi": fi, "ti": ti,
+			"rest_f_inv": rest_f.inverse(),
+			"rest_t": ctx_t["rg"].get(tb_low, Quaternion.IDENTITY),
+		}
+	return {"from_skel": from_skel, "to_skel": to_skel,
+		"ctx_t": ctx_t, "per_bone": per_bone, "count": per_bone.size()}
+
+## Salin delta dunia per frame (dipanggil SETELAH AnimationPlayer
+## menyelesaikan frame-nya — driver menjamin urutan lewat _process).
+static func live_apply(prep: Dictionary) -> void:
+	var from_skel: Skeleton3D = prep["from_skel"]
+	var to_skel: Skeleton3D = prep["to_skel"]
+	var ctx_t: Dictionary = prep["ctx_t"]
+	var per_bone: Dictionary = prep["per_bone"]
+	var gt := {}
+	for b in ctx_t["order"]:
+		var pn: String = ctx_t["p"].get(b, "")
+		var pg: Quaternion = gt.get(pn, Quaternion.IDENTITY)
+		var rl: Quaternion = ctx_t["rl"].get(b, Quaternion.IDENTITY)
+		var local_abs: Quaternion = rl
+		if per_bone.has(b):
+			var e: Dictionary = per_bone[b]
+			var qa: Quaternion = from_skel.get_bone_global_pose(e["fi"]).basis.get_rotation_quaternion().normalized()
+			var d: Quaternion = (qa * e["rest_f_inv"]).normalized()
+			var g_abs: Quaternion = (d * e["rest_t"]).normalized()
+			local_abs = (pg.inverse() * g_abs).normalized()
+			## set_bone_pose_rotation = pose (rest-relative):
+			## kunci tulisan = rl⁻¹ * lokal-absolut.
+			var pose_val: Quaternion = (rl.inverse() * local_abs).normalized()
+			to_skel.set_bone_pose_rotation(e["ti"], pose_val)
+		gt[b] = (pg * local_abs).normalized()
 
 ## Retarget klip humanoid (tulang beda nama): pindahkan delta rotasi
 ## dunia per tulang yang terpetakan. Mengembalikan Animation BARU
-## (track detik posisi/skala/morf dibuang dengan sadar).
-static func retarget_humanoid(anim: Animation, from_ctx: Dictionary,
-		to_ctx: Dictionary, bone_map: Dictionary, skel_prefix: String) -> Animation:
-	var out := Animation.new()
-	out.length = anim.length
-
-	# waktu kunci gabungan dari track rotasi + track per tulang sumber
-	var times: Array = []
-	var track_of := {}                    # bone_lower -> index track
-	for i in anim.get_track_count():
-		if anim.track_get_type(i) != Animation.TYPE_ROTATION_3D:
-			continue
-		var sub := String(anim.track_get_path(i).get_concatenated_subnames()).to_lower()
-		track_of[sub] = i
-		for k in anim.track_get_key_count(i):
-			var t: float = anim.track_get_key_time(i, k)
-			if not times.has(t):
-				times.append(t)
-	times.sort()
-	if times.is_empty():
-		return out
-
-	# pemetaan balik: tulang target_lower -> tulang sumber_lower
-	var fwd := {}
-	for fb in bone_map:
-		fwd[String(fb).to_lower()] = String(bone_map[fb]).to_lower()
-	var rev := {}
-	for fb2 in fwd:
-		rev[fwd[fb2]] = fb2
-	# nama asli tulang target (untuk path track)
-	var to_asli := {}
-	for b in to_ctx["order"]:
-		to_asli[b] = b
-	for nm in bone_map.values():
-		to_asli[String(nm).to_lower()] = String(nm)
-
-	var rows := {}     # target_lower -> [[t, quat_lokal], ...]
-	for t in times:
-		# 1) pose global sumber pada t (induk dulu). Konvensi Godot:
-		# nilai track ROTATION_3D = DELTA pose atas rest (pose, bukan
-		# rotasi lokal absolut) — komposisi = induk * rest * pose.
-		var gf := {}
-		for b in from_ctx["order"]:
-			var rl_src: Quaternion = from_ctx["rl"].get(b, Quaternion.IDENTITY)
-			var lq := rl_src
-			if track_of.has(b):
-				lq = (rl_src * _sample_quat(anim, track_of[b], t)).normalized()
-			var pn: String = from_ctx["p"].get(b, "")
-			gf[b] = (gf.get(pn, Quaternion.IDENTITY) * lq).normalized()
-		# 2) latih global target: delta dunia ditransplantasi ke rest target
-		var gt := {}
-		for b2 in to_ctx["order"]:
-			var pn2: String = to_ctx["p"].get(b2, "")
-			var pg: Quaternion = gt.get(pn2, Quaternion.IDENTITY)
-			var lq2: Quaternion
-			if rev.has(b2):
-				var sb: String = rev[b2]
-				var rest_from: Quaternion = from_ctx["rg"].get(sb, Quaternion.IDENTITY)
-				var d: Quaternion = (gf.get(sb, rest_from) * rest_from.inverse()).normalized()
-				lq2 = (pg.inverse() * (d * to_ctx["rg"].get(b2, Quaternion.IDENTITY))).normalized()
-				if not rows.has(b2):
-					rows[b2] = []
-				rows[b2].append([t, lq2])
-			else:
-				lq2 = to_ctx["rl"].get(b2, Quaternion.IDENTITY)
-			gt[b2] = (pg * lq2).normalized()
-
-	# 3) tulis track rotasi per tulang terpetakan. Nilai pada rows
-	# adalah rotasi lokal ABSOLUT (frame induk); konvensi track Godot
-	# = pose (delta atas rest) -> kunci: rl⁻¹ * lokal-absolut.
-	for b2 in rows:
-		var ti := out.add_track(Animation.TYPE_ROTATION_3D)
-		out.track_set_path(ti, NodePath("%s:%s" % [skel_prefix, to_asli.get(b2, b2)]))
-		var rl_to: Quaternion = to_ctx["rl"].get(b2, Quaternion.IDENTITY)
-		for row in rows[b2]:
-			out.track_insert_key(ti, row[0],
-				(rl_to.inverse() * row[1]).normalized())
-	return out
-
-## Iterasi indeks track (helper: hindari range terbalik menyebar).
 static func dup_iter(anim: Animation) -> Array:
 	var idx := []
 	for i in anim.get_track_count():

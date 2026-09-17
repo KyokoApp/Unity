@@ -35,16 +35,70 @@ var last_report := ""
 var _lock := 0.0
 var _oneshot_role := ""
 
+## Mode LIVE retarget: paket animasi bermain nativ di skeleton
+## sendiri (instans tersembunyi hidup di world), delta dunia
+## disalin tiap frame ke skeleton pengguna (lihat AnimMap).
+var _live := false
+var _live_prep: Dictionary = {}
+
+func _process(_dt: float) -> void:
+	if _live:
+		AnimMap.live_apply(_live_prep)
+
 ## Dipanggil CharacterRig setelah model terpasang.
-## libs: Array berisi {"lib": AnimationLibrary, "retarget": bool}
-## skel_prefix: path relatif model_root -> node Skeleton3D
-##            (mis. "Skeleton3D" atau "RootNode/Skeleton3D").
+## libs: Array berisi {"lib": AnimationLibrary, "mode": "", "...", ...};
+## entri mode "humanoid" membawa payload live (live_src/live_skel/
+## map/from_ctx/to_ctx/to_skel).
+## skel_prefix: path relatif model_root -> node Skeleton3D.
 ## Mengembalikan jumlah peran yang berhasil dipeta.
 func setup(model_root: Node3D, libs: Array, skel_prefix: String) -> int:
 	active = false
+	_live = false
+	_live_prep = {}
 	mapping.clear()
 	player = null
 	last_report = ""
+
+	## ---- jalur LIVE (humanoid beda-nama) -------------------------
+	for s in libs:
+		if s.get("mode", "") != "humanoid":
+			continue
+		var src = s
+		var p := AnimMap.find_player(src["live_src"])
+		if p == null:
+			continue
+		var prep := AnimMap.prepare_live(src["live_skel"], src["to_skel"],
+			src["from_ctx"], src["to_ctx"], src["map"])
+		if prep.get("count", 0) < 6:
+			continue
+		player = p
+		_live_prep = prep
+		_live = true
+		break
+
+	if _live:
+		## nama klip persis seperti yang dimiliki library paket —
+		## play() native Godot, crossfade native, TIDAK ada penyalinan.
+		var nama_semua: Array = []
+		for lib_name in player.get_animation_library_list():
+			nama_semua.append_array(player.get_animation_library(lib_name).get_animation_list())
+		var m := AnimMap.resolve(nama_semua)
+		m = AnimMap.fill_fallbacks(m)
+		for role in AnimMap.ROLE_ORDER:
+			var nm: String = m.get(role, "")
+			if nm != "":
+				mapping[role] = nm
+		var punya_loko: bool = mapping.get("idle", "") != ""
+		var punya_serang: bool = mapping.get("attack0", "") != ""
+		active = punya_loko or punya_serang
+		if active:
+			current_role = ""
+			_mainkan_peran(_peran_lokomosi(0.0, true, false, false), 0.0, true)
+		last_report = "%s | live=%d map=%d" % [AnimMap.report(mapping),
+			1 if _live else 0, _live_prep.get("count", 0)]
+		return mapping.size()
+
+	## ---- jalur klasik (skeleton sama / aset virtual) -------------
 
 	# 1) kumpulkan semua clip dari semua library (bare name -> sumber)
 	var semua: Array = []                # {"name": String, "src": int}
@@ -89,11 +143,7 @@ func setup(model_root: Node3D, libs: Array, skel_prefix: String) -> int:
 		var mentah: Animation = (libs[src]["lib"] as AnimationLibrary).get_animation(nm)
 		var anim: Animation = mentah.duplicate()
 		var sumber: Dictionary = libs[src]
-		var mode: String = sumber.get("mode", "")
-		if mode == "humanoid":
-			anim = AnimMap.retarget_humanoid(anim, sumber["from_ctx"],
-				sumber["to_ctx"], sumber["map"], skel_prefix)
-		elif mode == "prefix":
+		if sumber.get("mode", "") == "prefix":
 			anim = AnimMap.retarget_clip(anim, skel_prefix)
 		if role in AnimMap.LOCO_ROLES:
 			anim = AnimMap.strip_xz(anim)

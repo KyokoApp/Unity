@@ -199,6 +199,12 @@ func _calibrate_model(model: Node3D) -> void:
 	else:
 		_bind_report_parts.append("kalibr h=%.2f ok" % h)
 
+static func _hide_visuals(n: Node) -> void:
+	if n is VisualInstance3D:
+		(n as VisualInstance3D).visible = false
+	for c in n.get_children():
+		_hide_visuals(c)
+
 static func _measure_aabb(n: Node, xf: Transform3D, acc: AABB, has: bool) -> Array:
 	var local := xf
 	var a := acc
@@ -279,8 +285,16 @@ func _bind_anim(model: Node3D) -> void:
 		if ap != null:
 			for lib_name in ap.get_animation_library_list():
 				libs.append({"lib": ap.get_animation_library(lib_name),
-					"mode": mode, "from_ctx": from_ctx,
-					"to_ctx": to_ctx, "map": map})
+					"mode": mode, "from_ctx": from_ctx, "to_ctx": to_ctx,
+					"map": map, "live_src": inst, "live_skel": from_skel,
+					"to_skel": to_skel})
+		if mode == "humanoid":
+			## Paket animasi dibuat bermain nativ pada skeletonnya sendiri
+			## (disembunyikan) — delta disalin per-frame oleh driver.
+			inst.name = "AnimSrc"
+			_hide_visuals(inst)
+			_root_node.add_child(inst)
+			continue
 		sisa.append(inst)
 	for st in sisa:
 		st.queue_free()
