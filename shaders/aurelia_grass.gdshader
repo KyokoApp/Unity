@@ -24,8 +24,8 @@ global uniform float aurelia_fog_near;
 global uniform float aurelia_fog_far;
 global uniform vec4 aurelia_ambient_color : source_color;
 
-uniform vec4 base_color : source_color = vec4(0.20, 0.42, 0.16, 1.0);
-uniform vec4 tip_color : source_color = vec4(0.55, 0.78, 0.30, 1.0);
+uniform vec4 base_color : source_color = vec4(0.19, 0.40, 0.16, 1.0);
+uniform vec4 tip_color : source_color = vec4(0.50, 0.71, 0.29, 1.0);
 uniform float wind_strength : hint_range(0.0, 0.6) = 0.16;
 uniform float wind_speed : hint_range(0.0, 4.0) = 1.1;
 uniform float fade_start : hint_range(10.0, 80.0) = 22.0;
