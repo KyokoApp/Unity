@@ -203,25 +203,31 @@ static func _measure_aabb(n: Node, xf: Transform3D, acc: AABB, has: bool) -> Arr
 
 ## ------------------------------------------------------------
 ## Sambungkan jalur animasi GLB: klip dari model sendiri dan/atau
-## file animasi terpisah (retarget prafiks skeleton otomatis).
+## file animasi terpisah. Dua mode retarget otomatis per sumber:
+##   "prefix"    — nama tulang kebanyakan sama: ganti prafiks path.
+##   "humanoid"  — nama tulang beda (mis. kemasan UE -> J_Bip VRoid):
+##                 transplantasi delta rotasi dunia ke rest target.
+## Instance file eksternal dipertahankan hidup selama konversi
+## (konteks rest dibutuhkan), lalu dibebaskan.
 func _bind_anim(model: Node3D) -> void:
 	anim = CharacterAnimDriver.new()
 	anim.name = "AnimDriver"
 	add_child(anim)
 
-	var skel := AnimMap.find_skeleton(model)
+	var to_skel := AnimMap.find_skeleton(model)
 	var skel_prefix := "Skeleton3D"
-	if skel != null:
-		skel_prefix = str(model.get_path_to(skel))
+	if to_skel != null:
+		skel_prefix = str(model.get_path_to(to_skel))
+	var to_ctx: Dictionary = AnimMap.rest_ctx(to_skel) if to_skel != null else {}
 
 	var libs: Array = []
-	# Klip yang dibawa model itu sendiri (prafiks sudah benar).
+	# Klip yang dibawa model itu sendiri (path sudah benar).
 	var mesh_player := AnimMap.find_player(model)
 	if mesh_player != null:
 		for lib_name in mesh_player.get_animation_library_list():
-			libs.append({"lib": mesh_player.get_animation_library(lib_name),
-				"retarget": false})
-	# Klip dari file animasi terpisah (perlu retarget prafiks).
+			libs.append({"lib": mesh_player.get_animation_library(lib_name)})
+
+	var sisa: Array = []
 	for p in anim_paths:
 		if not ResourceLoader.exists(p):
 			continue
@@ -234,11 +240,35 @@ func _bind_anim(model: Node3D) -> void:
 		if inst == null:
 			continue
 		var ap := AnimMap.find_player(inst)
+		var from_skel := AnimMap.find_skeleton(inst)
+		var mode := "prefix"
+		var map: Dictionary = {}
+		var from_ctx: Dictionary = {}
+		if ap == null and from_skel == null:
+			inst.queue_free()
+			continue
+		if from_skel != null and to_skel != null:
+			var sama := 0
+			for i in from_skel.get_bone_count():
+				if to_skel.find_bone(from_skel.get_bone_name(i)) >= 0:
+					sama += 1
+			if sama < maxi(6, from_skel.get_bone_count() / 2):
+				mode = "humanoid"
+				from_ctx = AnimMap.rest_ctx(from_skel)
+				map = AnimMap.guess_bone_map(from_skel, to_skel)
+				if map.size() < 8:
+					mode = "prefix"
+					from_ctx = {}
+					map = {}
+			_bind_report_parts.append("mod=%s map=%d" % [mode, map.size()])
 		if ap != null:
 			for lib_name in ap.get_animation_library_list():
 				libs.append({"lib": ap.get_animation_library(lib_name),
-					"retarget": true})
-		inst.queue_free()
+					"mode": mode, "from_ctx": from_ctx,
+					"to_ctx": to_ctx, "map": map})
+		sisa.append(inst)
+	for st in sisa:
+		st.queue_free()
 
 	var n := anim.setup(model, libs, skel_prefix)
 	anim_active = anim.active

@@ -107,6 +107,26 @@ STATUS PELAKSANAAN (tahap 2, 17 Sep 2026):
   Setelah laporan keluar: sesuaikan kandidat nama klip di `AnimMap._CAND`
   bila nama tak umum, lalu push (cache otomatis dipakai build berikutnya).
 
+ASET NYATA (terbukti lewat `ci-logs:asset-report.txt`, 17 Sep 2026):
+- Berkas #1 = zip **Universal Animation Library 2 [Standard]**:
+  `Unreal-Godot/UAL2_Standard.glb` = 43 klip (in-place; nama:
+  `Idle_*/Walk_Carry_Loop/Sword_Regular_A|B|C/Sword_Dash/Shield_Dash/
+  NinjaJump_Start|Land/NinjaJump_Idle_Loop/Sword_Heavy_Combo/OverhandThrow/…`),
+  skeleton kemasan UE 65 tulang (pelvis, spine_01..03, thigh_l, …);
+  `_RM` = varian root-motion (dihindari tempat.py); ada `Mannequin_F.glb`.
+- Berkas #2 = karakter pengguna GLB 19 MB (VRoid/VRM, 3 mesh, 24 material,
+  tulang `J_Bip_*` + sekunder `J_Sec_*`), TINGGI ±1,57 m ✓ kalibrasi auto.
+- Tulang BEDA NAMA → retarget **humanoid** di `AnimMap.retarget_humanoid`:
+  `guess_bone_map` (inti tulang UE↔VRoid via `_ALIAS`) + transplantasi delta
+  rotasi dunia vs rest (benar walau orientasi rest beda); hanya track rotasi
+  tulang terpetakan. Mode "prefix" (nama sama) tetap opsi otomatis. Teruji:
+  identitas == sumber persis + uji delta-dunia pada rest kasar A/B.
+- Berkas #3 (rumput 4c) unduhan gagal = halaman HTML 19 KB; khusus 4c nanti.
+- Cache `user-assets-v1` sudah terisi {AureliaChar.glb=VRM 19 MB,
+  AureliaAnim.glb=UAL2 8 MB}; `android-build` otomatis me-restore.
+  Yang mungkin perlu diset pasca-lihat di HP: `model_yaw_deg` (arah hadap),
+  kandidat klip di `AnimMap._CAND`, dan durasi one-shot di AnimDriver.
+
 ### 4c. 🟢 Rumput dari aset user
 LINK USER: https://drive.google.com/file/d/18WFEJckB7Kn1ifvTe_JpAs7bB4iKbGZf/view?usp=drivesdk
 Sekarang rumput 100% prosedural: `runtime/grass_field.gd` (MultiMesh per-chunk) +

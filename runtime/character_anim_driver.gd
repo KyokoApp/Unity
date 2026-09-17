@@ -88,7 +88,12 @@ func setup(model_root: Node3D, libs: Array, skel_prefix: String) -> int:
 			keluar = "%s#%s" % [nm, role]
 		var mentah: Animation = (libs[src]["lib"] as AnimationLibrary).get_animation(nm)
 		var anim: Animation = mentah.duplicate()
-		if libs[src].get("retarget", false):
+		var sumber: Dictionary = libs[src]
+		var mode: String = sumber.get("mode", "")
+		if mode == "humanoid":
+			anim = AnimMap.retarget_humanoid(anim, sumber["from_ctx"],
+				sumber["to_ctx"], sumber["map"], skel_prefix)
+		elif mode == "prefix":
 			anim = AnimMap.retarget_clip(anim, skel_prefix)
 		if role in AnimMap.LOCO_ROLES:
 			anim = AnimMap.strip_xz(anim)

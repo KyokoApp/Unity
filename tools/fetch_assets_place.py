@@ -70,7 +70,11 @@ def main() -> int:
 
     os.makedirs("models", exist_ok=True)
     by_mesh = sorted(parsed, key=lambda x: (-x["n_mesh"], x["n_anim"]))
-    by_anim = sorted(parsed, key=lambda x: (-x["n_anim"], x["n_mesh"]))
+    ## Animasi: jumlah terbanyak; pada seri, hindari varian root-motion
+    ## (ialan "_rm") — gerak karakter digerakkan CharacterMotor, bukan klip.
+    by_anim = sorted(parsed, key=lambda x: (-x["n_anim"],
+                                            "_rm" in x["label"].lower(),
+                                            -x["n_mesh"]))
     char = by_mesh[0]
     anim = by_anim[0] if (by_anim[0]["n_anim"] > 0
                           and by_anim[0] is not char) else None
