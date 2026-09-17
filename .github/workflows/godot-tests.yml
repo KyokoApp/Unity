@@ -3,7 +3,11 @@ name: godot-tests
 # Uji headless proyek Godot 4 (pengganti verify.yml era Unity).
 on:
   push:
+    branches: [arena/01a0ac44-unity]
   pull_request:
+
+permissions:
+  contents: write
 
 jobs:
   tests:
@@ -36,5 +40,17 @@ jobs:
             echo '```'
             echo ""
             echo "exit code: $EC"
-          } >> "$GITHUB_STEP_SUMMARY"
           exit $EC
+
+      - name: Unggah log uji ke branch ci-logs
+        if: always() && !cancelled()
+        run: |
+          git config user.email "ci-debug@users.noreply.github.com"
+          git config user.name "ci-debug"
+          git fetch origin arena/01a0ac44-unity --depth=1 2>/dev/null || true
+          git checkout --orphan ci-logs 2>/dev/null || git checkout ci-logs
+          git rm -rf . >/dev/null 2>&1 || true
+          cp /tmp/testlog.txt run-log.txt
+          git add run-log.txt
+          git commit -m "ci log $(date -u '+%Y-%m-%d %H:%M UTC')" >/dev/null
+          git push --force origin ci-logs
