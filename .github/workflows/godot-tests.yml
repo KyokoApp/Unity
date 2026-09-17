@@ -47,7 +47,6 @@ jobs:
       - name: Probe input sentuh & pemain (headless)
         run: |
           set -o pipefail
-          cd unity
           /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
             --headless --path . -s res://tests/touch_probe.gd 2>&1 | tee /tmp/probelog.txt
           EC=$?
