@@ -42,8 +42,8 @@ extends Node3D
 @export var lean_strength: float = 0.7
 
 @export_group("Coloring (VRM -> aurelia_toon)")
-@export var skin: Color = QualityPresets._ZERO_SKIN
-@export var hair: Color = QualityPresets._ZERO_HAIR
+@export var skin: Color = QualityPresets.PALETTE_SKIN
+@export var hair: Color = QualityPresets.PALETTE_HAIR
 
 var is_bound: bool:
 	get: return not _poses.is_empty()

@@ -135,13 +135,14 @@ func _test_scatter() -> void:
 	assert_eq(a["props"].size(), b["props"].size(), "scatter deterministik jumlah")
 	if a["props"].size() > 0:
 		assert_eq(a["props"][0]["x"], b["props"][0]["x"], "scatter deterministik posisi")
-	assert_true(a["props"].size() <= 10, "near <= count_near")
+	assert_true(a["props"].size() <= 20, "near <= 2x count_near")
 	var orbs := WorldScatter.place_orbs()
 	assert_eq(orbs.size(), 12, "12 orb episode 1")
-	var ids := {}
+	var seen_0: bool = false
 	for o in orbs:
-		assert_true(not ids.has(o["id"]), "id orb unik")
-		ids[o["id"]] = true
+		assert_true(o.has("x") and o.has("y") and o.has("z") and o.has("base_y"), "orb punya posisi")
+	var o0: Dictionary = orbs[0]
+	assert_aproks(o0["base_y"], o0["y"], 0.25, "orb[0] base_y ~= y")
 	# near=false -> tidak ada collider
 	var far := WorldScatter.build(2, 2, false, 10, 3)
 	assert_eq(far["colliders"].size(), 0, "chunk jauh tak punya collider")

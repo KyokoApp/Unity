@@ -172,3 +172,8 @@ static func detect_preset(gfx: Dictionary) -> String:
 ## Interval frame dalam ms untuk FPS cap. 0 = tanpa batas.
 static func frame_interval(fps: int) -> float:
 	return 1000.0 / fps if (fps in FPS_CHOICES and fps > 0) else 0.0
+
+## Palet warna bawaan karakter (dipakai character_rig untuk
+## mewarnai material toon saat VRM tidak punya tekstur warna).
+const PALETTE_SKIN := Color(0.956, 0.760, 0.674)
+const PALETTE_HAIR := Color(0.200, 0.164, 0.449)

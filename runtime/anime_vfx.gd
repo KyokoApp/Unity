@@ -117,8 +117,8 @@ func _process(delta: float) -> void:
 		if i >= max_instances:
 			# overflow: jangan jatuhkan partikel — lepaskan (count caps)
 			continue
-		var alpha := 1.0 - (p["t"] / p["life"])
-		var s := 0.9 + (p["t"] / p["life"]) * 1.6
+		var alpha: float = 1.0 - (p["t"] / p["life"])
+		var s: float = 0.9 + (p["t"] / p["life"]) * 1.6
 		var xf := Transform3D(
 			Basis.from_scale(Vector3(s, s * (1.0 + alpha), s)),
 			p["p"])

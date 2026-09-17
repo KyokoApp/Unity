@@ -70,7 +70,7 @@ static func soft_style(color: Color = PANEL_SOFT) -> StyleBoxFlat:
 ## Semua koordinat dalam piksel REFERENSI (1920x1080). Rect baru dijangkar
 ## seperti Unity RectTransform: anchor_min..max 0..1.
 static func rect(nama: String, parent: Control, am00: Vector2, am11: Vector2, pos: Vector2, size: Vector2) -> Control:
-	var r := ControlRect.new()
+	var r: Control = Control.new()
 	r.name = nama
 	r.anchor_left = am00.x
 	r.anchor_top = am00.y
