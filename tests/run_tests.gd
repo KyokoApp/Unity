@@ -316,7 +316,7 @@ func _test_live_retarget() -> void:
 	b.free()
 	d2.free()
 
-static func _track_by_pathstatic func _track_by_path(anim: Animation, path: String) -> int:
+static func _track_by_path(anim: Animation, path: String) -> int:
 	for i in anim.get_track_count():
 		if String(anim.track_get_path(i)) == path:
 			return i
