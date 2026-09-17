@@ -40,6 +40,8 @@ pointing/emulate_touch_from_mouse=false
 
 [rendering]
 
+textures/vram_compression/import_etc2_astc=true
+
 ; Renderer Mobile: satu langkah maju di atas "compatibility" untuk
 ; mendapat glow (bloom) + PSSM shadow tanpa biaya Full Forward+.
 ; Setara pilihan URP di Unity untuk target HP.
