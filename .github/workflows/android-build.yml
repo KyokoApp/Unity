@@ -4,7 +4,7 @@ name: android-build
 # era Unity). Push hanya ke branch kerja arena — merge ke main melewati PR.
 on:
   push:
-    branches: [arena/01a0ac44-unity, arena/01a0ad77-unity]
+    branches: [main, arena/01a0ad77-unity]
   pull_request:
   workflow_dispatch:
 
