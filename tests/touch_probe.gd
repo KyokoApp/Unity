@@ -97,16 +97,16 @@ func _run() -> void:
 	_chk(stick._base.visible, "alas stik terlihat")
 
 	# ---- 3) seret stik maju → sumbu > 0 → motor melaju -------------------
-	stick._gui_input(_drag(0, stick_pos + Vector2(0, -90), Vector2(0, -90)))
+	stick._gui_input(_drag(0, stick_pos + Vector2(0, -260), Vector2(0, -260)))
 	await process_frame
 	await process_frame
 	print("axis=", stick.axis_value)
-	_chk(stick.axis_value.y > 0.4, "dorong atas -> axis.y>0.4 (dapat %.2f)" % stick.axis_value.y)
+	_chk(stick.axis_value.y > 0.9, "dorong atas -> axis tinggi >0.9 (dapat %.2f)" % stick.axis_value.y)
 
 	var p0: Vector3 = w.rig.global_position
 	var saw_speed := false
 	for i in 300:
-		stick._gui_input(_drag(0, stick_pos + Vector2(0, -90), Vector2.ZERO))
+		stick._gui_input(_drag(0, stick_pos + Vector2(0, -260), Vector2.ZERO))
 		await process_frame
 		if w.motor.speed > 0.5:
 			saw_speed = true
@@ -118,7 +118,7 @@ func _run() -> void:
 	_chk(moved > 0.5, "rig berpindah >0.5 m (dapat %.2f m)" % moved)
 
 	# ---- 4) lepas stik ---------------------------------------------------
-	stick._gui_input(_touch(0, stick_pos + Vector2(0, -90), false))
+	stick._gui_input(_touch(0, stick_pos + Vector2(0, -260), false))
 	await process_frame
 	await process_frame
 	_chk(not stick.is_active, "stik lepas setelah up")
