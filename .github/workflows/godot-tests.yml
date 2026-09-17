@@ -73,4 +73,11 @@ jobs:
           cp /tmp/probelog.txt probe-log.txt 2>/dev/null || echo "probelog tidak ada" > probe-log.txt
           git add run-log.txt boot-log.txt probe-log.txt
           git commit -m "ci log $(date -u '+%Y-%m-%d %H:%M UTC')" >/dev/null
-          git push --force origin ci-logs
+          # Log best-effort: dua job (push & pull_request) upload serentak —
+          # kalah race bukan kegagalan uji. Coba 3x; gagal tetap jalan terus.
+          for i in 1 2 3; do
+            git push --force origin ci-logs && exit 0
+            git fetch origin '+refs/heads/ci-logs:refs/remotes/origin/ci-logs' --force >/dev/null 2>&1 || true
+            sleep 3
+          done
+          exit 0
