@@ -79,11 +79,14 @@ func _init() -> void:
 	## kandidat siaga final paket UAL2 tanpa menebak.
 	if w.rig.anim != null and w.rig.anim.mapping.has("idle"):
 		var cadangan: String = w.rig.anim.mapping["idle"]
-		w.rig.anim.mapping["idle"] = "Idle_Lantern"
-		w.rig.anim.current_role = ""
-		for i in 50:
-			await process_frame
-		await _shoot("shot5_idle2.png")
+		for varian in [["Idle_Lantern", "shot5_idle2.png"],
+				["Idle_Rail", "shot6_idle3.png"],
+				["A_TPose", "shot7_tpose.png"]]:
+			w.rig.anim.mapping["idle"] = varian[0]
+			w.rig.anim.current_role = ""
+			for i in 50:
+				await process_frame
+			await _shoot(varian[1])
 		w.rig.anim.mapping["idle"] = cadangan
 		w.rig.anim.current_role = ""
 
