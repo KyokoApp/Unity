@@ -357,12 +357,15 @@ static func retarget_humanoid(anim: Animation, from_ctx: Dictionary,
 
 	var rows := {}     # target_lower -> [[t, quat_lokal], ...]
 	for t in times:
-		# 1) pose global sumber pada t (induk dulu)
+		# 1) pose global sumber pada t (induk dulu). Konvensi Godot:
+		# nilai track ROTATION_3D = DELTA pose atas rest (pose, bukan
+		# rotasi lokal absolut) — komposisi = induk * rest * pose.
 		var gf := {}
 		for b in from_ctx["order"]:
-			var lq: Quaternion = from_ctx["rl"].get(b, Quaternion.IDENTITY)
+			var rl_src: Quaternion = from_ctx["rl"].get(b, Quaternion.IDENTITY)
+			var lq := rl_src
 			if track_of.has(b):
-				lq = _sample_quat(anim, track_of[b], t)
+				lq = (rl_src * _sample_quat(anim, track_of[b], t)).normalized()
 			var pn: String = from_ctx["p"].get(b, "")
 			gf[b] = (gf.get(pn, Quaternion.IDENTITY) * lq).normalized()
 		# 2) latih global target: delta dunia ditransplantasi ke rest target
@@ -383,12 +386,16 @@ static func retarget_humanoid(anim: Animation, from_ctx: Dictionary,
 				lq2 = to_ctx["rl"].get(b2, Quaternion.IDENTITY)
 			gt[b2] = (pg * lq2).normalized()
 
-	# 3) tulis track rotasi per tulang terpetakan
+	# 3) tulis track rotasi per tulang terpetakan. Nilai pada rows
+	# adalah rotasi lokal ABSOLUT (frame induk); konvensi track Godot
+	# = pose (delta atas rest) -> kunci: rl⁻¹ * lokal-absolut.
 	for b2 in rows:
 		var ti := out.add_track(Animation.TYPE_ROTATION_3D)
 		out.track_set_path(ti, NodePath("%s:%s" % [skel_prefix, to_asli.get(b2, b2)]))
+		var rl_to: Quaternion = to_ctx["rl"].get(b2, Quaternion.IDENTITY)
 		for row in rows[b2]:
-			out.track_insert_key(ti, row[0], row[1])
+			out.track_insert_key(ti, row[0],
+				(rl_to.inverse() * row[1]).normalized())
 	return out
 
 ## Iterasi indeks track (helper: hindari range terbalik menyebar).
