@@ -30,6 +30,13 @@ public partial class TouchInputManager : Node
     Vector2  lastCameraTouchPos = Vector2.Zero;
     private bool isFirstCameraTouch = true;
 
+    // Double-tap jump settings
+    [Export] public ulong DoubleTapIntervalMs = 300; // Max duration in milliseconds between taps
+    [Export] public float DoubleTapDistanceThreshold = 50f; // Max distance in pixels between taps
+    private ulong lastTapTime = 0;
+    private Vector2 lastTapPosition = Vector2.Zero;
+    private bool isJumping = false;
+
     public override void _Process(double delta)
     {
         // Maintain active actions
@@ -40,6 +47,12 @@ public partial class TouchInputManager : Node
             else
                 Input.ActionRelease(action.Key);
         }
+
+        if (isJumping)
+        {
+            Input.ActionRelease("jump");
+            isJumping = false;
+        }
     }
 
     public override void _Input(InputEvent @event)
@@ -47,7 +60,10 @@ public partial class TouchInputManager : Node
         if (@event is InputEventScreenTouch touchEvent)
         {
             if (touchEvent.Pressed)
+            {
+                CheckDoubleTap(touchEvent.Position);
                 OnTouchStart(touchEvent.Position, touchEvent.Index);
+            }
             else
                 OnTouchEnd(touchEvent.Index);
         }
@@ -55,6 +71,27 @@ public partial class TouchInputManager : Node
         {
             OnTouchDrag(dragEvent.Position, dragEvent.Index);
         }
+    }
+
+    private void CheckDoubleTap(Vector2 position)
+    {
+        ulong currentTime = Time.GetTicksMsec();
+        if (currentTime - lastTapTime <= DoubleTapIntervalMs && position.DistanceTo(lastTapPosition) <= DoubleTapDistanceThreshold)
+        {
+            TriggerJump();
+            lastTapTime = 0; // Reset after successful double-tap
+        }
+        else
+        {
+            lastTapTime = currentTime;
+            lastTapPosition = position;
+        }
+    }
+
+    private void TriggerJump()
+    {
+        Input.ActionPress("jump");
+        isJumping = true;
     }
 
     private void OnTouchStart(Vector2 position, int index)
