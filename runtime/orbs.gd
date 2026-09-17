@@ -29,15 +29,19 @@ func _ready() -> void:
 ## Episode 1 memakai konstanta baku place_orbs (kosong = default).
 func setup_episode(_episode: int) -> void:
 	clear_all()
-	var list := WorldScatter.place_orbs(0, 0, 0, -1)
-	for o in list:
+	var list := WorldScatter.place_orbs()
+	for i in list.size():
+		var o: Dictionary = list[i]
+		# place_orbs mengembalikan {x,y,z,base_y} — id indeks dipakai
+		# sebagai kunci unik koleksi sesi ini (stabil karena deterministik).
+		o["id"] = i
 		_list.append(o)
-		if _collected.has(o["id"]):
+		if _collected.has(i):
 			continue
 		var node := _orb_node()
 		node.position = Vector3(o["x"], o["y"], o["z"])
 		add_child(node)
-		_node_map[o["id"]] = node
+		_node_map[i] = node
 
 func reset_collected() -> void:
 	_collected.clear()
@@ -59,8 +63,7 @@ func _process(delta: float) -> void:
 		var node: Node3D = _node_map.get(o["id"])
 		if node == null:
 			continue
-		var wobble := sin(_t * 1.6 + float(o["wx"]) ) * 0.22
-		node.position.y = float(o["y"]) + wobble
+		node.position.y = WorldScatter.orb_y(float(o["base_y"]), float(o["x"]), _t)
 
 	# pickup: pemain cukup menyentuh radius
 	if target != null:

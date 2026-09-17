@@ -57,7 +57,7 @@ func _process(_delta: float) -> void:
 	var p := target.global_position
 	# snap ke kelipatan size supaya shader (yang memakai posisi dunia)
 	# tidak terlihat bergeser saat quad mengikuti karakter
-	var sx := round(p.x / size) * size
-	var sz := round(p.z / size) * size
+	var sx: float = roundf(p.x / size) * size
+	var sz: float = roundf(p.z / size) * size
 	global_position = Vector3(sx, WorldData.WATER_LEVEL + height_bias, sz)
 	scale = Vector3(size, 1.0, size)

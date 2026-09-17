@@ -267,8 +267,8 @@ func _drain_results() -> void:
 		# Chunk di luar dunia -> build {} -> buang diam-diam.
 		# Buang juga hasil kalau quads berubah (set_quality) atau chunk
 		# sudah tidak diminta; belum ada Mesh yang perlu di-release.
-		var unusable := not d.has("quads") or int(d["quads"]) != quads_per_chunk \
-			or not _wanted.has(d["key"]) or _active.has(d["key"])
+		var unusable: bool = (not d.has("quads")) or int(d["quads"]) != quads_per_chunk \
+			or (not _wanted.has(d["key"])) or _active.has(d["key"])
 		if unusable:
 			if d.has("quads") and _wanted.has(d["key"]) and not _active.has(d["key"]):
 				_pending.append(d["key"])   # masih dibutuhkan: antre lagi
