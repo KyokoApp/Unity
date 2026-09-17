@@ -66,43 +66,42 @@ void fragment() {
 }
 
 void light() {
-	if (!LIGHT_IS_DIRECTIONAL) {
-		return;
-	}
-	vec3 n = normalize(NORMAL);
-	float atten = SHADOW.r * ATTENUATION;
+	if (LIGHT_IS_DIRECTIONAL) {
+		vec3 n = normalize(NORMAL);
+		float atten = SHADOW.r * ATTENUATION;
 
-	// Half-lambert: sisi membelakangi cahaya jatuh ke tingkat
-	// bayangan dengan lembut, tidak pernah hitam mendadak.
-	float ndl = dot(n, LIGHT);
-	float ramp_t = ndl * 0.5 + 0.5;
+		// Half-lambert: sisi membelakangi cahaya jatuh ke tingkat
+		// bayangan dengan lembut, tidak pernah hitam mendadak.
+		float ndl = dot(n, LIGHT);
+		float ramp_t = ndl * 0.5 + 0.5;
 
-	// Tingkat bertingkat dengan tepi antialiased (AureliaSoftStep).
-	float x = clamp(ramp_t * atten, 0.0, 1.0) * toon_steps;
-	float band = floor(x);
-	band += smoothstep(0.5 - toon_softness, 0.5 + toon_softness, fract(x));
-	float stepped = band / toon_steps;
+		// Tingkat bertingkat dengan tepi antialiased (AureliaSoftStep).
+		float x = clamp(ramp_t * atten, 0.0, 1.0) * toon_steps;
+		float band = floor(x);
+		band += smoothstep(0.5 - toon_softness, 0.5 + toon_softness, fract(x));
+		float stepped = band / toon_steps;
 
-	// Warna cahaya toon: putih di terang, shadow_color di gelap.
-	float ramp_w = clamp(ramp_t * atten, 0.0, 1.0);
-	vec3 procedural = mix(shadow_color.rgb, vec3(1.0), stepped);
-	vec3 light_col = procedural * mix(stepped, ramp_w, ramp_strength);
+		// Warna cahaya toon: putih di terang, shadow_color di gelap.
+		float ramp_w = clamp(ramp_t * atten, 0.0, 1.0);
+		vec3 procedural = mix(shadow_color.rgb, vec3(1.0), stepped);
+		vec3 light_col = procedural * mix(stepped, ramp_w, ramp_strength);
 
-	DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * light_col;
+		DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * light_col;
 
-	// Rim lembut: tepi objek menangkap warna cahaya.
-	float rim = pow(1.0 - clamp(dot(n, VIEW), 0.0, 1.0), rim_power) * rim_strength;
-	DIFFUSE_LIGHT += rim_color.rgb * rim * LIGHT_COLOR * (0.35 + 0.65 * atten) * ALBEDO;
+		// Rim lembut: tepi objek menangkap warna cahaya.
+		float rim = pow(1.0 - clamp(dot(n, VIEW), 0.0, 1.0), rim_power) * rim_strength;
+		DIFFUSE_LIGHT += rim_color.rgb * rim * LIGHT_COLOR * (0.35 + 0.65 * atten) * ALBEDO;
 
-	// Specular anime: blob mengeras, bukan pantulan fisik.
-	vec3 hv = normalize(LIGHT + VIEW);
-	float spec_pow = pow(clamp(dot(n, hv), 0.0, 1.0), spec_power);
-	float spec = smoothstep(0.45, 0.75, spec_pow) * spec_strength;
-	DIFFUSE_LIGHT += spec_color.rgb * spec * atten * LIGHT_COLOR;
+		// Specular anime: blob mengeras, bukan pantulan fisik.
+		vec3 hv = normalize(LIGHT + VIEW);
+		float spec_pow = pow(clamp(dot(n, hv), 0.0, 1.0), spec_power);
+		float spec = smoothstep(0.45, 0.75, spec_pow) * spec_strength;
+		DIFFUSE_LIGHT += spec_color.rgb * spec * atten * LIGHT_COLOR;
 
-	// Kabut linear manual (konsisten dengan shader lain).
-	float depth = -VERTEX.z;
-	float fog = clamp((depth - aurelia_fog_near)
-					  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
-	DIFFUSE_LIGHT = mix(DIFFUSE_LIGHT, aurelia_fog_color.rgb, fog);
+		// Kabut linear manual (konsisten dengan shader lain).
+		float depth = -VERTEX.z;
+		float fog = clamp((depth - aurelia_fog_near)
+						  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
+		DIFFUSE_LIGHT = mix(DIFFUSE_LIGHT, aurelia_fog_color.rgb, fog);
+}
 }

@@ -79,31 +79,30 @@ void fragment() {
 
 void light() {
 	// Hanya directional (matahari); light lain dibiarkan nol.
-	if (!LIGHT_IS_DIRECTIONAL) {
-		return;
-	}
-	vec3 n = normalize(NORMAL);
-	float ndl = dot(n, LIGHT);
-	// half-Lambert: terrain low-poly terlihat keras dengan Lambert
-	// murni; dunia ini memang bergaya flat-shaded.
-	float diffuse = clamp(ndl * 0.5 + 0.5, 0.0, 1.0);
-	diffuse = diffuse * diffuse;
+	if (LIGHT_IS_DIRECTIONAL) {
+		vec3 n = normalize(NORMAL);
+		float ndl = dot(n, LIGHT);
+		// half-Lambert: terrain low-poly terlihat keras dengan Lambert
+		// murni; dunia ini memang bergaya flat-shaded.
+		float diffuse = clamp(ndl * 0.5 + 0.5, 0.0, 1.0);
+		diffuse = diffuse * diffuse;
 
-	// Posterize LEMBUT ala Genshin: diffuse dilipat ke beberapa
-	// tingkat dengan tepi halus.
-	float tx = diffuse * toon_steps;
-	float tb = floor(tx) + smoothstep(0.5 - toon_softness,
-									  0.5 + toon_softness, fract(tx));
-	diffuse = tb / toon_steps;
+		// Posterize LEMBUT ala Genshin: diffuse dilipat ke beberapa
+		// tingkat dengan tepi halus.
+		float tx = diffuse * toon_steps;
+		float tb = floor(tx) + smoothstep(0.5 - toon_softness,
+										  0.5 + toon_softness, fract(tx));
+		diffuse = tb / toon_steps;
 
-	// SHADOW (vec3) = pengali bayangan; ATTENUATION = atenuasi jarak.
-	DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * diffuse * SHADOW * ATTENUATION;
+		// SHADOW (vec3) = pengali bayangan; ATTENUATION = atenuasi jarak.
+		DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * diffuse * SHADOW * ATTENUATION;
 
-	// Kabut linear manual (jarak pandang dari GfxResolver):
-	// DIFFUSE diganti warna kabut (EMISSION sudah dilipat 1-fog di
-	// fragment, jadi totalnya mix penuh persis MixFog Unity).
-	float depth = -VERTEX.z;
-	float fog = clamp((depth - aurelia_fog_near)
-					  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
-	DIFFUSE_LIGHT = mix(DIFFUSE_LIGHT, aurelia_fog_color.rgb, fog);
+		// Kabut linear manual (jarak pandang dari GfxResolver):
+		// DIFFUSE diganti warna kabut (EMISSION sudah dilipat 1-fog di
+		// fragment, jadi totalnya mix penuh persis MixFog Unity).
+		float depth = -VERTEX.z;
+		float fog = clamp((depth - aurelia_fog_near)
+						  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
+		DIFFUSE_LIGHT = mix(DIFFUSE_LIGHT, aurelia_fog_color.rgb, fog);
+}
 }

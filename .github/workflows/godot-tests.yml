@@ -40,7 +40,8 @@ jobs:
           EC=$?
           echo "exit=$EC" >> /tmp/bootlog.txt
           # crash/timeout (124) atau ada SCRIPT ERROR di log -> gagal
-          if [ "$EC" -ne 0 ] || grep -q "SCRIPT ERROR" /tmp/bootlog.txt; then
+          if [ "$EC" -ne 0 ] || ! grep -q "boot selesai" /tmp/bootlog.txt \
+             || grep -qE "SCRIPT ERROR|SHADER ERROR" /tmp/bootlog.txt; then
             exit 1
           fi
 

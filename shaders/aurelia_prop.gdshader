@@ -38,23 +38,22 @@ void fragment() {
 }
 
 void light() {
-	if (!LIGHT_IS_DIRECTIONAL) {
-		return;
-	}
-	vec3 n = normalize(NORMAL);
-	float ndl = dot(n, LIGHT);
-	float diffuse = clamp(ndl * 0.5 + 0.5, 0.0, 1.0);
-	diffuse = diffuse * diffuse;
+	if (LIGHT_IS_DIRECTIONAL) {
+		vec3 n = normalize(NORMAL);
+		float ndl = dot(n, LIGHT);
+		float diffuse = clamp(ndl * 0.5 + 0.5, 0.0, 1.0);
+		diffuse = diffuse * diffuse;
 
-	float tx = diffuse * toon_steps;
-	float tb = floor(tx) + smoothstep(0.5 - toon_softness,
-									  0.5 + toon_softness, fract(tx));
-	diffuse = tb / toon_steps;
+		float tx = diffuse * toon_steps;
+		float tb = floor(tx) + smoothstep(0.5 - toon_softness,
+										  0.5 + toon_softness, fract(tx));
+		diffuse = tb / toon_steps;
 
-	vec3 lit = ALBEDO * LIGHT_COLOR * diffuse * SHADOW * ATTENUATION;
+		vec3 lit = ALBEDO * LIGHT_COLOR * diffuse * SHADOW * ATTENUATION;
 
-	float depth = -VERTEX.z;
-	float fog = clamp((depth - aurelia_fog_near)
-					  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
-	DIFFUSE_LIGHT += mix(lit, aurelia_fog_color.rgb, fog);
+		float depth = -VERTEX.z;
+		float fog = clamp((depth - aurelia_fog_near)
+						  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
+		DIFFUSE_LIGHT += mix(lit, aurelia_fog_color.rgb, fog);
+}
 }

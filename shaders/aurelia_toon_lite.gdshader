@@ -56,25 +56,24 @@ void fragment() {
 }
 
 void light() {
-	if (!LIGHT_IS_DIRECTIONAL) {
-		return;
-	}
-	vec3 n = normalize(NORMAL);
-	float atten = SHADOW.r * ATTENUATION;
+	if (LIGHT_IS_DIRECTIONAL) {
+		vec3 n = normalize(NORMAL);
+		float atten = SHADOW.r * ATTENUATION;
 
-	float ndl = dot(n, LIGHT);
-	float ramp_t = ndl * 0.5 + 0.5;
+		float ndl = dot(n, LIGHT);
+		float ramp_t = ndl * 0.5 + 0.5;
 
-	float x = clamp(ramp_t * atten, 0.0, 1.0) * toon_steps;
-	float band = floor(x);
-	band += smoothstep(0.5 - toon_softness, 0.5 + toon_softness, fract(x));
-	float stepped = band / toon_steps;
+		float x = clamp(ramp_t * atten, 0.0, 1.0) * toon_steps;
+		float band = floor(x);
+		band += smoothstep(0.5 - toon_softness, 0.5 + toon_softness, fract(x));
+		float stepped = band / toon_steps;
 
-	vec3 light_col = mix(shadow_color.rgb, vec3(1.0), stepped);
-	DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * light_col;
+		vec3 light_col = mix(shadow_color.rgb, vec3(1.0), stepped);
+		DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * light_col;
 
-	float depth = -VERTEX.z;
-	float fog = clamp((depth - aurelia_fog_near)
-					  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
-	DIFFUSE_LIGHT = mix(DIFFUSE_LIGHT, aurelia_fog_color.rgb, fog);
+		float depth = -VERTEX.z;
+		float fog = clamp((depth - aurelia_fog_near)
+						  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
+		DIFFUSE_LIGHT = mix(DIFFUSE_LIGHT, aurelia_fog_color.rgb, fog);
+}
 }

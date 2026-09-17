@@ -84,17 +84,16 @@ void fragment() {
 }
 
 void light() {
-	if (!LIGHT_IS_DIRECTIONAL) {
-		return;
-	}
-	// Half-Lambert dari matahari: sisi membelakangi tetap terang.
-	float ndl = dot(normalize(NORMAL), LIGHT) * 0.5 + 0.5;
-	vec3 lit = ALBEDO * LIGHT_COLOR * (ndl * 0.75 + 0.25) * SHADOW * ATTENUATION;
+	if (LIGHT_IS_DIRECTIONAL) {
+		// Half-Lambert dari matahari: sisi membelakangi tetap terang.
+		float ndl = dot(normalize(NORMAL), LIGHT) * 0.5 + 0.5;
+		vec3 lit = ALBEDO * LIGHT_COLOR * (ndl * 0.75 + 0.25) * SHADOW * ATTENUATION;
 
-	// Kabut linear manual (konsisten lintas shader).
-	float depth = -VERTEX.z;
-	float fog = clamp((depth - aurelia_fog_near)
-					  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
-	lit = mix(lit, aurelia_fog_color.rgb, fog);
-	DIFFUSE_LIGHT += lit;
+		// Kabut linear manual (konsisten lintas shader).
+		float depth = -VERTEX.z;
+		float fog = clamp((depth - aurelia_fog_near)
+						  / max(1.0, aurelia_fog_far - aurelia_fog_near), 0.0, 1.0);
+		lit = mix(lit, aurelia_fog_color.rgb, fog);
+		DIFFUSE_LIGHT += lit;
+}
 }
