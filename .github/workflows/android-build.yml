@@ -1,0 +1,102 @@
+name: Build and Release Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android Command Line Tools and Build Tools
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest"
+
+      - name: Setup Godot Engine Mono & Export Templates
+        run: |
+          GODOT_VERSION="4.5.1"
+          RELEASE_TAG="4.5.1-stable"
+          
+          echo "Downloading Godot Mono..."
+          wget -q https://github.com/godotengine/godot/releases/download/${RELEASE_TAG}/Godot_v${RELEASE_TAG}_mono_linux_x86_64.zip
+          unzip -q Godot_v${RELEASE_TAG}_mono_linux_x86_64.zip -d godot_mono
+          sudo mv godot_mono/Godot_v${RELEASE_TAG}_mono_linux_x86_64/Godot_v${RELEASE_TAG}_mono_linux.x86_64 /usr/local/bin/godot
+          sudo mv godot_mono/Godot_v${RELEASE_TAG}_mono_linux_x86_64/GodotSharp /usr/local/bin/
+          sudo chmod +x /usr/local/bin/godot
+          
+          echo "Downloading Godot Export Templates..."
+          wget -q https://github.com/godotengine/godot/releases/download/${RELEASE_TAG}/Godot_v${RELEASE_TAG}_mono_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          unzip -q Godot_v${RELEASE_TAG}_mono_export_templates.tpz -d export_templates_temp
+          mv export_templates_temp/templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+          cp -r ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono
+          
+          rm -rf Godot_v${RELEASE_TAG}_mono_linux_x86_64.zip Godot_v${RELEASE_TAG}_mono_export_templates.tpz godot_mono export_templates_temp
+
+      - name: Create debug keystore and configure Godot editor settings
+        run: |
+          DEBUG_KEYSTORE="$HOME/.android/debug.keystore"
+          mkdir -p "$HOME/.android"
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore "$DEBUG_KEYSTORE" -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          
+          EDITOR_SETTINGS_DIR="$HOME/.config/godot"
+          mkdir -p "$EDITOR_SETTINGS_DIR"
+          cat << EOF > "$EDITOR_SETTINGS_DIR/editor_settings-4.5.tres"
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/debug_keystore = "$DEBUG_KEYSTORE"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+
+      - name: Build C# Solution
+        run: |
+          dotnet build "Procedural Infinite Runner.csproj" -c ExportDebug
+
+      - name: Export Android APK
+        run: |
+          mkdir -p build/android
+          godot --headless --export-debug "Android" build/android/InfiniteRunner.apk
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InfiniteRunner-APK
+          path: build/android/InfiniteRunner.apk
+
+      - name: Create or Update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view android-apk >/dev/null 2>&1; then
+            echo "Release android-apk exists, uploading APK asset..."
+            gh release upload android-apk build/android/InfiniteRunner.apk --clobber
+          else
+            echo "Creating release android-apk..."
+            gh release create android-apk build/android/InfiniteRunner.apk \
+              --title "Android APK" \
+              --notes "Latest Android build of Procedural Infinite Runner"
+          fi
