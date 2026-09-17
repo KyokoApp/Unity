@@ -72,9 +72,10 @@ jobs:
             --audio-driver Dummy --script tests/ci_screenshot.gd \
             > /tmp/shotlog.txt 2>&1 || true
           grep -E "CSI |SCRIPT ERROR|ERROR" /tmp/shotlog.txt | head -20 || true
-          ls -l /tmp/shot_*.png
+          ls -l /tmp/shot_*.png || true
 
       - name: Catat screenshot ke branch ci-logs (aditif)
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -84,9 +85,13 @@ jobs:
           git fetch origin ci-logs || true
           git checkout -f -B ci-logs origin/ci-logs
           mkdir -p shots
-          cp /tmp/shot_a.png shots/shot_a.png
-          cp /tmp/shot_b.png shots/shot_b.png
-          cp /tmp/shot_c.png shots/shot_c.png
+          cp /tmp/shotlog.txt shots/shot-log.txt
+          cp /tmp/importlog.txt shots/import-log.txt
+          for f in shot_a shot_b shot_c; do
+            if [ -f "/tmp/$f.png" ]; then
+              cp "/tmp/$f.png" "shots/$f.png"
+            fi
+          done
           {
             echo "commit: $GITHUB_SHA"
             echo "run: $GITHUB_RUN_ID"
