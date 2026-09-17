@@ -43,7 +43,7 @@ const GFX_OPTIONS: Array = [
 	{"key": "detail",     "label": "Kedetailan dunia",  "max": 3, "off": false, "hint": "Kerapatan pohon, batu, dan properti jalan"},
 	{"key": "texture",    "label": "Detail tekstur",    "max": 2, "off": false, "hint": "Resolusi & anisotropi tekstur prosedural"},
 	{"key": "bloom",      "label": "Bloom",             "max": 3, "off": true,  "hint": "Pendar cahaya pada orb, lampu, dan kilau"},
-	{"key": "motion_blur","label": "Motion blur",       "max": 3, "off": true,  "hint": "Blur kecepatan (belum dipakai di Godot — lihat MIGRASI-GODOT.md)"},
+	{"key": "motion_blur","label": "Motion blur",       "max": 3, "off": true,  "hint": "Blur kecepatan (belum dipakai di port Godot)"},
 	{"key": "volumetric", "label": "Volumetrik",        "max": 3, "off": true,  "hint": "Berkas cahaya matahari (god rays)"},
 ]
 

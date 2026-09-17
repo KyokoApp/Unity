@@ -84,20 +84,26 @@ func _run() -> void:
 	# ---- 2) stik merespons sentuhan di zona stik -------------------------
 	var stick = hud.stick
 	_chk(stick != null, "StickZone ada")
+	_chk(stick._ghost.visible, "cincin hantu (petunjuk visual) terlihat saat siaga")
 	print("stick global_rect=", stick.get_global_rect(),
 		" visible=", stick.is_visible_in_tree(),
 		" mouse_filter=", stick.mouse_filter)
 	# Kanvas headless bisa persegi (1920x1920) — posisi zona stik dihitung
 	# dari BAWAH layar (offset -340..-34 piksel kanvas), bukan fraksi tinggi.
+	# PENTING: _gui_input menerima koordinat LOKAL control (engine sudah
+	# xform) — make_input_local meniru delivery OS yang sesungguhnya.
 	var stick_pos := Vector2(vs.x * 0.22, vs.y - 100.0)
-	stick._gui_input(_touch(0, stick_pos, true))
+	stick._gui_input(stick.make_input_local(_touch(0, stick_pos, true)))
 	await process_frame
 	await process_frame
 	_chk(stick.is_active, "stik AKTIF setelah ScreenTouch di zona stik")
 	_chk(stick._base.visible, "alas stik terlihat")
+	_chk(not stick._ghost.visible, "cincin hantu sembunyi saat stik aktif")
+	_chk(stick.gui_hits >= 1, "penghitung stikGUI berjalan (gui_hits=%d)" % stick.gui_hits)
 
 	# ---- 3) seret stik maju → sumbu > 0 → motor melaju -------------------
-	stick._gui_input(_drag(0, stick_pos + Vector2(0, -260), Vector2(0, -260)))
+	stick._gui_input(stick.make_input_local(
+		_drag(0, stick_pos + Vector2(0, -260), Vector2(0, -260))))
 	await process_frame
 	await process_frame
 	print("axis=", stick.axis_value)
@@ -106,7 +112,8 @@ func _run() -> void:
 	var p0: Vector3 = w.rig.global_position
 	var saw_speed := false
 	for i in 300:
-		stick._gui_input(_drag(0, stick_pos + Vector2(0, -260), Vector2.ZERO))
+		stick._gui_input(stick.make_input_local(
+			_drag(0, stick_pos + Vector2(0, -260), Vector2.ZERO)))
 		await process_frame
 		if w.motor.speed > 0.5:
 			saw_speed = true
@@ -116,13 +123,16 @@ func _run() -> void:
 	var moved: float = w.rig.global_position.distance_to(p0)
 	print("rig berpindah=", moved)
 	_chk(moved > 0.5, "rig berpindah >0.5 m (dapat %.2f m)" % moved)
+	_chk(stick.drags_seen >= 2, "penghitung seret stik berjalan (drags=%d)" % stick.drags_seen)
 
 	# ---- 4) lepas stik ---------------------------------------------------
-	stick._gui_input(_touch(0, stick_pos + Vector2(0, -260), false))
+	stick._gui_input(stick.make_input_local(
+		_touch(0, stick_pos + Vector2(0, -260), false)))
 	await process_frame
 	await process_frame
 	_chk(not stick.is_active, "stik lepas setelah up")
 	_chk(stick.axis_value.length() < 0.001, "axis kembali nol")
+	_chk(stick._ghost.visible, "cincin hantu tampil lagi setelah lepas")
 
 	# ---- 5) drag di luar zona stik memutar kamera -------------------------
 	var yaw0: float = w.camera_rig.yaw
@@ -137,6 +147,16 @@ func _run() -> void:
 	var dyaw: float = w.camera_rig.yaw - yaw0
 	print("dyaw=", dyaw)
 	_chk(absf(dyaw) > 1.0, "drag kanan memutar yaw (%.2f derajat)" % dyaw)
+
+	# ---- 5b) TouchDebug membuktikan routing OS -> Node._input ------------
+	_chk(w.touch_debug != null, "TouchDebug terpasang di world")
+	_chk(TouchDebug.enabled, "TouchDebug nyala di build debug/editor")
+	_chk(w.touch_debug._downs >= 1,
+		"touch-down OS sampai ke Node._input (downs=%d)" % w.touch_debug._downs)
+	_chk(w.touch_debug._drags >= 1,
+		"seretan OS sampai ke Node._input (drags=%d)" % w.touch_debug._drags)
+	_chk(w.touch_debug._cam_presses >= 1,
+		"kamera melaporkan sentuhan (cam=%d)" % w.touch_debug._cam_presses)
 
 	# ---- 6) drag DI zona stik tidak memutar kamera ------------------------
 	yaw0 = w.camera_rig.yaw

@@ -1,90 +1,134 @@
 # CATATAN SERAH TERIMA — Aurelia (baca ini dulu di sesi baru)
 
-> Tanggal: 2026-09-17 · Branch kerja: `arena/01a0ac44-unity` · Tip terakhir teruji hijau: `211f59d`
-> Untuk AI berikutnya: **baca file ini sampai habis sebelum menyentuh apa pun**, lalu
-> bersih-bersih catatan usang sesuai §7. Setelah file ini dipahami dan diproses, file ini sendiri boleh dihapus/diperbarui.
+> Tanggal: 2026-09-17 · Branch kerja: **`arena/01a0ad77-unity`** (sesi Arena baru
+> memakai branch tetap `arena/01a0ad77-unity`; branch lama `arena/01a0ac44-unity`
+> sudah digabung penuh ke sini — DONOT push ke sana lagi).
+> Untuk AI berikutnya: **baca file ini sampai habis sebelum menyentuh apa pun**.
 
 ## 1. Proyek & aturan main (JANGAN dilanggar)
 - Game: **Aurelia** — open-world anime Genshin-like, open terrain 3×3 km, target **Android**.
 - Engine: **Godot 4.5.1**, bahasa **GDScript** (bukan C#, bukan Unity — Unity sudah dihapus total & jangan dikembalikan).
 - Proyek Godot berada di **root repo** (`project.godot` di `/`). Scene utama `res://scenes/world.tscn` (root Node3D + skrip `runtime/world.gd` yang membangun semua dari kode).
-- Kerja HANYA di branch `arena/01a0ac44-unity`; setiap commit push ke sana. PR #4 ke `main` masih menunggu user yang merge sendiri.
-- GitHub `gh`/git sudah terautentikasi di sandbox. Push/pull dua event (`push` + `pull_request`) → **dua run CI identik, wajar**.
+- Kerja HANYA di branch `arena/01a0ad77-unity`; setiap commit push ke sana. PR #4 (dari branch lama) masih menunggu user yang merge sendiri — biarkan.
+- GitHub `gh`/git sudah terautentikasi di sandbox. Push → dua run CI (`godot-tests` + `android-build`); event `pull_request` bisa menggandakan run — **wajar**.
 
-## 2. Status sekarang (yang SUDAH jadi & hijau)
-- Dunia tampil di HP (sky, terrain, air, rumput, HUD) — sebelumnya layar kosong; akar masalahnya sudah tuntas.
-- Ikon aplikasi = gambar anime (regenerasi mirip kiriman user: `icons/icon_master.png` + turunannya). **Gambar asli user tidak pernah sampai ke sandbox** — kalau user kirim ulang, tukar semua turunannya (512/192/432 fg/bg/mono) via PIL (numpy TIDAK ada di sandbox; pakai `pip install --user --break-system-packages pillow`).
-- CI `godot-tests`: 157 unit test + smoke-run 600 frame (gate `SCRIPT ERROR|SHADER ERROR` + exit code) + **touch probe 14/14** (`tests/touch_probe.gd`). CI `android-build`: artefak APK `aurelia-debug`.
-- Log diagnostik CI ada di branch `ci-logs` (run-log.txt = unit + probe, boot-log.txt = smoke). Cara baca (web/blob sering ke-block sandbox):
+## 2. Status sekarang (yang SUDAH jadi)
+- Dunia tampil di HP (sky, terrain, air, rumput, HUD); ikon anime terpasang.
+- CI `godot-tests`: 157 unit test + smoke-run 600 frame + touch probe (**naik dari 14 ke 19 cek** sesi ini).
+- CI `android-build`: artefak APK `aurelia-debug`, sekarang **berstempel build** (`runtime/build_stamp.gd` ditulis CI sebelum ekspor).
+- `version/name=0.2.0`, `version/code=2` (agar update APK bersih).
+- Log diagnostik CI di branch `ci-logs` (run-log.txt = unit + probe, boot-log.txt = smoke, probe-log.txt):
   ```
   git fetch origin '+refs/heads/ci-logs:refs/remotes/origin/ci-logs' --force
   git show origin/ci-logs:run-log.txt
   ```
 
-## 3. Bug yang SUDAH diperbaiki hari ini (agar tidak kebakar dua kali)
-- **Shader Godot 4 — 6 pelajaran keras** (semua fix sudah masuk; regression dicegah gate CI):
-  `return` dilarang di `light()` · `SHADOW` bukan built-in (sudah termasuk di `ATTENUATION`) · `VERTEX` tidak ada di `light()` (pakai `varying float view_depth` dari `fragment()`) · `force_vertex_shading=false` WAJIB di `[rendering]` — kalau tidak, `light()` custom dimatikan engine di HP.
-- **`gdparse` tidak bisa dipercaya sendirian**: lolos `:=` yang tak terinferensi dari Dictionary untyped & arg-count salah pada static call. Hakim akhir = smoke-run engine di CI.
-- **Pemain terkubur y=0**: `Motor` anak dari `Rig`; motor kini memindahkan `rig.global_position` (bukan dirinya) — rig = target kamera/streamer + pembawa visual. Rotasi (`rotation.y`) juga ditulis ke rig.
-- **Input sentuh mati total**: `HudRoot` STOP menelan semua sentuhan → sekarang IGNORE; dekorasi (potret face/ring, bar HP, stamina) semua IGNORE; widget interaktif tetap menangkap lewat panel anaknya. `pointing/emulate_mouse_from_touch=false` (multi-jari murni). `motor.camera_target` sudah tersambung.
-- Routing `ScreenTouch → Control._gui_input` **MATI di headless DisplayServer** (diketahui lewat probe Control polos) — makanya probe memanggil `_gui_input` langsung. Di device nyata GUI touch standar Godot berjalan.
+## 3. Prioritas #1 — "analog gk muncul di HP" (sesi ini)
+
+### Dua bug NYATA ditemukan & diperbaiki
+1. **Skala koordinat ganda** (`ui/virtual_joystick.gd`): `event.position` di
+   `_gui_input` SUDAH koordinat lokal control (engine xform). Kode lama membaginya
+   lagi dengan `_scale = max(vs/REF)` → di HP non-1920×1080 (mis. 2400×1080, skala
+   sebenarnya 1,0) alas stik muncul **melenceng ±20% dari jari**. Fix: pakai posisi
+   apa adanya; `_scale`/​`_recalc_scale` dihapus.
+2. **Touch-capture tidak ada di Godot GUI**: begitu jari keluar rect zona stik,
+   `_gui_input` berhenti menerima event → stik membeku di nilai terakhir DAN kamera
+   ikut memutar (event jatuh ke `_unhandled_input`). Fix: `VirtualJoystick._input()`
+   menangkap kelanjutan gerak/lepas untuk jari milik stik + `set_input_as_handled()`
+   + `accept_event()` pada press/release GUI. Dedup per-frame (`_drag_frame`/
+   `_release_frame`) mencegah proses ganda jalur GUI+_​input.
+
+### Alat baru untuk membuktikan sisanya di HP user
+- **Stempel build di layar**: loading screen kanan-bawah, PerfHud, strip debug,
+  BootLog. Kalau stempel di HP user ≠ hash commit terbaru → **itu APK lama**
+  (hipotesis utama sesi lalu). CI menulis stempel `<hash7>-b<run>`.
+- **`ui/touch_debug.gd`** (CanvasLayer 90, semua IGNORE, auto-ON hanya di
+  `OS.is_debug_build()`): strip teks kiri-atas + jejak titik sentuh + bingkai emas
+  rect zona stik persis seperti dihit engine. Tiga penghitung diagnosis:
+  `os` (Node._input) · `stikGUI` (VirtualJoystick._gui_input) · `kamera`.
+  - `os` naik, `stikGUI` diam, `kamera` naik → **routing GUI mati di device itu**
+    (jari dipastikan ADA di dalam bingkai zona). Rencana lanjutannya: jalankan
+    stik/​tombol lewat `_input` semua (pekerjaan besar, tunggu data dulu).
+  - `os` ikut diam → sentuhan tidak masuk aplikasi (emulasi/skin Android?).
+  - Semua naik tapi stik tak terlihat → masalah visual (warna/lapisan), bukan input.
+- **Cincin hantu saat siaga** di stik (alpha tipis di titik klasik) — "analog tidak
+  muncul" tidak boleh lagi berarti "layar kosong polos"; stik tetap mengambang
+  mengikuti jari saat disentuh.
+- `VirtualJoystick._gui_input` me-`print()`+BootLog 3 touch-down pertama
+  (`[stik] touch-down #N idx=.. lokal=.. rect=..`) → terbaca di ci-logs & logcat.
+
+### Cara pakai setelah user unduh APK baru
+Minta screenshot saat jari menekan kiri-bawah: baca stempel (benar build ini?),
+bingkai zona (ada jari di dalam?), dan tiga penghitung (ujung diagnosis di atas).
 
 ## 4. TUGAS TERBUKA — urutan prioritas dari user
 
-### 4a. 🔴 Analog tidak muncul di HP (laporan terakhir user, prioritas utama)
-Kata user: *"analog gk muncul"*. Di probe CI 14/14 lulus, jadi kemungkinan besar **build yang diuji user adalah APK lama** — pastikan user memakai artefak `aurelia-debug` dari build ≥ `211f59d`. Kalau setelah pakai tip terbaru masih mati, petunjuk investigasi:
-1. Tambah log masuk di `VirtualJoystick._gui_input()` (print/BootLog) lalu minta user kirim ulang — lihat apakah event sampai (lihat cara log cepat di bawah §8).
-2. Uji manual hal-hal fisik: StickZone rect = `0..0.45W × (H-340..H-34)` **piksel kanvas 1920×1080** (stretch `canvas_items`/`expand`); kalau resolusi HP berbeda jauh, posisinya seperti apa minta screenshot.
-3. Hati-hati: `_base`/`_knob` stik sudah IGNORE — jangan kembalikan STOP di sana; widget di atas StickZone semua harus ter-*audit* mouse_filter-nya.
-4. Genshin-build: stik "mengambang" (muncul di titik jari) — tombol-tombol kanan (JMP/ATK/DSH/E/Q) memakai `UiKit.button_slot` (Button PASS di panel STOP) — kalau tombol juga mati di HP, selidiki `Button` vs `mouse_filter` sekali lagi.
+### 4a. 🟡 Konfirmasi analog di HP (menunggu user tes APK stempel-baru)
+Jika stik tetap diam padahal stempel benar → kirim screenshot strip debug →
+tindak lanjut sesuai tabel diagnosis §3 (routing mati / os mati / visual).
 
 ### 4b. 🟡 Ganti karakter + animasi jalan/lari/idle/dash/attack (aset dari user)
 LINK USER (drive):
 - **Model + klip animasi**: https://drive.google.com/file/d/120fNMWnpMaiNEJLG53LdTd8DfSGdFrYq/view?usp=drivesdk
 - **Model karakter**: https://drive.google.com/file/d/1RZIwux_yJ6VB2j4nAsYdUlfcca0BLPar/view?usp=drivesdk
 Pekerjaan:
-1. Unduh (sandbox mungkin memblokir download langsung — coba `gh`-style / drive downloader / tanya user lampirkan file ke sesi; kalau zip dan besar: jangan di-commit mentah, ekstrak ke `models/`).
-2. Format tujuan: **GLB** di `models/` (Godot impor otomatis). Konversi kalau perlu lewat CI step atau minta varian GLB ke user.
-3. Sambungkan di `runtime/character_rig.gd`: `model_scene`/`model_paths` (sekarang: `res://models/AureliaChar.glb` → fallback mannequin). Gantikan pose prosedural dengan animasi `AnimationPlayer`: klip target = idle/walk/run/dash/attack; di-drive dari `CharacterMotor` (sinyal/sudah ada: `move01`, `run01`, `is_dashing`, `combat.is_attacking()`, `landed`, `attack_started(combo)`). Peta blend-speed lama ada di `Locomotion.sample_pose` — pertahankan transisi yang halus.
-4. Warna toon: `runtime/toon_character_setup.gd` + `shaders/aurelia_toon.gdshader` untuk material VRM→toon; GLB baru perlu adaptasi material yang sama (cek nama material/mesh-nya).
+1. Unduh (sandbox mungkin memblokir download langsung — coba downloader / tanya
+   user lampirkan ke sesi; kalau zip besar: jangan commit mentah, ekstrak ke `models/`).
+2. Format tujuan: **GLB** di `models/` (Godot impor otomatis; folder di-gitignore).
+3. Sambung di `runtime/character_rig.gd` (`model_paths` → fallback mannequin);
+   drive `AnimationPlayer` dari `CharacterMotor` (sinyal: `move01`, `run01`,
+   `is_dashing`, `combat.is_attacking()`, `landed`, `attack_started(combo)`). Peta
+   blend lama: `Locomotion.sample_pose` — jaga transisi halus.
+4. Material toon: `runtime/toon_character_setup.gd` + `shaders/aurelia_toon.gdshader`.
+5. Baca dulu `models/LISENSI.md` (lisensi! jangan commit/bundle aset itu).
 
 ### 4c. 🟢 Rumput dari aset user
 LINK USER: https://drive.google.com/file/d/18WFEJckB7Kn1ifvTe_JpAs7bB4iKbGZf/view?usp=drivesdk
-Sekarang rumput 100% prosedural: `runtime/grass_field.gd` (MultiMesh per-chunk, die-stream) + `shaders/aurelia_grass.gdshader` (geser angin berbasis TIME/vertex). Integrasi aset:
-- Kalau tekstur: pasang ke material blade; pertahankan gerak angin vertex-shader; kalau model mesh: jadikan sumber MultiMesh.
-- Jaga kontrak performa: tier kualitas di `core/quality_presets.gd` (jumlah blade/luas per preset), jarak sembur `quality_applier.gd`.
+Sekarang rumput 100% prosedural: `runtime/grass_field.gd` (MultiMesh per-chunk) +
+`shaders/aurelia_grass.gdshader`. Kalau tekstur → material bilah, pertahankan angin
+vertex-shader; kalau mesh → sumber MultiMesh. Jaga kontrak tier di
+`core/quality_presets.gd`.
 
 ### 4d. ℹ️ Umum
-- User merge PR #4 sendiri bila siap. Unduh APK tiap kali user minta build: artefak `aurelia-debug` run `android-build` terbaru.
-- Ikon anime persis = menunggu lampiran ulang gambar user.
+- User merge PR-nya sendiri bila siap. Unduh APK terbaru = artefak `aurelia-debug`
+  run `android-build` terbaru (cek stempel hash!).
+- Ikon anime persis = menunggu lampiran ulang gambar user (PIL ada di sandbox;
+  numpy TIDAK ada — `pip install --user --break-system-packages pillow`).
 
 ## 5. Peta kode kilat
 | Path | Isi |
 |---|---|
-| `runtime/world.gd` | World composer: membangun segalanya dari kode dalam `_build()`, `_boot_sync()` loading sinkron (failsafe 25s/900 frame), `hud.visible=false` sampai boot selesai |
-| `runtime/character_motor.gd` | Gerak pemain (jalan 6.5 m/s, lari 13.5, dash/stamina/coyote) — **memindahkan `rig` induknya** |
-| `runtime/character_rig.gd` | Pembawa visual + pose (sekarang prosedural 25 sendi; sambungan GLB/AnimationPlayer di sini) |
-| `runtime/camera_rig.gd` | Kamera orbit orang-ketiga; `_unhandled_input` drag kamera; cek `_in_stick_zone`; clamp ke terrain |
-| `runtime/terrain_chunk_streamer.gd`, `grass_field.gd`, `water_plane.gd`, `orbs.gd` | Streaming chunk/prop, rumput MultiMesh, air, orb kolektibel |
-| `ui/game_hud.gd`, `ui/virtual_joystick.gd`, `ui/ui_kit.gd` | HUD Genshin dari kode (layer 10) — **aturan: widget dekoratif = mouse_filter IGNORE, interaktif = STOP/via panel anak** |
-| `shaders/*.gdshader` | 5 world shader + sky/water/sparkle/outline — semua sudah Godot-4-sahih; rubah dengan takut |
-| `core/*` | terrain/world data, locomotion (kontrak numerik Genshin), quality presets, settings |
-| `tests/run_tests.gd`, `tests/touch_probe.gd`, `tests/gui_probe_control.gd` | 157 unit + probe sentuh end-to-end (headless) |
+| `runtime/world.gd` | World composer + urutan boot; memasang `TouchDebug.enabled = OS.is_debug_build()` |
+| `runtime/build_stamp.gd` | Stempel build (DITIMPA CI; di repo = `dev-lokal`) |
+| `runtime/character_motor.gd` | Gerak pemain — memindahkan `rig` induknya |
+| `runtime/character_rig.gd` | Pembawa visual + pose prosedural 25 sendi (sambungan GLB di sini) |
+| `runtime/camera_rig.gd` | Kamera orbit; `_unhandled_input`; melapor ke TouchDebug |
+| `runtime/terrain_chunk_streamer.gd`, `grass_field.gd`, `water_plane.gd`, `orbs.gd` | Streaming chunk/prop, rumput, air, orb |
+| `ui/game_hud.gd`, `ui/virtual_joystick.gd`, `ui/ui_kit.gd` | HUD dari kode (layer 10). **Aturan: dekoratif=IGNORE, interaktif=STOP/panel anak; stik=PASS+accept_event** |
+| `ui/touch_debug.gd` | Strip diagnosa sentuh (layer 90, semua IGNORE) |
+| `ui/loading_screen.gd` | Loading ala Genshin + stempel build |
+| `shaders/*.gdshader` | Shader Godot-4-sahih; rubah dengan takut |
+| `core/*` | terrain/world data, locomotion, quality presets, settings (kunci normalize TETAP) |
+| `tests/run_tests.gd`, `tests/touch_probe.gd`, `tests/gui_probe_control.gd` | 157 unit + probe sentuh end-to-end 19 cek |
 
-## 6. Alur verifikasi setiap ubah kode (wajibikan)
-1. `gdparse <file>` cepat, tapi **bukan** bukti benar.
+## 6. Alur verifikasi setiap ubah kode (wajibkan)
+1. `gdparse <file>` cepat, tapi **bukan** bukti benar (sandbox sesi ini TIDAK punya
+   gdparse — review manual teliti; hakim akhir = CI).
 2. Push → tunggu `godot-tests` hijau (unit + smoke + probe). Baca `ci-logs` kalau merah.
-3. `android-build` sukses → minta user tes artefak APK terbaru secara eksplisit (sebut hash).
+3. `android-build` sukses → minta user tes artefak APK terbaru **dan sebutkan stempel
+   yang harus muncul** (`<hash7>-b<run>` di layar loading).
 4. Sandbox melarang download binary Godot langsung; jangan coba lagi — verifikasi via CI.
 
-## 7. Bersih-bersih CATATAN usang (yang boleh & yang JANGAN dihapus)
-Perintah user: hapus catatan lain yang sudah tidak kepakai setelah catatan ini terpakai.
-- **Boleh dihapus**: `MIGRASI-GODOT.md` (migrasi tuntas — sejarahnya ada di git), `OPTIMASI-KARAKTER.md` (dokumentasi tooling VRM era Unity; skripnya sendiri `tools/vrm_optim.py` boleh disimpan), `_verify/` (sisa verifikasi pra-migrasi), `site/` (build web three.js usang), `tools/` yaml Unity-era bila ada.
-- **JANGAN dihapus**: `DESAIN.md` (kontrak numerik/desain yang masih berlaku), `README.md` (perbarui sedikit, bukan buang), `models/LISENSI.md`, `tests/README.md`, file ini (sampai selesai diproses), `LANGKAH-SELANJUTNYA.md` kalau muncul lagi (sudah tak ada di tree tip).
-- File `.md` yang dihapus tetap ada di history git — aman.
+## 7. Bersih-bersih CATATAN usang — SUDAH SELESAI (2026-09-17)
+- Dihapus: `MIGRASI-GODOT.md`, `OPTIMASI-KARAKTER.md`, `_verify/`, `site/`
+  (referensi ke mereka di `DESAIN.md`, `README.md`, `core/quality_presets.gd`,
+  `models/LISENSI.md` sudah disesuaikan; `tools/vrm_optim.py` disimpan).
+- **JANGAN dihapus**: `DESAIN.md`, `README.md`, `models/LISENSI.md`, `tests/README.md`.
 
 ## 8. Resep cepat: "tolong lihat di HP saya lagi"
-- Kalau user lapor sesuatu lagi di HP: minta screenshot DAN jalankan probe terbaru; tambahkan output debug yang relevan ke BootLog agar muncul di `ci-logs:run-log.txt`… (BootLog tidak menulis ke stdout — panggil `print()` langsung bila perlu log mentahnya di CI).
-- Tombol kanan HUD: DSH = dash kilat darat (pakai stamina, cooldown di `CombatState`), E = skill (cd 6s), Q = burst (cd 15s, butuh energi 100 = cincin emas penuh).
+- Minta screenshot SAAT jari menyentuh zona stik (strip debug + bingkai zona +
+  stempel harus terbaca SATU layar).
+- BootLog tidak menulis ke stdout — panggil `print()` langsung bila perlu log mentahnya di CI.
+- Tombol kanan HUD: DSH = dash (stamina), E = skill (cd 6s), Q = burst (cd 15s, energi 100).
 
-_Selamat melanjutkan — semua yang di atas terverifikasi, bukan tebakan._
+_Selamat melanjutkan — stempel build adalah wasiat sesi ini: jangan pernah lagi menebak APK mana yang diuji user._

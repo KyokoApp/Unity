@@ -47,7 +47,8 @@ func _process(dt: float) -> void:
 	var fps := _frames / _acc
 	_acc = 0.0
 	_frames = 0
-	var txt := "fps %.0f  (%.1f ms)\n" % [fps, 1000.0 / maxf(1.0, fps)]
+	var txt := "build %s\n" % BuildStamp.id()
+	txt += "fps %.0f  (%.1f ms)\n" % [fps, 1000.0 / maxf(1.0, fps)]
 	txt += "chunk %d (antre %d)\n" % [streamer.active_chunks if streamer else 0,
 		streamer.queued_chunks if streamer else 0]
 	txt += "tris %dk  vert %dk\n" % [int((streamer.total_triangles if streamer else 0) / 1000),

@@ -3,7 +3,7 @@ name: godot-tests
 # Uji headless proyek Godot 4 (pengganti verify.yml era Unity).
 on:
   push:
-    branches: [arena/01a0ac44-unity]
+    branches: [arena/01a0ac44-unity, arena/01a0ad77-unity]
   pull_request:
 
 permissions:
@@ -62,7 +62,7 @@ jobs:
         run: |
           git config user.email "ci-debug@users.noreply.github.com"
           git config user.name "ci-debug"
-          git fetch origin arena/01a0ac44-unity --depth=1 2>/dev/null || true
+          git fetch origin ci-logs --depth=1 2>/dev/null || true
           git checkout --orphan ci-logs 2>/dev/null || git checkout ci-logs
           git rm -rf . >/dev/null 2>&1 || true
           echo "commit=$GITHUB_SHA run=$GITHUB_RUN_ID" > run-log.txt

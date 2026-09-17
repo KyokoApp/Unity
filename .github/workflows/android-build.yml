@@ -4,7 +4,7 @@ name: android-build
 # era Unity). Push hanya ke branch kerja arena — merge ke main melewati PR.
 on:
   push:
-    branches: [arena/01a0ac44-unity]
+    branches: [arena/01a0ac44-unity, arena/01a0ad77-unity]
   pull_request:
   workflow_dispatch:
 
@@ -55,6 +55,12 @@ jobs:
             --headless --path . --import || true
           /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
             --headless --path . --editor --quit || true
+
+      - name: Stempel build (identitas APK di layar)
+        run: |
+          STAMP="${GITHUB_SHA:0:7}-b$GITHUB_RUN_NUMBER"
+          printf 'class_name BuildStamp\nextends RefCounted\nconst ID := "%s"\nstatic func id() -> String:\n\treturn ID\n' "$STAMP" > runtime/build_stamp.gd
+          cat runtime/build_stamp.gd
 
       - name: Ekspor APK
         run: |

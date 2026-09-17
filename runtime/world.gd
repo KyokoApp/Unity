@@ -35,12 +35,17 @@ var camera_rig: CameraRig
 var quality: QualityApplier
 var hud: GameHud
 var perf: PerfHud
+var touch_debug: TouchDebug
 var loading: LoadingScreen
 
 var boot_done := false
 
 func _ready() -> void:
 	BootLog.install()
+	BootLog.add("stempel build: %s" % BuildStamp.id())
+	# Mata diagnosa sentuh: otomatis hanya di build debug (APK CI
+	# aurelia-debug SELALU debug -> strip terlihat di HP user).
+	TouchDebug.enabled = OS.is_debug_build()
 	_setup_input_map()
 	_build()
 	_disable_gameplay_input(true)
@@ -176,6 +181,13 @@ func _build() -> void:
 	perf.vfx = vfx
 	perf.motor = motor
 	add_child(perf)
+
+	# Strip diagnosa sentuh (debug-only; layer 90, semua IGNORE).
+	touch_debug = TouchDebug.new()
+	touch_debug.name = "TouchDebug"
+	touch_debug.stick = hud.stick
+	touch_debug.camera_rig = camera_rig
+	add_child(touch_debug)
 
 	# HUD sementara disembunyikan sampai boot selesai.
 	hud.visible = false

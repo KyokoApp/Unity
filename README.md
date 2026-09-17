@@ -6,10 +6,10 @@ RPG open-world anime bergaya Genshin: dunia prosedural 3 km × 3 km dengan
 dan target utama **Android**.
 
 Repo ini adalah hasil **migrasi penuh dari Unity 6** — tidak ada
-Asset/Packages/ProjectSettings lagi; yang tersisa murni proyek Godot 4.
-Lihat **[MIGRASI-GODOT.md](MIGRASI-GODOT.md)** untuk peta yang diporting
-sistem-per-sistem, dan **[DESAIN.md](DESAIN.md)** untuk dokumen desain
-(yang tidak berubah — dunia & gameplay-nya sama, enginenya saja yang ganti).
+Asset/Packages/ProjectSettings lagi; yang tersisa murni proyek Godot 4
+(peta porting sistem-per-sistem ada di history git). Lihat
+**[DESAIN.md](DESAIN.md)** untuk dokumen desain yang masih berlaku
+(dunia & gameplay-nya sama, enginenya saja yang ganti).
 
 ## Struktur
 
@@ -25,11 +25,11 @@ shaders/             # 8 shader GLSL: sky, terrain, water, grass, sparkle,
 runtime/             # lapisan engine: motor karakter, rig, kamera orbit,
                      #   streamer chunk (thread latar), rumput MultiMesh, air,
                      #   siklus siang/malam, VFX, orbs, quality applier, dll.
-ui/                  # HUD Genshin (dibangun dari kode), stik virtual, loading
+ui/                  # HUD Genshin (dibangun dari kode), stik virtual, loading,
+                     #   touch_debug (strip diagnosa sentuh, debug-build saja)
 tests/               # runner uji headless (godot --headless)
 models/              # tempat karakter GLB/VRM hasil konversi (lihat LISENSI)
 tools/               # skrip pipeline karakter (bawaan dari era Unity)
-site/                # game three.js ASLI (acuan numerik & visual, bukan runtime)
 DESIGN               # -> DESAIN.md
 ```
 

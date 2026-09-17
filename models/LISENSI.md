@@ -49,9 +49,9 @@ untuk memberikan hak komersial atasnya — persis logika yang sudah ditulis di
 nol risiko, dan itu memang rencana sekarang.** Dua hal yang tetap harus dijaga:
 
 1. Repo tetap **tidak boleh** berisi file ini → sudah diurus `.gitignore`.
-2. Workflow `.github/workflows/android-release.yml` mengunggah APK ke
-   **GitHub Releases yang publik**. Selama APK itu memuat model ini, jangan
-   jalankan workflow-nya, atau ganti dulu jadi build tanpa karakter.
+2. Jangan unggah APK yang memuat model ini ke tempat publik (GitHub
+   Releases dsb.). Workflow sekarang (`.github/workflows/android-build.yml`)
+   hanya menghasilkan **artifact privat** repo — itu batas amannya.
 
 Kalau nanti mau naik ke Play Store, model ini **harus diganti** — karakter
 VRoid Studio buatan sendiri, sesuai rencana `DESAIN.md`.
@@ -67,11 +67,11 @@ VRoid Studio buatan sendiri, sesuai rencana `DESAIN.md`.
 
 Keduanya **menghasilkan gambar yang identik secara bit-per-bit** untuk geometri,
 material, dan semua tekstur detail. Yang dibuang hanya data yang tidak pernah
-dipakai. Rinciannya di `OPTIMASI-KARAKTER.md` di root repo.
+dipakai. Rincian transformasinya: skrip `tools/vrm_optim.py` di repo ini.
 
 ---
 
-## Cara impor ke Unity
+## Cara impor (era Unity — referensi sejarah; target sekarang = GLB di Godot)
 
 1. Install **UniVRM** (`vrm-c/UniVRM` v0.131.2 — `UniVRM-0.131.2_a471.unitypackage`).
    File ini **VRM 0.x** (`specVersion: 0.0`), didukung UniVRM 0.131.2.

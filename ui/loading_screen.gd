@@ -84,6 +84,15 @@ func _build() -> void:
 	_error_text.offset_top = 40
 	_error_text.offset_bottom = 200
 
+	# Stempel build: SATU-SATUNYA cara yakin APK di HP itu BARU.
+	# (CI menulis runtime/build_stamp.gd sebelum ekspor; nilai di
+	# editor selalu "dev-lokal".)
+	var stamp := UiKit.rect("Stamp", root, Vector2(1, 1), Vector2(1, 1),
+		Vector2(-440, -34), Vector2(428, 26))
+	stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiKit.label(stamp, "build %s" % BuildStamp.id(), 18,
+		Color(0.40, 0.38, 0.35, 1), HORIZONTAL_ALIGNMENT_RIGHT)
+
 func _process(dt: float) -> void:
 	_tip_t += dt
 	if _tip_t > 4.0:

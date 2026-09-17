@@ -158,6 +158,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if st.pressed:
 			if not _in_stick_zone(st.position):
 				_drag_id = st.index
+				TouchDebug.note_cam(st.position, st.index)
 		elif st.index == _drag_id:
 			_drag_id = -2147483648
 	elif event is InputEventScreenDrag:
