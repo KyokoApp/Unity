@@ -232,7 +232,7 @@ func _place_cell(cx: int, cz: int, focus: Vector3) -> Array:
 			continue
 
 		var yaw := hr * TAU
-		var scale := 0.75 + _hash3(cx, cz, i * 5 + 1) * 0.65
+		var scale := 0.72 + _hash3(cx, cz, i * 5 + 1) * 0.45
 		list.append(Transform3D(
 			Basis.from_euler(Vector3(0, yaw, 0)).scaled(Vector3(scale, scale, scale)),
 			Vector3(x, y - 0.04, z)))
@@ -273,7 +273,7 @@ class BuildClumpMesh:
 			var yaw := deg_to_rad(b * 90.0 + b * 17.0)
 			var tilt := deg_to_rad(14.0 + b * 5.0)
 			var h: float = 0.30 + b * 0.05
-			var w := 0.024
+			var w := 0.018
 			var rot := Basis.from_euler(Vector3(0, yaw, 0))
 			var lean := Basis.from_euler(Vector3(0, 0, tilt))
 			var fwd := rot * lean * Vector3.FORWARD

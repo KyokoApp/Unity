@@ -55,9 +55,9 @@ func _run() -> void:
 	if rig != null:
 		rig.set("pitch", 12.0)
 
-	# Kembali ke sudut bermain.
+	# Kembali ke sudut bermain (jarak default baru 7 m).
 	if rig != null:
-		rig.call("set_distance", 5.0)
+		rig.call("set_distance", 7.0)
 		rig.set("yaw", float(rig.get("yaw")) - 170.0)
 	for i in 45:
 		await process_frame

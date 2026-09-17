@@ -92,13 +92,13 @@ static func build(cx: int, cz: int, near: bool, props_near: int, props_far: int)
 		if not pine:
 			for k in 2:
 				var frak := _lohash(int(wx * 7.0 + wz * 13.0), i * 3 + k)
-				var ox2 := (frak - 0.5) * 2.4 * scale
+				var ox2 := (frak - 0.5) * 3.2 * scale
 				var oz2 := (_lohash(int(wz * 9.0 - wx * 5.0), i * 5 + k)
-					- 0.5) * 2.4 * scale
-				var s2 := scale * (0.42 + 0.30
+					- 0.5) * 3.2 * scale
+				var s2 := scale * (0.50 + 0.30
 					* _lohash(int(wx * 11.0 + wz * 3.0), i * 7 + k))
 				props.append({"kind": PROP_LEAF,
-						  "x": x + ox2, "y": y + (7.1 + 1.5 * float(k)) * scale,
+						  "x": x + ox2, "y": y + (7.6 + 1.7 * float(k)) * scale,
 						  "z": z + oz2, "sx": s2, "sy": 0.78 * s2, "sz": s2,
 						  "yaw": frak * 6.28, "foliage": region["foliage"],
 						  "has_foliage": true})

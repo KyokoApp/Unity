@@ -18,7 +18,7 @@ uniform vec4 horizon_color : source_color = vec4(0.75, 0.82, 0.88, 1.0);
 uniform vec4 bottom_color : source_color = vec4(0.55, 0.58, 0.62, 1.0);
 uniform vec4 sun_color : source_color = vec4(1.0, 0.95, 0.85, 1.0);
 uniform vec3 sun_direction = vec3(0.0, 1.0, 0.3);
-uniform float sun_size : hint_range(0.001, 0.05) = 0.0015;
+uniform float sun_size : hint_range(0.001, 0.05) = 0.0010;
 uniform float sun_glow : hint_range(0.0, 1.0) = 0.12;
 
 void sky() {
