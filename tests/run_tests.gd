@@ -228,12 +228,13 @@ func _test_droop_sec() -> void:
 	var p1: Quaternion = s.get_bone_pose_rotation(l1)
 	assert_true(p1.is_finite(), "pose pita finit")
 	assert_aproks(p1.length(), 1.0, 1e-3, "pose pita unit-normal")
-	# Arah segmen pertama SETELAH droop harus cenderung ke bawah.
-	if s.has_method("force_update_all_bone_transforms"):
-		s.call("force_update_all_bone_transforms")
-	var g1 := s.get_bone_global_pose(l1).origin
-	var g2 := s.get_bone_global_pose(l2).origin
-	assert_true((g2 - g1).y < 0.0, "segmen pertama menjuntai setelah droop")
+	# Arah segmen pertama SETELAH droop harus cenderung ke bawah —
+	# diperiksa dari pose TERTULIS (bukan cache global yang belum
+	# berproses): basis-akhir = rest_induk_g * rest_lokal * pose.
+	var final_basis: Basis = Basis(s.get_bone_rest(h).basis.get_rotation_quaternion()) \
+		* s.get_bone_rest(l1).basis * Basis(p1)
+	var seg: Vector3 = final_basis * Vector3(0, -0.1, 0)
+	assert_true(seg.y < 0.0, "segmen pertama menjuntai setelah droop")
 	s.free()
 
 func _test_motor_misc() -> void:

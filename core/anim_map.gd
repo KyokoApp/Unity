@@ -414,17 +414,22 @@ static func droop_sec_bones(skel: Skeleton3D) -> int:
 		if not nm_l.begins_with("j_sec"):
 			continue
 		var pn2 := skel.get_bone_parent(i)
-		if pn2 >= 0 and nama[pn2].to_lower().begins_with("j_sec"):
+		if pn2 < 0:
+			continue
+		if nama[pn2].to_lower().begins_with("j_sec"):
 			continue  # hanya ROOT rantai — kroni ikut otomatis
-		# cari anak pertama rantai untuk arah segmen awal.
+		# arah segmen awal: menuju anak j_sec pertama; bila tulang ini
+		# ujung rantai, pakai arah KELUAR dari induknya.
 		var anak := -1
 		for j in skel.get_bone_count():
 			if skel.get_bone_parent(j) == i and nama[j].to_lower().begins_with("j_sec"):
 				anak = j
 				break
-		if anak < 0:
-			continue
-		var d0: Vector3 = (gxf[anak] as Transform3D).origin - (gxf[i] as Transform3D).origin
+		var d0: Vector3
+		if anak >= 0:
+			d0 = (gxf[anak] as Transform3D).origin - (gxf[i] as Transform3D).origin
+		else:
+			d0 = (gxf[i] as Transform3D).origin - (gxf[pn2] as Transform3D).origin
 		if d0.length() < 1e-4:
 			continue
 		d0 = d0.normalized()
