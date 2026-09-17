@@ -60,11 +60,18 @@ jobs:
       - name: Unggah log uji ke branch ci-logs
         if: always()
         run: |
+          # ci-logs = satu-satunya jalur baca log dari sandbox (endpoint blob
+          # Actions di-block). Pola ADITIF + rebase-retry: tidak ada --force,
+          # tidak ada rm -rf, jadi file job lain (apk-log.txt) tidak terhapus.
           git config user.email "ci-debug@users.noreply.github.com"
           git config user.name "ci-debug"
-          git fetch origin ci-logs --depth=1 2>/dev/null || true
-          git checkout --orphan ci-logs 2>/dev/null || git checkout ci-logs
-          git rm -rf . >/dev/null 2>&1 || true
+          git fetch origin '+refs/heads/ci-logs:refs/remotes/origin/ci-logs' --force >/dev/null 2>&1 || true
+          if git rev-parse --verify -q origin/ci-logs >/dev/null; then
+            git checkout -B ci-logs origin/ci-logs
+          else
+            git checkout --orphan ci-logs
+          fi
+          rm -f run-log.txt boot-log.txt probe-log.txt
           echo "commit=$GITHUB_SHA run=$GITHUB_RUN_ID" > run-log.txt
           cat /tmp/testlog.txt >> run-log.txt
           echo "== probe ==" >> run-log.txt
@@ -73,11 +80,12 @@ jobs:
           cp /tmp/probelog.txt probe-log.txt 2>/dev/null || echo "probelog tidak ada" > probe-log.txt
           git add run-log.txt boot-log.txt probe-log.txt
           git commit -m "ci log $(date -u '+%Y-%m-%d %H:%M UTC')" >/dev/null
-          # Log best-effort: dua job (push & pull_request) upload serentak —
-          # kalah race bukan kegagalan uji. Coba 3x; gagal tetap jalan terus.
+          # Log best-effort: push gagal race -> rebase lalu coba lagi (3x).
           for i in 1 2 3; do
-            git push --force origin ci-logs && exit 0
-            git fetch origin '+refs/heads/ci-logs:refs/remotes/origin/ci-logs' --force >/dev/null 2>&1 || true
+            git push origin ci-logs && exit 0
             sleep 3
+            git fetch origin '+refs/heads/ci-logs:refs/remotes/origin/ci-logs' --force >/dev/null 2>&1
+            git rebase origin/ci-logs >/dev/null 2>&1 || git rebase --abort
           done
+          git push origin ci-logs || true
           exit 0

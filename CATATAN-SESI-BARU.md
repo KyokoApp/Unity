@@ -14,7 +14,7 @@
 
 ## 2. Status sekarang (yang SUDAH jadi)
 - Dunia tampil di HP (sky, terrain, air, rumput, HUD); ikon anime terpasang.
-- CI `godot-tests`: 157 unit test + smoke-run 600 frame + touch probe (**naik dari 14 ke 19 cek** sesi ini).
+- CI `godot-tests`: 157 unit test + smoke-run 600 frame + touch probe (**naik dari 14 ke 24 cek** sesi ini).
 - CI `android-build`: artefak APK `aurelia-debug`, sekarang **berstempel build** (`runtime/build_stamp.gd` ditulis CI sebelum ekspor).
 - `version/name=0.2.0`, `version/code=2` (agar update APK bersih).
 - Log diagnostik CI di branch `ci-logs` (run-log.txt = unit + probe, boot-log.txt = smoke, probe-log.txt):
@@ -116,8 +116,14 @@ vertex-shader; kalau mesh → sumber MultiMesh. Jaga kontrak tier di
    gdparse — review manual teliti; hakim akhir = CI).
 2. Push → tunggu `godot-tests` hijau (unit + smoke + probe). Baca `ci-logs` kalau merah.
 3. `android-build` sukses → minta user tes artefak APK terbaru **dan sebutkan stempel
-   yang harus muncul** (`<hash7>-b<run>` di layar loading).
-4. Sandbox melarang download binary Godot langsung; jangan coba lagi — verifikasi via CI.
+   yang harus muncul** (`<hash7>-b<run>` di layar loading). Bukti APK tanpa download:
+   `git show origin/ci-logs:apk-log.txt` (stempel + sha256 + ukuran).
+4. **Sandbox mem-block endpoint blob GitHub Actions** (artefak & log run tidak bisa
+   diunduh dari sini — koneksi EOF ke Azure blob). Karena itu SEMUA bukti CI
+   dirancang lewat branch `ci-logs` (github.com biasa bisa): `run-log.txt` /
+   `probe-log.txt` / `boot-log.txt` (dari godot-tests) dan `apk-log.txt`
+   (dari android-build). JANGAN buang pola ini.
+5. Sandbox melarang download binary Godot langsung; jangan coba lagi — verifikasi via CI.
 
 ## 7. Bersih-bersih CATATAN usang — SUDAH SELESAI (2026-09-17)
 - Dihapus: `MIGRASI-GODOT.md`, `OPTIMASI-KARAKTER.md`, `_verify/`, `site/`
