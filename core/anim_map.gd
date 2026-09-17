@@ -137,10 +137,10 @@ static func fill_fallbacks(m: Dictionary) -> Dictionary:
 ## (morf, value, audio, metode) dibuang — retarget morph antar
 ## file tidak pernah aman.
 static func retarget_clip(anim: Animation, skel_prefix: String) -> Animation:
-	var dup := anim.duplicate()
+	var dup: Animation = anim.duplicate()
 	for i in range(dup.get_track_count() - 1, -1, -1):
-		var t := dup.track_get_type(i)
-		var p := dup.track_get_path(i)
+		var t: Animation.TrackType = dup.track_get_type(i)
+		var p: NodePath = dup.track_get_path(i)
 		if t == Animation.TYPE_POSITION_3D or t == Animation.TYPE_ROTATION_3D \
 		or t == Animation.TYPE_SCALE_3D:
 			var sub := String(p.get_concatenated_subnames())

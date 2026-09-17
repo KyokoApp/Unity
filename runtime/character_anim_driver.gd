@@ -215,7 +215,7 @@ func _oneshot_sederhana(peran: String, dur: float) -> void:
 	_mainkan_oneshot(peran, nama, dur)
 
 func _mainkan_oneshot(peran: String, nama: String, durasi_target: float) -> void:
-	var anim := player.get_animation(nama)
+	var anim: Animation = player.get_animation(nama)
 	var panjang := anim.length if anim != null and anim.length > 0.05 else 0.55
 	var sp := clampf(panjang / maxf(0.05, durasi_target), 0.6, 3.0)
 	player.play(nama, fade_oneshot, sp)
