@@ -1,0 +1,91 @@
+name: godot-tests
+
+# Uji headless proyek Godot 4 (pengganti verify.yml era Unity).
+on:
+  push:
+    branches: [arena/01a0ac44-unity, arena/01a0ad77-unity]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unduh Godot 4 headless (Linux)
+        run: |
+          GODOT_VER=4.5.1
+          curl -fL "https://github.com/godotengine/godot/releases/download/${GODOT_VER}-stable/Godot_v${GODOT_VER}-stable_linux.x86_64.zip" \
+               -o /tmp/godot.zip
+          unzip -o /tmp/godot.zip -d /tmp/godot-bin
+          chmod +x /tmp/godot-bin/Godot_v${GODOT_VER}-stable_linux.x86_64
+          # impor resource sekali supaya cache siap
+          /tmp/godot-bin/Godot_v${GODOT_VER}-stable_linux.x86_64 \
+            --headless --path . --import || true
+
+      - name: Jalankan runner uji
+        run: |
+          /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
+            --headless --path . --script tests/run_tests.gd 2>&1 | tee /tmp/testlog.txt
+          exit ${PIPESTATUS[0]}
+
+      - name: Smoke-run game asli (600 frame, tangkap SCRIPT ERROR)
+        run: |
+          set +e
+          timeout 120 /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
+            --headless --path . --quit-after 600 2>&1 | tee /tmp/bootlog.txt
+          EC=$?
+          echo "exit=$EC" >> /tmp/bootlog.txt
+          # crash/timeout (124) atau ada SCRIPT ERROR di log -> gagal
+          if [ "$EC" -ne 0 ] || grep -qE "SCRIPT ERROR|SHADER ERROR" /tmp/bootlog.txt; then
+            exit 1
+          fi
+
+      - name: Probe input sentuh & pemain (headless)
+        run: |
+          set -o pipefail
+          /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
+            --headless --path . -s res://tests/touch_probe.gd 2>&1 | tee /tmp/probelog.txt
+          EC=$?
+          # echo ringkasan agar muncul di logs GitHub langsung
+          echo "exit probe=$EC; ringkasan:"
+          tail -20 /tmp/probelog.txt
+          if [ "$EC" -ne 0 ] || grep -qE "PROBEFAIL|SCRIPT ERROR|SHADER ERROR" /tmp/probelog.txt; then
+            echo "::error::touch probe gagal (exit=$EC)"
+            exit 1
+          fi
+      - name: Unggah log uji ke branch ci-logs
+        if: always()
+        run: |
+          # ci-logs = satu-satunya jalur baca log dari sandbox (endpoint blob
+          # Actions di-block). Pola ADITIF + rebase-retry: tidak ada --force,
+          # tidak ada rm -rf, jadi file job lain (apk-log.txt) tidak terhapus.
+          git config user.email "ci-debug@users.noreply.github.com"
+          git config user.name "ci-debug"
+          git fetch origin '+refs/heads/ci-logs:refs/remotes/origin/ci-logs' --force >/dev/null 2>&1 || true
+          if git rev-parse --verify -q origin/ci-logs >/dev/null; then
+            git checkout -f -B ci-logs origin/ci-logs
+          else
+            git checkout --orphan ci-logs
+          fi
+          rm -f run-log.txt boot-log.txt probe-log.txt
+          echo "commit=$GITHUB_SHA run=$GITHUB_RUN_ID" > run-log.txt
+          cat /tmp/testlog.txt >> run-log.txt
+          echo "== probe ==" >> run-log.txt
+          cat /tmp/probelog.txt >> run-log.txt 2>/dev/null || echo "(probelog hilang)" >> run-log.txt
+          cp /tmp/bootlog.txt boot-log.txt 2>/dev/null || echo "bootlog tidak ada" > boot-log.txt
+          cp /tmp/probelog.txt probe-log.txt 2>/dev/null || echo "probelog tidak ada" > probe-log.txt
+          git add run-log.txt boot-log.txt probe-log.txt
+          git commit -m "ci log $(date -u '+%Y-%m-%d %H:%M UTC')" >/dev/null
+          # Log best-effort: push gagal race -> rebase lalu coba lagi (3x).
+          for i in 1 2 3; do
+            git push origin ci-logs && exit 0
+            sleep 3
+            git fetch origin '+refs/heads/ci-logs:refs/remotes/origin/ci-logs' --force >/dev/null 2>&1
+            git rebase origin/ci-logs >/dev/null 2>&1 || git rebase --abort
+          done
+          git push origin ci-logs || true
+          exit 0

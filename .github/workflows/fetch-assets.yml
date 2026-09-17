@@ -1,0 +1,111 @@
+name: fetch-assets
+
+## ==============================================================
+## FETCH-ASSETS — mengunduh 3 file aset pengguna dari Google Drive
+## di RUNNER (sandbox dev memblokir Drive; runner GitHub tidak),
+## menulis LAPORAN metadata GLB ke branch ci-logs (pola aditif yang
+## sama dengan godot-tests / android-build), dan menyimpan models/
+## ke cache aksi agar android-build bisa menyertakannya di APK.
+##
+## Ases pengguna bersifat berlisensi -> TIDAK masuk git.
+## Jalan hanya manual (workflow_dispatch). Lihat CATATAN-SESI-BARU
+## bagian 4b untuk alur lengkapnya.
+## ==============================================================
+
+## Catatan trigger: workflow_dispatch hanya bisa dipicu API bila file
+## sudah ada di branch default. Selama belum, trigger `push` tepat pada
+## file ini sendiri berfungsi sebagai tombol "jalankan sekarang":
+## ubah/kirim file ini -> run terpanggil di branch kerja yang sama.
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - ".github/workflows/fetch-assets.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-assets
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Siapkan Python + gdown
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install gdown
+
+      ## 3 tautan Drive pengguna (lihat CATATAN / handoff sesi).
+      - name: Unduh aset Drive pengguna
+        run: |
+          set -e
+          gdown "120fNMWnpMaiNEJLG53LdTd8DfSGdFrYq" -O /tmp/a2_model_anim.bin || true
+          gdown "1RZIwux_yJ6VB2j4nAsYdUlfcca0BLPar" -O /tmp/a2_char.bin || true
+          gdown "18WFEJckB7Kn1ifvTe_JpAs7bB4iKbGZf" -O /tmp/a3_grass.bin || true
+          ls -l /tmp/*.bin 2>/dev/null || echo "(tidak ada unduhan berhasil)"
+
+      - name: Tulis laporan metadata aset
+        run: |
+          python3 tools/fetch_assets_report.py \
+            /tmp/a2_model_anim.bin /tmp/a2_char.bin /tmp/a3_grass.bin \
+            > /tmp/asset-report.txt 2>&1 || true
+          cat /tmp/asset-report.txt
+
+      ## Keputusan penempatan (mesh vs klip) diambil skrip baku.
+      - name: Tempatkan GLB ke models/ (nama baku)
+        run: |
+          python3 tools/fetch_assets_place.py \
+            /tmp/a2_model_anim.bin /tmp/a2_char.bin || true
+          ls -l models/ 2>/dev/null || echo "models/ kosong (tidak ada GLB valid)"
+
+      - name: Simpan models/ ke cache aksi
+        uses: actions/cache/save@v4
+        if: hashFiles('models/*.glb') != ''
+        continue-on-error: true
+        with:
+          path: models
+          key: user-assets-v1
+
+      ## Pola aditif ci-logs: checkout -B ke branch ci-logs, tambah/
+      ## ganti HANYA file milik job ini, push TANPA --force (retry
+      ## rebase bila berbarengan job lain).
+      - name: Catat laporan ke branch ci-logs (aditif)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          git config user.email "arena-bot@local"
+          git config user.name "Arena Bot"
+          git fetch origin ci-logs || true
+          if git show-ref --verify --quiet refs/remotes/origin/ci-logs; then
+            git checkout -f -B ci-logs origin/ci-logs
+          else
+            git checkout --orphan ci-logs
+            git rm -rf .
+          fi
+          {
+            echo "commit: $GITHUB_SHA"
+            echo "run: $GITHUB_RUN_ID"
+            echo "waktu: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo ""
+            cat /tmp/asset-report.txt
+          } > asset-report.txt
+          git add asset-report.txt
+          git commit -m "ci: laporan aset run $GITHUB_RUN_ID" \
+            || echo "tidak ada perubahan"
+          for i in 1 2 3; do
+            if git push origin ci-logs; then
+              break
+            fi
+            git fetch origin ci-logs
+            git rebase origin/ci-logs || git rebase --abort || true
+          done

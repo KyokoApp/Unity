@@ -1,7 +1,15 @@
-# Usulan desain — Aurelia di Unity (tanpa mobil)
+# Usulan desain — Aurelia (three.js → ~~Unity~~ → **Godot 4**)
 
-Repo target: `github.com/KyokoApp/Unity` (sudah ada, masih kosong — 0 ref)
-Referensi: `KyokoApp/rpg` (three.js). Semua angka di bawah diukur dari repo itu.
+> **Status 2026-09-16:** proyek FTT bermigrasi penuh dari Unity ke
+> **Godot 4** (GDScript) — peta implementasinya ada di history git.
+> Dokumen ini tetap dokumen desain: semua angka di bawah masih
+> berlaku dan menjadi kontrak numerik port Godot — hanya nama
+> enginenya yang berganti.
+
+Repo: `github.com/KyokoApp/Unity` (history Unity dipertahankan di git,
+working tree-nya sekarang proyek Godot).
+Referensi gameplay: `site/` (three.js asli). Semua angka di bawah diukur
+dari game itu.
 
 ---
 
@@ -239,7 +247,7 @@ bikin supaya sesuai seleramu. Yang bisa saya kerjakan lebih dulu: semua sisi Uni
 
 - Pipeline render: **URP** (sudah pasti — kamu pilih target Android/APK, dan HDRP
   tidak mendukung Android/iOS sama sekali).
-- PWA/GitHub Pages: **tidak relevan lagi** untuk jalur APK. Halaman `site/index.html`
-  yang sudah saya buat tetap berguna sebagai halaman unduh, tapi bukan cara install utama.
+- PWA/GitHub Pages: **tidak relevan lagi** untuk jalur APK (halaman `site/`
+  usangnya sudah dibersihkan; cara install utama = APK dari CI).
 - `carCamera`, `stickShape` mobil, dan semua preset terkait mobil: dihapus dari
   `GameSettings`.

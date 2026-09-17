@@ -1,0 +1,109 @@
+name: ci-screenshot  # v3 script-fix
+
+## ==============================================================
+## CI SCREENSHOT — menjalankan game di runner (xvfb + llvmpipe),
+## mengambil 3 screenshot sungguhan (tests/ci_screenshot.gd) dan
+## menaruhnya di branch ci-logs:shots/*.png (pola aditif). Dengan
+## ini kita MEMBANDINGKAN game vs gambar referensi pengguna tanpa
+## perlu melihat HP langsung.
+## Trigger: manual (workflow_dispatch) atau push file ini sendiri
+## (workflow_dispatch API menolak sebelum file ada di default).
+## ==============================================================
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [arena/01a0ad77-unity]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-screenshot
+  cancel-in-progress: true
+
+jobs:
+  shoot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pulihkan aset pengguna dari cache
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: models
+          key: user-assets-v1
+          restore-keys: |
+            user-assets-
+
+      - name: Siapkan xvfb + mesa + Godot 4.5.1
+        run: |
+          set -e
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb libgl1 libgl1-mesa-dri mesa-utils \
+            libglu1-mesa fonts-dejavu-core >/dev/null
+          GODOT_VER=4.5.1
+          curl -fL "https://github.com/godotengine/godot/releases/download/${GODOT_VER}-stable/Godot_v${GODOT_VER}-stable_linux.x86_64.zip" \
+            -o /tmp/godot.zip
+          unzip -o /tmp/godot.zip -d /tmp/godot-bin
+          chmod +x /tmp/godot-bin/Godot_v${GODOT_VER}-stable_linux.x86_64
+          ls /tmp/godot-bin
+
+      - name: Impor aset (cache .import)
+        run: |
+          set -e
+          xvfb-run -a /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
+            --path . --editor --quit-after 120 > /tmp/importlog.txt 2>&1 || true
+          tail -5 /tmp/importlog.txt
+          ls models/ 2>/dev/null || true
+
+      - name: Ambil screenshot game (3 sudut)
+        run: |
+          set -e
+          xvfb-run -a -s "-screen 0 1280x720x24" \
+            /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
+            --path . --rendering-driver opengl3 \
+            --audio-driver Dummy --script tests/ci_screenshot.gd \
+            > /tmp/shotlog.txt 2>&1 || true
+          grep -E "CSI |SCRIPT ERROR|ERROR" /tmp/shotlog.txt | head -20 || true
+          ls -l /tmp/shot_*.png || true
+
+      - name: Catat screenshot ke branch ci-logs (aditif)
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          git config user.email "arena-bot@local"
+          git config user.name "Arena Bot"
+          git fetch origin ci-logs || true
+          git checkout -f -B ci-logs origin/ci-logs
+          mkdir -p shots
+          cp /tmp/shotlog.txt shots/shot-log.txt
+          cp /tmp/importlog.txt shots/import-log.txt
+          for f in shot_a shot_b shot_c shot_d; do
+            if [ -f "/tmp/$f.png" ]; then
+              cp "/tmp/$f.png" "shots/$f.png"
+            fi
+          done
+          {
+            echo "commit: $GITHUB_SHA"
+            echo "run: $GITHUB_RUN_ID"
+            echo "waktu: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            grep -E "^CSI " /tmp/shotlog.txt || true
+          } > shots/shot-meta.txt
+          git add shots/
+          git commit -m "ci screenshot run $GITHUB_RUN_ID" \
+            || echo "tidak ada perubahan"
+          for i in 1 2 3; do
+            if git push origin ci-logs; then
+              break
+            fi
+            git fetch origin ci-logs
+            git rebase origin/ci-logs || git rebase --abort || true
+          done
