@@ -298,6 +298,11 @@ func _test_live_retarget() -> void:
 		* (d * rg_b_c)).normalized()
 	var pose_exp: Quaternion = (rl_b_c.inverse() * local_abs_exp).normalized()
 	var got: Quaternion = b.get_bone_pose_rotation(bc).normalized()
+	if absf(pose_exp.dot(got)) <= 0.999:
+		print("DBG flip_q=", prep["flip_q"], " d=", d,
+			" local_abs_exp=", local_abs_exp,
+			" pose_exp=", pose_exp, " got=", got,
+			" rl_b_c=", rl_b_c, " rg_b_p=", rg_b_p, " rg_b_c=", rg_b_c)
 	assert_true(absf(pose_exp.dot(got)) > 0.999,
 		"live_apply menanam delta dunia dengan presisi")
 	# dan pada skeleton ber-rest-sama, pose target == pose sumber PERSIS
