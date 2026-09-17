@@ -154,7 +154,9 @@ func bind() -> void:
 	## tetap menjadi fallback (lihat _bind_anim).
 	_bind_anim(model)
 
-	last_bind_report = " & ".join(_bind_report_parts)
+	last_bind_report = " & ".join(_bind_report_parts) \
+		+ " | tekstur %d/%d surface bertuan" % [ToonCharacterSetup.last_tex,
+			maxi(1, ToonCharacterSetup.last_hadir)]
 	BootLog.add(last_bind_report)
 	BootLog.add(anim.last_report if anim != null else "anim: nonaktif")
 

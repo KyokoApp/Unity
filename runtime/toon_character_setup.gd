@@ -15,6 +15,13 @@ extends RefCounted
 
 const OPTS_KEYS := ["skin_color", "hair_color"]
 
+## Diagnostik panggilan apply() terakhir: berapa surface yang membawa
+## tekstur albedo berhasil dipertahankan (dibaca CharacterRig ->
+## strip debug; kunci utama menyelidiki kasus "karakter putih").
+static var last_hadir := 0
+static var last_tex := 0
+static var _no_material := 0
+
 static func apply(root: Node3D, opts: Dictionary = {}) -> void:
 	if root == null:
 		return
@@ -23,6 +30,9 @@ static func apply(root: Node3D, opts: Dictionary = {}) -> void:
 	var shader_outline: Shader = opts.get("outline_shader")
 	if shader_body == null:
 		return
+	last_hadir = 0
+	last_tex = 0
+	_no_material = 0
 
 	for mesh_inst in _mesh_instances(root):
 		var mesh: Mesh = mesh_inst.mesh
@@ -43,6 +53,26 @@ static func apply(root: Node3D, opts: Dictionary = {}) -> void:
 				transparent = sm.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED
 				if sm.emission_enabled:
 					emission = sm.emission
+			elif src is ShaderMaterial:
+				## Model eksternal kadang membawa shader siap pakai —
+				## coba tarik tekstur pembanding keluar dulu sebelum
+				## ditukar ke toon (nama param umum).
+				src_name = mesh_inst.name.to_lower()
+				for pname in ["albedo_texture", "base_map", "base_texture",
+						"main_tex", "texture_albedo"]:
+					var t: Variant = (src as ShaderMaterial).get_shader_parameter(pname)
+					if t is Texture2D:
+						albedo = t
+						break
+				var tc: Variant = (src as ShaderMaterial).get_shader_parameter("albedo_color")
+				if tc is Color:
+					tint = tc
+			else:
+				_no_material += 1
+
+			last_hadir += 1
+			if albedo != null:
+				last_tex += 1
 
 			# Material "hair/*" & *_in (iris) adalah wajah/rambut khas
 			# VRM-KK; yang transparan memakai lite (tanpa outline),
@@ -55,6 +85,11 @@ static func apply(root: Node3D, opts: Dictionary = {}) -> void:
 			if albedo != null:
 				mat.set_shader_parameter("base_map", albedo)
 			mat.set_shader_parameter("base_color", tint)
+			## Anti "karakter putih": ambient shader karakter ditambahkan
+			## DI ATAS diffuse; total ~1,35x akan memutihkan tekstur
+			## pastell (keluhan user: warna hilang). Iklim EMISSION di
+			## 0,32 menjaga warna asli + toon ramp tetap bertugas.
+			mat.set_shader_parameter("ambient_boost", 0.32)
 			var n := src_name
 			if n.find("hair") >= 0 or n.find("rambut") >= 0:
 				mat.set_shader_parameter("rim_strength", 0.35)

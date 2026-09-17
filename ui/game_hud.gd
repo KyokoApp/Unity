@@ -92,24 +92,27 @@ func _build() -> void:
 		camera_rig = get_tree().get_first_node_in_group("player").get_node("../CameraRig") as CameraRig
 
 func _build_party(root: Control) -> void:
-	var menu := UiKit.rect("MenuBtn", root, Vector2(0, 1), Vector2(0, 1),
-		Vector2(-56, -56), Vector2(64, 64))
-	(menu as Control).add_theme_stylebox_override("panel", UiKit.panel_style(UiKit.PANEL, 14))
+	## Menu pengaturan: kanan atas, di bawah minimap (layout ala
+	## referensi: tombol kecil pojok, party vertikal tepi kanan).
+	var menu := UiKit.rect("MenuBtn", root, Vector2(1, 0), Vector2(1, 0),
+		Vector2(-70, 212), Vector2(54, 54))
+	(menu as Control).add_theme_stylebox_override("panel",
+		UiKit.panel_style(Color(0.06, 0.09, 0.16, 0.72), 9999))
 	UiKit.button_slot(menu, _toggle_settings)
-	UiKit.label(menu, "=", 40, UiKit.CREAM)
+	UiKit.label(menu, "=", 32, UiKit.CREAM)
 
-	# 4 potret party + bar HP.
+	# 4 potret party vertikal + bar HP tipis di bawahnya.
 	for i in 4:
 		var active := i == 0
-		var px := 16.0 + i * 96.0
+		var py := 320.0 + i * 104.0
 		var p := UiKit.portrait(root, "Portrait%d" % i,
-			Vector2(0, 1), Vector2(0, 1), Vector2(px, -150), Vector2(84, 84),
+			Vector2(1, 0), Vector2(1, 0), Vector2(-100, py), Vector2(84, 84),
 			UiKit.TEAL if active else Color(0.30, 0.34, 0.42, 0.9),
 			UiKit.GOLD if active else UiKit.DIM)
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		UiKit.label(p, str(i + 1), 34, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER, true)
-		var hp := UiKit.bar(root, "Hp%d" % i, Vector2(0, 1), Vector2(0, 1),
-			Vector2(px + 2, -52), Vector2(80, 10), Color(0, 0, 0, 0.55), UiKit.HP_GREEN)
+		UiKit.label(p, str(i + 1), 28, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER, true)
+		var hp := UiKit.bar(root, "Hp%d" % i, Vector2(1, 0), Vector2(1, 0),
+			Vector2(-98, py + 92), Vector2(80, 8), Color(0, 0, 0, 0.55), UiKit.HP_GREEN)
 		(hp["outer"] as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 		(hp["fill"] as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 		UiKit.set_bar(hp, 1.0)
@@ -178,7 +181,7 @@ func _build_minimap(root: Control) -> void:
 	_n_mark = nord
 
 	var fps := UiKit.rect("Fps", root, Vector2(1, 0), Vector2(1, 0),
-		Vector2(-210, 208), Vector2(190, 30))
+		Vector2(-210, 276), Vector2(190, 30))
 	_fps_text = UiKit.label(fps, "", 22, UiKit.DIM)
 
 func _build_stamina(root: Control) -> void:
@@ -199,17 +202,23 @@ func _build_stamina(root: Control) -> void:
 	(outer["fill"] as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stam_fill = outer
 
+## ------------------------------------------------------------
+## Klaster aksi kanan-bawah ala Genshin: ATK besar di pojok, lompat
+## di atasnya, dash di kiri, skill/burst elemen di atas-kirinya.
+## Tombol = lingkaran gelap translusen + ring tipis + glif vektor
+## (lihat ui/hud_icons.gd) — bukan lagi teks polos, dan dijangkar ke
+## KANAN-BAWAH supaya proporsi awet di layar apa pun.
 func _build_actions(root: Control) -> void:
-	_make_action(root, "BtnAttack", Vector2(-170, 200), 210, "ATK", 44,
-		func(): pressed_attack.emit())
-	_make_action(root, "BtnSkill", Vector2(-350, 270), 150, "E", 52,
-		_fire_skill)
-	_make_action(root, "BtnBurst", Vector2(-330, 445), 165, "Q", 56,
-		_fire_burst)
-	_make_action(root, "BtnJump", Vector2(-545, 180), 135, "JMP", 34,
-		func(): pressed_jump.emit())
-	_make_action(root, "BtnDash", Vector2(-705, 160), 135, "DSH", 34,
-		func(): pressed_dash.emit())
+	_make_action2(root, "BtnAttack", "sword", Vector2(-214, -214), 190,
+		UiKit.INK, func(): pressed_attack.emit())
+	_make_action2(root, "BtnJump", "jump", Vector2(-166, -355), 128,
+		UiKit.INK, func(): pressed_jump.emit())
+	_make_action2(root, "BtnDash", "dash", Vector2(-368, -168), 128,
+		UiKit.INK, func(): pressed_dash.emit())
+	_make_action2(root, "BtnSkill", "bolt", Vector2(-352, -390), 140,
+		UiKit.INK, _fire_skill)
+	_make_action2(root, "BtnBurst", "burst", Vector2(-384, -558), 160,
+		UiKit.INK, _fire_burst)
 
 	# Cincin energi ultimate.
 	var q := root.get_node_or_null("BtnBurst") as Control
@@ -219,18 +228,23 @@ func _build_actions(root: Control) -> void:
 		ring_p.add_theme_stylebox_override("panel", UiKit.ring_style(UiKit.GOLD))
 		ring_p.offset_left = -6
 		ring_p.offset_top = -6
-		ring_p.offset_right = 171
-		ring_p.offset_bottom = 171
+		ring_p.offset_right = 166
+		ring_p.offset_bottom = 166
+		ring_p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		q.add_child(ring_p)
 		_burst_ring_nodes.append(ring_p)
 
-func _make_action(root: Control, nama: String, pos: Vector2, size: int,
-				  label_teks: String, font_size: int, on_press: Callable) -> Control:
-	var b := UiKit.rect(nama, root, Vector2(1, 0), Vector2(1, 0), pos, Vector2(size, size))
+func _make_action2(root: Control, nama: String, icon_kind: String,
+		pos: Vector2, size: int, _ink_unused: Color, on_press: Callable) -> Control:
+	## Tombol lingkaran gelap (jangkar pojok kanan-bawah).
+	var b := UiKit.rect(nama, root, Vector2(1, 1), Vector2(1, 1),
+		pos, Vector2(size, size))
 	(b as Control).add_theme_stylebox_override("panel",
-		UiKit.panel_style(Color(1, 1, 1, 0.30), 9999, UiKit.GOLD, 4))
+		UiKit.panel_style(Color(0.06, 0.09, 0.16, 0.78), 9999,
+			Color(0.96, 0.95, 0.91, 0.55), 3))
+	(b as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiKit.button_slot(b, on_press)
-	UiKit.label(b, label_teks, font_size, UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER, true)
+	HudIcons.icon(b as Control, icon_kind)
 	return b
 
 func _build_stick(root: Control) -> void:

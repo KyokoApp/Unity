@@ -80,7 +80,7 @@ static func terrain_h(x: float, z: float) -> float:
 ## ---- Data 7 region (padanan class Region & array Regions di C#) ----
 ## color: rgb 0..1; foliage: 0xRRGGBB.
 const REGIONS: Array = [
-	{"id": "heartlands", "name": "Aurelia Heartlands", "subtitle": "Padang hijau & gerbang kerajaan", "x":    0.0, "z":    0.0, "color": Vector3(.42, .56, .28), "foliage": 0x729b53},
+	{"id": "heartlands", "name": "Aurelia Heartlands", "subtitle": "Padang hijau & gerbang kerajaan", "x":    0.0, "z":    0.0, "color": Vector3(.36, .58, .23), "foliage": 0x729b53},
 	{"id": "frost",      "name": "Frostspire Reach",   "subtitle": "Puncak es & menara penjaga",      "x": -750.0, "z": -750.0, "color": Vector3(.68, .76, .77), "foliage": 0x8eafb0},
 	{"id": "highlands",  "name": "Crownfall Highlands","subtitle": "Pegunungan & reruntuhan kuno",    "x":    0.0, "z": -750.0, "color": Vector3(.43, .49, .42), "foliage": 0x58705b},
 	{"id": "amber",      "name": "Amber Wastes",       "subtitle": "Bukit keemasan & kuil matahari",  "x":  750.0, "z": -750.0, "color": Vector3(.72, .56, .33), "foliage": 0xb88d4b},

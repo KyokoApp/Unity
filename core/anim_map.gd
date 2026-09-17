@@ -23,21 +23,34 @@ const ROLE_ORDER := ["idle", "walk", "run", "dash", "fall", "jump",
 const LOCO_ROLES := ["idle", "walk", "run", "dash", "fall"]
 
 const _CAND := {
-	"idle": ["idle", "idle loop", "standing", "breathing", "stand"],
-	"walk": ["walk", "walking", "walk forward", "walk loop"],
+	## UAL2 Standard (aset pengguna): nama-nama eksplisit didahulukan —
+	## tanpa ini resolve() menunjuk klip bergaya (Idle_FoldArms saat
+	## siaga, "walk carry" membawa kardus saat jalan) yang terlihat aneh.
+	"idle": ["idle no loop", "idle_loop", "idle loop", "idle", "standing",
+		"breathing", "stand"],
+	"walk": ["walk carry loop", "walk", "walking", "walk forward",
+		"walk loop"],
+	## Tak ada klip lari di UAL2 Standard; run selalu jatuh ke walk
+	## yang dipercepat oleh AnimDriver (clamp speed 2,4x).
 	"run": ["run", "running", "sprint", "run forward", "jog"],
-	"dash": ["dash", "dodge", "roll", "evade", "lunge"],
-	"fall": ["fall", "falling", "air", "airborne", "in air"],
-	"jump": ["jump", "jump up", "leap", "takeoff"],
-	"land": ["land", "landing", "touchdown"],
-	"attack0": ["attack1", "attack 1", "attack_1", "combo1", "slash1",
-		"attack", "slash", "sword", "punch", "hit"],
-	"attack1": ["attack2", "attack 2", "attack_2", "combo2", "slash2",
-		"attack", "slash", "sword", "punch", "hit"],
-	"attack2": ["attack3", "attack 3", "attack_3", "combo3", "slash3",
-		"attack", "slash", "sword", "punch", "hit"],
-	"skill": ["skill", "cast", "spell", "ability", "magic"],
-	"burst": ["burst", "ultimate", "ult", "finisher", "special"],
+	"dash": ["sword dash", "shield dash", "dash", "dodge", "roll",
+		"evade", "lunge"],
+	"fall": ["ninjajump idle loop", "fall", "falling", "air", "airborne",
+		"in air"],
+	"jump": ["jump start", "ninjajump start", "jump up", "jump", "leap",
+		"takeoff"],
+	"land": ["jump land", "ninjajump land", "land", "landing",
+		"touchdown"],
+	"attack0": ["sword regular a", "attack1", "attack 1", "attack_1",
+		"combo1", "slash1", "attack", "slash", "sword", "punch", "hit"],
+	"attack1": ["sword regular b", "attack2", "attack 2", "attack_2",
+		"combo2", "slash2", "attack", "slash", "sword", "punch", "hit"],
+	"attack2": ["sword regular c", "attack3", "attack 3", "attack_3",
+		"combo3", "slash3", "attack", "slash", "sword", "punch", "hit"],
+	"skill": ["overhand throw", "skill", "cast", "spell", "ability",
+		"magic"],
+	"burst": ["sword heavy combo", "burst", "ultimate", "ult",
+		"finisher", "special"],
 }
 
 ## Normalisasi nama klip: huruf kecil, hanya alfanumerik.

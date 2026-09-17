@@ -139,6 +139,19 @@ vertex-shader; kalau mesh → sumber MultiMesh. Jaga kontrak tier di
   run `android-build` terbaru (cek stempel hash!).
 - Ikon anime persis = menunggu lampiran ulang gambar user (PIL ada di sandbox;
   numpy TIDAK ada — `pip install --user --break-system-packages pillow`).
+- **Umpan balik visual user (17 Sep, sesi berjalan)**: karakter "putih
+  tanpa warna", pilihan klip salah (Idle_FoldArms / Walk_Carry tampak aneh),
+  langit-tanah-rumput kusam, HUD mau semirip referensi Genshin (gambar terlampir).
+  Sudah diubah: `_CAND` memilih `Idle_No_Loop`/`Sword_Dash`/`NinjaJump_*`/
+  `Sword_Regular_A|B|C`/`OverhandThrow`/`Sword_Heavy_Combo`; jangkar
+  `day_night_cycle.realtime=false` @ `start_hour=17.2` (jam emas senja);
+  `ambient_boost` karakter 1.0→0.32 (anti pencucian tekstur); strip debug
+  sekarang juga menampilkan `tekstur a/b surface bertuan` (dari
+  `ToonCharacterSetup.last_tex/hadir`) — bukti berputar investigasi putih.
+  HUD rombak: klaster kanan-bawah (ATK besar pojok, JMP atas, DSH kiri,
+  bolt=Q atas-kiri, burst=E di atasnya) tombol gelap + glif vektor
+  `ui/hud_icons.gd`, party vertikal tepi kanan, menu pindah kanan atas.
+  Iterasi: bandingkan screenshot HP dengan referensi sampai puas.
 
 ## 5. Peta kode kilat
 | Path | Isi |

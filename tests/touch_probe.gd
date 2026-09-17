@@ -250,6 +250,37 @@ func _run() -> void:
 	_chk(w.rig.is_bound, "mannequin terikat (is_bound) setelah bind ulang")
 	fake_root.queue_free()
 
+	# ---- 8) Interogasi aset pengguna (bila CI menyediakan models/) -------
+	# Bukti material dari aset NYATA tercatat di probe-log — kunci
+	# menyelidiki "karakter putih" tanpa perlu melihat layar sendiri.
+	if ResourceLoader.exists("res://models/AureliaChar.glb"):
+		var aset: Node = (load("res://models/AureliaChar.glb") as PackedScene).instantiate()
+		var n_mesh := 0
+		var n_mat_std := 0
+		var n_tex := 0
+		for mi in _collect_meshes(aset):
+			n_mesh += 1
+			for s in mi.mesh.get_surface_count():
+				var m: Material = mi.get_active_material(s)
+				if m is StandardMaterial3D:
+					n_mat_std += 1
+					if (m as StandardMaterial3D).albedo_texture != null:
+						n_tex += 1
+		print("ASETCHAR mesh=%d standar=%d bertekstur=%d" % [n_mesh, n_mat_std, n_tex])
+		_chk(n_tex > 0, "aset karakter: >=1 permukaan membawa tekstur (%d)" % n_tex)
+		aset.free()
+	if ResourceLoader.exists("res://models/AureliaAnim.glb"):
+		var nama_klip := []
+		var an: Node = (load("res://models/AureliaAnim.glb") as PackedScene).instantiate()
+		var ap := AnimMap.find_player(an)
+		if ap != null:
+			for lib_nm in ap.get_animation_library_list():
+				nama_klip.append_array(ap.get_animation_library(lib_nm).get_animation_list())
+		print("ASETANIM klip(%d): %s" % [nama_klip.size(),
+			", ".join(nama_klip.slice(0, 12))])
+		_chk(nama_klip.size() > 0, "aset animasi: klip terbaca (%d)" % nama_klip.size())
+		an.free()
+
 	print("== hasil: %d lulus, %d gagal ==" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -267,3 +298,11 @@ func _own_tree(n: Node, o: Node) -> void:
 	for c in n.get_children():
 		c.owner = o
 		_own_tree(c, o)
+
+func _collect_meshes(n: Node) -> Array:
+	var out: Array = []
+	if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
+		out.append(n)
+	for c in n.get_children():
+		out.append_array(_collect_meshes(c))
+	return out

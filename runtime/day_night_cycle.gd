@@ -20,12 +20,16 @@ extends Node3D
 @export var environment: WorldEnvironment
 
 @export_group("Waktu")
-## Jam berjalan sendiri mengikuti waktu nyata.
-@export var realtime: bool = true
+## Jam berjalan sendiri mengikuti waktu nyata. Default dipadamkan:
+## tampilan dibekukan di jam emas senja (start_hour) supaya kesan
+## pertama mirip referensi stylized hangat; tombol suasana masih bisa
+## mengaktifkan kembali mode live bila dikehendaki.
+@export var realtime: bool = false
 ## Berapa menit dunia nyata untuk satu hari game penuh.
 @export_range(2.0, 120.0) var day_minutes: float = 15.0
-## Jam saat scene mulai (0-24).
-@export_range(0.0, 24.0) var start_hour: float = 8.0
+## Jam saat scene mulai (0-24). 17,2 = jam emas sore (langit hangat,
+## bayangan panjang lembut).
+@export_range(0.0, 24.0) var start_hour: float = 17.2
 
 var hour: float
 
