@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode cull_disabled, blend_mix, depth_draw_prepass_alpha;
+render_mode cull_disabled, blend_mix, depth_prepass_alpha;
 
 // ============================================================
 // aurelia_toon_lite.gdshader — toon TANPA rim/spec/outline.
@@ -9,7 +9,7 @@ render_mode cull_disabled, blend_mix, depth_draw_prepass_alpha;
 // iris — outline justru merusak wajah) dan sebagai pengganti
 // total saat preset Rendah mematikan outline.
 //
-// depth_draw_prepass_alpha meniru perilaku TransparentZWrite di
+// depth_prepass_alpha meniru perilaku TransparentZWrite di
 // versi Unity (MToon wajah): mencegah bulu mata/alis tembus
 // rambut. Model pencahayaan IDENTIK dengan aurelia_toon.gdshader
 // supaya hasilnya konsisten.

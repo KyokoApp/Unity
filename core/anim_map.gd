@@ -385,6 +385,71 @@ static func facing_flip(from_skel: Skeleton3D, to_skel: Skeleton3D) -> Quaternio
 		return Quaternion(Vector3.UP, PI)
 	return Quaternion.IDENTITY
 
+## ------------------------------------------------------------
+## PITAI SEKUNDER (J_Sec_*) — konversi VRM->GLB menyimpan rambut
+## spring-bone pada POSE BIND "bergerak ke atas-luar" (fisika
+## VRoid-lah yang seharusnya menjatuhkannya). Tanpa solver spring,
+## pucuk pita terlihat melengkung di atas kepala. Solusi sekali
+## pakai setelah bind: putar ROOT tiap rantai sehingga arah
+## segmen pertamanya menjuntai ke bawah (sedikit keluar), anak
+## kroni mengikuti secara struktural. Mengembalikan jumlah root
+## yang diputar.
+## ------------------------------------------------------------
+static func droop_sec_bones(skel: Skeleton3D) -> int:
+	var idx := {}
+	var nama := {}
+	for i in skel.get_bone_count():
+		nama[i] = skel.get_bone_name(i)
+		idx[nama[i].to_lower()] = i
+	# posisi rest dunia per tulang (komposisi induk) untuk arah segmen.
+	var gpos := {}
+	var grot := {}
+	for i in skel.get_bone_count():
+		var pn_idx := skel.get_bone_parent(i)
+		var rest: Transform3D = skel.get_bone_rest(i)
+		if pn_idx >= 0:
+			gpos[i] = (gpos[pn_idx] * rest).origin
+			grot[i] = (grot[pn_idx] * rest).basis.get_rotation_quaternion()
+		else:
+			gpos[i] = rest.origin
+			grot[i] = rest.basis.get_rotation_quaternion()
+	var digerakkan := 0
+	for i in skel.get_bone_count():
+		var nm_l: String = nama[i].to_lower()
+		if not nm_l.begins_with("j_sec"):
+			continue
+		var pn2 := skel.get_bone_parent(i)
+		if pn2 >= 0 and nama[pn2].to_lower().begins_with("j_sec"):
+			continue  # hanya ROOT rantai — kroni ikut otomatis
+		# cari anak pertama rantai untuk arah segmen awal.
+		var anak := -1
+		for j in skel.get_bone_count():
+			if skel.get_bone_parent(j) == i and nama[j].to_lower().begins_with("j_sec"):
+				anak = j
+				break
+		if anak < 0:
+			continue
+		var d0: Vector3 = (gpos[anak] - gpos[i])
+		if d0.length() < 1e-4:
+			continue
+		d0 = d0.normalized()
+		# arah target: menjuntai ke bawah + sedikit keluar (x mengikuti
+		# sisi posisi root), kroni membawa lekuk manis ikatan aslinya.
+		var arah := Vector3(0.25 * signf((gpos[i] as Vector3).x), -0.96, 0.0).normalized()
+		var r := Quaternion(d0, arah)
+		var rest_l: Transform3D = skel.get_bone_rest(i)
+		var rest_g: Quaternion = grot[i]
+		var g_new: Quaternion = (r * rest_g).normalized()
+		var plah: Quaternion = Quaternion.IDENTITY
+		if pn2 >= 0:
+			plah = grot[pn2]
+		var lokal_abs: Quaternion = (plah.inverse() * g_new).normalized()
+		var rest_lq: Quaternion = rest_l.basis.get_rotation_quaternion()
+		var pose: Quaternion = (rest_lq.inverse() * lokal_abs).normalized()
+		skel.set_bone_pose_rotation(i, pose)
+		digerakkan += 1
+	return digerakkan
+
 ## Persiapan rest + daftar tulang terpetakan (dihitung SEKALI).
 static func prepare_live(from_skel: Skeleton3D, to_skel: Skeleton3D,
 		ctx_f: Dictionary, ctx_t: Dictionary, bone_map: Dictionary) -> Dictionary:

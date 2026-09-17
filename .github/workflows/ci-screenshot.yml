@@ -86,7 +86,7 @@ jobs:
           mkdir -p shots
           cp /tmp/shotlog.txt shots/shot-log.txt
           cp /tmp/importlog.txt shots/import-log.txt
-          for f in shot_a shot_b shot_c; do
+          for f in shot_a shot_b shot_c shot_d; do
             if [ -f "/tmp/$f.png" ]; then
               cp "/tmp/$f.png" "shots/$f.png"
             fi

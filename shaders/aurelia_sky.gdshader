@@ -38,7 +38,9 @@ void sky() {
 	vec3 sun_dir = normalize(sun_direction);
 	float s = dot(d, sun_dir);
 	float disc = smoothstep(1.0 - sun_size, 1.0 - sun_size * 0.45, s);
-	float glow = pow(clamp(s, 0.0, 1.0), 6.0) * sun_glow;
+	// Halo dibuat rapat (pangkat 32) — tanpa ini kabur glow memenuhi
+	// langit seperti matahari raksasa (keluhan visual awal).
+	float glow = pow(clamp(s, 0.0, 1.0), 32.0) * sun_glow;
 	col += sun_color.rgb * (disc * 1.6 + glow);
 
 	COLOR = col;

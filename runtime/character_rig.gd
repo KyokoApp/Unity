@@ -301,6 +301,12 @@ func _bind_anim(model: Node3D) -> void:
 
 	var n := anim.setup(model, libs, skel_prefix)
 	anim_active = anim.active
+	# Rambut pita J_Sec_* di-trade sebagai pose bind mendongak —
+	# jatuhkan sekali supaya wajah terlihat (driver tak memetakannya).
+	if to_skel != null:
+		var seq := AnimMap.droop_sec_bones(to_skel)
+		if seq > 0:
+			_bind_report_parts.append("hair=%d" % seq)
 	if anim_active:
 		_bound_ok = true
 		_bind_report_parts.append("anim=%d peran" % n)

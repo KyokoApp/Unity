@@ -45,6 +45,16 @@ func _run() -> void:
 		await process_frame
 	_ambil("shot_b")
 
+	# Close-up WAJAH dari depan-rendah (membuktikan pose kepala/leher).
+	if rig != null:
+		rig.call("set_distance", 1.7)
+		rig.set("pitch", -6.0)
+	for i in 45:
+		await process_frame
+	_ambil("shot_d")
+	if rig != null:
+		rig.set("pitch", 12.0)
+
 	# Kembali ke sudut bermain.
 	if rig != null:
 		rig.call("set_distance", 5.0)
