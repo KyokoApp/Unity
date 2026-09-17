@@ -12,8 +12,15 @@ name: fetch-assets
 ## bagian 4b untuk alur lengkapnya.
 ## ==============================================================
 
+## Catatan trigger: workflow_dispatch hanya bisa dipicu API bila file
+## sudah ada di branch default. Selama belum, trigger `push` tepat pada
+## file ini sendiri berfungsi sebagai tombol "jalankan sekarang":
+## ubah/kirim file ini -> run terpanggil di branch kerja yang sama.
 on:
   workflow_dispatch: {}
+  push:
+    paths:
+      - ".github/workflows/fetch-assets.yml"
 
 permissions:
   contents: write
