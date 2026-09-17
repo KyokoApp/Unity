@@ -136,7 +136,7 @@ func _test_scatter() -> void:
 	if a["props"].size() > 0:
 		assert_eq(a["props"][0]["x"], b["props"][0]["x"], "scatter deterministik posisi")
 	assert_true(a["props"].size() <= 10, "near <= count_near")
-	var orbs := WorldScatter.place_orbs(0, 0, 0, -1)
+	var orbs := WorldScatter.place_orbs()
 	assert_eq(orbs.size(), 12, "12 orb episode 1")
 	var ids := {}
 	for o in orbs:
