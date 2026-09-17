@@ -88,7 +88,7 @@ class _Glyph:
 
 	## Bintang meledak 8 arah (burst/ultimate).
 	func _burst(p: Callable) -> void:
-		var c := p.call(0.5, 0.5)
+		var c: Vector2 = p.call(0.5, 0.5)
 		var r := 0.15 * (size.x * scale01)
 		# empat pancang panjang (N/E/S/W)
 		for i in 4:
