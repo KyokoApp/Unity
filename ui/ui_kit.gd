@@ -143,6 +143,7 @@ static func portrait(parent: Control, nama: String, am00: Vector2, am11: Vector2
 	face.name = "Face"
 	face.add_theme_stylebox_override("panel", circle_style(color))
 	face.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(face)
 	var ring_p := Panel.new()
 	ring_p.name = "Ring"
@@ -152,6 +153,7 @@ static func portrait(parent: Control, nama: String, am00: Vector2, am11: Vector2
 	ring_p.offset_top = -d
 	ring_p.offset_right = size.x + d
 	ring_p.offset_bottom = size.y + d
+	ring_p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(ring_p)
 	return p
 
