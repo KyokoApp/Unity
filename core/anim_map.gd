@@ -26,17 +26,20 @@ const _CAND := {
 	## UAL2 Standard (aset pengguna): nama-nama eksplisit didahulukan —
 	## tanpa ini resolve() menunjuk klip bergaya (Idle_FoldArms saat
 	## siaga, "walk carry" membawa kardus saat jalan) yang terlihat aneh.
-	"idle": ["idle no loop", "idle_loop", "idle loop", "idle", "standing",
-		"breathing", "stand"],
-	"walk": ["walk carry loop", "walk", "walking", "walk forward",
-		"walk loop"],
+	## PENTING: importer GLTF Godot MEMOTONG akhiran "_Loop" dari nama
+	## klip (bukti REPORTA di ci-logs: library memuat "Idle_No", bukan
+	## "Idle_No_Loop"). Kandidat dipilih untuk NAMA HASIL IMPOR.
+	"idle": ["idle no", "idleno", "idle no loop", "idle_loop",
+		"idle loop", "idle", "standing", "breathing", "stand"],
+	"walk": ["walk carry", "walk carry loop", "walk", "walking",
+		"walk forward", "walk loop"],
 	## Tak ada klip lari di UAL2 Standard; run selalu jatuh ke walk
 	## yang dipercepat oleh AnimDriver (clamp speed 2,4x).
 	"run": ["run", "running", "sprint", "run forward", "jog"],
 	"dash": ["sword dash", "shield dash", "dash", "dodge", "roll",
 		"evade", "lunge"],
-	"fall": ["ninjajump idle loop", "fall", "falling", "air", "airborne",
-		"in air"],
+	"fall": ["ninjajump idle", "ninjajump idle loop", "fall", "falling",
+		"air", "airborne", "in air"],
 	"jump": ["jump start", "ninjajump start", "jump up", "jump", "leap",
 		"takeoff"],
 	"land": ["jump land", "ninjajump land", "land", "landing",

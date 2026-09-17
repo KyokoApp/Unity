@@ -89,7 +89,11 @@ static func apply(root: Node3D, opts: Dictionary = {}) -> void:
 			## DI ATAS diffuse; total ~1,35x akan memutihkan tekstur
 			## pastell (keluhan user: warna hilang). Iklim EMISSION di
 			## 0,32 menjaga warna asli + toon ramp tetap bertugas.
-			mat.set_shader_parameter("ambient_boost", 0.32)
+			## Bukti CI (REPORTT tex=24/24): tekstur masuk SEMUA; gelap
+			## murni pencahayaan (matahari membelakangi karakter, emisi
+			## redup). Naikkan supaya karakter tetap TERBACA dari sisi
+			## bayang — musuh klasik stylized backlit.
+			mat.set_shader_parameter("ambient_boost", 0.55)
 			## Sisi bayang karakter: indigo muda — remote-probing pertama
 			## menunjukkan sisi membelakangi matahari bisa terlalu gelap
 			## (keluhan visual menyusul) + rim sedikit lebih kuat.
