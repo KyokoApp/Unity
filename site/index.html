@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aurelia — unduh APK</title>
-<meta name="description" content="Unduh APK Android Aurelia langsung dari GitHub.">
+<title>Aurelia — RPG open-world anime (Godot)</title>
+<meta name="description" content="Aurelia — RPG open-world anime (Godot 4). Build Android dari repo ini.">
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -43,7 +43,7 @@
 <body>
   <div class="card">
     <h1>Aurelia</h1>
-    <p class="sub">Open world fantasy · build Android dari repo ini</p>
+    <p class="sub">Open world fantasy · dimigrasi dari Unity ke Godot 4 · build Android dari repo ini</p>
 
     <a id="dl" class="btn" aria-disabled="true" href="#">Memeriksa rilis terbaru…</a>
 
@@ -78,7 +78,7 @@
 (function () {
   var owner = location.hostname.split('.')[0];
   var repo  = location.pathname.split('/')[1] || 'rpg';
-  if (owner === 'localhost' || owner === '127') { owner = 'KyokoApp'; repo = 'unity-rpg'; }
+  if (owner === 'localhost' || owner === '127') { owner = 'KyokoApp'; repo = 'unity'; }
 
   var dl = document.getElementById('dl');
   var err = document.getElementById('err');

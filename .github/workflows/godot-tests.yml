@@ -1,0 +1,28 @@
+name: godot-tests
+
+# Uji headless proyek Godot 4 (pengganti verify.yml era Unity).
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unduh Godot 4 headless (Linux)
+        run: |
+          GODOT_VER=4.5.1
+          curl -fL "https://github.com/godotengine/godot/releases/download/${GODOT_VER}-stable/Godot_v${GODOT_VER}-stable_linux.x86_64.zip" \
+               -o /tmp/godot.zip
+          unzip -o /tmp/godot.zip -d /tmp/godot-bin
+          chmod +x /tmp/godot-bin/Godot_v${GODOT_VER}-stable_linux.x86_64
+          # impor resource sekali supaya cache siap
+          /tmp/godot-bin/Godot_v${GODOT_VER}-stable_linux.x86_64 \
+            --headless --path . --import || true
+
+      - name: Jalankan runner uji
+        run: |
+          /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
+            --headless --path . --script tests/run_tests.gd
