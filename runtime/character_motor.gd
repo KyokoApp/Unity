@@ -142,6 +142,7 @@ func _process(dt: float) -> void:
 		_yaw = rad_to_deg(atan2(_dash_dir.x, _dash_dir.z))
 		if rig != null:
 			rig.rotation.y = deg_to_rad(_yaw)
+			rig.anim_dash()
 		if vfx != null:
 			vfx.spawn_dash(global_position + Vector3.UP * 0.6)
 		if camera_target != null:
@@ -156,10 +157,11 @@ func _process(dt: float) -> void:
 		_yaw = face_yaw
 		if rig != null:
 			rig.rotation.y = deg_to_rad(_yaw)
+			rig.anim_attack(combat.combo)
 		var fwd := Vector3(sin(deg_to_rad(_yaw)), 0.0, cos(deg_to_rad(_yaw)))
 		if vfx != null:
 			vfx.spawn_attack(global_position + Vector3.UP * 1.1 + fwd * 0.9,
-							 combat.combo)
+						 combat.combo)
 		if camera_target != null:
 			camera_target.add_shake(0.12)
 
@@ -197,6 +199,8 @@ func _process(dt: float) -> void:
 		grounded = false
 		_coyote = 0.0
 		_jump_buf = 0.0
+		if rig != null:
+			rig.anim_jump()
 
 	_vy -= gravity * dt
 	p.y += _vy * dt
@@ -245,13 +249,14 @@ func _process(dt: float) -> void:
 	move01 = _move_sm
 	run01 = _run_sm
 
-	# ---- 10. pose: versi Unity melakukannya di LateUpdate; di sini
-	# dilakukan di akhir _process sehingga rig menerima posisi final.
-	if rig != null and rig.is_bound:
+	# ---- 10. pose/animasi: versi Unity melakukannya di LateUpdate; di
+	# sini di akhir _process sehingga rig menerima posisi final. Dua
+	# jalur: AnimDriver (GLB nyata) ATAU pose prosedural (fallback).
+	if rig != null:
 		# attack ditahan di 1 (pulih bertahap oleh smoothing rig),
 		# persis pola HumanLocomotion.Unity di versi Unity.
 		var attack_val := 1.0 if combat.is_attacking() else -1.0
-		var pose := Locomotion.sample_pose({
+		var st := {
 			"phase": phase, "time": _clock,
 			"move": move01, "run": run01,
 			"dash": 1.0 if is_dashing else 0.0,
@@ -259,9 +264,15 @@ func _process(dt: float) -> void:
 			"falling": not grounded and _vy < 0.0,
 			"attack": attack_val,
 			"combo": combat.combo,
-		})
-		var resolved := RigMapping.resolve(pose)
-		rig.apply_pose(resolved, phase, dt)
+		}
+		if rig.anim_active:
+			st["speed"] = sp
+			st["grounded"] = grounded
+			st["dashing"] = is_dashing
+			rig.drive_anim(st, dt)
+		elif rig.is_bound:
+			var resolved := RigMapping.resolve(Locomotion.sample_pose(st))
+			rig.apply_pose(resolved, phase, dt)
 
 func _yaw_now_delta() -> float:
 	var d := wrapf(_yaw - _prev_yaw, -180.0, 180.0)
@@ -270,6 +281,8 @@ func _yaw_now_delta() -> float:
 
 func _on_touchdown(fall_sp: float) -> void:
 	landed.emit()
+	if rig != null:
+		rig.anim_land(fall_sp)
 	if fall_sp < -7.0 and rig != null:
 		rig.pulse_crouch(clampf((-fall_sp - 7.0) / 8.0, 0.25, 1.0))
 	if fall_sp < -9.0:

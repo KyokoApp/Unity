@@ -71,16 +71,41 @@ tindak lanjut sesuai tabel diagnosis §3 (routing mati / os mati / visual).
 LINK USER (drive):
 - **Model + klip animasi**: https://drive.google.com/file/d/120fNMWnpMaiNEJLG53LdTd8DfSGdFrYq/view?usp=drivesdk
 - **Model karakter**: https://drive.google.com/file/d/1RZIwux_yJ6VB2j4nAsYdUlfcca0BLPar/view?usp=drivesdk
-Pekerjaan:
-1. Unduh (sandbox mungkin memblokir download langsung — coba downloader / tanya
-   user lampirkan ke sesi; kalau zip besar: jangan commit mentah, ekstrak ke `models/`).
-2. Format tujuan: **GLB** di `models/` (Godot impor otomatis; folder di-gitignore).
-3. Sambung di `runtime/character_rig.gd` (`model_paths` → fallback mannequin);
-   drive `AnimationPlayer` dari `CharacterMotor` (sinyal: `move01`, `run01`,
-   `is_dashing`, `combat.is_attacking()`, `landed`, `attack_started(combo)`). Peta
-   blend lama: `Locomotion.sample_pose` — jaga transisi halus.
-4. Material toon: `runtime/toon_character_setup.gd` + `shaders/aurelia_toon.gdshader`.
-5. Baca dulu `models/LISENSI.md` (lisensi! jangan commit/bundle aset itu).
+  (terbukti GLB nyata, skinned ±1,6 m).
+
+STATUS PELAKSANAAN (tahap 2, 17 Sep 2026):
+- **Sandbox TIDAK bisa unduh Drive** (SSL_ERROR_SYSCALL) → unduhan dipindah ke
+  RUNNER CI: workflow baru **`.github/workflows/fetch-assets.yml`** (manual,
+  `gh workflow run fetch-assets.yml`) → `gdown` → laporan metadata GLB ke
+  `ci-logs:asset-report.txt` (pola aditif) + `models/` disimpan ke **cache aksi
+  key `user-assets-v1`**. `android-build.yml` me-restore cache itu sebelum
+  `--import` (continue-on-error; tanpa cache = fallback mannequin seperti biasa).
+  Aset berlisensi TIDAK masuk git (baris `.gitignore` models/ sudah ada).
+- **Pipeline di repo (tanpa AnimationTree)**:
+  - `core/anim_map.gd` — pemetaan nama klip → peran (idle/walk/run/dash/fall/
+    jump/land/attack0-2/skill/burst), case-agnostik + fallback peran;
+    `retarget_clip` (prafiks path tulang), `strip_xz` (anti root-motion
+    pinggul), `apply_loop` (lokomosi LINEAR, one-shot NONE). MURNI → 17 uji
+    unit baru.
+  - `runtime/character_anim_driver.gd` — AnimationPlayer segar, crossfade
+    manual `play(nama, 0,22, speed)`; lock one-shot berbasis waktu; irama
+    klip walk/run diskala ke laju tanah (anti selip kaki).
+  - `runtime/character_rig.gd` — `_bind_anim(model)`: klip dari model sendiri
+    (retarget=false) + file animasi eksternal `anim_paths` (retarget=true);
+    **auto-kalibrasi AABB** → tinggi 1,6 m + kaki ke tanah + `model_yaw_deg`.
+    `anim_active` = jalur anim h; prosedural di bawah = fallback utuh.
+  - `runtime/character_motor.gd` — langkah 10 bercabang: anim_active →
+    `drive_anim(st,dt)`, selain itu pose prosedural; pemicu anim di dash/
+    attack/jump/touchdown; skill/burst lewat sinyal HUD di `world.gd`.
+  - Strip TouchDebug (baris 3) mencetak peran anim (lihat di HP).
+- **Bug laten ikut diperbaiki**: `is_bound` lama menunggu `_poses` terisi,
+  padahal `_poses` hanya diisi `apply_pose` yang digate `is_bound` → pose
+  prosedural tak pernah diterapkan. Kini flag `_bound_ok` dari `bind()`.
+- Penempatan hasil unduhan diaturnya `tools/fetch_assets_place.py`
+  (mesh terbanyak → `models/AureliaChar.glb`; klip terbanyak →
+  `models/AureliaAnim.glb`) + laporan oleh `tools/fetch_assets_report.py`.
+  Setelah laporan keluar: sesuaikan kandidat nama klip di `AnimMap._CAND`
+  bila nama tak umum, lalu push (cache otomatis dipakai build berikutnya).
 
 ### 4c. 🟢 Rumput dari aset user
 LINK USER: https://drive.google.com/file/d/18WFEJckB7Kn1ifvTe_JpAs7bB4iKbGZf/view?usp=drivesdk
@@ -100,8 +125,11 @@ vertex-shader; kalau mesh → sumber MultiMesh. Jaga kontrak tier di
 |---|---|
 | `runtime/world.gd` | World composer + urutan boot; memasang `TouchDebug.enabled = OS.is_debug_build()` |
 | `runtime/build_stamp.gd` | Stempel build (DITIMPA CI; di repo = `dev-lokal`) |
-| `runtime/character_motor.gd` | Gerak pemain — memindahkan `rig` induknya |
-| `runtime/character_rig.gd` | Pembawa visual + pose prosedural 25 sendi (sambungan GLB di sini) |
+| `runtime/character_motor.gd` | Gerak pemain — memindahkan `rig` induknya; memicu AnimDriver/prosedural |
+| `runtime/character_rig.gd` | Pembawa visual + pose prosedural 25 sendi; `_bind_anim` menyambung GLB |
+| `core/anim_map.gd` | Klip GLB → peran (retarget/strip_xz/loop), murni, teruji unit |
+| `runtime/character_anim_driver.gd` | State machine klip GLB (crossfade manual, lock one-shot) |
+| `tools/fetch_assets_report.py` / `fetch_assets_place.py` | Metadata GLB / penempatan `models/` untuk CI fetch-assets |
 | `runtime/camera_rig.gd` | Kamera orbit; `_unhandled_input`; melapor ke TouchDebug |
 | `runtime/terrain_chunk_streamer.gd`, `grass_field.gd`, `water_plane.gd`, `orbs.gd` | Streaming chunk/prop, rumput, air, orb |
 | `ui/game_hud.gd`, `ui/virtual_joystick.gd`, `ui/ui_kit.gd` | HUD dari kode (layer 10). **Aturan: dekoratif=IGNORE, interaktif=STOP/panel anak; stik=PASS+accept_event** |

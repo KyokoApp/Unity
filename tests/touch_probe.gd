@@ -172,5 +172,98 @@ func _run() -> void:
 	var dyaw2: float = absf(w.camera_rig.yaw - yaw0)
 	_chk(dyaw2 < 0.5, "drag di zona stik TIDAK memutar kamera (%.2f)" % dyaw2)
 
+	# ---- 7) AnimDriver: klip GLB menggantikan jalur prosedural ----------
+	# Model animasi SINTETIS (tanpa aset user): skeleton + AnimationPlayer
+	# berisi klip Idle/Walk/Run/Attack*. Membuktikan seleksi klip,
+	# strip_xz anti root-motion, loop lokomosi, state machine lokomosi,
+	# one-shot serangan, dan kembali ke fallback mannequin dengan selamat.
+	var fake_root := Node3D.new()
+	fake_root.name = "FakeChar"
+	var fskel := Skeleton3D.new()
+	fskel.name = "Skeleton3D"
+	fake_root.add_child(fskel)
+	var b0 := fskel.add_bone("Hips")
+	var b1 := fskel.add_bone("Spine")
+	fskel.set_bone_parent(b1, b0)
+	fskel.set_bone_rest(b0, Transform3D(Basis(), Vector3(0, 1.0, 0)))
+	fskel.set_bone_rest(b1, Transform3D(Basis(), Vector3(0, 0.2, 0)))
+	var fmesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.6, 1.6, 0.4)
+	fmesh.mesh = box
+	fmesh.position = Vector3(0, 0.8, 0)
+	var smat := StandardMaterial3D.new()
+	smat.albedo_color = Color(0.8, 0.3, 0.3)
+	fmesh.material_override = smat
+	fake_root.add_child(fmesh)
+	var fap := AnimationPlayer.new()
+	fap.name = "AnimationPlayer"
+	fake_root.add_child(fap)
+	var lib := AnimationLibrary.new()
+	lib.add_animation("Idle", _mk_clip("Skeleton3D:Hips", 1.2))
+	lib.add_animation("Walk", _mk_clip("Skeleton3D:Hips", 0.8))
+	lib.add_animation("Run", _mk_clip("Skeleton3D:Hips", 0.6))
+	lib.add_animation("Attack1", _mk_clip("Skeleton3D:Hips", 0.5))
+	lib.add_animation("Attack2", _mk_clip("Skeleton3D:Hips", 0.5))
+	lib.add_animation("Attack3", _mk_clip("Skeleton3D:Hips", 0.7))
+	fap.add_animation_library("", lib)
+	_own_tree(fake_root, fake_root)
+	var ps := PackedScene.new()
+	var pack_ok := ps.pack(fake_root)
+	_chk(pack_ok == OK, "model sintetis ter-pack ke PackedScene (%d)" % pack_ok)
+	w.rig.model_scene = ps
+	w.rig.bind()
+	_chk(w.rig.anim_active, "rig mengaktifkan AnimDriver untuk klip GLB")
+	_chk(w.rig.anim.mapping.get("idle", "") == "Idle",
+		"idle terpetakan ke 'Idle' (dapat %s)" % w.rig.anim.mapping.get("idle", ""))
+	_chk(w.rig.anim.mapping.get("run", "") == "Run",
+		"run terpetakan ke 'Run' (dapat %s)" % w.rig.anim.mapping.get("run", ""))
+	_chk(w.rig.anim.mapping.get("attack1", "") == "Attack2",
+		"attack1 terpetakan ke 'Attack2' (dapat %s)" % w.rig.anim.mapping.get("attack1", ""))
+	var aw: Animation = w.rig.anim.player.get_animation("Walk")
+	_chk(aw != null, "klip walk terpasang di CharAnimPlayer")
+	var kv: Vector3 = aw.track_get_key_value(0, 1)
+	_chk(absf(kv.x) < 1e-6 and absf(kv.z) < 1e-6,
+		"strip_xz menolkan XZ klip walk (dapat %s)" % str(kv))
+	_chk(aw.loop_mode == Animation.LOOP_LINEAR, "klip lokomosi LOOP_LINEAR")
+	w.rig.drive_anim({"speed": 0.0, "grounded": true, "falling": false,
+		"dashing": false, "move": 0.0}, 0.016)
+	_chk(w.rig.anim.current_role == "idle",
+		"drive siaga -> idle (dapat %s)" % w.rig.anim.current_role)
+	w.rig.drive_anim({"speed": 13.5, "grounded": true, "falling": false,
+		"dashing": false, "move": 1.0}, 0.016)
+	_chk(w.rig.anim.current_role == "run",
+		"drive lari -> run (dapat %s)" % w.rig.anim.current_role)
+	w.rig.anim_attack(1)
+	_chk(w.rig.anim.current_role == "attack1",
+		"serang kombo 1 -> attack1 (dapat %s)" % w.rig.anim.current_role)
+	for i in 50:
+		w.rig.drive_anim({"speed": 0.0, "grounded": true, "falling": false,
+			"dashing": false, "move": 0.0}, 0.016)
+		await process_frame
+	_chk(w.rig.anim.current_role == "idle",
+		"one-shot selesai -> kembali idle (dapat %s)" % w.rig.anim.current_role)
+	# Kembalikan fallback mannequin: jalur lama harus tetap hidup.
+	w.rig.model_scene = null
+	w.rig.bind()
+	_chk(not w.rig.anim_active, "bind ulang -> kembali fallback prosedural")
+	_chk(w.rig.is_bound, "mannequin terikat (is_bound) setelah bind ulang")
+	fake_root.queue_free()
+
 	print("== hasil: %d lulus, %d gagal ==" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
+
+## Klip posisi satu tulang dengan XZ TIDAK nol (uji strip_xz).
+func _mk_clip(bone_path: String, dur: float) -> Animation:
+	var a := Animation.new()
+	a.length = dur
+	var t := a.add_track(Animation.TYPE_POSITION_3D)
+	a.track_set_path(t, NodePath(bone_path))
+	a.track_insert_key(t, 0.0, Vector3(0, 1.0, 0))
+	a.track_insert_key(t, dur, Vector3(0.4, 1.05, 0.3))
+	return a
+
+func _own_tree(n: Node, o: Node) -> void:
+	for c in n.get_children():
+		c.owner = o
+		_own_tree(c, o)

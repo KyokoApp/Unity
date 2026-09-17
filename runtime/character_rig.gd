@@ -25,6 +25,18 @@ extends Node3D
 	"res://models/AureliaChar.glb",
 ]
 
+@export_group("Animasi (klip GLB dari file lain)")
+## File berisi klip animasi ketika GLB karakter sendiri tidak
+## membawanya. Skeleton sama = retarget prafiks saja.
+@export var anim_paths: Array[String] = [
+	"res://models/AureliaAnim.glb",
+	"res://models/AureliaChar_anim.glb",
+]
+## Offset arah hadap model (derajat) kalau GLB menghadap bukan +Z.
+@export_range(-180.0, 180.0, 1.0) var model_yaw_deg := 0.0
+## Tinggi target karakter (meter); model melenceng jauh di-rescale.
+@export var model_target_height := 1.6
+
 @export_group("Kalibrasi sumbu — balik tanda kalau limb bergerak terbalik")
 @export_range(-1.0, 1.0) var sign_leg_x := 1.0
 @export_range(-1.0, 1.0) var sign_leg_y := 1.0
@@ -45,8 +57,12 @@ extends Node3D
 @export var skin: Color = QualityPresets.PALETTE_SKIN
 @export var hair: Color = QualityPresets.PALETTE_HAIR
 
+## is_bound: TRUE begitu ada skeleton yang terikat ATAU driver animasi
+## aktif. (Versi lama murni menunggu _poses terisi — padahal _poses hanya
+## diisi apply_pose yang sendirinya digate is_bound di motor: POSE TIDAK
+## PERNAH DIPANGGIL. Laten, tersembunyi, baru ketahuan era AnimDriver.)
 var is_bound: bool:
-	get: return not _poses.is_empty()
+	get: return _bound_ok or not _poses.is_empty()
 var bound_count: int:
 	get: return _poses.size()
 var last_bind_report := ""
@@ -55,9 +71,14 @@ var last_bind_report := ""
 var poses: Dictionary:
 	get: return _poses
 
+## Jalur animasi GLB (non-prosedural). aktif = anim_active.
+var anim: CharacterAnimDriver
+var anim_active := false
+
 var _skel: MannequinSkeleton
 var _poses: Dictionary = {}         ## joint(String) -> Vector3 ter-smooth
 var _smoothed: Dictionary = {}
+var _bound_ok := false
 var _last_fall := -1.0
 var _crouch := 0.0
 var _lean := 0.0
@@ -76,6 +97,12 @@ func _ready() -> void:
 func bind() -> void:
 	for c in _root_node.get_children():
 		c.queue_free()
+	if anim != null:
+		anim.queue_free()
+		anim = null
+	anim_active = false
+	_bound_ok = false
+	_bind_report_parts.clear()
 
 	var model: Node3D = null
 	var used_path := ""
@@ -107,11 +134,12 @@ func bind() -> void:
 		_root_node.add_child(model)
 		_bind_report_parts.append("model=fallback mannequin")
 
+	_calibrate_model(model)
+
 	_skel = MannequinSkeleton.new()
 	_skel.setup(model)
+	_bound_ok = _skel.skel != null
 	_bind_report_parts.append("bind=%s" % _skel.report())
-	last_bind_report = " & ".join(_bind_report_parts)
-	BootLog.add(last_bind_report)
 
 	## Apply toon setup (outline + rim) ke semua mesh.
 	ToonCharacterSetup.apply(_root_node, {
@@ -121,6 +149,136 @@ func bind() -> void:
 		"skin_color": skin,
 		"hair_color": hair,
 	})
+
+	## Jalur animasi GLB bila ada klip yang termapping; prosedural
+	## tetap menjadi fallback (lihat _bind_anim).
+	_bind_anim(model)
+
+	last_bind_report = " & ".join(_bind_report_parts)
+	BootLog.add(last_bind_report)
+	BootLog.add(anim.last_report if anim != null else "anim: nonaktif")
+
+## ------------------------------------------------------------
+## Kalibrasi model GLB nyata: ukur AABB seluruh mesh (bind pose),
+## rescale ke tinggi target bila melenceng jauh (model sumber
+## sering 0,01x/100x), turunkan kaki ke tanah, putar yaw bila
+## tidak menghadap +Z. Mannequin (~1,68 m) masuk toleransi.
+func _calibrate_model(model: Node3D) -> void:
+	var r := _measure_aabb(model, Transform3D(), AABB(), false)
+	if not r[1]:
+		return
+	var bb: AABB = r[0]
+	var h: float = bb.size.y
+	if h <= 0.001:
+		return
+	var s := 1.0
+	if absf(h - model_target_height) > 0.45:
+		s = clampf(model_target_height / h, 0.02, 30.0)
+		model.scale = Vector3.ONE * s
+	# kaki (dasar AABB) tepat di y=0
+	model.position.y = -bb.position.y * s
+	if model_yaw_deg != 0.0:
+		model.rotation_degrees.y = model_yaw_deg
+	if s != 1.0 or model_yaw_deg != 0.0:
+		_bind_report_parts.append("kalibr h=%.2f s=%.2f yaw=%.0f" % [h, s, model_yaw_deg])
+	else:
+		_bind_report_parts.append("kalibr h=%.2f ok" % h)
+
+static func _measure_aabb(n: Node, xf: Transform3D, acc: AABB, has: bool) -> Array:
+	var local := xf
+	var a := acc
+	var h := has
+	if n is Node3D:
+		local = xf * (n as Node3D).transform
+		if n is VisualInstance3D:
+			var gi := n as VisualInstance3D
+			var bb := local * gi.get_aabb()
+			a = a.merge(bb) if h else bb
+			h = true
+	for c in n.get_children():
+		var r := _measure_aabb(c, local, a, h)
+		a = r[0]
+		h = r[1]
+	return [a, h]
+
+## ------------------------------------------------------------
+## Sambungkan jalur animasi GLB: klip dari model sendiri dan/atau
+## file animasi terpisah (retarget prafiks skeleton otomatis).
+func _bind_anim(model: Node3D) -> void:
+	anim = CharacterAnimDriver.new()
+	anim.name = "AnimDriver"
+	add_child(anim)
+
+	var skel := AnimMap.find_skeleton(model)
+	var skel_prefix := "Skeleton3D"
+	if skel != null:
+		skel_prefix = str(model.get_path_to(skel))
+
+	var libs: Array = []
+	# Klip yang dibawa model itu sendiri (prafiks sudah benar).
+	var mesh_player := AnimMap.find_player(model)
+	if mesh_player != null:
+		for lib_name in mesh_player.get_animation_library_list():
+			libs.append({"lib": mesh_player.get_animation_library(lib_name),
+				"retarget": false})
+	# Klip dari file animasi terpisah (perlu retarget prafiks).
+	for p in anim_paths:
+		if not ResourceLoader.exists(p):
+			continue
+		var res: Resource = load(p)
+		var inst: Node = null
+		if res is PackedScene:
+			inst = (res as PackedScene).instantiate()
+		elif res != null and res.has_method("instantiate_scene"):
+			inst = res.instantiate_scene()
+		if inst == null:
+			continue
+		var ap := AnimMap.find_player(inst)
+		if ap != null:
+			for lib_name in ap.get_animation_library_list():
+				libs.append({"lib": ap.get_animation_library(lib_name),
+					"retarget": true})
+		inst.queue_free()
+
+	var n := anim.setup(model, libs, skel_prefix)
+	anim_active = anim.active
+	if anim_active:
+		_bound_ok = true
+		_bind_report_parts.append("anim=%d peran" % n)
+	elif n > 0:
+		_bind_report_parts.append("anim=tak aktif (%d klip?)" % n)
+
+## ---- API yang dipanggil CharacterMotor / HUD -------------------
+func drive_anim(st: Dictionary, dt: float) -> void:
+	if anim != null and anim.active:
+		anim.update_state(st, dt)
+
+func anim_attack(combo: int) -> void:
+	if anim != null and anim.active:
+		anim.attack(combo)
+
+func anim_dash() -> void:
+	if anim != null and anim.active:
+		anim.dash()
+
+func anim_jump() -> void:
+	if anim != null and anim.active:
+		anim.jump()
+
+func anim_land(fall_speed: float) -> void:
+	if anim != null and anim.active:
+		anim.land(fall_speed)
+
+func anim_skill() -> void:
+	if anim != null and anim.active:
+		anim.skill()
+
+func anim_burst() -> void:
+	if anim != null and anim.active:
+		anim.burst()
+
+func anim_debug_line() -> String:
+	return anim.debug_line() if anim != null else "anim:kosong"
 
 func set_lean(n: float) -> void:
 	_lean = clampf(n, -1.0, 1.0)

@@ -48,6 +48,7 @@ static func note_cam(pos_screen: Vector2, idx: int) -> void:
 ## ---- state instance ----
 var stick: VirtualJoystick
 var camera_rig: CameraRig
+var rig: CharacterRig
 
 var _downs := 0
 var _drags := 0
@@ -199,12 +200,16 @@ func _refresh_text() -> void:
 		var r: Rect2 = stick.get_global_rect()
 		zona = str(r)
 		_zone_tag.position = r.position + Vector2(8, 4)
+	var anim_txt := "anim:kosong"
+	if rig != null:
+		anim_txt = rig.anim_debug_line()
 	_strip.text = "DBG %s | layar %.0fx%.0f kanvas %.0fx%.0f x%.2f\n" % [
 			BuildStamp.id(), vs.x, vs.y, kanvas.x, kanvas.y, sk] \
 		+ "os turun %d seret %d | stikGUI %d | kamera %d | stik:%s\n" % [
 			_downs, _drags, _gui_hits, _cam_presses, stik_txt] \
-		+ "zona %s | layar-sentuh=%s\n" % [
-			zona, "YA" if DisplayServer.is_touchscreen_available() else "tidak"] \
+		+ "zona %s | layar-sentuh=%s | %s\n" % [
+			zona, "YA" if DisplayServer.is_touchscreen_available() else "tidak",
+			anim_txt] \
 		+ "%s | %s" % [device, _last_note]
 
 func _on_dots_draw() -> void:

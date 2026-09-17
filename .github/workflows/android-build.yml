@@ -17,6 +17,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      ## Aset pengguna (models/*.glb) TIDAK masuk git demi lisensi —
+      ## ditanam oleh workflow fetch-assets ke cache aksi. Restore
+      ## pakai restore-keys agar cache kedaluwarsa tetap tertarik.
+      ## continue-on-error: build tanpa aset tetap jalan (fallback
+      ## mannequin), sebagaimana hari-hari sebelumnya.
+      - name: Pulihkan aset pengguna dari cache
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: models
+          key: user-assets-v1
+          restore-keys: |
+            user-assets-
+
       - name: Unduh Godot 4.5.1 + export templates
         run: |
           GODOT_VER=4.5.1

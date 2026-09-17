@@ -173,6 +173,8 @@ func _build() -> void:
 	hud.pressed_jump.connect(func(): motor.hud_press("jump"))
 	hud.pressed_attack.connect(func(): motor.hud_press("attack"))
 	hud.pressed_dash.connect(func(): motor.hud_press("dash"))
+	hud.pressed_skill.connect(func(): rig.anim_skill())
+	hud.pressed_burst.connect(func(): rig.anim_burst())
 
 	perf = PerfHud.new()
 	perf.name = "PerfHud"
@@ -187,6 +189,7 @@ func _build() -> void:
 	touch_debug.name = "TouchDebug"
 	touch_debug.stick = hud.stick
 	touch_debug.camera_rig = camera_rig
+	touch_debug.rig = rig
 	add_child(touch_debug)
 
 	# HUD sementara disembunyikan sampai boot selesai.

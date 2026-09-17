@@ -41,6 +41,7 @@ func _init() -> void:
 	_test_settings()
 	_test_gfx()
 	_test_motor_misc()
+	_test_anim_map()
 	print("selesai: %d lulus, %d gagal" % [_passed, _failed])
 	for f in _failures:
 		print("  - " + f)
@@ -175,3 +176,43 @@ func _test_gfx() -> void:
 func _test_motor_misc() -> void:
 	assert_aproks(CharacterMotor.damp_angle(180.0, -180.0, 1.0, 0.5), 180.0, 1e-4,
 		"damp_angle merangkum sudut ekstrem")
+
+func _test_anim_map() -> void:
+	# resolve: prioritas exact -> match_begins -> substring, case-robust.
+	var m := AnimMap.resolve(["Tea Time", "WALK Forward", "run", "Slash2", "attack1"])
+	assert_eq(m["idle"], "", "idle kosong bila tak ada kandidat")
+	assert_eq(m["walk"], "WALK Forward", "walk cocok pola awalan case-insensitif")
+	assert_eq(m["run"], "run", "run tercocokkan persis")
+	assert_eq(m["attack0"], "attack1", "attack0 -> attack1 (persis)")
+	assert_eq(m["attack1"], "Slash2", "attack1 -> slash2 (pola pesenjataan)")
+	var f := AnimMap.fill_fallbacks(m)
+	assert_eq(f["idle"], "WALK Forward", "idle diisi dari walk")
+	assert_eq(f["attack2"], "attack1", "attack2 diisi dari attack1")
+	# retarget: prafiks skeleton ditulis ulang, track non-tulang dibuang,
+	# dan SUMBER tidak ikut berubah (hasil sudah hasil duplicate).
+	var a := Animation.new()
+	a.length = 1.0
+	var tp := a.add_track(Animation.TYPE_POSITION_3D)
+	a.track_set_path(tp, NodePath("Armature:Hips"))
+	a.track_insert_key(tp, 0.0, Vector3(1, 2, 3))
+	a.track_insert_key(tp, 1.0, Vector3(5, 2, 4))
+	var tv := a.add_track(Animation.TYPE_VALUE)
+	a.track_set_path(tv, NodePath("Face:Smile"))
+	a.track_insert_key(tv, 0.0, 0.5)
+	var rt := AnimMap.retarget_clip(a, "RootNode/Skeleton3D")
+	assert_eq(rt.get_track_count(), 1, "retarget hanya menyisakan track tulang")
+	assert_eq(String(rt.track_get_path(0)), "RootNode/Skeleton3D:Hips",
+		"retarget menulis prafiks skeleton")
+	assert_eq(String(a.track_get_path(0)), "Armature:Hips", "sumber tetap utuh")
+	# strip_xz: XZ dinolkan, Y utuh — anti root-motion lokomosi.
+	var sx := AnimMap.strip_xz(rt)
+	var v1: Vector3 = sx.track_get_key_value(0, 1)
+	assert_true(absf(v1.x) < 1e-9 and absf(v1.z) < 1e-9 and absf(v1.y - 2.0) < 1e-9,
+		"strip_xz: XZ nol, Y utuh (dapat %s)" % str(v1))
+	# loop: lokomosi berulang, one-shot tidak.
+	assert_eq(AnimMap.apply_loop(a, "walk").loop_mode, Animation.LOOP_LINEAR,
+		"walk LOOP_LINEAR")
+	assert_eq(AnimMap.apply_loop(a, "attack0").loop_mode, Animation.LOOP_NONE,
+		"attack0 LOOP_NONE")
+	# norm: pembandingan nama klip agnostik kapital/spasi/garis bawah.
+	assert_eq(AnimMap.norm("Mixamo:Run_Fwd 2"), "mixamorunfwd2", "norm nama klip")
