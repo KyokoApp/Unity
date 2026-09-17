@@ -156,7 +156,7 @@ func _build_minimap(root: Control) -> void:
 			UiKit.panel_style(UiKit.PANEL, 999))
 	UiKit.label(map, "MAP", 30, UiKit.DIM)
 	var gold_ring := Panel.new()
-	gold_ring.add_theme_stylebox_override("panel", UiKit._ring_style(UiKit.GOLD))
+	gold_ring.add_theme_stylebox_override("panel", UiKit.ring_style(UiKit.GOLD))
 	gold_ring.offset_left = -4
 	gold_ring.offset_top = -4
 	gold_ring.offset_right = 194
@@ -207,7 +207,7 @@ func _build_actions(root: Control) -> void:
 	if q != null:
 		var ring_p := Panel.new()
 		ring_p.name = "Energy"
-		ring_p.add_theme_stylebox_override("panel", UiKit._ring_style(UiKit.GOLD))
+		ring_p.add_theme_stylebox_override("panel", UiKit.ring_style(UiKit.GOLD))
 		ring_p.offset_left = -6
 		ring_p.offset_top = -6
 		ring_p.offset_right = 171

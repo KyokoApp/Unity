@@ -146,7 +146,7 @@ static func portrait(parent: Control, nama: String, am00: Vector2, am11: Vector2
 	p.add_child(face)
 	var ring_p := Panel.new()
 	ring_p.name = "Ring"
-	ring_p.add_theme_stylebox_override("panel", _ring_style(ring))
+	ring_p.add_theme_stylebox_override("panel", ring_style(ring))
 	var d := (size_ring - size.x) / 2.0
 	ring_p.offset_left = -d
 	ring_p.offset_top = -d
@@ -155,7 +155,7 @@ static func portrait(parent: Control, nama: String, am00: Vector2, am11: Vector2
 	p.add_child(ring_p)
 	return p
 
-static func _ring_style(color: Color) -> StyleBoxFlat:
+static func ring_style(color: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0, 0, 0, 0)
 	sb.border_color = color

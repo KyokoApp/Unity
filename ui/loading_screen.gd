@@ -50,7 +50,7 @@ func _build() -> void:
 	_spinner.anchor_bottom = 0.40
 	_spinner.custom_minimum_size = Vector2(150, 150)
 	var ring := Panel.new()
-	ring.add_theme_stylebox_override("panel", UiKit._ring_style(UiKit.GOLD))
+	ring.add_theme_stylebox_override("panel", UiKit.ring_style(UiKit.GOLD))
 	ring.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_spinner.add_child(ring)
 	root.add_child(_spinner)

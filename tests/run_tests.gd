@@ -125,7 +125,7 @@ func _test_rig_mapping() -> void:
 	for j in RigMapping.ALL_JOINTS:
 		assert_true(o.has(j), "resolve punya " + j)
 	# twist split menjumlahkan kembali ke LOWLEGL
-	var ll: Vector3 = RigMapping._get(pose, "LOWLEGL")
+	var ll: Vector3 = pose.get("LOWLEGL", Vector3.ZERO)
 	var sum: Vector3 = o[RigMapping.J_LEFT_SHIN_TWIST_A] + o[RigMapping.J_LEFT_SHIN_TWIST_B]
 	assert_true(sum.is_equal_approx(ll), "twist A+B == LOWLEGL")
 
