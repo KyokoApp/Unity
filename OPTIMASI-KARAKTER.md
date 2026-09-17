@@ -1,3 +1,5 @@
+> **USANG (2026-09-17):** digantikan `CATATAN-SESI-BARU.md` — file ini tercatat di daftar hapus §7 dokumen itu.
+
 # Optimasi model karakter — apa yang diubah, apa yang tidak
 
 Model: `Assets/Art/Characters/AureliaChar.vrm` (VRM 0.x, `specVersion 0.0`)

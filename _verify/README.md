@@ -1,3 +1,5 @@
+> **USANG (2026-09-17):** digantikan `CATATAN-SESI-BARU.md` — file ini tercatat di daftar hapus §7 dokumen itu.
+
 # _verify — arsip verifikasi (histori)
 
 Isi folder ini hanyalah REFERENSI NUMERIK dari era migrasi

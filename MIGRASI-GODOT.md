@@ -1,3 +1,5 @@
+> **USANG (2026-09-17):** digantikan `CATATAN-SESI-BARU.md` — file ini tercatat di daftar hapus §7 dokumen itu.
+
 # MIGRASI → GODOT 4
 
 Dokumen ini memetakan **sistem demi sistem** dari proyek Unity 6
