@@ -51,7 +51,8 @@ jobs:
           git fetch origin arena/01a0ac44-unity --depth=1 2>/dev/null || true
           git checkout --orphan ci-logs 2>/dev/null || git checkout ci-logs
           git rm -rf . >/dev/null 2>&1 || true
-          cp /tmp/testlog.txt run-log.txt
+          echo "commit=$GITHUB_SHA run=$GITHUB_RUN_ID" > run-log.txt
+          cat /tmp/testlog.txt >> run-log.txt
           git add run-log.txt
           git commit -m "ci log $(date -u '+%Y-%m-%d %H:%M UTC')" >/dev/null
           git push --force origin ci-logs
