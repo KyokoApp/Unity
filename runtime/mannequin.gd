@@ -15,7 +15,11 @@ extends RefCounted
 ##   4. Menerapkan pose prosedural: local = bind * fix * euler(v*tanda).
 ## ============================================================
 
-const J := RigMapping
+## Tidak boleh "const J := RigMapping" — class_name reference bukan
+## constant expression menurut parser Godot (compile error).
+## Dipakai: RigMapping.J_HIPS -> RigMapping.J_HIPS dst.
+static func _J() -> Object:
+	return RigMapping
 
 var skel: Skeleton3D
 var joint_to_bone: Dictionary = {}     ## Joint(String) -> int
@@ -62,8 +66,8 @@ func setup(root: Node3D) -> void:
 ## premultiply lokal-tulang. Kalau modelnya sudah A-pose, sudutnya
 ## ~0 dan koreksinya otomatis identitas.
 const ARM_FIX_JOINTS := [
-	[J.J_LEFT_UPPER_ARM, J.J_LEFT_LOWER_ARM],
-	[J.J_RIGHT_UPPER_ARM, J.J_RIGHT_LOWER_ARM],
+	[RigMapping.J_LEFT_UPPER_ARM, RigMapping.J_LEFT_LOWER_ARM],
+	[RigMapping.J_RIGHT_UPPER_ARM, RigMapping.J_RIGHT_LOWER_ARM],
 ]
 
 func _compute_arm_fix() -> void:
