@@ -46,10 +46,14 @@ jobs:
 
       - name: Probe input sentuh & pemain (headless)
         run: |
+          set -o pipefail
           cd unity
           /tmp/godot-bin/Godot_v4.5.1-stable_linux.x86_64 \
-            --headless --path . -s res://tests/touch_probe.gd | tee /tmp/probelog.txt
+            --headless --path . -s res://tests/touch_probe.gd 2>&1 | tee /tmp/probelog.txt
           EC=$?
+          # echo ringkasan agar muncul di logs GitHub langsung
+          echo "exit probe=$EC; ringkasan:"
+          tail -20 /tmp/probelog.txt
           if [ "$EC" -ne 0 ] || grep -qE "PROBEFAIL|SCRIPT ERROR|SHADER ERROR" /tmp/probelog.txt; then
             echo "::error::touch probe gagal (exit=$EC)"
             exit 1
@@ -64,6 +68,8 @@ jobs:
           git rm -rf . >/dev/null 2>&1 || true
           echo "commit=$GITHUB_SHA run=$GITHUB_RUN_ID" > run-log.txt
           cat /tmp/testlog.txt >> run-log.txt
+          echo "== probe ==" >> run-log.txt
+          cat /tmp/probelog.txt >> run-log.txt 2>/dev/null || echo "(probelog hilang)" >> run-log.txt
           cp /tmp/bootlog.txt boot-log.txt 2>/dev/null || echo "bootlog tidak ada" > boot-log.txt
           cp /tmp/probelog.txt probe-log.txt 2>/dev/null || echo "probelog tidak ada" > probe-log.txt
           git add run-log.txt boot-log.txt probe-log.txt
