@@ -119,10 +119,14 @@ size_flags_horizontal = 4
 theme_override_styles/normal = SubResource("StyleBoxFlat_button")
 text = "Coba Lagi"
 
+# CATATAN: node HTTPRequest ini tidak lagi dipakai oleh Bootstrapper.cs
+# (downloader baru berbasis HttpClient dengan resume + stall detection).
+# timeout = 0 artinya TANPA batas total — mencegah kambuhnya bug "stuck 80MB"
+# (timeout Godot membatalkan total durasi request, bukan idle time).
 [node name="ManifestRequest" type="HTTPRequest" parent="."]
 use_threads = true
-timeout = 15.0
+timeout = 0.0
 
 [node name="DownloadRequest" type="HTTPRequest" parent="."]
 use_threads = true
-timeout = 180.0
+timeout = 0.0
