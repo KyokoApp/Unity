@@ -130,6 +130,7 @@ jobs:
           grep -A3 'name="PatchPack"' export_presets.cfg | head -5 || true
           # Daftar file berubah -> flag requires_restart / needs_new_apk di version.json.
           # baseline_commit.txt berisi baris komentar '#': lewati seperti di gen_patch_filter.py
+          mkdir -p build/android
           BASELINE=$(grep -v '^\s*#' tools/update_pipeline/baseline_commit.txt | head -1 | tr -d '[:space:]')
           echo "Baseline diff: $BASELINE"
           git diff --name-only "$BASELINE" HEAD > build/android/changed_files.txt || true
