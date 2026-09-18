@@ -240,6 +240,13 @@ jobs:
           echo "Diff skip-base terhadap rilis sukses: $PREV_SHA"
           git diff --name-only "$PREV_SHA" HEAD > build/android/changed_since_last_release.txt || true
           wc -l build/android/changed_since_last_release.txt && head -12 build/android/changed_since_last_release.txt
+          # Referensi file base LAMA (agar manifest bisa menunjuknya saat skip-base):
+          curl -sfL "https://github.com/KyokoApp/Unity/releases/download/android-apk/version.json" \
+            -o build/android/prev_version.json || echo "{}" > build/android/prev_version.json
+          gh api repos/KyokoApp/Unity/releases/tags/android-apk \
+            --jq '.assets[] | select(.name=="assets_v1.pck") | {size: .size, digest: .digest}' \
+            > build/android/base_asset_info.json || echo "{}" > build/android/base_asset_info.json
+          cat build/android/base_asset_info.json
 
       - name: Generate version.json Manifest
         run: |
@@ -253,7 +260,9 @@ jobs:
             --patch-name "$PATCH_NAME" \
             --apk-name InfiniteRunner-Lite.apk \
             --changed-files build/android/changed_files.txt \
-            --changed-files-skip-base build/android/changed_since_last_release.txt
+            --changed-files-skip-base build/android/changed_since_last_release.txt \
+            --prev-manifest build/android/prev_version.json \
+            --base-asset-info build/android/base_asset_info.json
 
       - name: APK Size Report (apk_report.txt)
         run: |
