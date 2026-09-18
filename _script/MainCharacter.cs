@@ -530,31 +530,25 @@ public partial class MainCharacter : CharacterBody3D
 		}
 
 		// Get the input direction and handle the movement/deceleration.
-		// Supports keyboard, joypad, and dynamic mobile touch joystick analog vector.
-		Vector2 inputDir = Input.GetVector("ui_right", "ui_left", "ui_down", "ui_up");
+		Vector2 inputDir = Vector2.Zero;
 		if (touchInputManager != null && touchInputManager.MoveVector != Vector2.Zero)
 		{
-			// X: right/left, Y: forward/backward relative to camera view
-			inputDir = new Vector2(touchInputManager.MoveVector.X, -touchInputManager.MoveVector.Y);
+			// Analog stick: X is horizontal (-1 left, 1 right), Y is vertical (-1 up/fwd, 1 down/back)
+			inputDir = new Vector2(touchInputManager.MoveVector.X, touchInputManager.MoveVector.Y);
+		}
+		else
+		{
+			inputDir = Input.GetVector("ui_left", "ui_right", "ui_up", "ui_down");
 		}
 
-		// Calculate world direction relative to Camera orientation
-		Vector3 camFwd = -PlayerCamera.GlobalTransform.Basis.Z;
-		camFwd.Y = 0;
-		camFwd = camFwd.Normalized();
-		Vector3 camRight = PlayerCamera.GlobalTransform.Basis.X;
-		camRight.Y = 0;
-		camRight = camRight.Normalized();
-
-		Vector3 moveWorldDir = (camRight * inputDir.X + camFwd * inputDir.Y).Normalized();
-		CurrentInput.Direction = moveWorldDir;
-
-		// Smoothly rotate character mesh/body towards movement direction
-		if (moveWorldDir != Vector3.Zero)
+		if (inputDir.LengthSquared() > 0.01f)
 		{
-			float targetAngle = Mathf.Atan2(-moveWorldDir.X, -moveWorldDir.Z);
-			float currentAngle = Rotation.Y;
-			Rotation = new Vector3(Rotation.X, Mathf.LerpAngle(currentAngle, targetAngle, deltaFloat * 10f), Rotation.Z);
+			// Transform relative to character or camera
+			CurrentInput.Direction = (Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
+		}
+		else
+		{
+			CurrentInput.Direction = Vector3.Zero;
 		}
 		if (IsOnFloor())
 		{
@@ -642,11 +636,18 @@ public partial class MainCharacter : CharacterBody3D
 		{
 			cam_rot_x -= CameraRotationAxis.Y;
 			cam_rot_y += Mathf.Clamp(CameraRotationAxis.X, -25, 60);
+			// Reset CameraRotationAxis after applying delta so it doesn't spin infinitely!
+			CameraRotationAxis = Vector3.Zero;
 		}
 		PlayerCamera.Fov = Mathf.Lerp(PlayerCamera.Fov, targetFov, fovLerpTime * deltaFloat);
 
-		CameraPivot.RotationDegrees = new Vector3(cam_rot_x, cam_rot_y, 0);
-		//Rotation = (rotate.X);
+		Vector3 rotateCam = new Vector3(cam_rot_x, CameraPivot.RotationDegrees.Y, CameraPivot.RotationDegrees.Z);
+		Vector3 rotateChar = new Vector3(RotationDegrees.X, cam_rot_y, RotationDegrees.Z);
+		if (CurrentAction != CharacterActions.Sitting)
+		{
+			RotationDegrees = rotateCam;
+			RotateY(Mathf.DegToRad(cam_rot_y));
+		}
 
 		//RotateObjectLocal(Vector3.Right, Mathf.DegToRad(-pitch));
 	}

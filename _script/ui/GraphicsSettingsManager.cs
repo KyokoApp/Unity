@@ -78,13 +78,19 @@ public partial class GraphicsSettingsManager : CanvasLayer
         toggleButton.Pressed += OnToggleSettingsPressed;
         AddChild(toggleButton);
 
-        // 2. Settings Panel Modal
+        // 2. Settings Panel Modal (Responsive centered dialog)
         settingsPanel = new Panel();
         settingsPanel.Name = "GraphicsSettingsPanel";
         settingsPanel.Visible = false;
-        settingsPanel.AnchorsPreset = (int)Control.LayoutPreset.Center;
-        settingsPanel.Size = new Vector2(520, 480);
-        settingsPanel.Position = new Vector2(100, 60);
+        settingsPanel.AnchorsPreset = (int)Control.LayoutPreset.FullRect;
+        settingsPanel.AnchorLeft = 0.15f;
+        settingsPanel.AnchorRight = 0.85f;
+        settingsPanel.AnchorTop = 0.08f;
+        settingsPanel.AnchorBottom = 0.92f;
+        settingsPanel.OffsetLeft = 0;
+        settingsPanel.OffsetTop = 0;
+        settingsPanel.OffsetRight = 0;
+        settingsPanel.OffsetBottom = 0;
 
         var panelStyle = new StyleBoxFlat();
         panelStyle.BgColor = new Color(0.08f, 0.10f, 0.16f, 0.92f);
@@ -134,12 +140,19 @@ public partial class GraphicsSettingsManager : CanvasLayer
         var presetLabel = new Label { Text = "Quality Preset:" };
         presetLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         presetOption = new OptionButton();
+        presetOption.CustomMinimumSize = new Vector2(160, 38);
         presetOption.AddItem("Low (Max FPS)", 0);
         presetOption.AddItem("Medium (Balanced)", 1);
         presetOption.AddItem("High (Fidelity)", 2);
         presetOption.AddItem("Ultra (Max Detail)", 3);
         presetOption.AddItem("Custom", 4);
         presetOption.Selected = 1;
+        var popup = presetOption.GetPopup();
+        if (popup != null)
+        {
+            popup.TransparentBg = false;
+            popup.AddThemeFontSizeOverride("font_size", 18);
+        }
         presetOption.ItemSelected += (idx) => ApplyPreset((QualityPreset)idx);
         presetRow.AddChild(presetLabel);
         presetRow.AddChild(presetOption);

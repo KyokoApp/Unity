@@ -125,6 +125,12 @@ jobs:
       - name: Export Android APK Lite (InfiniteRunner-Lite.apk)
         run: |
           mkdir -p build/android
+          # Automatically bump versionCode so new APK seamlessly installs over old APK without conflict
+          VERSION_CODE=${{ github.run_number }}
+          sed -i "s/version\/code=.*/version\/code=${VERSION_CODE}/" export_presets.cfg
+          sed -i "s/version\/name=.*/version\/name=\"1.0.${VERSION_CODE}\"/" export_presets.cfg
+          echo "Set Android versionCode=${VERSION_CODE}"
+
           # Attempt export release for stripped optimized binary, fallback to debug if needed
           godot --headless --verbose --export-release "Android" build/android/InfiniteRunner-Lite.apk || \
           godot --headless --verbose --export-debug "Android" build/android/InfiniteRunner-Lite.apk
