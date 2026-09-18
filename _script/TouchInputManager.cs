@@ -45,6 +45,9 @@ public partial class TouchInputManager : Node2D
 
     // Info untuk debug overlay: sentuhan aktif & vektor gerak terakhir.
     public static int LiveTouchCount { get; private set; }
+
+    // Diagnosa: total event sentuh mentah yang SEMPAT sampai ke node ini.
+    public static long RawTouchEvents { get; private set; }
     public static TouchInputManager ActiveInstance { get; private set; }
 
     public bool IsJoystickActive => isJoystickActive;
@@ -98,6 +101,7 @@ public partial class TouchInputManager : Node2D
 
     public override void _Input(InputEvent @event)
     {
+        RawTouchEvents++;
         if (@event is InputEventScreenTouch touchEvent)
         {
             if (touchEvent.Pressed)

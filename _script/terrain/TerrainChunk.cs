@@ -356,6 +356,16 @@ namespace Bouncerock.Terrain
 				i++;
 				//worldItems.Add(items);
 			}
+
+			// Padang pedesaan: rumpun rumput + jalan tanah berkelok (kode-only).
+			try
+			{
+				GrassRoadBuilder.BuildForChunk(this, parentNode, meshObject.Position);
+			}
+			catch (System.Exception exGrass)
+			{
+				GD.PrintErr("[GrassRoad] gagal dibangun: " + exGrass.Message);
+			}
 			
 		}
 

@@ -40,38 +40,38 @@ namespace Bouncerock.Terrain
 		{
 			Passes = new List<TerrainPass>();
 			TerrainPass pass1 = new TerrainPass();
-			pass1.VerticalScale = 120;
+			pass1.VerticalScale = 14f; // padang: gelombang landai besar saja
 			pass1.HorizontalScale = Vector2.One*3000;
 			pass1.Frequency = 2;
 			pass1.Octaves = 2;
 			pass1.BlendType = TerrainPass.BlendTypes.Mix;
 
 			TerrainPass pass2 = new TerrainPass();
-			pass2.VerticalScale = 50;
+			pass2.VerticalScale = 8f;
 			pass2.HorizontalScale = Vector2.One*700;
 			pass2.BlendType = TerrainPass.BlendTypes.Mix;
 			pass2.Octaves = 3;
 			pass1.Frequency = 3;
 
 			TerrainPass pass3 = new TerrainPass();
-			pass3.VerticalScale = 15;
+			pass3.VerticalScale = 3.5f;
 			pass3.HorizontalScale = Vector2.One*300;
 			pass3.Octaves = 2;
 			pass3.Frequency = 5;
 			pass3.Contrast = 1f;
-			pass3.MinHeight = -20f;
-			pass3.MaxHeight = 10f;
+			pass3.MinHeight = -2f;
+			pass3.MaxHeight = 4f;
 			pass3.BlendValue = 0.3f;
 			pass3.BlendType = TerrainPass.BlendTypes.Add;
 
 			TerrainPass pass4 = new TerrainPass();
-			pass4.VerticalScale = 70;
+			pass4.VerticalScale = 9f; // gundukan lembut + pengangkat dasar di atas permukaan air
 			pass4.HorizontalScale = Vector2.One*150;
 			pass4.Octaves = 2;
 			pass4.Frequency = 5;
 			pass4.Contrast = 1f;
-			pass4.MinHeight = 20;
-			pass4.MaxHeight = 200;
+			pass4.MinHeight = 3f;
+			pass4.MaxHeight = 26f;
 			pass4.BlendType = TerrainPass.BlendTypes.Add;
 
 			Passes.Add(pass1);
@@ -83,11 +83,11 @@ namespace Bouncerock.Terrain
 			WorldItemSettings newObj = new WorldItemSettings();
 			newObj.Name = "tree_2";
 			newObj.Path = "tree_2";
-			newObj.Concentration = 3f;
+			newObj.Concentration = 0.12f;
 			newObj.RandomizeTiltAngle = 5;
 			newObj.RandomizeYRotation = true;
 			newObj.MinSize = 0.8f;
-			newObj.MinimumSpawnAltitude = 15f;
+			newObj.MinimumSpawnAltitude = 2f;
 			newObj.MaxSize = 1.2f;
 			newObj.ItemType = WorldItemSettings.ItemTypes.Static;
 
@@ -95,10 +95,10 @@ namespace Bouncerock.Terrain
 			WorldItemSettings tree = new WorldItemSettings();
 			tree.Name = "tree_3";
 			tree.Path = "tree_3";
-			tree.Concentration = 1.7f;
+			tree.Concentration = 0.18f;
 			tree.RandomizeTiltAngle = 5;
 			tree.RandomizeYRotation = true;
-			tree.MinimumSpawnAltitude = 8f;
+			tree.MinimumSpawnAltitude = 2f;
 			tree.MinSize = 0.8f;
 			tree.MaxSize = 1.7f;
 			tree.ItemType = WorldItemSettings.ItemTypes.Static;
@@ -107,7 +107,7 @@ namespace Bouncerock.Terrain
 			WorldItemSettings newObjbush = new WorldItemSettings();
 			newObjbush.Name = "bush_berries";
 			newObjbush.Path = "bush_berries";
-			newObjbush.Concentration = 3;
+			newObjbush.Concentration = 0.25f;
 			newObjbush.MinSize = 0.8f;
 			newObjbush.MaxSize = 1.3f;
 			newObjbush.ItemType = WorldItemSettings.ItemTypes.Static;
@@ -115,19 +115,19 @@ namespace Bouncerock.Terrain
 			WorldItemSettings newObj2 = new WorldItemSettings();
 			newObj2.Name = "wall";
 			newObj2.Path = "wall";
-			newObj2.Concentration = 1;
+			newObj2.Concentration = 0.03f;
 			newObj2.ItemType = WorldItemSettings.ItemTypes.Static;
 
 			WorldItemSettings newObj3 = new WorldItemSettings();
 			newObj3.Name = "stoneandplant";
 			newObj3.Path = "stoneandplant";
-			newObj3.Concentration = 5f;
+			newObj3.Concentration = 0.2f;
 			newObj3.ItemType = WorldItemSettings.ItemTypes.Static;
 
 			WorldItemSettings pine = new WorldItemSettings();
 			pine.Name = "pine_tree_1";
 			pine.Path = "pine_tree_1";
-			pine.Concentration = 0.01f;
+			pine.Concentration = 0f; // padang: tanpa pinus (butuh ketinggian 30m)
 			pine.MinimumSpawnAltitude = 30f;
 			pine.ItemType = WorldItemSettings.ItemTypes.Static;
 
@@ -135,7 +135,7 @@ namespace Bouncerock.Terrain
 			WorldItemSettings newObstone = new WorldItemSettings();
 			newObstone.Name = "schroom";
 			newObstone.Path = "schroom";
-			newObstone.Concentration = 0.1f;
+			newObstone.Concentration = 0.08f;
 			newObstone.MinSize = 0.8f;
 			newObstone.MaxSize = 2f;
 			newObstone.ItemType = WorldItemSettings.ItemTypes.Static;
@@ -143,7 +143,7 @@ namespace Bouncerock.Terrain
 			WorldItemSettings palm = new WorldItemSettings();
 			palm.Name = "palm_tree_1";
 			palm.Path = "palm_tree_1";
-			palm.Concentration = 2.2f;
+			palm.Concentration = 0.07f;
 			palm.RandomizeTiltAngle = 3;
 			palm.MinimumSpawnAltitude = -0.2f;
 			palm.MaximumSpawnAltitude = 6f;
@@ -180,7 +180,7 @@ namespace Bouncerock.Terrain
 			powerUp1.Path = "power_up";
 			powerUp1.MinSize = 2;
 			powerUp1.MaxSize = 2;
-			powerUp1.Concentration = 3;
+			powerUp1.Concentration = 0.5f;
 			powerUp1.Levitation = 6;
 			GameplayObjects.Add(powerUp1);
 		}

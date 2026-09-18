@@ -356,6 +356,9 @@ public partial class GraphicsSettingsManager : CanvasLayer
             ? Bouncerock.Terrain.TerrainManager.Instance.CurrentLoadStatus.ToString()
             : "null";
         string phys = ch != null ? ch.PhysicsTicks.ToString() : "-";
+        bool camOk = GameManager.Instance != null && GameManager.Instance.MainCamera != null;
+        bool viewerOk = Bouncerock.Terrain.TerrainManager.Instance != null
+            && Bouncerock.Terrain.TerrainManager.Instance.Viewer != null;
         string act = ch != null ? ch.CurrentAction.ToString() : "-";
         string spd = ch != null ? ch.DebugSpeed.ToString("0.0") : "-";
         string vel = ch != null ? $"{ch.Velocity.X:0.00},{ch.Velocity.Y:0.00},{ch.Velocity.Z:0.00}" : "-";
@@ -364,7 +367,8 @@ public partial class GraphicsSettingsManager : CanvasLayer
             $"joy {(tim != null && tim.IsJoystickActive ? "ON" : "off")}  |  physics {phys}\n" +
             $"move {moveV}  |  cam {camV}  |  speed {spd}\n" +
             $"char init {init}  |  act {act}  |  vel ({vel})\n" +
-            $"terrain {terrain}  |  pos ({pos.X:0.0}, {pos.Y:0.1}, {pos.Z:0.0})";
+            $"terrain {terrain}  |  pos ({pos.X:0.0}, {pos.Y:0.1}, {pos.Z:0.0})\n" +
+            $"raw {TouchInputManager.RawTouchEvents}  |  camreg {(camOk ? "ok" : "-")}  |  viewer {(viewerOk ? "ok" : "-")}";
     }
 
     private void OnToggleSettingsPressed()

@@ -59,6 +59,23 @@ def main() -> int:
         with open(args.changed_files, encoding="utf-8") as f:
             changed = [line.strip() for line in f if line.strip()]
 
+    # Hemat unduhan ala update game mobile: bila yang berubah HANYA kode
+    # (script C# yang dikompilasi ke APK / berkas CI), konten paket dasar
+    # identik secara fungsi -> JANGAN masukkan assets_v1.pck ke manifest.
+    # Client lama tetap memakai salinan lokal; patch kecil ditumpuk di atasnya.
+    CODE_ONLY_PREFIXES = ("_script/", ".github/", "tools/", "docs/")
+    CODE_ONLY_ROOT = ("README", "LICENSE", ".gitignore", ".gitattributes")
+
+    def is_code_only_change(c: str) -> bool:
+        if any(c.startswith(p) for p in CODE_ONLY_PREFIXES):
+            return True
+        if "/" not in c and any(c.startswith(r) for r in CODE_ONLY_ROOT):
+            return True
+        return False
+
+    base_content_changed = (not changed) or any(
+        not is_code_only_change(c) for c in changed)
+
     # Semantik "update data game" ala Mobile Legends:
     # - requires_restart: file yang hanya dibaca saat boot berubah
     #   (project.godot) -> client sarankan restart otomatis setelah unduh.
@@ -71,6 +88,17 @@ def main() -> int:
     requires_restart = any_changed(lambda c: c == "project.godot" or c == "export_presets.cfg")
     needs_new_apk = any_changed(lambda c: c.startswith("_script/") or c.endswith(".csproj") or c.endswith(".sln"))
 
+    packs = []
+    if base_content_changed:
+        packs.append(pack_entry(args.base_name, order=1, is_patch=False))
+    else:
+        # Tandai ke workflow: tidak perlu meng-upload ulang base pack ke release.
+        with open(os.path.join(args.build_dir, "skip_base_upload.flag"), "w") as f:
+            f.write("1\n")
+        print("[make_manifest] Hanya kode berubah -> base pack dilewati "
+              "(hemat ~50MB unduhan per update).")
+    packs.append(pack_entry(args.patch_name, order=2, is_patch=True))
+
     manifest = {
         "version": args.version,
         "version_code": int(args.version_code),
@@ -78,10 +106,7 @@ def main() -> int:
         "requires_restart": requires_restart,
         "needs_new_apk": needs_new_apk,
         "changed_files_count": len(changed),
-        "packs": [
-            pack_entry(args.base_name, order=1, is_patch=False),
-            pack_entry(args.patch_name, order=2, is_patch=True),
-        ],
+        "packs": packs,
     }
 
     with open(args.out, "w", encoding="utf-8") as f:
