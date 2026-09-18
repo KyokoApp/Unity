@@ -352,11 +352,19 @@ public partial class GraphicsSettingsManager : CanvasLayer
         string camV = tim != null ? tim.CameraRotationAxis.ToString("0.00") : "-";
         bool init = ch != null && ch.Initialized;
         Vector3 pos = ch != null ? ch.GlobalPosition : Vector3.Zero;
+        string terrain = Bouncerock.Terrain.TerrainManager.Instance != null
+            ? Bouncerock.Terrain.TerrainManager.Instance.CurrentLoadStatus.ToString()
+            : "null";
+        string phys = ch != null ? ch.PhysicsTicks.ToString() : "-";
+        string act = ch != null ? ch.CurrentAction.ToString() : "-";
+        string spd = ch != null ? ch.DebugSpeed.ToString("0.0") : "-";
+        string vel = ch != null ? $"{ch.Velocity.X:0.00},{ch.Velocity.Y:0.00},{ch.Velocity.Z:0.00}" : "-";
         debugLabel.Text =
             $"FPS {(int)Engine.GetFramesPerSecond()}  |  touch {TouchInputManager.LiveTouchCount}  |  " +
-            $"joy {(tim != null && tim.IsJoystickActive ? "ON" : "off")}\n" +
-            $"move {moveV}  |  cam {camV}\n" +
-            $"char init {init}  |  pos ({pos.X:0.0}, {pos.Y:0.1}, {pos.Z:0.0})";
+            $"joy {(tim != null && tim.IsJoystickActive ? "ON" : "off")}  |  physics {phys}\n" +
+            $"move {moveV}  |  cam {camV}  |  speed {spd}\n" +
+            $"char init {init}  |  act {act}  |  vel ({vel})\n" +
+            $"terrain {terrain}  |  pos ({pos.X:0.0}, {pos.Y:0.1}, {pos.Z:0.0})";
     }
 
     private void OnToggleSettingsPressed()
