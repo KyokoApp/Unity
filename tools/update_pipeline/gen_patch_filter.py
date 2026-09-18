@@ -51,7 +51,11 @@ ALWAYS_INCLUDE = ()
 # menutupi include_filter (exclude menang di exporter Godot!) sehingga model
 # baru tidak pernah masuk patch. Cukup jagokan konten berat-statis yang
 # memang tak pernah di-patch (filter ini juga jala pengaman ganda).
-SLIM_PATCH_EXCLUDES = "Universal Animation Library 2[Standard]/*, Amv/*, videos/*, images/*, icon_192.png, icon_432.png, _scenes/bootstrapper.tscn"
+# PENTING: include_filter & exclude_filter Godot MENGGUNAKAN awalan `res://`.
+# Tanpa awalan itu tak ada satu pun yang cocok -> include_filter dianggap
+# kosong -> exporter 'selected_resources' MENGEXPORT SELURUH PROYEK
+# (penyebab patch 42-50 MB meski hanya 4 file yang dipilih!).
+SLIM_PATCH_EXCLUDES = "res://Universal Animation Library 2[Standard]/*, res://Amv/*, res://videos/*, res://images/*, res://icon_192.png, res://icon_432.png, res://_scenes/bootstrapper.tscn"
 
 # File yang hidupnya di APK (bukan di paket aset) — bootstrapper & script
 # tidak boleh ikut patch meski berada di bawah prefix konten.
@@ -102,8 +106,9 @@ def build_include_list(changed: list[str]) -> list[str]:
     for extra in ALWAYS_INCLUDE:
         if extra not in files and os.path.exists(os.path.join(REPO_ROOT, extra)):
             files.append(extra)
-    # Stabilkan urutan agar hasil deterministik.
-    return sorted(files)
+    # Stabilkan urutan agar hasil deterministik, dan beri awalan res://
+    # (filter exporter Godot bekerja pada path res://...).
+    return sorted("res://" + f for f in files)
 
 
 def rewrite_preset(cfg_text: str, include_list: list[str]) -> str:
