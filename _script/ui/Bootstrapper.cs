@@ -779,7 +779,9 @@ public partial class Bootstrapper : Control
         DetailLabel?.SetText("");
         StatusLabel?.SetText("Memeriksa pembaruan...");
 
-        BeginDownloader(FallbackManifestUrl, ManifestDownloadPath, "", 0);
+        // Anti-cache proxy/CDN: parameter cb diabaikan server tapi memaksa unduhan segar.
+        string manifestUrl = FallbackManifestUrl + "?cb=" + ((long)Time.GetUnixTimeFromSystem()).ToString();
+        BeginDownloader(manifestUrl, ManifestDownloadPath, "", 0);
     }
 
     private void BeginDownloader(string url, string userPath, string sha256, long size)
@@ -805,14 +807,60 @@ public partial class Bootstrapper : Control
         WriteTextFile(LastManifestPath, json);
         GD.Print($"Manifest v{_manifest.Version}: {_manifest.Packs.Count} paket.");
 
-        // Kode C# tidak bisa hot-update via .pck — beri tahu pemain bahwa
-        // versi kode terbaru hadir lewat APK (game tetap jalan normal).
+        // Versi terpasang vs versi data terbaru: terlihat jelas di layar boot
+        // (foto layar ini = bukti APK mana yang berjalan di HP pemain).
+        string versiInfo = "Kode terpasang: v" + BuildInfo.Version + "  |  Data terbaru: v" + _manifest.Version;
+        GD.Print("[Bootstrapper] " + versiInfo);
+
+        // Kode C# tidak bisa hot-update via .pck. JANGAN diam-diam lanjut dengan
+        // kode usang (bug tampak 'tidak pernah berubah') — tampilkan prompt
+        // eksplisit: unduh APK terbaru (1 ketuk) atau lanjut sadar-risiko.
         if (_manifest.NeedsNewApk)
         {
-            StatusLabel?.SetText("Update kode v" + _manifest.Version + " tersedia — unduh APK terbaru untuk fitur penuh. Melanjutkan...");
-            GD.Print("[Bootstrapper] needs_new_apk=true → tetap lanjut; fitur kode aktif setelah update APK. " + _manifest.ApkUrl);
+            ShowApkUpdatePrompt(versiInfo);
+            return;
         }
+        DetailLabel?.SetText(versiInfo);
         PlanDownloads();
+    }
+
+    private Button _apkUpdateButton;
+    private Button _apkSkipButton;
+
+    private void ShowApkUpdatePrompt(string versiInfo)
+    {
+        StatusLabel?.SetText("PERBARUI APLIKASI DIPERLUKAN\n" + versiInfo +
+            "\n\nPerbaikan & fitur baru ada di dalam APK, bukan unduhan data. " +
+            "Tanpa APK v" + _manifest.Version + " game tetap memakai kode lama.");
+        DetailLabel?.SetText("Ketuk 'Unduh APK Terbaru', pasang, lalu buka lagi.");
+        if (ProgressBar != null) ProgressBar.Value = 100;
+
+        if (_apkUpdateButton == null && RetryButton != null && RetryButton.GetParent() != null)
+        {
+            _apkUpdateButton = new Button { Text = "Unduh APK Terbaru (v" + _manifest.Version + ")", Visible = true };
+            _apkSkipButton = new Button { Text = "Lewati — lanjut kode lama", Visible = true };
+            var parent = RetryButton.GetParent();
+            parent.AddChild(_apkUpdateButton);
+            parent.AddChild(_apkSkipButton);
+            _apkUpdateButton.Pressed += () =>
+            {
+                GD.Print("[Bootstrapper] Membuka URL APK: " + _manifest.ApkUrl);
+                OS.ShellOpen(_manifest.ApkUrl);
+            };
+            _apkSkipButton.Pressed += () =>
+            {
+                _apkUpdateButton.Visible = false;
+                _apkSkipButton.Visible = false;
+                DetailLabel?.SetText(versiInfo + "  (mode kode lama)");
+                PlanDownloads();
+            };
+        }
+        else if (_apkUpdateButton != null)
+        {
+            _apkUpdateButton.Text = "Unduh APK Terbaru (v" + _manifest.Version + ")";
+            _apkUpdateButton.Visible = true;
+            _apkSkipButton.Visible = true;
+        }
     }
 
     private void OnDownloaderFailed(string message)
