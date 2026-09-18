@@ -9,6 +9,11 @@ public partial class GraphicsSettingsManager : CanvasLayer
     private Control settingsPanel;
     private Button toggleButton;
 
+    // Overlay diagnosa (bisa dimatikan dari panel Setting → Debug Overlay)
+    private PanelContainer debugPanel;
+    private Label debugLabel;
+    private double _dbgAccum;
+
     // Presets
     public enum QualityPreset { Low, Medium, High, Ultra, Custom }
     public QualityPreset CurrentPreset { get; private set; } = QualityPreset.Medium;
@@ -99,6 +104,28 @@ public partial class GraphicsSettingsManager : CanvasLayer
         panelStyle.BorderColor = new Color(0.4f, 0.7f, 1.0f, 0.6f);
         settingsPanel.AddThemeStyleboxOverride("panel", panelStyle);
         AddChild(settingsPanel);
+
+        // Overlay diagnosa kecil di pojok kiri atas. Menunjukkan apakah
+        // sentuhan terdaftar, vektor analog, kamera, dan status init karakter
+        // — berguna untuk memverifikasi masalah input di device.
+        GameSettings.EnsureLoaded();
+        debugPanel = new PanelContainer();
+        debugPanel.Name = "DebugOverlay";
+        var dbgStyle = new StyleBoxFlat();
+        dbgStyle.BgColor = new Color(0f, 0f, 0f, 0.55f);
+        dbgStyle.CornerRadiusBottomLeft = 8;
+        dbgStyle.CornerRadiusBottomRight = 8;
+        dbgStyle.CornerRadiusTopLeft = 8;
+        dbgStyle.CornerRadiusTopRight = 8;
+        debugPanel.AddThemeStyleboxOverride("panel", dbgStyle);
+        debugPanel.Position = new Vector2(20, 270);
+        debugLabel = new Label();
+        debugLabel.Text = "debug...";
+        debugLabel.AddThemeFontSizeOverride("font_size", 14);
+        debugLabel.AddThemeColorOverride("font_color", new Color(0.75f, 1f, 0.75f, 1f));
+        debugPanel.AddChild(debugLabel);
+        debugPanel.Visible = GameSettings.DebugOverlay;
+        AddChild(debugPanel);
 
         // Scrollable container
         var scroll = new ScrollContainer();
@@ -244,6 +271,92 @@ public partial class GraphicsSettingsManager : CanvasLayer
         };
         vfxRow.AddChild(vfxCheck);
         vbox.AddChild(vfxRow);
+
+        // ======================= KONTROL & KAMERA =======================
+        var ctrlHeader = new Label { Text = "KONTROL & KAMERA" };
+        ctrlHeader.AddThemeFontSizeOverride("font_size", 18);
+        vbox.AddChild(ctrlHeader);
+
+        // Sensitivitas kamera analog (swipe sisi kanan layar)
+        var sensRow = new VBoxContainer();
+        var sensHeader = new HBoxContainer();
+        var sensTitle = new Label { Text = "Camera Sensitivity:" };
+        sensTitle.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        var sensValue = new Label { Text = GameSettings.CameraSensitivity.ToString("0.00") + "x" };
+        sensHeader.AddChild(sensTitle);
+        sensHeader.AddChild(sensValue);
+        var sensSlider = new HSlider { MinValue = 0.3, MaxValue = 3.0, Step = 0.05, Value = GameSettings.CameraSensitivity };
+        sensSlider.ValueChanged += (val) => {
+            GameSettings.CameraSensitivity = (float)val;
+            sensValue.Text = GameSettings.CameraSensitivity.ToString("0.00") + "x";
+            GameSettings.Save();
+        };
+        sensRow.AddChild(sensHeader);
+        sensRow.AddChild(sensSlider);
+        vbox.AddChild(sensRow);
+
+        // Invert sumbu kamera
+        var invertXRow = new HBoxContainer();
+        var invertXCheck = new CheckBox { Text = "Invert Camera X (geser kanan → kamera kiri)", ButtonPressed = GameSettings.InvertCameraX };
+        invertXCheck.Toggled += (on) => { GameSettings.InvertCameraX = on; GameSettings.Save(); };
+        invertXRow.AddChild(invertXCheck);
+        vbox.AddChild(invertXRow);
+
+        var invertYRow = new HBoxContainer();
+        var invertYCheck = new CheckBox { Text = "Invert Camera Y (geser atas → kamera bawah)", ButtonPressed = GameSettings.InvertCameraY };
+        invertYCheck.Toggled += (on) => { GameSettings.InvertCameraY = on; GameSettings.Save(); };
+        invertYRow.AddChild(invertYCheck);
+        vbox.AddChild(invertYRow);
+
+        // Ukuran analog (radius joystick virtual)
+        var joyRow = new VBoxContainer();
+        var joyHeader = new HBoxContainer();
+        var joyTitle = new Label { Text = "Analog Stick Size:" };
+        joyTitle.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        var joyValue = new Label { Text = GameSettings.JoystickScale.ToString("0.00") + "x" };
+        joyHeader.AddChild(joyTitle);
+        joyHeader.AddChild(joyValue);
+        var joySlider = new HSlider { MinValue = 0.7, MaxValue = 1.6, Step = 0.05, Value = GameSettings.JoystickScale };
+        joySlider.ValueChanged += (val) => {
+            GameSettings.JoystickScale = (float)val;
+            joyValue.Text = GameSettings.JoystickScale.ToString("0.00") + "x";
+            GameSettings.Save();
+        };
+        joyRow.AddChild(joyHeader);
+        joyRow.AddChild(joySlider);
+        vbox.AddChild(joyRow);
+
+        // Overlay diagnosa on/off
+        var dbgRow = new HBoxContainer();
+        var dbgCheck = new CheckBox { Text = "Debug Overlay (status input di layar)", ButtonPressed = GameSettings.DebugOverlay };
+        dbgCheck.Toggled += (on) => {
+            GameSettings.DebugOverlay = on;
+            GameSettings.Save();
+            if (debugPanel != null) debugPanel.Visible = on;
+        };
+        dbgRow.AddChild(dbgCheck);
+        vbox.AddChild(dbgRow);
+    }
+
+    // Update overlay diagnosa 5x/detik saja (hemat alokasi string di mobile).
+    public override void _Process(double delta)
+    {
+        if (debugPanel == null || !debugPanel.Visible) return;
+        _dbgAccum += delta;
+        if (_dbgAccum < 0.2) return;
+        _dbgAccum = 0;
+
+        var tim = TouchInputManager.ActiveInstance;
+        var ch = GameManager.CurrentCharacter;
+        string moveV = tim != null ? tim.MoveVector.ToString("0.00") : "-";
+        string camV = tim != null ? tim.CameraRotationAxis.ToString("0.00") : "-";
+        bool init = ch != null && ch.Initialized;
+        Vector3 pos = ch != null ? ch.GlobalPosition : Vector3.Zero;
+        debugLabel.Text =
+            $"FPS {(int)Engine.GetFramesPerSecond()}  |  touch {TouchInputManager.LiveTouchCount}  |  " +
+            $"joy {(tim != null && tim.IsJoystickActive ? "ON" : "off")}\n" +
+            $"move {moveV}  |  cam {camV}\n" +
+            $"char init {init}  |  pos ({pos.X:0.0}, {pos.Y:0.1}, {pos.Z:0.0})";
     }
 
     private void OnToggleSettingsPressed()

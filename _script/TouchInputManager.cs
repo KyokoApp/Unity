@@ -38,8 +38,16 @@ public partial class TouchInputManager : Node2D
         // Draw on canvas layer above game
         ZIndex = 100;
         Visible = true;
+        GameSettings.EnsureLoaded();
+        JoystickRadius *= GameSettings.JoystickScale;
         QueueRedraw();
     }
+
+    // Info untuk debug overlay: sentuhan aktif & vektor gerak terakhir.
+    public static int LiveTouchCount { get; private set; }
+    public static TouchInputManager ActiveInstance { get; private set; }
+
+    public bool IsJoystickActive => isJoystickActive;
 
     public override void _Process(double delta)
     {
@@ -107,6 +115,11 @@ public partial class TouchInputManager : Node2D
         }
     }
 
+    public override void _EnterTree()
+    {
+        ActiveInstance = this;
+    }
+
     private void OnTouchStart(Vector2 position, int index)
     {
         float screenWidth = GetViewport().GetVisibleRect().Size.X;
@@ -133,6 +146,7 @@ public partial class TouchInputManager : Node2D
         }
 
         activeTouches[index] = position;
+        LiveTouchCount = activeTouches.Count;
     }
 
     private void OnTouchEnd(int index)
@@ -154,6 +168,7 @@ public partial class TouchInputManager : Node2D
         }
 
         activeTouches.Remove(index);
+        LiveTouchCount = activeTouches.Count;
     }
 
     private void OnTouchDrag(Vector2 position, int index)
@@ -201,8 +216,11 @@ public partial class TouchInputManager : Node2D
         else if (index == cameraTouchIndex)
         {
             Vector2 delta = position - lastCameraTouchPos;
-            float cameraSensitivity = 0.05f;
-            CameraRotationAxis = new Vector2(-delta.X * cameraSensitivity, -delta.Y * cameraSensitivity);
+            // Sensitivitas & inversi kamera dari menu Setting (user://game_settings.cfg)
+            float cameraSensitivity = 0.05f * GameSettings.CameraSensitivity;
+            float dirX = GameSettings.InvertCameraX ? 1f : -1f;
+            float dirY = GameSettings.InvertCameraY ? 1f : -1f;
+            CameraRotationAxis = new Vector2(dirX * delta.X * cameraSensitivity, dirY * delta.Y * cameraSensitivity);
             lastCameraTouchPos = position;
         }
     }
