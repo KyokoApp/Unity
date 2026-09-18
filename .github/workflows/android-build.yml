@@ -228,6 +228,19 @@ jobs:
             echo "$f OK - $(stat -c%s "$f") bytes"
           done
 
+      - name: Diff sejak rilis sukses terakhir (untuk keputusan skip base pack)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Keputusan "perlu upload base 50MB?" diambil dari diff sejak commit
+          # rilis SUKSES sebelumnya (run terakhir = indeks 1, indeks 0 = run ini).
+          PREV_SHA=$(gh run list --workflow android-build.yml --branch "${{ github.ref_name }}" \
+              --status success --limit 2 --json headSha --jq '.[1].headSha' 2>/dev/null || true)
+          if [ -z "$PREV_SHA" ]; then PREV_SHA=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD); fi
+          echo "Diff skip-base terhadap rilis sukses: $PREV_SHA"
+          git diff --name-only "$PREV_SHA" HEAD > build/android/changed_since_last_release.txt || true
+          wc -l build/android/changed_since_last_release.txt && head -12 build/android/changed_since_last_release.txt
+
       - name: Generate version.json Manifest
         run: |
           python3 tools/update_pipeline/make_manifest.py \
@@ -239,7 +252,8 @@ jobs:
             --base-name assets_v1.pck \
             --patch-name "$PATCH_NAME" \
             --apk-name InfiniteRunner-Lite.apk \
-            --changed-files build/android/changed_files.txt
+            --changed-files build/android/changed_files.txt \
+            --changed-files-skip-base build/android/changed_since_last_release.txt
 
       - name: APK Size Report (apk_report.txt)
         run: |
