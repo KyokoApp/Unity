@@ -95,6 +95,10 @@ public partial class MainCharacter : CharacterBody3D
 	public bool Initialized = false;
 	float _initWaitTimer = 0f;
 
+	// Properti diagnosa untuk Debug Overlay.
+	public long PhysicsTicks { get; private set; }
+	public float DebugSpeed => speed;
+
 	public bool hasGlided = false;
 
 	private float attackCooldown = 0.5f;
@@ -266,6 +270,7 @@ public partial class MainCharacter : CharacterBody3D
 
 	public override void _PhysicsProcess(double delta)
 	{
+		PhysicsTicks++;
 		if (Initialized)
 		{
 			float deltaFloat = (float)delta;
