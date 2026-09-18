@@ -149,6 +149,9 @@ jobs:
           echo "Base PCK size: $(stat -c%s build/android/assets_v1.pck) bytes"
           echo "Patch PCK size: $(stat -c%s build/android/$PATCH_NAME) bytes"
 
+          # Audit isi patch (dipublikasikan sebagai patch_report.txt di release).
+          python3 tools/update_pipeline/list_pck.py "build/android/$PATCH_NAME" | tee build/android/patch_report.txt
+
           PATCH_BYTES=$(stat -c%s "build/android/$PATCH_NAME")
           if [ "$PATCH_BYTES" -gt 26214400 ]; then
             echo "::warning::Patch pack ${PATCH_BYTES} byte (>25MB). Pertimbangkan RE-BASE assets_v1.pck (lihat docs/SISTEM_UPDATE.md)."
@@ -299,7 +302,7 @@ jobs:
             done
           fi
 
-          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/assets_v1.pck build/android/$PATCH_NAME build/android/version.json build/android/apk_report.txt"
+          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/assets_v1.pck build/android/$PATCH_NAME build/android/version.json build/android/apk_report.txt build/android/patch_report.txt"
           if gh release view android-apk >/dev/null 2>&1; then
             echo "Release android-apk exists, uploading assets..."
             gh release upload android-apk $RELEASE_FILES --clobber
