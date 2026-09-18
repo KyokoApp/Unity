@@ -5080,7 +5080,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Spotlight" type="Node3D" parent="." unique_id=1132396204]
-visible = false
+visible = true
 
 [node name="SpotLight3D" type="SpotLight3D" parent="Spotlight" unique_id=640430979]
 transform = Transform3D(-0.9991038, 0, 0.042328976, 0, 1, 0, -0.042328976, 0, -0.9991038, 0, 1.8170458, 0.39457458)

@@ -38,6 +38,12 @@ public partial class TouchInputManager : Node2D
         // Draw on canvas layer above game
         ZIndex = 100;
         QueueRedraw();
+
+        bool isMobile = OS.HasFeature("mobile") || OS.HasFeature("android") || DisplayServer.IsTouchscreenAvailable();
+        #if GODOT_ANDROID
+        isMobile = true;
+        #endif
+        Visible = isMobile;
     }
 
     public override void _Process(double delta)

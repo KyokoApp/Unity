@@ -63,11 +63,17 @@ namespace Bouncerock.UI
         {
             Instance = this;
             LoadingUI.Visible  = true;
-            MobileUI.Visible = false;
+            
+            // Show mobile controls on Android or TouchScreen devices
+            bool isMobile = OS.HasFeature("mobile") || OS.HasFeature("android") || DisplayServer.IsTouchscreenAvailable();
             #if GODOT_ANDROID
-			MobileUI.Visible = true;
-			#endif
-            //StartModules();
+            isMobile = true;
+            #endif
+            MobileUI.Visible = isMobile;
+
+            // Instantiate GraphicsSettingsManager (Settings Gear Button & Optimization Panel)
+            var settingsMgr = new GraphicsSettingsManager();
+            AddChild(settingsMgr);
         }
 
         protected void StartModules()

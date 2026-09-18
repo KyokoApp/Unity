@@ -532,13 +532,30 @@ public partial class MainCharacter : CharacterBody3D
 		// Get the input direction and handle the movement/deceleration.
 		// Supports keyboard, joypad, and dynamic mobile touch joystick analog vector.
 		Vector2 inputDir = Input.GetVector("ui_right", "ui_left", "ui_down", "ui_up");
-#if GODOT_ANDROID
 		if (touchInputManager != null && touchInputManager.MoveVector != Vector2.Zero)
 		{
+			// X: right/left, Y: forward/backward relative to camera view
 			inputDir = new Vector2(touchInputManager.MoveVector.X, -touchInputManager.MoveVector.Y);
 		}
-#endif
-		CurrentInput.Direction = (Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
+
+		// Calculate world direction relative to Camera orientation
+		Vector3 camFwd = -PlayerCamera.GlobalTransform.Basis.Z;
+		camFwd.Y = 0;
+		camFwd = camFwd.Normalized();
+		Vector3 camRight = PlayerCamera.GlobalTransform.Basis.X;
+		camRight.Y = 0;
+		camRight = camRight.Normalized();
+
+		Vector3 moveWorldDir = (camRight * inputDir.X + camFwd * inputDir.Y).Normalized();
+		CurrentInput.Direction = moveWorldDir;
+
+		// Smoothly rotate character mesh/body towards movement direction
+		if (moveWorldDir != Vector3.Zero)
+		{
+			float targetAngle = Mathf.Atan2(-moveWorldDir.X, -moveWorldDir.Z);
+			float currentAngle = Rotation.Y;
+			Rotation = new Vector3(Rotation.X, Mathf.LerpAngle(currentAngle, targetAngle, deltaFloat * 10f), Rotation.Z);
+		}
 		if (IsOnFloor())
 		{
 			if (Action > 0)
@@ -628,20 +645,7 @@ public partial class MainCharacter : CharacterBody3D
 		}
 		PlayerCamera.Fov = Mathf.Lerp(PlayerCamera.Fov, targetFov, fovLerpTime * deltaFloat);
 
-		Vector3 rotateCam = new Vector3(cam_rot_x, CameraPivot.RotationDegrees.Y, CameraPivot.RotationDegrees.Z);
-		//this.RotationDegrees = this.RotationDegrees * (Vector3.up * 
-		Vector3 rotateChar = new Vector3(RotationDegrees.X, cam_rot_y, RotationDegrees.Z);
-		//CameraPivot.RotationDegrees = rotateChar;
-		if (CurrentAction != CharacterActions.Sitting)
-		{
-			RotationDegrees = rotateCam;
-			RotateY(Mathf.DegToRad(cam_rot_y));
-		}
-		if (CurrentAction == CharacterActions.Sitting)
-		{
-			//RotationDegrees = rotateCam;
-			//CameraPivot.RotateY(Mathf.DegToRad(cam_rot_y));
-		}
+		CameraPivot.RotationDegrees = new Vector3(cam_rot_x, cam_rot_y, 0);
 		//Rotation = (rotate.X);
 
 		//RotateObjectLocal(Vector3.Right, Mathf.DegToRad(-pitch));
