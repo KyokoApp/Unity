@@ -1,88 +1,67 @@
 shader_type spatial;
-render_mode depth_draw_opaque, cull_back,
-            diffuse_burley, specular_schlick_ggx;
+render_mode depth_draw_opaque, cull_back, diffuse_toon, specular_schlick_ggx;
 
-/* ────────  Layer 0  ──────── */
-uniform sampler2D albedo0 : source_color;
-uniform sampler2D normal0 : hint_normal;
-uniform sampler2D rough0;          // R channel = roughness
+/* ══════════════════════════════════════════════════════════════════════
+   Genshin / Anime Style Stylized Gradient Terrain Shader
+   - Zero heavy textures (smooth, vibrant anime aesthetic)
+   - Smooth non-clashing color gradients
+   - Vertex weight & slope blending (Dark Green -> Grass Green -> Earth / Sand)
+   ══════════════════════════════════════════════════════════════════════ */
 
-/* ────────  Layer 1  ──────── */
-uniform sampler2D albedo1 : source_color;
-uniform sampler2D normal1 : hint_normal;
-uniform sampler2D rough1;
+// Stylized Anime Palette (Vibrant, soft & harmonious like Genshin Impact / Zelda BotW)
+uniform vec4 grass_dark_color   : source_color = vec4(0.18, 0.45, 0.22, 1.0); // Soft deep forest green
+uniform vec4 grass_bright_color : source_color = vec4(0.38, 0.68, 0.28, 1.0); // Vibrant meadow grass green
+uniform vec4 grass_light_color  : source_color = vec4(0.55, 0.78, 0.35, 1.0); // Sunlit warm light green
+uniform vec4 soil_color         : source_color = vec4(0.52, 0.44, 0.34, 1.0); // Soft warm earth brown
+uniform vec4 sand_color         : source_color = vec4(0.76, 0.68, 0.50, 1.0); // Warm sunny sand
 
-/* ────────  Layer 2  ──────── */
-uniform sampler2D albedo2 : source_color;
-uniform sampler2D normal2 : hint_normal;
-uniform sampler2D rough2;
+// Slope & Height transition thresholds
+uniform float slope_threshold   : hint_range(0.0, 1.0) = 0.65;
+uniform float slope_smoothness  : hint_range(0.01, 0.5) = 0.20;
 
-/* ────────  Mapping & global controls  ──────── */
-/* Exactly 1 per mask row; change these to rewire rgb layers */
-uniform vec3 channel_mask0 = vec3(1.0, 0.0, 0.0);   // default: R
-uniform vec3 channel_mask1 = vec3(0.0, 1.0, 0.0);   // default: G
-uniform vec3 channel_mask2 = vec3(0.0, 0.0, 1.0);   // default: B
+// World detail subtle variation (creates soft painterly field patches without texture files)
+varying vec3 v_world_pos;
+varying vec3 v_world_normal;
 
-uniform float uv_scale        : hint_range(0.1, 32.0) = 4.0;
-uniform float normal_strength : hint_range(0.0,  2.0) = 1.0;
-uniform float rough_strength  : hint_range(0.0,  2.0) = 1.0;
-
-uniform bool  invert_normal_y = false;   // flip green ”
-uniform bool  invert_roughness = false;  // set true if black = rough
-
-/* ───────────────────────────────────────────── */
+void vertex() {
+    v_world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+    v_world_normal = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+}
 
 void fragment() {
-    /* 1.  Compute weights */
+    // 1. Procedural subtle anime color gradation across world space (wind / patch gradient)
+    float world_noise = sin(v_world_pos.x * 0.08) * cos(v_world_pos.z * 0.08) * 0.5 + 0.5;
+    float micro_noise = sin(v_world_pos.x * 0.25 + v_world_pos.z * 0.25) * 0.5 + 0.5;
+    float grass_gradient = clamp(world_noise * 0.7 + micro_noise * 0.3, 0.0, 1.0);
+
+    // 2. Smooth gradient from deep green -> vibrant grass -> sunlit grass
+    vec3 lush_grass = mix(grass_dark_color.rgb, grass_bright_color.rgb, grass_gradient);
+    vec3 sunny_grass = mix(lush_grass, grass_light_color.rgb, clamp(v_world_pos.y * 0.02, 0.0, 0.4));
+
+    // 3. Slope calculation: Steep slopes smoothly reveal soil / cliff rock
+    float up_dot = clamp(v_world_normal.y, 0.0, 1.0);
+    float slope_factor = smoothstep(slope_threshold - slope_smoothness, slope_threshold + slope_smoothness, up_dot);
+
+    // 4. Vertex color weights (R = mud/soil, G = grass, B = sand/beach)
     vec3 vtx = COLOR.rgb;
-    vec3 w;
-    w.x = dot(vtx, channel_mask0);   // weight for layer0
-    w.y = dot(vtx, channel_mask1);   // weight for layer1
-    w.z = dot(vtx, channel_mask2);   // weight for layer2
+    float grass_weight = vtx.g;
+    float soil_weight = vtx.r;
+    float sand_weight = vtx.b;
+    float total_w = max(grass_weight + soil_weight + sand_weight, 0.001);
+    grass_weight /= total_w;
+    soil_weight /= total_w;
+    sand_weight /= total_w;
 
-    float sum = max(w.x + w.y + w.z, 0.001);
-    w /= sum;                        // renormalise
+    // Blend soil and sand with earth color
+    vec3 ground_color = mix(soil_color.rgb, sand_color.rgb, sand_weight);
 
-    /* 2.  UV tiling */
-    vec2 uv = UV * uv_scale;
+    // 5. Harmonious final blend: Grass smoothly fades into soil on slopes or where soil vertex weight is high
+    vec3 final_color = mix(ground_color, sunny_grass, slope_factor * grass_weight);
+    
+    // Also blend sand smoothly at low altitudes or where sand weight dominates
+    final_color = mix(final_color, sand_color.rgb, sand_weight * 0.6);
 
-    /* 3.  Albedo */
-    vec3 a0 = texture(albedo0, uv).rgb;
-    vec3 a1 = texture(albedo1, uv).rgb;
-    vec3 a2 = texture(albedo2, uv).rgb;
-    ALBEDO = a0 * w.x + a1 * w.y + a2 * w.z;
-
-    /* ── 4.  NORMALS  ──────────────────────────────────────────────── */
-vec3 base_N = NORMAL;                          // geometric normal (world)
-
-mat3 tbn = mat3( normalize(TANGENT),
-                 normalize(BINORMAL),         // BINORMAL in older builds
-                 base_N );
-
-vec3 ts0 = texture(normal0, uv).xyz * 2.0 - 1.0;   // tangentspace
-vec3 ts1 = texture(normal1, uv).xyz * 2.0 - 1.0;
-vec3 ts2 = texture(normal2, uv).xyz * 2.0 - 1.0;
-
-if (invert_normal_y) { ts0.y = -ts0.y; ts1.y = -ts1.y; ts2.y = -ts2.y; }
-
-vec3 ws0 = normalize(tbn * ts0);               // to world space
-vec3 ws1 = normalize(tbn * ts1);
-vec3 ws2 = normalize(tbn * ts2);
-
-vec3 blended_ws = normalize(ws0 * w.x + ws1 * w.y + ws2 * w.z);
-
-/* Spherically blend with the geometric normal so vector stays */
-vec3 final_N = normalize( mix(base_N, blended_ws, normal_strength) );
-NORMAL = final_N;
-
-    /* 5.  Roughness  */
-    float r0 = texture(rough0, uv).r;
-    float r1 = texture(rough1, uv).r;
-    float r2 = texture(rough2, uv).r;
-    float rough = r0 * w.x + r1 * w.y + r2 * w.z;
-    if (invert_roughness) rough = 1.0 - rough;
-    ROUGHNESS = clamp(pow(rough, 2.0) * rough_strength, 0.04, 1.0);
-
-    /* 6.  Specular is just a constant */
-    SPECULAR = 0.5;
+    ALBEDO = final_color;
+    ROUGHNESS = 0.85;
+    SPECULAR = 0.15;
 }
