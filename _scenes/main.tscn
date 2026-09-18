@@ -13,6 +13,7 @@
 [ext_resource type="Texture2D" uid="uid://ctw7uwu7jh871" path="res://materials/textures/br/logo.png" id="10_7kglf"]
 [ext_resource type="Shader" uid="uid://cqnkjxmmne051" path="res://materials/shaders/canvas_tweakable_base.gdshader" id="10_g15ir"]
 
+[ext_resource type="Script" path="res://_script/ui/AnimeActionTouchButton.cs" id="11_action"]
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_hi6yo"]
 shader = ExtResource("7_urak4")
 shader_parameter/blur_sharp = -5.0
@@ -428,103 +429,88 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -40.0
-offset_top = -40.0
+offset_left = -400.0
+offset_top = -400.0
+offset_right = 0.0
+offset_bottom = 0.0
 grow_horizontal = 0
 grow_vertical = 0
+mouse_filter = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="UI/Control2" unique_id=1008998373]
+[node name="AttackButton" type="Control" parent="UI/Control2" unique_id=113595026]
 layout_mode = 0
-offset_left = -515.0
-offset_top = -479.0
-offset_right = -15.0
-offset_bottom = -9.0
-theme_override_constants/separation = 10
+offset_left = 220.0
+offset_top = 220.0
+offset_right = 360.0
+offset_bottom = 360.0
+script = ExtResource("11_action")
+ActionName = "attack"
+LabelText = "ATK"
+FontSize = 32
+ButtonRadius = 65.0
+BaseColor = Color(1, 1, 1, 0.28)
+PressedColor = Color(1, 1, 1, 0.55)
+BorderColor = Color(1, 1, 1, 0.85)
 
-[node name="PanelContainer" type="PanelContainer" parent="UI/Control2/VBoxContainer" unique_id=375256759]
-custom_minimum_size = Vector2(500, 150)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_hi6yo")
+[node name="JumpButton" type="Control" parent="UI/Control2" unique_id=1053755752]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 240.0
+offset_right = 190.0
+offset_bottom = 350.0
+script = ExtResource("11_action")
+ActionName = "jump"
+LabelText = "JUMP"
+FontSize = 24
+ButtonRadius = 52.0
+BaseColor = Color(1, 1, 1, 0.22)
+PressedColor = Color(1, 1, 1, 0.50)
+BorderColor = Color(1, 1, 1, 0.75)
 
-[node name="JumpButton" type="TouchScreenButton" parent="UI/Control2/VBoxContainer/PanelContainer" unique_id=1053755752]
-position = Vector2(253, 76)
-shape = SubResource("RectangleShape2D_urak4")
-action = "jump"
-visibility_mode = 1
+[node name="DashButton" type="Control" parent="UI/Control2" unique_id=862352751]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 80.0
+offset_right = 350.0
+offset_bottom = 190.0
+script = ExtResource("11_action")
+ActionName = "run"
+LabelText = "DASH"
+FontSize = 24
+ButtonRadius = 52.0
+BaseColor = Color(1, 1, 1, 0.22)
+PressedColor = Color(1, 1, 1, 0.50)
+BorderColor = Color(1, 1, 1, 0.75)
 
-[node name="Label" type="Label" parent="UI/Control2/VBoxContainer/PanelContainer/JumpButton" unique_id=1837346428]
-offset_left = -68.0
-offset_top = -32.0
-offset_right = 61.0
-offset_bottom = 37.0
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
-theme_override_font_sizes/font_size = 50
-text = "JUMP"
+[node name="FlyButton" type="Control" parent="UI/Control2" unique_id=1345775207]
+layout_mode = 0
+offset_left = 110.0
+offset_top = 110.0
+offset_right = 210.0
+offset_bottom = 210.0
+script = ExtResource("11_action")
+ActionName = "fly"
+LabelText = "FLY"
+FontSize = 22
+ButtonRadius = 46.0
+BaseColor = Color(1, 1, 1, 0.20)
+PressedColor = Color(1, 1, 1, 0.50)
+BorderColor = Color(1, 1, 1, 0.70)
 
-[node name="HBoxContainer" type="HBoxContainer" parent="UI/Control2/VBoxContainer" unique_id=2020449644]
-layout_mode = 2
-
-[node name="PanelContainer2" type="PanelContainer" parent="UI/Control2/VBoxContainer/HBoxContainer" unique_id=1797652395]
-custom_minimum_size = Vector2(245, 150)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_hi6yo")
-
-[node name="JumpButton" type="TouchScreenButton" parent="UI/Control2/VBoxContainer/HBoxContainer/PanelContainer2" unique_id=113595026]
-position = Vector2(124, 75)
-shape = SubResource("RectangleShape2D_hi6yo")
-action = "attack"
-visibility_mode = 1
-
-[node name="Label" type="Label" parent="UI/Control2/VBoxContainer/HBoxContainer/PanelContainer2/JumpButton" unique_id=1768055359]
-offset_left = -132.0
-offset_top = -33.0
-offset_right = 150.0
-offset_bottom = 36.0
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
-theme_override_font_sizes/font_size = 50
-text = "CRATES"
-horizontal_alignment = 1
-
-[node name="PanelContainer3" type="PanelContainer" parent="UI/Control2/VBoxContainer/HBoxContainer" unique_id=1063132736]
-custom_minimum_size = Vector2(245, 150)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_hi6yo")
-
-[node name="JumpButton" type="TouchScreenButton" parent="UI/Control2/VBoxContainer/HBoxContainer/PanelContainer3" unique_id=2094996649]
-position = Vector2(124, 75)
-shape = SubResource("RectangleShape2D_hi6yo")
-action = "torch"
-visibility_mode = 1
-
-[node name="Label" type="Label" parent="UI/Control2/VBoxContainer/HBoxContainer/PanelContainer3/JumpButton" unique_id=1388124890]
-offset_left = -132.0
-offset_top = -33.0
-offset_right = 150.0
-offset_bottom = 36.0
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
-theme_override_font_sizes/font_size = 50
-text = "LIGHT"
-horizontal_alignment = 1
-
-[node name="PanelContainer3" type="PanelContainer" parent="UI/Control2/VBoxContainer" unique_id=862352751]
-custom_minimum_size = Vector2(500, 150)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_hi6yo")
-
-[node name="JumpButton" type="TouchScreenButton" parent="UI/Control2/VBoxContainer/PanelContainer3" unique_id=1345775207]
-position = Vector2(250, 71)
-shape = SubResource("RectangleShape2D_urak4")
-action = "fly"
-visibility_mode = 1
-
-[node name="Label" type="Label" parent="UI/Control2/VBoxContainer/PanelContainer3/JumpButton" unique_id=849095927]
-offset_left = -50.0
-offset_top = -35.0
-offset_right = 79.0
-offset_bottom = 34.0
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
-theme_override_font_sizes/font_size = 50
-text = "FLY"
+[node name="LightButton" type="Control" parent="UI/Control2" unique_id=2094996649]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 150.0
+offset_right = 100.0
+offset_bottom = 230.0
+script = ExtResource("11_action")
+ActionName = "torch"
+LabelText = "LIGHT"
+FontSize = 18
+ButtonRadius = 38.0
+BaseColor = Color(1, 1, 1, 0.18)
+PressedColor = Color(1, 1, 1, 0.45)
+BorderColor = Color(1, 1, 1, 0.65)
 
 [node name="Control3" type="Control" parent="UI" unique_id=973035803 node_paths=PackedStringArray("MinimapTexture", "ImagesContainer")]
 visible = false

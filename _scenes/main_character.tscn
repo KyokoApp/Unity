@@ -4977,9 +4977,12 @@ skin = SubResource("Skin_sd48s")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1205872868]
 root_motion_track = NodePath("RobotArmature/Skeleton3D:spine")
-libraries/ = SubResource("AnimationLibrary_qujj8")
+libraries = {
+&"": SubResource("AnimationLibrary_qujj8")
+}
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1724813824]
+active = true
 tree_root = SubResource("AnimationNodeStateMachine_5wvc5")
 anim_player = NodePath("../AnimationPlayer")
 parameters/conditions/falling = false
@@ -5052,7 +5055,7 @@ gi_mode = 0
 mesh = SubResource("QuadMesh_nd5cu")
 surface_material_override/0 = SubResource("StandardMaterial3D_sb554")
 
-[node name="TouchInputManager" type="Node" parent="." unique_id=458362263]
+[node name="TouchInputManager" type="Node2D" parent="." unique_id=458362263]
 script = ExtResource("3_jo1m3")
 
 [node name="Node" type="Node" parent="." unique_id=1552509476]

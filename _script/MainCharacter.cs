@@ -530,8 +530,14 @@ public partial class MainCharacter : CharacterBody3D
 		}
 
 		// Get the input direction and handle the movement/deceleration.
-		// As good practice, you should replace UI actions with custom gameplay actions.
+		// Supports keyboard, joypad, and dynamic mobile touch joystick analog vector.
 		Vector2 inputDir = Input.GetVector("ui_right", "ui_left", "ui_down", "ui_up");
+#if GODOT_ANDROID
+		if (touchInputManager != null && touchInputManager.MoveVector != Vector2.Zero)
+		{
+			inputDir = new Vector2(touchInputManager.MoveVector.X, -touchInputManager.MoveVector.Y);
+		}
+#endif
 		CurrentInput.Direction = (Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
 		if (IsOnFloor())
 		{

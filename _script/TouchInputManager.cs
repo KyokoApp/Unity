@@ -2,40 +2,43 @@
 /// This script is part of the project "Infinite Runner", a procedural generation project
 /// By Adrien Pierret
 /// 
-/// TouchInputManager: Mobile controls.
-/// ///////////////////////////////////////////////////////////////////////////////////////
+/// TouchInputManager: Mobile dynamic analog joystick & camera touch controls.
+/// Anime / Mobile Action RPG style floating analog joystick.
+///////////////////////////////////////////////////////////////////////////////////////////
 
 using Godot;
 using System.Collections.Generic;
 
-public partial class TouchInputManager : Node
+public partial class TouchInputManager : Node2D
 {
-    //quick and probably flawed mobile movement managers for touch screens
-    #if GODOT_ANDROID
-    private Dictionary<int, Vector2> activeTouches = new Dictionary<int, Vector2>(); // Track multiple touches
-    private int movementTouchIndex = -1; 
-    private int cameraTouchIndex = -1;   
+    private Dictionary<int, Vector2> activeTouches = new Dictionary<int, Vector2>();
+    private int movementTouchIndex = -1;
+    private int cameraTouchIndex = -1;
 
-    private Vector2 movementStartPos = Vector2.Zero;
-    //private Vector2 cameraStartPos = Vector2.Zero;
-    private bool isDraggingMovement = false;
-    private bool isDraggingCamera = false;
+    // Joystick visual & control parameters
+    private Vector2 joystickCenter = Vector2.Zero;
+    private Vector2 joystickCurrentPos = Vector2.Zero;
+    private bool isJoystickActive = false;
 
-    [Export] public float DragThreshold = 50f; // Min distance to register movement
-     [Export] public float RunThreshold = 350f; // Min distance to register ruuuuuuun
+    [Export] public float JoystickRadius = 120f;
+    [Export] public float JoystickDeadzone = 12f;
+    [Export] public float DragThreshold = 20f;
+    [Export] public float RunThreshold = 85f; // Distance from center to trigger sprinting
 
     public Vector2 CameraRotationAxis { get; private set; } = Vector2.Zero;
     private Dictionary<string, bool> activeActions = new Dictionary<string, bool>();
 
-    Vector2  lastCameraTouchPos = Vector2.Zero;
-    private bool isFirstCameraTouch = true;
+    private Vector2 lastCameraTouchPos = Vector2.Zero;
 
-    // Double-tap jump settings
-    [Export] public ulong DoubleTapIntervalMs = 300; // Max duration in milliseconds between taps
-    [Export] public float DoubleTapDistanceThreshold = 50f; // Max distance in pixels between taps
-    private ulong lastTapTime = 0;
-    private Vector2 lastTapPosition = Vector2.Zero;
-    private bool isJumping = false;
+    // Analog directional input vector (-1 to 1)
+    public Vector2 MoveVector { get; private set; } = Vector2.Zero;
+
+    public override void _Ready()
+    {
+        // Draw on canvas layer above game
+        ZIndex = 100;
+        QueueRedraw();
+    }
 
     public override void _Process(double delta)
     {
@@ -47,12 +50,37 @@ public partial class TouchInputManager : Node
             else
                 Input.ActionRelease(action.Key);
         }
+    }
 
-        if (isJumping)
+    public override void _Draw()
+    {
+        if (!isJoystickActive) return;
+
+        // Modern Anime RPG translucent aesthetic (white translucent rings and glowing thumb knob)
+        Color ringColor = new Color(1f, 1f, 1f, 0.22f);
+        Color ringBorderColor = new Color(1f, 1f, 1f, 0.55f);
+        Color innerRingColor = new Color(1f, 1f, 1f, 0.25f);
+        Color knobFill = new Color(1f, 1f, 1f, 0.65f);
+        Color knobBorder = new Color(1f, 1f, 1f, 0.95f);
+
+        // Outer base background circle
+        DrawCircle(joystickCenter, JoystickRadius, ringColor);
+        // Outer ring border
+        DrawArc(joystickCenter, JoystickRadius, 0, Mathf.Tau, 64, ringBorderColor, 2.5f, true);
+
+        // Decorative middle guideline circle
+        DrawArc(joystickCenter, JoystickRadius * 0.5f, 0, Mathf.Tau, 48, innerRingColor, 1.2f, true);
+
+        // Line connecting center to knob
+        if (joystickCurrentPos.DistanceTo(joystickCenter) > 4f)
         {
-            Input.ActionRelease("jump");
-            isJumping = false;
+            DrawLine(joystickCenter, joystickCurrentPos, new Color(1f, 1f, 1f, 0.35f), 2f, true);
         }
+
+        // Joystick knob (draggable thumb)
+        float knobRadius = JoystickRadius * 0.35f;
+        DrawCircle(joystickCurrentPos, knobRadius, knobFill);
+        DrawArc(joystickCurrentPos, knobRadius, 0, Mathf.Tau, 48, knobBorder, 2.5f, true);
     }
 
     public override void _Input(InputEvent @event)
@@ -61,11 +89,12 @@ public partial class TouchInputManager : Node
         {
             if (touchEvent.Pressed)
             {
-                CheckDoubleTap(touchEvent.Position);
                 OnTouchStart(touchEvent.Position, touchEvent.Index);
             }
             else
+            {
                 OnTouchEnd(touchEvent.Index);
+            }
         }
         else if (@event is InputEventScreenDrag dragEvent)
         {
@@ -73,48 +102,28 @@ public partial class TouchInputManager : Node
         }
     }
 
-    private void CheckDoubleTap(Vector2 position)
-    {
-        ulong currentTime = Time.GetTicksMsec();
-        if (currentTime - lastTapTime <= DoubleTapIntervalMs && position.DistanceTo(lastTapPosition) <= DoubleTapDistanceThreshold)
-        {
-            TriggerJump();
-            lastTapTime = 0; // Reset after successful double-tap
-        }
-        else
-        {
-            lastTapTime = currentTime;
-            lastTapPosition = position;
-        }
-    }
-
-    private void TriggerJump()
-    {
-        Input.ActionPress("jump");
-        isJumping = true;
-    }
-
     private void OnTouchStart(Vector2 position, int index)
     {
         float screenWidth = GetViewport().GetVisibleRect().Size.X;
 
-        if (position.X < screenWidth / 2) // Left side: Movement
+        // Left 50% screen width: Dynamic Floating Analog Joystick
+        if (position.X < screenWidth * 0.5f)
         {
-            if (movementTouchIndex == -1) // Only track one movement touch
+            if (movementTouchIndex == -1)
             {
                 movementTouchIndex = index;
-                movementStartPos = position;
-                isDraggingMovement = true;
+                joystickCenter = position;
+                joystickCurrentPos = position;
+                isJoystickActive = true;
+                QueueRedraw();
             }
         }
-        else // Right side: Camera Control
+        else // Right 50% screen: Camera Rotation
         {
-            if (cameraTouchIndex == -1) // Only track one camera touch
+            if (cameraTouchIndex == -1)
             {
-
                 cameraTouchIndex = index;
                 lastCameraTouchPos = position;
-                isDraggingCamera = true;
             }
         }
 
@@ -123,20 +132,20 @@ public partial class TouchInputManager : Node
 
     private void OnTouchEnd(int index)
     {
-        if (index == movementTouchIndex) // Only stop movement if this was the movement touch
+        if (index == movementTouchIndex)
         {
             StopMovement();
             Input.ActionRelease("run");
             movementTouchIndex = -1;
-            isDraggingMovement = false;
+            isJoystickActive = false;
+            MoveVector = Vector2.Zero;
+            QueueRedraw();
         }
 
-        if (index == cameraTouchIndex) // Only stop camera control if this was the camera touch
+        if (index == cameraTouchIndex)
         {
             CameraRotationAxis = Vector2.Zero;
-            //lastCameraTouchPos = Vector2.Zero;
             cameraTouchIndex = -1;
-            isDraggingCamera = false;
         }
 
         activeTouches.Remove(index);
@@ -144,52 +153,91 @@ public partial class TouchInputManager : Node
 
     private void OnTouchDrag(Vector2 position, int index)
     {
-       
-        if (index == movementTouchIndex && isDraggingMovement)
+        if (index == movementTouchIndex && isJoystickActive)
         {
-            Vector2 delta = position - movementStartPos;
-            if (delta.Length() < DragThreshold) return; 
-            string action = GetMoveDirection(delta);
-            if (delta.Length() > RunThreshold) {Input.ActionPress("run");}
-            else {Input.ActionRelease("run");}
-            if (action != null)
-                StartAction(action);
-        }
-        else if (index == cameraTouchIndex && isDraggingCamera) 
-        {
-            /*if (isFirstCameraTouch)
+            Vector2 offset = position - joystickCenter;
+            float dist = offset.Length();
+
+            // Clamp knob within JoystickRadius
+            if (dist > JoystickRadius)
             {
-                isFirstCameraTouch = false;
-            }*/
+                joystickCurrentPos = joystickCenter + offset.Normalized() * JoystickRadius;
+            }
+            else
+            {
+                joystickCurrentPos = position;
+            }
 
-            Vector2 delta = position - lastCameraTouchPos; 
-            float cameraSensitivity = 0.05f; 
-            GD.Print("axis" + CameraRotationAxis);
-            CameraRotationAxis = new Vector2(-delta.X * cameraSensitivity, -delta.Y * cameraSensitivity);
-            //lastCameraRotationAxis = CameraRotationAxis;
-            lastCameraTouchPos = position; 
+            QueueRedraw();
+
+            if (dist < JoystickDeadzone)
+            {
+                StopMovement();
+                Input.ActionRelease("run");
+                MoveVector = Vector2.Zero;
+                return;
+            }
+
+            Vector2 dir = offset.Normalized();
+            MoveVector = dir * Mathf.Clamp((dist - JoystickDeadzone) / (JoystickRadius - JoystickDeadzone), 0f, 1f);
+
+            // Sprinting check
+            if (dist >= RunThreshold)
+            {
+                Input.ActionPress("run");
+            }
+            else
+            {
+                Input.ActionRelease("run");
+            }
+
+            // Map continuous direction to standard 4-way UI actions
+            UpdateDirectionalActions(dir);
         }
-            
-
+        else if (index == cameraTouchIndex)
+        {
+            Vector2 delta = position - lastCameraTouchPos;
+            float cameraSensitivity = 0.05f;
+            CameraRotationAxis = new Vector2(-delta.X * cameraSensitivity, -delta.Y * cameraSensitivity);
+            lastCameraTouchPos = position;
+        }
     }
 
-    private void OnTouchRelease(int index)
-{
-   /* if (index == cameraTouchIndex)
+    private void UpdateDirectionalActions(Vector2 dir)
     {
-        isFirstCameraTouch = true; 
-    }*/
-}
+        // Smooth analog mapping: threshold 0.35 allows diagonal movement
+        float threshold = 0.35f;
 
-    private string GetMoveDirection(Vector2 delta)
-    {
-        if (Mathf.Abs(delta.X) > Mathf.Abs(delta.Y)) // Horizontal movement
+        if (dir.X > threshold)
         {
-            return delta.X > 0 ? "ui_right" : "ui_left";
+            StartAction("ui_right");
+            StopAction("ui_left");
         }
-        else // Vertical movement
+        else if (dir.X < -threshold)
         {
-            return delta.Y > 0 ? "ui_down" : "ui_up";
+            StartAction("ui_left");
+            StopAction("ui_right");
+        }
+        else
+        {
+            StopAction("ui_right");
+            StopAction("ui_left");
+        }
+
+        if (dir.Y > threshold)
+        {
+            StartAction("ui_down");
+            StopAction("ui_up");
+        }
+        else if (dir.Y < -threshold)
+        {
+            StartAction("ui_up");
+            StopAction("ui_down");
+        }
+        else
+        {
+            StopAction("ui_down");
+            StopAction("ui_up");
         }
     }
 
@@ -210,5 +258,4 @@ public partial class TouchInputManager : Node
     {
         activeActions[actionName] = false;
     }
-    #endif
 }
