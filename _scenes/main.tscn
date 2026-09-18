@@ -186,12 +186,15 @@ TimeOfDay = NodePath("PanelContainer5/HBoxContainer/Label2")
 layout_mode = 1
 
 [node name="PanelContainer3" type="PanelContainer" parent="UI/ScreenSpaceUI" unique_id=1676788873]
-layout_mode = 0
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
 offset_left = 20.0
-offset_top = 591.0
+offset_top = -60.0
 offset_right = 204.365
-offset_bottom = 631.0
-grow_horizontal = 2
+offset_bottom = -20.0
+grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_lavtb")
 
 [node name="BlurPass" type="TextureRect" parent="UI/ScreenSpaceUI/PanelContainer3" unique_id=113963546]
@@ -215,12 +218,15 @@ size_flags_horizontal = 3
 text = "0"
 
 [node name="PanelContainer5" type="PanelContainer" parent="UI/ScreenSpaceUI" unique_id=1693749222]
-layout_mode = 0
-offset_left = 211.0
-offset_top = 591.0
-offset_right = 395.365
-offset_bottom = 631.0
-grow_horizontal = 2
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 215.0
+offset_top = -60.0
+offset_right = 399.365
+offset_bottom = -20.0
+grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_lavtb")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="UI/ScreenSpaceUI/PanelContainer5" unique_id=1399970140]
@@ -423,7 +429,7 @@ size_flags_horizontal = 3
 text = "Version 1.0a"
 
 [node name="Control2" type="Control" parent="UI" unique_id=1007481590]
-visible = false
+visible = true
 layout_mode = 3
 anchors_preset = 3
 anchor_left = 1.0

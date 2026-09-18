@@ -10,7 +10,13 @@ config/icon="res://icon.svg"
 
 [display]
 
+window/size/viewport_width=1152
+window/size/viewport_height=648
+window/size/mode=0
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 window/handheld/orientation=0
+input_devices/pointing/emulate_touch_from_mouse=true
 
 [dotnet]
 

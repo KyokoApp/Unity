@@ -37,13 +37,8 @@ public partial class TouchInputManager : Node2D
     {
         // Draw on canvas layer above game
         ZIndex = 100;
+        Visible = true;
         QueueRedraw();
-
-        bool isMobile = OS.HasFeature("mobile") || OS.HasFeature("android") || DisplayServer.IsTouchscreenAvailable();
-        #if GODOT_ANDROID
-        isMobile = true;
-        #endif
-        Visible = isMobile;
     }
 
     public override void _Process(double delta)
@@ -60,33 +55,42 @@ public partial class TouchInputManager : Node2D
 
     public override void _Draw()
     {
-        if (!isJoystickActive) return;
+        Vector2 center = joystickCenter;
+        Vector2 knob = joystickCurrentPos;
+
+        if (!isJoystickActive)
+        {
+            // Default idle joystick anchor at bottom-left corner
+            Vector2 viewportSize = GetViewportRect().Size;
+            center = new Vector2(160, viewportSize.Y - 160);
+            knob = center;
+        }
 
         // Modern Anime RPG translucent aesthetic (white translucent rings and glowing thumb knob)
-        Color ringColor = new Color(1f, 1f, 1f, 0.22f);
-        Color ringBorderColor = new Color(1f, 1f, 1f, 0.55f);
-        Color innerRingColor = new Color(1f, 1f, 1f, 0.25f);
-        Color knobFill = new Color(1f, 1f, 1f, 0.65f);
-        Color knobBorder = new Color(1f, 1f, 1f, 0.95f);
+        Color ringColor = isJoystickActive ? new Color(1f, 1f, 1f, 0.25f) : new Color(1f, 1f, 1f, 0.12f);
+        Color ringBorderColor = isJoystickActive ? new Color(1f, 1f, 1f, 0.65f) : new Color(1f, 1f, 1f, 0.30f);
+        Color innerRingColor = isJoystickActive ? new Color(1f, 1f, 1f, 0.30f) : new Color(1f, 1f, 1f, 0.15f);
+        Color knobFill = isJoystickActive ? new Color(1f, 1f, 1f, 0.70f) : new Color(1f, 1f, 1f, 0.25f);
+        Color knobBorder = isJoystickActive ? new Color(1f, 1f, 1f, 0.95f) : new Color(1f, 1f, 1f, 0.45f);
 
         // Outer base background circle
-        DrawCircle(joystickCenter, JoystickRadius, ringColor);
+        DrawCircle(center, JoystickRadius, ringColor);
         // Outer ring border
-        DrawArc(joystickCenter, JoystickRadius, 0, Mathf.Tau, 64, ringBorderColor, 2.5f, true);
+        DrawArc(center, JoystickRadius, 0, Mathf.Tau, 64, ringBorderColor, 2.5f, true);
 
         // Decorative middle guideline circle
-        DrawArc(joystickCenter, JoystickRadius * 0.5f, 0, Mathf.Tau, 48, innerRingColor, 1.2f, true);
+        DrawArc(center, JoystickRadius * 0.5f, 0, Mathf.Tau, 48, innerRingColor, 1.2f, true);
 
         // Line connecting center to knob
-        if (joystickCurrentPos.DistanceTo(joystickCenter) > 4f)
+        if (isJoystickActive && knob.DistanceTo(center) > 4f)
         {
-            DrawLine(joystickCenter, joystickCurrentPos, new Color(1f, 1f, 1f, 0.35f), 2f, true);
+            DrawLine(center, knob, new Color(1f, 1f, 1f, 0.35f), 2f, true);
         }
 
         // Joystick knob (draggable thumb)
         float knobRadius = JoystickRadius * 0.35f;
-        DrawCircle(joystickCurrentPos, knobRadius, knobFill);
-        DrawArc(joystickCurrentPos, knobRadius, 0, Mathf.Tau, 48, knobBorder, 2.5f, true);
+        DrawCircle(knob, knobRadius, knobFill);
+        DrawArc(knob, knobRadius, 0, Mathf.Tau, 48, knobBorder, 2.5f, true);
     }
 
     public override void _Input(InputEvent @event)

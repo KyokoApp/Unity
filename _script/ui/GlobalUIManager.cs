@@ -62,14 +62,17 @@ namespace Bouncerock.UI
         public override void _Ready()
         {
             Instance = this;
-            LoadingUI.Visible  = true;
+            if (LoadingUI != null)
+            {
+                LoadingUI.Visible = true;
+            }
             
-            // Show mobile controls on Android or TouchScreen devices
-            bool isMobile = OS.HasFeature("mobile") || OS.HasFeature("android") || DisplayServer.IsTouchscreenAvailable();
-            #if GODOT_ANDROID
-            isMobile = true;
-            #endif
-            MobileUI.Visible = isMobile;
+            // Always ensure MobileUI is visible on Android, mobile, or touchscreen
+            if (MobileUI != null)
+            {
+                MobileUI.Visible = true;
+                MobileUI.MouseFilter = Control.MouseFilterEnum.Ignore;
+            }
 
             // Instantiate GraphicsSettingsManager (Settings Gear Button & Optimization Panel)
             var settingsMgr = new GraphicsSettingsManager();
