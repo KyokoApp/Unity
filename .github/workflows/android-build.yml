@@ -81,13 +81,12 @@ jobs:
           echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=androiddebugkey" >> $GITHUB_ENV
           echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=android" >> $GITHUB_ENV
 
-      - name: Setup App Icon
+      - name: Setup App Icon and Character Project Assets
         run: |
           ICON_URL="https://c.termai.cc/a149/Q71XDqS.jpg"
           echo "Downloading custom icon from $ICON_URL..."
           if curl -fL "$ICON_URL" -o custom_icon.jpg; then
             echo "Successfully downloaded custom icon from termai.cc."
-            # Convert to PNG for Godot icons
             python3 -c "
             from PIL import Image
             img = Image.open('custom_icon.jpg')
@@ -96,9 +95,24 @@ jobs:
             img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
             print('Icons generated successfully.')
             " || cp custom_icon.jpg icon.png
-          else
-            echo "Termai link download failed, fallback to existing icon."
           fi
+
+          # Attempt downloading Google Drive animation assets
+          GDRIVE_FILE_ID="120fNMWnpMaiNEJLG53LdTd8DfSGdFrYq"
+          echo "Attempting to fetch animation package from Google Drive ($GDRIVE_FILE_ID)..."
+          GDRIVE_URL="https://drive.usercontent.google.com/download?id=${GDRIVE_FILE_ID}&export=download&confirm=t"
+          curl -sL "$GDRIVE_URL" -o gdrive_asset.tmp || true
+          
+          if file gdrive_asset.tmp | grep -qi "zip\|gzip\|data"; then
+            echo "Downloaded valid archive from Google Drive. Extracting..."
+            mkdir -p imported_anims
+            unzip -q gdrive_asset.tmp -d imported_anims || true
+            echo "Extracted files:"
+            ls -la imported_anims
+          else
+            echo "Google Drive file could not be downloaded directly (may require OAuth or virus scan confirmation)."
+          fi
+          rm -f gdrive_asset.tmp
 
       - name: Initialize Godot Project and Import Resources
         run: |

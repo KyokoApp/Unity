@@ -533,7 +533,7 @@ public partial class MainCharacter : CharacterBody3D
 		Vector2 inputDir = Vector2.Zero;
 		if (touchInputManager != null && touchInputManager.MoveVector != Vector2.Zero)
 		{
-			// Analog stick: X is horizontal (-1 left, 1 right), Y is vertical (-1 up/fwd, 1 down/back)
+			// Analog stick: X is horizontal (-1 left, 1 right), Y is vertical (-1 up/forward, 1 down/backward)
 			inputDir = new Vector2(touchInputManager.MoveVector.X, touchInputManager.MoveVector.Y);
 		}
 		else
@@ -543,8 +543,22 @@ public partial class MainCharacter : CharacterBody3D
 
 		if (inputDir.LengthSquared() > 0.01f)
 		{
-			// Transform relative to character or camera
-			CurrentInput.Direction = (Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
+			// Calculate movement vector relative to Camera orientation
+			Vector3 camForward = -PlayerCamera.GlobalTransform.Basis.Z;
+			camForward.Y = 0;
+			camForward = camForward.Normalized();
+
+			Vector3 camRight = PlayerCamera.GlobalTransform.Basis.X;
+			camRight.Y = 0;
+			camRight = camRight.Normalized();
+
+			// Analog up (negative Y) moves forward along camera; analog right (positive X) moves right
+			Vector3 targetMoveDir = (camRight * inputDir.X + camForward * -inputDir.Y).Normalized();
+			CurrentInput.Direction = targetMoveDir;
+
+			// Smoothly rotate character mesh heading towards moving direction
+			float targetAngle = Mathf.Atan2(-targetMoveDir.X, -targetMoveDir.Z);
+			Rotation = new Vector3(Rotation.X, Mathf.LerpAngle(Rotation.Y, targetAngle, deltaFloat * 12f), Rotation.Z);
 		}
 		else
 		{
@@ -641,13 +655,8 @@ public partial class MainCharacter : CharacterBody3D
 		}
 		PlayerCamera.Fov = Mathf.Lerp(PlayerCamera.Fov, targetFov, fovLerpTime * deltaFloat);
 
-		Vector3 rotateCam = new Vector3(cam_rot_x, CameraPivot.RotationDegrees.Y, CameraPivot.RotationDegrees.Z);
-		Vector3 rotateChar = new Vector3(RotationDegrees.X, cam_rot_y, RotationDegrees.Z);
-		if (CurrentAction != CharacterActions.Sitting)
-		{
-			RotationDegrees = rotateCam;
-			RotateY(Mathf.DegToRad(cam_rot_y));
-		}
+		// Camera pivot rotates horizontally (Y yaw) and vertically (X pitch) independently from character body
+		CameraPivot.RotationDegrees = new Vector3(cam_rot_x, cam_rot_y, 0);
 
 		//RotateObjectLocal(Vector3.Right, Mathf.DegToRad(-pitch));
 	}
