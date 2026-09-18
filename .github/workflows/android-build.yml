@@ -73,9 +73,32 @@ jobs:
           printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\nexport/android/debug_keystore = "%s"\nexport/android/debug_keystore_user = "androiddebugkey"\nexport/android/debug_keystore_pass = "android"\n' "$ANDROID_HOME" "$JAVA_HOME" "$DEBUG_KEYSTORE" > "$EDITOR_SETTINGS_DIR/editor_settings-4.tres"
           cp "$EDITOR_SETTINGS_DIR/editor_settings-4.tres" "$EDITOR_SETTINGS_DIR/editor_settings-4.5.tres"
 
+          # Setup keystore for debug and release in Godot
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$DEBUG_KEYSTORE" >> $GITHUB_ENV
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> $GITHUB_ENV
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$DEBUG_KEYSTORE" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=androiddebugkey" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=android" >> $GITHUB_ENV
+
+      - name: Setup App Icon
+        run: |
+          ICON_URL="https://c.termai.cc/a149/Q71XDqS.jpg"
+          echo "Downloading custom icon from $ICON_URL..."
+          if curl -fL "$ICON_URL" -o custom_icon.jpg; then
+            echo "Successfully downloaded custom icon from termai.cc."
+            # Convert to PNG for Godot icons
+            python3 -c "
+            from PIL import Image
+            img = Image.open('custom_icon.jpg')
+            img.save('icon.png')
+            img.resize((192, 192), Image.Resampling.LANCZOS).save('icon_192.png')
+            img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
+            print('Icons generated successfully.')
+            " || cp custom_icon.jpg icon.png
+          else
+            echo "Termai link download failed, fallback to existing icon."
+          fi
 
       - name: Initialize Godot Project and Import Resources
         run: |
@@ -83,7 +106,7 @@ jobs:
 
       - name: Build C# Solution
         run: |
-          dotnet build "Procedural Infinite Runner.csproj" -c ExportDebug
+          dotnet build "Procedural Infinite Runner.csproj" -c ExportRelease || dotnet build "Procedural Infinite Runner.csproj" -c ExportDebug
 
       - name: Export Data Pack (assets_v1.pck)
         run: |
@@ -103,6 +126,8 @@ jobs:
       - name: Export Android APK Lite (InfiniteRunner-Lite.apk)
         run: |
           mkdir -p build/android
+          # Attempt export release for stripped optimized binary, fallback to debug if needed
+          godot --headless --verbose --export-release "Android" build/android/InfiniteRunner-Lite.apk || \
           godot --headless --verbose --export-debug "Android" build/android/InfiniteRunner-Lite.apk
 
       - name: Verify Builds
