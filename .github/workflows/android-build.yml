@@ -85,35 +85,88 @@ jobs:
         run: |
           dotnet build "Procedural Infinite Runner.csproj" -c ExportDebug
 
-      - name: Export Android APK
+      - name: Export Data Pack (assets_v1.pck)
         run: |
           mkdir -p build/android
-          godot --headless --verbose --export-debug "Android" build/android/InfiniteRunner.apk
-
-      - name: Verify APK
-        run: |
-          if [ ! -s build/android/InfiniteRunner.apk ]; then
-            echo "Error: build/android/InfiniteRunner.apk was not generated or is empty!"
+          # Export data pack containing all assets using AssetPack preset
+          godot --headless --verbose --export-pack "AssetPack" build/android/assets_v1.pck
+          if [ ! -s build/android/assets_v1.pck ]; then
+            echo "Fallback: exporting pack using Android preset..."
+            godot --headless --verbose --export-pack "Android" build/android/assets_v1.pck
+          fi
+          if [ ! -s build/android/assets_v1.pck ]; then
+            echo "Error: assets_v1.pck was not generated or is empty!"
             exit 1
           fi
-          echo "APK generated successfully. Size: $(stat -c%s build/android/InfiniteRunner.apk) bytes"
+          echo "PCK generated successfully. Size: $(stat -c%s build/android/assets_v1.pck) bytes"
 
-      - name: Upload Artifact
+      - name: Export Android APK Lite (InfiniteRunner-Lite.apk)
+        run: |
+          mkdir -p build/android
+          godot --headless --verbose --export-debug "Android" build/android/InfiniteRunner-Lite.apk
+
+      - name: Verify Builds
+        run: |
+          if [ ! -s build/android/InfiniteRunner-Lite.apk ]; then
+            echo "Error: build/android/InfiniteRunner-Lite.apk was not generated or is empty!"
+            exit 1
+          fi
+          echo "APK Lite generated successfully. Size: $(stat -c%s build/android/InfiniteRunner-Lite.apk) bytes"
+
+          if [ ! -s build/android/assets_v1.pck ]; then
+            echo "Error: build/android/assets_v1.pck was not generated or is empty!"
+            exit 1
+          fi
+          echo "Assets PCK verified. Size: $(stat -c%s build/android/assets_v1.pck) bytes"
+
+      - name: Generate version.json Manifest
+        run: |
+          PCK_SIZE=$(stat -c%s build/android/assets_v1.pck)
+          PCK_SHA256=$(sha256sum build/android/assets_v1.pck | awk '{print $1}')
+          
+          python3 -c "
+          import json
+          
+          manifest = {
+              'version': '1.0.0',
+              'apk_url': 'https://github.com/KyokoApp/Unity/releases/download/android-apk/InfiniteRunner-Lite.apk',
+              'packs': [
+                  {
+                      'name': 'assets_v1.pck',
+                      'url': 'https://github.com/KyokoApp/Unity/releases/download/android-apk/assets_v1.pck',
+                      'size': int('$PCK_SIZE'),
+                      'sha256': '$PCK_SHA256',
+                      'is_patch': False,
+                      'order': 1
+                  }
+              ]
+          }
+          with open('build/android/version.json', 'w') as f:
+              json.dump(manifest, f, indent=2)
+          "
+          echo "Generated version.json:"
+          cat build/android/version.json
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: InfiniteRunner-APK
-          path: build/android/InfiniteRunner.apk
+          name: InfiniteRunner-Android-Release
+          path: |
+            build/android/InfiniteRunner-Lite.apk
+            build/android/assets_v1.pck
+            build/android/version.json
 
       - name: Create or Update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/assets_v1.pck build/android/version.json"
           if gh release view android-apk >/dev/null 2>&1; then
-            echo "Release android-apk exists, uploading APK asset..."
-            gh release upload android-apk build/android/InfiniteRunner.apk --clobber
+            echo "Release android-apk exists, uploading assets..."
+            gh release upload android-apk $RELEASE_FILES --clobber
           else
             echo "Creating release android-apk..."
-            gh release create android-apk build/android/InfiniteRunner.apk \
+            gh release create android-apk $RELEASE_FILES \
               --title "Android APK" \
-              --notes "Latest Android build of Procedural Infinite Runner. Download and install InfiniteRunner.apk."
+              --notes "Android build of Procedural Infinite Runner with In-Game Asset Downloader (Lite APK + assets_v1.pck)."
           fi
