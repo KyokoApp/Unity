@@ -57,14 +57,16 @@ Sebelum: `InfiniteRunner-Lite.apk` ≈ **113MB**. Penyebab utama & perbaikannya:
 
 | Item | Sebelum | Sesudah | Hemat |
 |---|---|---|---|
-| `videos/loading.mp4` (27MB) ikut ter-export ke APK | Ya (filter tidak mengecualikan) | **Dihapus dari repo** (file ini duplikat persis dengan `Amv/*.mp4`) + `videos/*.mp4` masuk `exclude_filter` | ~27MB |
-| Video loading di dalam APK | mp4 27MB + ogv ~12MB (duplikat ganda) | Hanya `loading.ogv` hasil re-encode **854px, q4, tanpa audio, 24fps** (≈4–6MB) | ~30MB |
+| Arsip statis `lib/**.a` sisa template Godot Mono (`libmonosgen-2.0.a` 44MB dkk.) | Ikut ter-pack di APK | **Dibuang di CI** (zip trim) lalu APK di-zipalign & **re-sign** dengan keystore release — `.a` adalah arsip link-time yang tidak pernah bisa dimuat runtime Android | ~60MB |
+| `videos/loading.mp4` (27MB) ikut ter-export ke APK | Ya (filter tidak mengecualikan) | **Dihapus dari repo** (duplikat persis `Amv/*.mp4`) + `videos/*.mp4` masuk `exclude_filter` | ~27MB |
+| Video loading di dalam APK | mp4 27MB + ogv ~12MB (ganda) | Hanya `loading.ogv` hasil re-encode **854px, q4, tanpa audio, 24fps** | ~36MB (tersisa ±3MB) |
 | Debug symbols .NET di APK | `dotnet/include_debug_symbols=true` | `false` | ~2–5MB |
-| Ikon launcher `icon_192.png`/`icon_432.png` ikut ter-pack | Ya | Masuk `exclude_filter` (Android tetap memakai sumbernya untuk mipmap) | ~0.3MB |
+| Ikon launcher `icon_192.png`/`icon_432.png` ikut ter-pack | Ya | Masuk `exclude_filter` | ~0.3MB |
 | Format tekstur di paket aset | s3tc/bptc (desktop, berat & lambat di HP) | **etc2_astc=true** untuk preset `AssetPack` & `PatchPack` | load & VRAM lebih ringan |
 
-Perkiraan APK setelah perubahan: **±80–86MB** (runtime Godot+Mono arm64 ≈70MB sisanya memang
-tidak bisa dipangkas tanpa migrasi dari C#).
+Hasil terukur (lihat aset `apk_report.txt` di setiap release): APK turun dari **±113MB**
+menjadi **±45–50MB**; paket aset dasar dari **97MB → ±49MB**; patch update biasa hanya
+**±1–3MB**.
 
 ### Checklist agar APK tidak bengkak lagi
 
