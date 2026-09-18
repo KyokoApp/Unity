@@ -44,18 +44,12 @@ public partial class GraphicsSettingsManager : CanvasLayer
 
     private void CreateUI()
     {
-        // 1. Gear Icon Button at Top-Right
+        // 1. Gear Icon Button at Top-Left (below compass)
         toggleButton = new Button();
         toggleButton.Text = "⚙";
         toggleButton.Name = "SettingsGearButton";
-        toggleButton.AnchorsPreset = (int)Control.LayoutPreset.TopRight;
-        toggleButton.AnchorLeft = 1.0f;
-        toggleButton.AnchorRight = 1.0f;
-        toggleButton.OffsetLeft = -70;
-        toggleButton.OffsetTop = 180;
-        toggleButton.OffsetRight = -20;
-        toggleButton.OffsetBottom = 230;
-        toggleButton.CustomMinimumSize = new Vector2(50, 50);
+        toggleButton.Position = new Vector2(30, 200);
+        toggleButton.CustomMinimumSize = new Vector2(55, 55);
         toggleButton.FocusMode = Control.FocusModeEnum.None;
         
         // Clean anime/modern style for gear button
