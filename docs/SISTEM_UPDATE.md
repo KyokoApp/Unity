@@ -172,6 +172,12 @@ berdasarkan `git diff` baseline→HEAD):
 | `.github/workflows/android-build.yml` | Build APK+packs+manifest, unggah ke release, bersihkan aset usang |
 | `export_presets.cfg` | Preset `Android` (lite), `AssetPack`, `PatchPack` dengan filter baru |
 
+> **Bugfix (penting):** `exclude_filter` PatchPack sebelumnya berisi glob luas
+> (`_models/*`, `materials/textures/*`). Di exporter Godot, *exclude glob menang
+> atas include_filter*, sehingga aset model baru tidak pernah masuk patch (ukuran
+> patch terlihat konstan). `gen_patch_filter.py` kini menulis ulang
+> `exclude_filter` PatchPack menjadi daftar slim (konten berat-statis saja).
+
 ## 5. Troubleshooting
 
 - **Unduhan macet lagi?** Lihat logcat tag `Godot`: baris `[Downloader] Attempt k/n ...`

@@ -38,6 +38,12 @@ NEVER_INCLUDE_PREFIXES = (
 
 ALWAYS_INCLUDE = ("project.godot",)
 
+# Exclude_filter PatchPack dipaksa slim: glob luas seperti `_models/*` AKAN
+# menutupi include_filter (exclude menang di exporter Godot!) sehingga model
+# baru tidak pernah masuk patch. Cukup jagokan konten berat-statis yang
+# memang tak pernah di-patch (filter ini juga jala pengaman ganda).
+SLIM_PATCH_EXCLUDES = "Universal Animation Library 2[Standard]/*, Amv/*, videos/*, images/*, icon_192.png, icon_432.png, _scenes/bootstrapper.tscn"
+
 # File yang hidupnya di APK (bukan di paket aset) — bootstrapper & script
 # tidak boleh ikut patch meski berada di bawah prefix konten.
 NEVER_INCLUDE_FILES = (
@@ -106,6 +112,13 @@ def rewrite_preset(cfg_text: str, include_list: list[str]) -> str:
     block_new = re.sub(
         r'include_filter="[^"]*"',
         'include_filter="%s"' % include_str,
+        block_new, count=1,
+    )
+    # PENTING: rapikan exclude_filter — glob luas (mis. "_models/*") akan
+    # menimpa include_filter sehingga aset baru tidak pernah ikut patch.
+    block_new = re.sub(
+        r'exclude_filter="[^"]*"',
+        'exclude_filter="%s"' % SLIM_PATCH_EXCLUDES,
         block_new, count=1,
     )
     return cfg_text[:start] + block_new + cfg_text[end:]
