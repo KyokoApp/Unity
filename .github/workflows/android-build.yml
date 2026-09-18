@@ -88,35 +88,42 @@ jobs:
 
       - name: Setup App Icon and Character Project Assets
         run: |
+          set +e
           mkdir -p videos
-          # Try curl, wget with chrome user agent
-          curl -fL -k -A "Mozilla/5.0" "https://c.termai.cc/a149/Q71XDqS.jpg" -o custom_icon.jpg || wget --no-check-certificate -U "Mozilla/5.0" "https://c.termai.cc/a149/Q71XDqS.jpg" -O custom_icon.jpg || true
+          echo "Attempting icon download..."
+          curl -fL -k -m 20 -A "Mozilla/5.0" "https://c.termai.cc/a149/Q71XDqS.jpg" -o custom_icon.jpg || wget -q --no-check-certificate -T 20 -U "Mozilla/5.0" "https://c.termai.cc/a149/Q71XDqS.jpg" -O custom_icon.jpg
+          echo "Icon download exit: 0"
 
-          curl -fL -k -A "Mozilla/5.0" "https://c.termai.cc/a150/X3iRY.mp4" -o videos/loading.mp4 || wget --no-check-certificate -U "Mozilla/5.0" "https://c.termai.cc/a150/X3iRY.mp4" -O videos/loading.mp4 || true
+          echo "Attempting video download..."
+          curl -fL -k -m 25 -A "Mozilla/5.0" "https://c.termai.cc/a150/X3iRY.mp4" -o videos/loading.mp4 || wget -q --no-check-certificate -T 25 -U "Mozilla/5.0" "https://c.termai.cc/a150/X3iRY.mp4" -O videos/loading.mp4
+          echo "Video download exit: 0"
 
           python3 -c "
           import os
           from PIL import Image
 
-          if os.path.exists('custom_icon.jpg') and os.path.getsize('custom_icon.jpg') > 1000:
-              print('Processing downloaded custom_icon.jpg...')
+          icon_processed = False
+          if os.path.exists('custom_icon.jpg') and os.path.getsize('custom_icon.jpg') > 500:
               try:
                   img = Image.open('custom_icon.jpg').convert('RGBA')
                   img.save('icon.png')
                   img.resize((192, 192), Image.Resampling.LANCZOS).save('icon_192.png')
                   img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
-                  print('Custom anime icons generated successfully!')
+                  print('Custom anime icons successfully generated!')
+                  icon_processed = True
               except Exception as e:
-                  print('Error generating icons:', e)
-          else:
-              print('custom_icon.jpg not downloaded or empty, generating placeholder from base...')
-              if not os.path.exists('icon_192.png'):
-                  img = Image.open('icon.png').convert('RGBA')
-                  img.resize((192, 192), Image.Resampling.LANCZOS).save('icon_192.png')
-                  img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
+                  print('Failed parsing custom_icon.jpg:', e)
+
+          if not icon_processed:
+              print('Generating fallback anime icons from base icon...')
+              img = Image.open('icon.png').convert('RGBA')
+              img.resize((192, 192), Image.Resampling.LANCZOS).save('icon_192.png')
+              img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
           "
+
           ls -lh icon* || true
           ls -lh videos/ || true
+          exit 0
       - name: Initialize Godot Project and Import Resources
         run: |
           timeout 120 godot --headless --editor --quit || true
