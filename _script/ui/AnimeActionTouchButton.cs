@@ -61,7 +61,7 @@ public partial class AnimeActionTouchButton : Control
     {
         if (@event is InputEventScreenTouch touch)
         {
-            Vector2 localPos = ToLocal(touch.Position);
+            Vector2 localPos = touch.Position - GlobalPosition;
             Vector2 center = Size * 0.5f;
             float dist = localPos.DistanceTo(center);
 
@@ -86,7 +86,7 @@ public partial class AnimeActionTouchButton : Control
         }
         else if (@event is InputEventScreenDrag drag && drag.Index == touchIndex)
         {
-            Vector2 localPos = ToLocal(drag.Position);
+            Vector2 localPos = drag.Position - GlobalPosition;
             Vector2 center = Size * 0.5f;
             float dist = localPos.DistanceTo(center);
 
