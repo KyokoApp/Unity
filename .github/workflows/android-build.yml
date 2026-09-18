@@ -33,6 +33,12 @@ jobs:
           echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
           echo "VERSION_NAME=1.0.${{ github.run_number }}" >> $GITHUB_ENV
           echo "PATCH_NAME=patch_1.0.${{ github.run_number }}.pck" >> $GITHUB_ENV
+          # Stempel versi ke dalam kode (terlihat di layar boot & overlay debug).
+          # File di repo tetap placeholder; perubahan ini hanya ada di working
+          # copy CI sehingga tidak ikut menghitung diff patch.
+          printf 'public static class BuildInfo\n{\n\tpublic const string Version = "%s";\n\tpublic const int VersionCode = %s;\n}\n' \
+            "$VERSION_NAME" "$VERSION_CODE" > _script/BuildInfo.cs
+          cat _script/BuildInfo.cs
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

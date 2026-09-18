@@ -363,6 +363,7 @@ public partial class GraphicsSettingsManager : CanvasLayer
         string spd = ch != null ? ch.DebugSpeed.ToString("0.0") : "-";
         string vel = ch != null ? $"{ch.Velocity.X:0.00},{ch.Velocity.Y:0.00},{ch.Velocity.Z:0.00}" : "-";
         debugLabel.Text =
+            $"ver {BuildInfo.Version}\n" +
             $"FPS {(int)Engine.GetFramesPerSecond()}  |  touch {TouchInputManager.LiveTouchCount}  |  " +
             $"joy {(tim != null && tim.IsJoystickActive ? "ON" : "off")}  |  physics {phys}\n" +
             $"move {moveV}  |  cam {camV}  |  speed {spd}\n" +
