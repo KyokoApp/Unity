@@ -96,10 +96,16 @@ def read_pck_dir(path: str):
                 return got
 
     tail = buf[-48:].hex() if fsize > 48 else buf.hex()
+    d32 = u64(32)
+    ddiag = ""
+    if d32 is not None and 0 < d32 < fsize:
+        ddiag = (f"count@d32={u32(d32)} count+4={u32(d32+4)} count+32={u32(d32+32)}\n"
+                 f"hex d32..+96: {buf[d32:d32+96].hex()}\n"
+                 f"ascii d32..+96: {buf[d32:d32+96]!r}")
     raise SystemExit(
         f"Gagal parse direktori PCK {path} (pack_ver={pack_ver}, hits={len(hits)}, "
-        f"fsize={fsize}, doff32={u64(32)})\nfirst hits: {hits[:4]}\n"
-        f"last hits: {hits[-6:] if hits else []}\nhex -48..EOF: {tail}")
+        f"fsize={fsize}, doff32={d32})\nfirst hits: {hits[:4]}\n"
+        f"last hits: {hits[-6:] if hits else []}\nhex -48..EOF: {tail}\n{ddiag}")
 
 
 
