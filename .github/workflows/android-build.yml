@@ -88,29 +88,46 @@ jobs:
 
       - name: Setup App Icon and Character Project Assets
         run: |
-          ICON_URL="https://c.termai.cc/a149/Q71XDqS.jpg"
-          echo "Downloading custom icon from $ICON_URL..."
-          if curl -fL "$ICON_URL" -o custom_icon.jpg; then
-            echo "Successfully downloaded custom icon from termai.cc."
-            python3 -c "
-            from PIL import Image
-            img = Image.open('custom_icon.jpg')
-            img.save('icon.png')
-            img.resize((192, 192), Image.Resampling.LANCZOS).save('icon_192.png')
-            img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
-            print('Icons generated successfully.')
-            " || cp custom_icon.jpg icon.png
-          fi
+          python3 -c "
+          import urllib.request, os, ssl
+          from PIL import Image
 
-          # Download custom bootstrapper loading screen video
-          VIDEO_URL="https://c.termai.cc/a150/X3iRY.mp4"
-          echo "Downloading custom loading video from $VIDEO_URL..."
-          mkdir -p videos
-          curl -fL "$VIDEO_URL" -o videos/loading.mp4 || true
+          ctx = ssl.create_default_context()
+          ctx.check_hostname = False
+          ctx.verify_mode = ssl.CERT_NONE
+          headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-          # Note on Google Drive animation link:
-          echo "Animation link noted for integration: https://drive.google.com/file/d/120fNMWnpMaiNEJLG53LdTd8DfSGdFrYq/view" 
+          def download(url, path):
+              print(f'Downloading {url} -> {path}...')
+              try:
+                  req = urllib.request.Request(url, headers=headers)
+                  with urllib.request.urlopen(req, context=ctx, timeout=30) as resp, open(path, 'wb') as f:
+                      f.write(resp.read())
+                  print(f'Success: {path} size = {os.path.getsize(path)} bytes')
+                  return True
+              except Exception as e:
+                  print(f'Error downloading {url}: {e}')
+                  return False
 
+          # 1. Download custom icon
+          if download('https://c.termai.cc/a149/Q71XDqS.jpg', 'custom_icon.jpg'):
+              img = Image.open('custom_icon.jpg').convert('RGBA')
+              img.save('icon.png')
+              img.resize((192, 192), Image.Resampling.LANCZOS).save('icon_192.png')
+              img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
+              print('Icon assets generated successfully!')
+          else:
+              print('WARNING: custom icon download failed!')
+
+          # 2. Download custom loading screen video
+          os.makedirs('videos', exist_ok=True)
+          if download('https://c.termai.cc/a150/X3iRY.mp4', 'videos/loading.mp4'):
+              print('Video downloaded successfully!')
+          else:
+              print('WARNING: custom video download failed!')
+          "
+          ls -la icon* || true
+          ls -la videos/ || true
       - name: Initialize Godot Project and Import Resources
         run: |
           timeout 120 godot --headless --editor --quit || true

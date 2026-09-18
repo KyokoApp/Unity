@@ -54,7 +54,11 @@ public partial class Bootstrapper : Control
         string videoPath = "res://videos/loading.mp4";
         if (FileAccess.FileExists(videoPath) && VideoPlayer != null)
         {
-            var stream = ResourceLoader.Load<VideoStream>(videoPath);
+            var stream = GD.Load<VideoStream>(videoPath);
+            if (stream == null)
+            {
+                GD.Print("VideoStream loading fallback to VideoStreamTheora / general stream...");
+            }
             if (stream != null)
             {
                 VideoPlayer.Stream = stream;
@@ -398,7 +402,11 @@ public partial class Bootstrapper : Control
         string videoPath = "res://videos/loading.mp4";
         if (FileAccess.FileExists(videoPath) && VideoPlayer != null)
         {
-            var stream = ResourceLoader.Load<VideoStream>(videoPath);
+            var stream = GD.Load<VideoStream>(videoPath);
+            if (stream == null)
+            {
+                GD.Print("VideoStream loading fallback to VideoStreamTheora / general stream...");
+            }
             if (stream != null)
             {
                 VideoPlayer.Stream = stream;
