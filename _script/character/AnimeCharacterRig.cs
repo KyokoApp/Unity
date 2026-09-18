@@ -423,7 +423,10 @@ public partial class AnimeCharacterRig : Node
 				if (isRotation && value.VariantType == Variant.Type.Quaternion)
 				{
 					Quaternion q = value.AsQuaternion();
-					dst.TrackInsertKey(newTrack, time, Variant.From(correction * q), transition);
+					// Godot C# defines no Basis * Quaternion operator, so convert the
+					// correction basis into a quaternion and multiply quaternion-by-quaternion.
+					Quaternion corrected = new Quaternion(correction) * q;
+					dst.TrackInsertKey(newTrack, time, Variant.From(corrected), transition);
 				}
 				else if (isPosition && value.VariantType == Variant.Type.Vector3)
 				{
