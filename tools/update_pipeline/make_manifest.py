@@ -164,10 +164,16 @@ def main() -> int:
             packs.append(pack_entry(args.base_name, order=1, is_patch=False))
     packs.append(pack_entry(args.patch_name, order=2, is_patch=True))
 
+    apk_path = os.path.join(args.build_dir, args.apk_name)
+    apk_sha = sha256_of(apk_path) if os.path.exists(apk_path) else ""
+    apk_size = os.path.getsize(apk_path) if os.path.exists(apk_path) else 0
+
     manifest = {
         "version": args.version,
         "version_code": int(args.version_code),
         "apk_url": f"{args.release_base_url}/{args.apk_name}",
+        "apk_sha256": apk_sha,
+        "apk_size": apk_size,
         "requires_restart": requires_restart,
         "needs_new_apk": needs_new_apk,
         "changed_files_count": len(changed),
