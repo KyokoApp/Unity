@@ -13,6 +13,11 @@ bin/
 obj/
 *.user
 
+# Build & export outputs
+build/
+exported/
+videos/
+
 # Python tooling
 __pycache__/
 *.pyc
