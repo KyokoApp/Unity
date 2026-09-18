@@ -86,30 +86,14 @@ jobs:
           echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=androiddebugkey" >> $GITHUB_ENV
           echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=android" >> $GITHUB_ENV
 
-      - name: Setup App Icon and Character Project Assets
+      - name: Verify App Icon and Loading Video
         run: |
           mkdir -p videos
-          # Copy loading video from committed Amv directory
-          if [ -f "Amv/Proyek Baru 28 [7EB4FCC].mp4" ]; then
+          if [ -f "Amv/Proyek Baru 28 [7EB4FCC].mp4" ] && [ ! -f "videos/loading.mp4" ]; then
             cp "Amv/Proyek Baru 28 [7EB4FCC].mp4" videos/loading.mp4
-            echo "Loading video copied from Amv/"
           fi
-
-          # Process icon from committed Amv directory
-          python3 -c "
-          import os
-          from PIL import Image
-
-          if os.path.exists('Amv/Q71XDqS.jpg'):
-              img = Image.open('Amv/Q71XDqS.jpg').convert('RGBA')
-              img.save('icon.png')
-              img.resize((192, 192), Image.Resampling.LANCZOS).save('icon_192.png')
-              img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
-              print('Generated official custom anime icons from Amv/Q71XDqS.jpg successfully!')
-          "
-
-          ls -lh icon* || true
-          ls -lh videos/ || true
+          ls -lh icon*
+          ls -lh videos/
       - name: Initialize Godot Project and Import Resources
         run: |
           timeout 120 godot --headless --editor --quit || true
