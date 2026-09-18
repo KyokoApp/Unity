@@ -12,3 +12,7 @@ mono_crash.*.json
 bin/
 obj/
 *.user
+
+# Python tooling
+__pycache__/
+*.pyc

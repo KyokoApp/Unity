@@ -1,0 +1,10 @@
+# Commit dasar (baseline) untuk pembuatan PATCH pack.
+#
+# Patch pack = daftar file yang berubah sejak commit ini (git diff) dan
+# bersifat KUMULATIF: siapa pun yang punya assets_v1.pck bisa langsung
+# melompat ke patch terbaru tanpa perlu patch-patch sebelumnya.
+#
+# KAPAN diubah: hanya saat Anda me-"re-base" paket dasar, yaitu saat rilis
+# yang ikut MEMPERBARUI assets_v1.pck di GitHub Release. Setelah itu, isi
+# file ini dengan commit HEAD rilis tersebut. Lihat docs/SISTEM_UPDATE.md.
+1363060343f361cd7394899975e078739d319d87

@@ -18,11 +18,21 @@ jobs:
   build:
     name: Build Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Riwayat penuh diperlukan untuk `git diff baseline..HEAD`
+          # (pembuatan patch pack incremental).
+          fetch-depth: 0
+
+      - name: Tentukan Versi Build
+        run: |
+          echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
+          echo "VERSION_NAME=1.0.${{ github.run_number }}" >> $GITHUB_ENV
+          echo "PATCH_NAME=patch_1.0.${{ github.run_number }}.pck" >> $GITHUB_ENV
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -49,14 +59,14 @@ jobs:
         run: |
           GODOT_VERSION="4.5.1"
           RELEASE_TAG="4.5.1-stable"
-          
+
           echo "Downloading Godot Mono..."
           curl -fL "https://github.com/godotengine/godot/releases/download/${RELEASE_TAG}/Godot_v${RELEASE_TAG}_mono_linux_x86_64.zip" -o godot_mono.zip
           unzip -q godot_mono.zip -d godot_mono
           sudo mv godot_mono/Godot_v${RELEASE_TAG}_mono_linux_x86_64/Godot_v${RELEASE_TAG}_mono_linux.x86_64 /usr/local/bin/godot
           sudo mv godot_mono/Godot_v${RELEASE_TAG}_mono_linux_x86_64/GodotSharp /usr/local/bin/
           sudo chmod +x /usr/local/bin/godot
-          
+
           echo "Downloading Godot Export Templates..."
           curl -fL "https://github.com/godotengine/godot/releases/download/${RELEASE_TAG}/Godot_v${RELEASE_TAG}_mono_export_templates.tpz" -o export_templates.tpz
           mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
@@ -64,7 +74,7 @@ jobs:
           unzip -q export_templates.tpz -d export_templates_temp
           cp -r export_templates_temp/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
           cp -r export_templates_temp/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono/"
-          
+
           rm -rf godot_mono.zip export_templates.tpz godot_mono export_templates_temp
 
       - name: Configure Keystore and Godot Editor Settings
@@ -75,13 +85,12 @@ jobs:
             mkdir -p .keystore
             keytool -keyalg RSA -genkeypair -alias permanentkey -keypass permanentpass123 -keystore "$KEYSTORE_PATH" -storepass permanentpass123 -dname "CN=AnimeRunner,OU=Dev,O=KyokoApp,C=ID" -validity 20000 -deststoretype pkcs12
           fi
-          
+
           EDITOR_SETTINGS_DIR="$HOME/.config/godot"
           mkdir -p "$EDITOR_SETTINGS_DIR"
           printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\nexport/android/debug_keystore = "%s"\nexport/android/debug_keystore_user = "permanentkey"\nexport/android/debug_keystore_pass = "permanentpass123"\n' "$ANDROID_HOME" "$JAVA_HOME" "$KEYSTORE_PATH" > "$EDITOR_SETTINGS_DIR/editor_settings-4.tres"
           cp "$EDITOR_SETTINGS_DIR/editor_settings-4.tres" "$EDITOR_SETTINGS_DIR/editor_settings-4.5.tres"
 
-          # Setup keystore for debug and release in Godot
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=permanentkey" >> $GITHUB_ENV
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=permanentpass123" >> $GITHUB_ENV
@@ -89,110 +98,86 @@ jobs:
           echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=permanentkey" >> $GITHUB_ENV
           echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=permanentpass123" >> $GITHUB_ENV
 
-      - name: Verify App Icon and Convert Loading Video to OGV
+      - name: Generate Loading Video OGV (Mobile-Optimized)
         run: |
+          # Sumber video ada di Amv/ (gdignore -> tidak ikut ter-export).
+          # Hanya loading.ogv hasil konversi yang masuk ke APK (~4-6 MB,
+          # menggantikan mp4 27 MB sebelumnya).
           mkdir -p videos
-          if [ -f "Amv/Proyek Baru 28 [7EB4FCC].mp4" ]; then
-            cp "Amv/Proyek Baru 28 [7EB4FCC].mp4" videos/loading.mp4
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+          SRC="Amv/Proyek Baru 28 [7EB4FCC].mp4"
+          if [ -f "$SRC" ]; then
+            echo "Converting to videos/loading.ogv (854px, q4, tanpa audio)..."
+            ffmpeg -y -i "$SRC" -an -c:v libtheora -q:v 4 -vf "scale=854:-2" -r 24 videos/loading.ogv
+          else
+            echo "PERINGATAN: sumber video tidak ditemukan, layar loading tanpa video."
           fi
-
-          echo "Installing ffmpeg to convert loading video to native Godot Theora OGV..."
-          sudo apt-get update && sudo apt-get install -y ffmpeg
-
-          if [ -f "videos/loading.mp4" ]; then
-            echo "Converting videos/loading.mp4 to videos/loading.ogv (muted, optimized for mobile)..."
-            ffmpeg -y -i videos/loading.mp4 -an -c:v libtheora -q:v 6 -vf "scale=1280:-2" videos/loading.ogv || true
-          fi
-
+          ls -lh videos/ || true
           ls -lh icon*
-          ls -lh videos/
+
       - name: Initialize Godot Project and Import Resources
         run: |
-          timeout 120 godot --headless --editor --quit || true
+          timeout 180 godot --headless --editor --quit || true
 
       - name: Build C# Solution
         run: |
           dotnet build "Procedural Infinite Runner.csproj" -c ExportRelease || dotnet build "Procedural Infinite Runner.csproj" -c ExportDebug
 
-      - name: Export Base Data Pack and Lightweight Patch Pack
+      - name: Generate Incremental Patch Filter (git diff vs baseline)
+        run: |
+          python3 tools/update_pipeline/gen_patch_filter.py
+          grep -A3 'name="PatchPack"' export_presets.cfg | head -5 || true
+
+      - name: Export Base Data Pack and Patch-Only Pack
         run: |
           mkdir -p build/android
-          
+
           echo "Exporting base data pack (assets_v1.pck)..."
           timeout 300 godot --headless --export-pack "AssetPack" build/android/assets_v1.pck
 
-          # Export lightweight update patch (only scripts, modified scenes, and configs, excluding heavy models & textures ~1-2 MB!)
-          echo "Exporting lightweight patch pack (patch_v1.pck)..."
-          timeout 180 godot --headless --export-pack "PatchPack" build/android/patch_v1.pck
+          echo "Exporting patch pack ($PATCH_NAME) - hanya file berubah sejak baseline..."
+          timeout 300 godot --headless --export-pack "PatchPack" "build/android/$PATCH_NAME"
 
           echo "Base PCK size: $(stat -c%s build/android/assets_v1.pck) bytes"
-          echo "Patch PCK size: $(stat -c%s build/android/patch_v1.pck) bytes"
+          echo "Patch PCK size: $(stat -c%s build/android/$PATCH_NAME) bytes"
+
+          PATCH_BYTES=$(stat -c%s "build/android/$PATCH_NAME")
+          if [ "$PATCH_BYTES" -gt 26214400 ]; then
+            echo "::warning::Patch pack ${PATCH_BYTES} byte (>25MB). Pertimbangkan RE-BASE assets_v1.pck (lihat docs/SISTEM_UPDATE.md)."
+          fi
 
       - name: Export Android APK Lite (InfiniteRunner-Lite.apk)
         run: |
           mkdir -p build/android
-          # Automatically bump versionCode so new APK seamlessly installs over old APK without conflict
-          VERSION_CODE=${{ github.run_number }}
+          # Bump versionCode/nama agar APK baru mulus menimpa instalasi lama
           sed -i "s/version\/code=.*/version\/code=${VERSION_CODE}/" export_presets.cfg
-          sed -i "s/version\/name=.*/version\/name=\"1.0.${VERSION_CODE}\"/" export_presets.cfg
-          echo "Set Android versionCode=${VERSION_CODE}"
+          sed -i "s/version\/name=.*/version\/name=\"${VERSION_NAME}\"/" export_presets.cfg
+          echo "Set Android versionCode=${VERSION_CODE} versionName=${VERSION_NAME}"
 
-          # Attempt export release for stripped optimized binary, fallback to debug if needed
           timeout 300 godot --headless --export-release "Android" build/android/InfiniteRunner-Lite.apk || \
           timeout 300 godot --headless --export-debug "Android" build/android/InfiniteRunner-Lite.apk
 
       - name: Verify Builds
         run: |
-          if [ ! -s build/android/InfiniteRunner-Lite.apk ]; then
-            echo "Error: build/android/InfiniteRunner-Lite.apk was not generated or is empty!"
-            exit 1
-          fi
-          echo "APK Lite generated successfully. Size: $(stat -c%s build/android/InfiniteRunner-Lite.apk) bytes"
-
-          if [ ! -s build/android/assets_v1.pck ]; then
-            echo "Error: build/android/assets_v1.pck was not generated or is empty!"
-            exit 1
-          fi
-          echo "Assets PCK verified. Size: $(stat -c%s build/android/assets_v1.pck) bytes"
+          for f in "build/android/InfiniteRunner-Lite.apk" "build/android/assets_v1.pck" "build/android/$PATCH_NAME"; do
+            if [ ! -s "$f" ]; then
+              echo "Error: $f tidak ada atau kosong!"; exit 1
+            fi
+            echo "$f OK - $(stat -c%s "$f") bytes"
+          done
 
       - name: Generate version.json Manifest
         run: |
-          BASE_SIZE=$(stat -c%s build/android/assets_v1.pck)
-          BASE_SHA256=$(sha256sum build/android/assets_v1.pck | awk '{print $1}')
-          
-          PATCH_SIZE=$(stat -c%s build/android/patch_v1.pck)
-          PATCH_SHA256=$(sha256sum build/android/patch_v1.pck | awk '{print $1}')
-
-          python3 -c "
-          import json
-          
-          manifest = {
-              'version': '1.0.1',
-              'apk_url': 'https://github.com/KyokoApp/Unity/releases/download/android-apk/InfiniteRunner-Lite.apk',
-              'packs': [
-                  {
-                      'name': 'assets_v1.pck',
-                      'url': 'https://github.com/KyokoApp/Unity/releases/download/android-apk/assets_v1.pck',
-                      'size': int('$BASE_SIZE'),
-                      'sha256': '$BASE_SHA256',
-                      'is_patch': False,
-                      'order': 1
-                  },
-                  {
-                      'name': 'patch_v1.pck',
-                      'url': 'https://github.com/KyokoApp/Unity/releases/download/android-apk/patch_v1.pck',
-                      'size': int('$PATCH_SIZE'),
-                      'sha256': '$PATCH_SHA256',
-                      'is_patch': True,
-                      'order': 2
-                  }
-              ]
-          }
-          with open('build/android/version.json', 'w') as f:
-              json.dump(manifest, f, indent=2)
-          "
-          echo "Generated version.json with delta patch support:"
-          cat build/android/version.json
+          python3 tools/update_pipeline/make_manifest.py \
+            --build-dir build/android \
+            --out build/android/version.json \
+            --release-base-url "https://github.com/KyokoApp/Unity/releases/download/android-apk" \
+            --version "$VERSION_NAME" \
+            --version-code "$VERSION_CODE" \
+            --base-name assets_v1.pck \
+            --patch-name "$PATCH_NAME" \
+            --apk-name InfiniteRunner-Lite.apk
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -201,14 +186,34 @@ jobs:
           path: |
             build/android/InfiniteRunner-Lite.apk
             build/android/assets_v1.pck
-            build/android/patch_v1.pck
+            build/android/patch_*.pck
             build/android/version.json
 
       - name: Create or Update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/assets_v1.pck build/android/patch_v1.pck build/android/version.json"
+          # Bersihkan aset usang di release: patch versi lama & APK fat legacy,
+          # agar daftar unduhan tetap ramping (client lama tetap aman karena
+          # hanya membaca version.json yang baru).
+          if gh release view android-apk >/dev/null 2>&1; then
+            gh release view android-apk --json assets --jq '.assets[].name' | while read -r asset; do
+              case "$asset" in
+                patch_*.pck)
+                  if [ "$asset" != "$PATCH_NAME" ]; then
+                    echo "Menghapus aset patch usang: $asset"
+                    gh release delete-asset android-apk "$asset" --yes || true
+                  fi
+                  ;;
+                InfiniteRunner.apk)
+                  echo "Menghapus APK fat legacy (194MB): $asset"
+                  gh release delete-asset android-apk "$asset" --yes || true
+                  ;;
+              esac
+            done
+          fi
+
+          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/assets_v1.pck build/android/$PATCH_NAME build/android/version.json"
           if gh release view android-apk >/dev/null 2>&1; then
             echo "Release android-apk exists, uploading assets..."
             gh release upload android-apk $RELEASE_FILES --clobber
@@ -216,5 +221,5 @@ jobs:
             echo "Creating release android-apk..."
             gh release create android-apk $RELEASE_FILES \
               --title "Android APK" \
-              --notes "Android build of Procedural Infinite Runner with In-Game Asset Downloader (Lite APK + assets_v1.pck)."
+              --notes "Lite APK + unduhan aset in-game. Update hanya mengunduh paket yang berubah (lihat docs/SISTEM_UPDATE.md)."
           fi
