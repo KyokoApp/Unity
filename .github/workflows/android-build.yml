@@ -102,7 +102,7 @@ jobs:
 
       - name: Initialize Godot Project and Import Resources
         run: |
-          godot --headless --editor --quit || true
+          timeout 120 godot --headless --editor --quit || true
 
       - name: Build C# Solution
         run: |
