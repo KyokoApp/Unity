@@ -88,46 +88,35 @@ jobs:
 
       - name: Setup App Icon and Character Project Assets
         run: |
+          mkdir -p videos
+          # Try curl, wget with chrome user agent
+          curl -fL -k -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "https://c.termai.cc/a149/Q71XDqS.jpg" -o custom_icon.jpg ||           wget --no-check-certificate -U "Mozilla/5.0" "https://c.termai.cc/a149/Q71XDqS.jpg" -O custom_icon.jpg || true
+
+          curl -fL -k -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "https://c.termai.cc/a150/X3iRY.mp4" -o videos/loading.mp4 ||           wget --no-check-certificate -U "Mozilla/5.0" "https://c.termai.cc/a150/X3iRY.mp4" -O videos/loading.mp4 || true
+
           python3 -c "
-          import urllib.request, os, ssl
+          import os
           from PIL import Image
 
-          ctx = ssl.create_default_context()
-          ctx.check_hostname = False
-          ctx.verify_mode = ssl.CERT_NONE
-          headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-
-          def download(url, path):
-              print(f'Downloading {url} -> {path}...')
+          if os.path.exists('custom_icon.jpg') and os.path.getsize('custom_icon.jpg') > 1000:
+              print('Processing downloaded custom_icon.jpg...')
               try:
-                  req = urllib.request.Request(url, headers=headers)
-                  with urllib.request.urlopen(req, context=ctx, timeout=30) as resp, open(path, 'wb') as f:
-                      f.write(resp.read())
-                  print(f'Success: {path} size = {os.path.getsize(path)} bytes')
-                  return True
+                  img = Image.open('custom_icon.jpg').convert('RGBA')
+                  img.save('icon.png')
+                  img.resize((192, 192), Image.Resampling.LANCZOS).save('icon_192.png')
+                  img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
+                  print('Custom anime icons generated successfully!')
               except Exception as e:
-                  print(f'Error downloading {url}: {e}')
-                  return False
-
-          # 1. Download custom icon
-          if download('https://c.termai.cc/a149/Q71XDqS.jpg', 'custom_icon.jpg'):
-              img = Image.open('custom_icon.jpg').convert('RGBA')
-              img.save('icon.png')
-              img.resize((192, 192), Image.Resampling.LANCZOS).save('icon_192.png')
-              img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
-              print('Icon assets generated successfully!')
+                  print('Error generating icons:', e)
           else:
-              print('WARNING: custom icon download failed!')
-
-          # 2. Download custom loading screen video
-          os.makedirs('videos', exist_ok=True)
-          if download('https://c.termai.cc/a150/X3iRY.mp4', 'videos/loading.mp4'):
-              print('Video downloaded successfully!')
-          else:
-              print('WARNING: custom video download failed!')
+              print('custom_icon.jpg not downloaded or empty, generating placeholder from base...')
+              if not os.path.exists('icon_192.png'):
+                  img = Image.open('icon.png').convert('RGBA')
+                  img.resize((192, 192), Image.Resampling.LANCZOS).save('icon_192.png')
+                  img.resize((432, 432), Image.Resampling.LANCZOS).save('icon_432.png')
           "
-          ls -la icon* || true
-          ls -la videos/ || true
+          ls -lh icon* || true
+          ls -lh videos/ || true
       - name: Initialize Godot Project and Import Resources
         run: |
           timeout 120 godot --headless --editor --quit || true
