@@ -36,8 +36,10 @@ jobs:
           # Stempel versi ke dalam kode (terlihat di layar boot & overlay debug).
           # File di repo tetap placeholder; perubahan ini hanya ada di working
           # copy CI sehingga tidak ikut menghitung diff patch.
-          printf 'public static class BuildInfo\n{\n\tpublic const string Version = "%s";\n\tpublic const int VersionCode = %s;\n}\n' \
-            "$VERSION_NAME" "$VERSION_CODE" > _script/BuildInfo.cs
+          # Catatan: $GITHUB_ENV baru berlaku di step BERIKUTNYA — di step yang
+          # sama variabel shell belum ada, jadi pakai ekspresi Actions langsung.
+          printf 'public static class BuildInfo\n{\n\tpublic const string Version = "1.0.%s";\n\tpublic const int VersionCode = %s;\n}\n' \
+            "${{ github.run_number }}" "${{ github.run_number }}" > _script/BuildInfo.cs
           cat _script/BuildInfo.cs
 
       - name: Setup .NET
