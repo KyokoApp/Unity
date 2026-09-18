@@ -205,7 +205,12 @@ public partial class MainCharacter : CharacterBody3D
 	{
 		//Faraway = GetNode("/root/Faraway") as MeshInstance3D;
 		GameSettings.EnsureLoaded();
-		Input.MouseMode = Input.MouseModeEnum.Captured;
+		// Mouse capture hanya relevan di desktop; di Android tidak didukung
+		// dan bisa mengganggu penyaluran event sentuh.
+		if (DisplayServer.GetName() != "Android")
+		{
+			Input.MouseMode = Input.MouseModeEnum.Captured;
+		}
 		FloorMaxAngle = Mathf.DegToRad(50);
 		GameManager.Instance.SetMainCamera(PlayerCamera);
 		GameManager.Instance.SetMainCharacter(this);

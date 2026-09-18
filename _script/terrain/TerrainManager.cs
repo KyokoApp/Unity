@@ -114,7 +114,7 @@ namespace Bouncerock.Terrain
 		public void LoadNewTerrain()
 		{
 			GD.Print("Initializing map");
-			GlobalUIManager.Instance.LoadingUI.SetLoadingText("Initializing map...");
+			GlobalUIManager.Instance?.LoadingUI?.SetLoadingText("Initializing map...");
 			CurrentMapSettings = new MapGenerationSettings();
 			CurrentMapSettings.DefaultValues();
 			Instance = this;
@@ -306,8 +306,21 @@ namespace Bouncerock.Terrain
 
 		public override void _Process(double time)
 		{
-			if (Viewer == null) {; return; }
 			if (CurrentLoadStatus == LoadStatuses.Unloaded) {; return; }
+			// Anti-NRE: kamera bisa belum terdaftar saat _Ready (urutan ready
+			// world scene: TerrainManager dulu, MainCharacter belakangan).
+			// Registrasi ulang tiap frame sampai kamera tersedia.
+			if (Viewer == null)
+			{
+				if (GameManager.Instance != null && GameManager.Instance.MainCamera != null)
+				{
+					Viewer = GameManager.Instance.MainCamera;
+				}
+				else
+				{
+					return;
+				}
+			}
 			viewerPosition = new Vector2(Viewer.GlobalPosition.X, Viewer.GlobalPosition.Z);
 
 			updateTimer = updateTimer + (float)time;
@@ -325,7 +338,7 @@ namespace Bouncerock.Terrain
 			//GD.Print("Updating chunks");
 			if (CurrentLoadStatus == LoadStatuses.Armed)
 			{
-				GlobalUIManager.Instance.LoadingUI.SetLoadingText("Loading world chunks...");
+				GlobalUIManager.Instance?.LoadingUI?.SetLoadingText("Loading world chunks...");
 			}
 			Vector2 newChunkPosition = CameraInChunk();
 			if (currentChunk == null)
@@ -378,7 +391,7 @@ namespace Bouncerock.Terrain
 				{
 					if (CurrentLoadStatus == LoadStatuses.Armed)
 					{
-						GlobalUIManager.Instance.LoadingUI.SetLoadingText($"Loading {i}/{chunksLayered.Length}");
+						GlobalUIManager.Instance?.LoadingUI?.SetLoadingText($"Loading {i}/{chunksLayered.Length}");
 					}
 					//Loop through each lod coordinate in the fresh list to see if we need to change the chunk
 					
@@ -462,7 +475,8 @@ namespace Bouncerock.Terrain
 			if (CurrentLoadStatus == LoadStatuses.Armed)
 			{
 				CurrentLoadStatus = LoadStatuses.Initialized;
-				GlobalUIManager.Instance.LoadingUI.Visible = false;
+				if (GlobalUIManager.Instance != null && GlobalUIManager.Instance.LoadingUI != null)
+					GlobalUIManager.Instance.LoadingUI.Visible = false;
 			}
 			updatingChunks = false;
 		}
