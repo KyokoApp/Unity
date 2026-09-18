@@ -61,7 +61,7 @@ namespace Bouncerock.Terrain
 			int gz0 = Mathf.RoundToInt(chunk.GridPosition.Y);
 			rng.Seed = (ulong)((gx0 * 73856093) ^ (gz0 * 19349663) ^ 0x5eed) & 0x7fffffff;
 
-			var road = new RoadSampler(chunk, chunkOrigin);
+			var road = new RoadSampler();
 			var mm = new MultiMesh
 			{
 				TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
