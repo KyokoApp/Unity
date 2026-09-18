@@ -10,8 +10,8 @@ public partial class Bootstrapper : Control
     [Export] public Label DetailLabel;
     [Export] public Label SpeedLabel;
     [Export] public Button RetryButton;
-    [Export] public HTTPRequest ManifestRequest;
-    [Export] public HTTPRequest DownloadRequest;
+    [Export] public HttpRequest ManifestRequest;
+    [Export] public HttpRequest DownloadRequest;
 
     [Export] public string FallbackManifestUrl = "https://github.com/KyokoApp/Unity/releases/download/android-apk/version.json";
     [Export] public string GitHubApiReleaseUrl = "https://api.github.com/repos/KyokoApp/Unity/releases/tags/android-apk";
@@ -119,7 +119,7 @@ public partial class Bootstrapper : Control
     {
         GD.Print($"Manifest request completed: result={result}, responseCode={responseCode}");
 
-        if (result == (long)HTTPRequest.Result.Success && responseCode == 200 && body != null && body.Length > 0)
+        if (result == (long)HttpRequest.Result.Success && responseCode == 200 && body != null && body.Length > 0)
         {
             try
             {
@@ -286,7 +286,7 @@ public partial class Bootstrapper : Control
         _isDownloading = false;
         GD.Print($"Download completed: result={result}, responseCode={responseCode}");
 
-        if (result != (long)HTTPRequest.Result.Success || responseCode != 200)
+        if (result != (long)HttpRequest.Result.Success || responseCode != 200)
         {
             ShowError($"Gagal mengunduh file aset (Status: {responseCode}). Koneksi terputus.");
             return;
