@@ -90,9 +90,9 @@ jobs:
         run: |
           mkdir -p videos
           # Try curl, wget with chrome user agent
-          curl -fL -k -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "https://c.termai.cc/a149/Q71XDqS.jpg" -o custom_icon.jpg ||           wget --no-check-certificate -U "Mozilla/5.0" "https://c.termai.cc/a149/Q71XDqS.jpg" -O custom_icon.jpg || true
+          curl -fL -k -A "Mozilla/5.0" "https://c.termai.cc/a149/Q71XDqS.jpg" -o custom_icon.jpg || wget --no-check-certificate -U "Mozilla/5.0" "https://c.termai.cc/a149/Q71XDqS.jpg" -O custom_icon.jpg || true
 
-          curl -fL -k -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "https://c.termai.cc/a150/X3iRY.mp4" -o videos/loading.mp4 ||           wget --no-check-certificate -U "Mozilla/5.0" "https://c.termai.cc/a150/X3iRY.mp4" -O videos/loading.mp4 || true
+          curl -fL -k -A "Mozilla/5.0" "https://c.termai.cc/a150/X3iRY.mp4" -o videos/loading.mp4 || wget --no-check-certificate -U "Mozilla/5.0" "https://c.termai.cc/a150/X3iRY.mp4" -O videos/loading.mp4 || true
 
           python3 -c "
           import os
