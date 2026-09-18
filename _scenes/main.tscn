@@ -158,7 +158,8 @@ grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="UI" type="Node" parent="." unique_id=2062801815 node_paths=PackedStringArray("MobileUI", "LoadingUI")]
+[node name="UI" type="CanvasLayer" parent="." unique_id=2062801815 node_paths=PackedStringArray("MobileUI", "LoadingUI")]
+layer = 10
 script = ExtResource("3_7t23k")
 MobileUI = NodePath("Control2")
 LoadingUI = NodePath("LoadingScreen")

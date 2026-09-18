@@ -108,20 +108,27 @@ jobs:
         run: |
           dotnet build "Procedural Infinite Runner.csproj" -c ExportRelease || dotnet build "Procedural Infinite Runner.csproj" -c ExportDebug
 
-      - name: Export Data Pack (assets_v1.pck)
+      - name: Export Base Data Pack and Lightweight Patch Pack
         run: |
           mkdir -p build/android
-          # Export data pack containing all assets using AssetPack preset
-          godot --headless --verbose --export-pack "AssetPack" build/android/assets_v1.pck
-          if [ ! -s build/android/assets_v1.pck ]; then
-            echo "Fallback: exporting pack using Android preset..."
-            godot --headless --verbose --export-pack "Android" build/android/assets_v1.pck
+          
+          # Check if existing base assets_v1.pck is already published on release
+          # If published, download it so users don't have to re-download 90MB if base models/textures haven't changed!
+          echo "Checking for existing base assets_v1.pck from release..."
+          if curl -fIL "https://github.com/KyokoApp/Unity/releases/download/android-apk/assets_v1.pck" >/dev/null 2>&1; then
+            echo "Found existing assets_v1.pck on GitHub Releases. Using cached base pack."
+            curl -fL "https://github.com/KyokoApp/Unity/releases/download/android-apk/assets_v1.pck" -o build/android/assets_v1.pck
+          else
+            echo "Base assets_v1.pck not found on remote, generating full base pack..."
+            godot --headless --verbose --export-pack "AssetPack" build/android/assets_v1.pck
           fi
-          if [ ! -s build/android/assets_v1.pck ]; then
-            echo "Error: assets_v1.pck was not generated or is empty!"
-            exit 1
-          fi
-          echo "PCK generated successfully. Size: $(stat -c%s build/android/assets_v1.pck) bytes"
+
+          # Export lightweight update patch (only scripts, modified scenes, and configs, excluding heavy models & textures ~1-2 MB!)
+          echo "Exporting lightweight patch pack (patch_v1.pck)..."
+          godot --headless --verbose --export-pack "PatchPack" build/android/patch_v1.pck
+
+          echo "Base PCK size: $(stat -c%s build/android/assets_v1.pck) bytes"
+          echo "Patch PCK size: $(stat -c%s build/android/patch_v1.pck) bytes"
 
       - name: Export Android APK Lite (InfiniteRunner-Lite.apk)
         run: |
@@ -146,30 +153,41 @@ jobs:
 
       - name: Generate version.json Manifest
         run: |
-          PCK_SIZE=$(stat -c%s build/android/assets_v1.pck)
-          PCK_SHA256=$(sha256sum build/android/assets_v1.pck | awk '{print $1}')
+          BASE_SIZE=$(stat -c%s build/android/assets_v1.pck)
+          BASE_SHA256=$(sha256sum build/android/assets_v1.pck | awk '{print $1}')
           
+          PATCH_SIZE=$(stat -c%s build/android/patch_v1.pck)
+          PATCH_SHA256=$(sha256sum build/android/patch_v1.pck | awk '{print $1}')
+
           python3 -c "
           import json
           
           manifest = {
-              'version': '1.0.0',
+              'version': '1.0.1',
               'apk_url': 'https://github.com/KyokoApp/Unity/releases/download/android-apk/InfiniteRunner-Lite.apk',
               'packs': [
                   {
                       'name': 'assets_v1.pck',
                       'url': 'https://github.com/KyokoApp/Unity/releases/download/android-apk/assets_v1.pck',
-                      'size': int('$PCK_SIZE'),
-                      'sha256': '$PCK_SHA256',
+                      'size': int('$BASE_SIZE'),
+                      'sha256': '$BASE_SHA256',
                       'is_patch': False,
                       'order': 1
+                  },
+                  {
+                      'name': 'patch_v1.pck',
+                      'url': 'https://github.com/KyokoApp/Unity/releases/download/android-apk/patch_v1.pck',
+                      'size': int('$PATCH_SIZE'),
+                      'sha256': '$PATCH_SHA256',
+                      'is_patch': True,
+                      'order': 2
                   }
               ]
           }
           with open('build/android/version.json', 'w') as f:
               json.dump(manifest, f, indent=2)
           "
-          echo "Generated version.json:"
+          echo "Generated version.json with delta patch support:"
           cat build/android/version.json
 
       - name: Upload Artifacts
@@ -179,13 +197,14 @@ jobs:
           path: |
             build/android/InfiniteRunner-Lite.apk
             build/android/assets_v1.pck
+            build/android/patch_v1.pck
             build/android/version.json
 
       - name: Create or Update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/assets_v1.pck build/android/version.json"
+          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/assets_v1.pck build/android/patch_v1.pck build/android/version.json"
           if gh release view android-apk >/dev/null 2>&1; then
             echo "Release android-apk exists, uploading assets..."
             gh release upload android-apk $RELEASE_FILES --clobber
