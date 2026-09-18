@@ -67,6 +67,45 @@ jobs:
           
           rm -rf godot_mono.zip export_templates.tpz godot_mono export_templates_temp
 
+      - name: Verify App Icon and Convert Loading Video to OGV
+        run: |
+          mkdir -p videos
+          if [ -f "Amv/Proyek Baru 28 [7EB4FCC].mp4" ]; then
+            cp "Amv/Proyek Baru 28 [7EB4FCC].mp4" videos/loading.mp4
+          fi
+
+          echo "Installing ffmpeg to convert loading video to native Godot Theora OGV..."
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+
+          if [ -f "videos/loading.mp4" ]; then
+            echo "Converting videos/loading.mp4 to videos/loading.ogv (muted, optimized for mobile)..."
+            ffmpeg -y -i videos/loading.mp4 -an -c:v libtheora -q:v 6 -vf "scale=1280:-2" videos/loading.ogv || true
+          fi
+
+          ls -lh icon*
+          ls -lh videos/
+      - name: Initialize Godot Project and Import Resources
+        run: |
+          timeout 120 godot --headless --editor --quit || true
+
+      - name: Build C# Solution
+        run: |
+          dotnet build "Procedural Infinite Runner.csproj" -c ExportRelease || dotnet build "Procedural Infinite Runner.csproj" -c ExportDebug
+
+      - name: Export Base Data Pack and Lightweight Patch Pack
+        run: |
+          mkdir -p build/android
+          
+          echo "Exporting base data pack (assets_v1.pck)..."
+          timeout 300 godot --headless --export-pack "AssetPack" build/android/assets_v1.pck
+
+          # Export lightweight update patch (only scripts, modified scenes, and configs, excluding heavy models & textures ~1-2 MB!)
+          echo "Exporting lightweight patch pack (patch_v1.pck)..."
+          timeout 180 godot --headless --export-pack "PatchPack" build/android/patch_v1.pck
+
+          echo "Base PCK size: $(stat -c%s build/android/assets_v1.pck) bytes"
+          echo "Patch PCK size: $(stat -c%s build/android/patch_v1.pck) bytes"
+
       - name: Configure Keystore and Godot Editor Settings
         env:
           # Stored as repository secrets, NOT in the tree. The keystore itself used to be
@@ -111,45 +150,6 @@ jobs:
             echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=$KEY_ALIAS"
             echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=$KEY_PASSWORD"
           } >> $GITHUB_ENV
-
-      - name: Verify App Icon and Convert Loading Video to OGV
-        run: |
-          mkdir -p videos
-          if [ -f "Amv/Proyek Baru 28 [7EB4FCC].mp4" ]; then
-            cp "Amv/Proyek Baru 28 [7EB4FCC].mp4" videos/loading.mp4
-          fi
-
-          echo "Installing ffmpeg to convert loading video to native Godot Theora OGV..."
-          sudo apt-get update && sudo apt-get install -y ffmpeg
-
-          if [ -f "videos/loading.mp4" ]; then
-            echo "Converting videos/loading.mp4 to videos/loading.ogv (muted, optimized for mobile)..."
-            ffmpeg -y -i videos/loading.mp4 -an -c:v libtheora -q:v 6 -vf "scale=1280:-2" videos/loading.ogv || true
-          fi
-
-          ls -lh icon*
-          ls -lh videos/
-      - name: Initialize Godot Project and Import Resources
-        run: |
-          timeout 120 godot --headless --editor --quit || true
-
-      - name: Build C# Solution
-        run: |
-          dotnet build "Procedural Infinite Runner.csproj" -c ExportRelease || dotnet build "Procedural Infinite Runner.csproj" -c ExportDebug
-
-      - name: Export Base Data Pack and Lightweight Patch Pack
-        run: |
-          mkdir -p build/android
-          
-          echo "Exporting base data pack (assets_v1.pck)..."
-          timeout 300 godot --headless --export-pack "AssetPack" build/android/assets_v1.pck
-
-          # Export lightweight update patch (only scripts, modified scenes, and configs, excluding heavy models & textures ~1-2 MB!)
-          echo "Exporting lightweight patch pack (patch_v1.pck)..."
-          timeout 180 godot --headless --export-pack "PatchPack" build/android/patch_v1.pck
-
-          echo "Base PCK size: $(stat -c%s build/android/assets_v1.pck) bytes"
-          echo "Patch PCK size: $(stat -c%s build/android/patch_v1.pck) bytes"
 
       - name: Export Android APK Lite (InfiniteRunner-Lite.apk)
         run: |
