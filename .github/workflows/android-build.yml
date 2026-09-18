@@ -306,7 +306,14 @@ jobs:
             done
           fi
 
-          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/assets_v1.pck build/android/$PATCH_NAME build/android/version.json build/android/apk_report.txt build/android/patch_report.txt"
+          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/$PATCH_NAME build/android/version.json build/android/apk_report.txt build/android/patch_report.txt"
+          # Paket dasar 50MB hanya diunggah saat kontennya benar-benar berubah
+          # (make_manifest.py menuliskan flag saat rilis hanya menyentuh kode).
+          if [ ! -f build/android/skip_base_upload.flag ]; then
+            RELEASE_FILES="build/android/assets_v1.pck $RELEASE_FILES"
+          else
+            echo "Melewati upload assets_v1.pck (konten dasar tak berubah)."
+          fi
           if gh release view android-apk >/dev/null 2>&1; then
             echo "Release android-apk exists, uploading assets..."
             gh release upload android-apk $RELEASE_FILES --clobber

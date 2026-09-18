@@ -43,6 +43,8 @@ public partial class Bootstrapper : Control
     [Export] public int MaxRedirects = 5;
     [Export] public bool VerifyHashes = true;         // verifikasi SHA256 bila manifest menyediakan
 
+    public const string BasePackName = "assets_v1.pck"; // nama stabil paket dasar (embedded/diunduh)
+
     private const string StateFilePath = "user://update_state.json";
     private const string LastManifestPath = "user://last_manifest.json";
     private const string ManifestDownloadPath = "user://manifest_dl.json";
@@ -1011,6 +1013,9 @@ public partial class Bootstrapper : Control
     {
         var keep = new HashSet<string>();
         foreach (var p in _manifest.Packs) keep.Add(p.Name);
+        // Paket dasar abadi: disediakan APK + tidak selalu tercantum di manifest
+        // (manifest baru menghemat unduhan dengan melewatinya saat konten tak berubah).
+        keep.Add(BasePackName);
 
         using var dir = DirAccess.Open("user://");
         if (dir == null) return;
@@ -1045,11 +1050,17 @@ public partial class Bootstrapper : Control
 
         // Urutkan sesuai manifest (base dulu, lalu patch) - patch mereplace file base.
         var orderedPaths = new List<string>();
+        bool baseListed = false;
         foreach (var pack in _manifest.Packs)
         {
             string p = $"user://{pack.Name}";
             if (FileAccess.FileExists(p)) orderedPaths.Add(p);
+            if (pack.Name == BasePackName) baseListed = true;
         }
+        // Bila manifest hemat-unduhan tidak mencantumkan base, tetap muat salinan
+        // lokal yang sudah ada (patch tetap me-replace di atasnya via urutan baca).
+        if (!baseListed && FileAccess.FileExists("user://" + BasePackName))
+            orderedPaths.Insert(0, "user://" + BasePackName);
 
         foreach (var packPath in orderedPaths)
         {
