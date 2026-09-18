@@ -144,7 +144,11 @@ jobs:
           timeout 300 godot --headless --export-pack "AssetPack" build/android/assets_v1.pck
 
           echo "Exporting patch pack ($PATCH_NAME) - hanya file berubah sejak baseline..."
-          timeout 300 godot --headless --export-pack "PatchPack" "build/android/$PATCH_NAME"
+          # NOTE: export_filter="selected_resources" di Godot 4.5 tidak memangkas
+          # isi pack sesuai ekspektasi pipeline ini (patch selalu seikut paket
+          # penuh). Solusinya: stage proyek minimal lalu export all_resources.
+          python3 tools/update_pipeline/stage_patch_project.py
+          timeout 300 godot --headless --path build/patch_project --export-pack "PatchPack" "$(pwd)/build/android/$PATCH_NAME"
 
           echo "Base PCK size: $(stat -c%s build/android/assets_v1.pck) bytes"
           echo "Patch PCK size: $(stat -c%s build/android/$PATCH_NAME) bytes"
