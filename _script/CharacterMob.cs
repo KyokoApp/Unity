@@ -188,36 +188,39 @@ public partial class CharacterMob : CharacterBody3D
 
 		}*/
 
+	// State animasi di-cache: sebelumnya 5x Animator.Set (string lookup) dipanggil
+	// TIAP FRAME PER MOB (~20 mob -> ~100 native string call/frame). Sekarang hanya
+	// ditulis saat state benar-benar berubah.
+	private string _lastAnimState = null;
+
 	protected void UpdateAnimations()
 	{
-
-		Animator.Set("parameters/conditions/falling", false);
-		Animator.Set("parameters/conditions/idle", false);
-		Animator.Set("parameters/conditions/sprinting", false);
-		Animator.Set("parameters/conditions/running", false);
-		Animator.Set("parameters/conditions/tossing", false);
-		
+		string state;
 		if (!IsOnFloor())
 		{
-			Animator.Set("parameters/conditions/falling", true);
-			return;
+			state = "falling";
 		}
-		if (Velocity.Z == 0 && IsOnFloor())
+		else if (Velocity.Z == 0)
 		{
-			Animator.Set("parameters/conditions/idle", true);
-			return;
+			state = "idle";
 		}
-		if (Velocity.Z != 0)
+		else if (Input.IsActionPressed("run"))
 		{
-			if (Input.IsActionPressed("run"))
-			{
-				Animator.Set("parameters/conditions/sprinting", true);
-				return;
-			}
-			Animator.Set("parameters/conditions/running", true);
-			return;
+			state = "sprinting";
+		}
+		else
+		{
+			state = "running";
 		}
 
+		if (state == _lastAnimState) return;
+		_lastAnimState = state;
+
+		Animator.Set("parameters/conditions/falling", state == "falling");
+		Animator.Set("parameters/conditions/idle", state == "idle");
+		Animator.Set("parameters/conditions/sprinting", state == "sprinting");
+		Animator.Set("parameters/conditions/running", state == "running");
+		Animator.Set("parameters/conditions/tossing", false);
 	}
 
 	protected void ChangeAnimState()

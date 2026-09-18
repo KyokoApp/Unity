@@ -40,14 +40,27 @@ public partial class Compass : Control
 
         currentSmoothedAngle = Mathf.PosMod(currentSmoothedAngle, 360f);
 
-        CallDeferred("updateAngleText");
+        updateAngleText(); // langsung (CallDeferred tiap frame sebelumnya)
     }
+
+    private int _lastAngleText = -1;
+    private float _lastNeedleRotation = -999f;
 
     void updateAngleText()
     {
         float invertedAngle = Mathf.PosMod(360f - currentSmoothedAngle, 360f);
-        Angle.Text = Mathf.Round(invertedAngle).ToString("000");
-        CompassContainer.RotationDegrees = currentSmoothedAngle;
+        int rounded = (int)Mathf.Round(invertedAngle);
+        // SetText hanya saat angka berubah (re-layout label setiap frame = boros).
+        if (rounded != _lastAngleText)
+        {
+            _lastAngleText = rounded;
+            Angle.Text = rounded.ToString("000");
+        }
+        if (Mathf.Abs(currentSmoothedAngle - _lastNeedleRotation) > 0.05f)
+        {
+            _lastNeedleRotation = currentSmoothedAngle;
+            CompassContainer.RotationDegrees = currentSmoothedAngle;
+        }
     }
 
     public static float GetCompassHeading(Node3D node)
