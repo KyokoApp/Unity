@@ -37,6 +37,9 @@ public partial class GameManager : Node
     public static GameManager Instance;
 	private static Camera3D mainCamera;
 	private static MainCharacter mainCharacter;
+
+	// Akses read-only ke karakter aktif (dipakai debug overlay).
+	public static MainCharacter CurrentCharacter => mainCharacter;
 	
 	public bool Initialized = false;
 	public static PackedScene World;

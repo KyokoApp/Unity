@@ -93,6 +93,7 @@ public partial class MainCharacter : CharacterBody3D
 	float upkeepTimer = 0;
 
 	public bool Initialized = false;
+	float _initWaitTimer = 0f;
 
 	public bool hasGlided = false;
 
@@ -199,6 +200,7 @@ public partial class MainCharacter : CharacterBody3D
 	protected virtual void Initialization()
 	{
 		//Faraway = GetNode("/root/Faraway") as MeshInstance3D;
+		GameSettings.EnsureLoaded();
 		Input.MouseMode = Input.MouseModeEnum.Captured;
 		FloorMaxAngle = Mathf.DegToRad(50);
 		GameManager.Instance.SetMainCamera(PlayerCamera);
@@ -276,9 +278,28 @@ public partial class MainCharacter : CharacterBody3D
 
 	public override void _Process(double delta)
 	{
-		if (TerrainManager.Instance.CurrentLoadStatus != TerrainManager.LoadStatuses.Initialized)
+		if (TerrainManager.Instance == null ||
+		    TerrainManager.Instance.CurrentLoadStatus != TerrainManager.LoadStatuses.Initialized)
 		{
 			return;
+		}
+		if (!Initialized)
+		{
+			// Anti-softlock: kalau lookup terrain gagal > 3 detik (mis. spawn
+			// di luar chunk / koordinat tak ketemu), paksa inisialisasi di
+			// posisi saat ini daripada karakter macet tak bisa digerakkan.
+			_initWaitTimer += (float)delta;
+			if (_initWaitTimer > 3f)
+			{
+				float safeY = Position.Y > -50 ? Position.Y : 30f;
+				GlobalPosition = new Vector3(Position.X, safeY, Position.Z);
+				if (MobManager.Instance != null)
+				{
+					MobManager.Instance.CallDeferred("ResetSecureZone", GlobalPosition);
+				}
+				Initialized = true;
+				GD.Print("[MainCharacter] Fallback init dipakai setelah 3 detik.");
+			}
 		}
 		if (!Initialized)
 		{
@@ -342,7 +363,10 @@ public partial class MainCharacter : CharacterBody3D
 				Initialized = true;
 			}
 		}
-		Faraway.Position = new Vector3(Position.X, 0, Position.Z);
+		if (Faraway != null)
+		{
+			Faraway.Position = new Vector3(Position.X, 0, Position.Z);
+		}
 		float deltaFloat = (float)delta;
 		//GD.Print(RaycastDown.IsColliding());
 		UpdateAction(deltaFloat);
