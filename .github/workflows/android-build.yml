@@ -18,6 +18,7 @@ jobs:
   build:
     name: Build Android APK
     runs-on: ubuntu-latest
+    timeout-minutes: 12
 
     steps:
       - name: Checkout repository
@@ -117,11 +118,11 @@ jobs:
           mkdir -p build/android
           
           echo "Exporting base data pack (assets_v1.pck)..."
-          godot --headless --verbose --export-pack "AssetPack" build/android/assets_v1.pck
+          timeout 300 godot --headless --export-pack "AssetPack" build/android/assets_v1.pck
 
           # Export lightweight update patch (only scripts, modified scenes, and configs, excluding heavy models & textures ~1-2 MB!)
           echo "Exporting lightweight patch pack (patch_v1.pck)..."
-          godot --headless --verbose --export-pack "PatchPack" build/android/patch_v1.pck
+          timeout 180 godot --headless --export-pack "PatchPack" build/android/patch_v1.pck
 
           echo "Base PCK size: $(stat -c%s build/android/assets_v1.pck) bytes"
           echo "Patch PCK size: $(stat -c%s build/android/patch_v1.pck) bytes"
@@ -136,8 +137,8 @@ jobs:
           echo "Set Android versionCode=${VERSION_CODE}"
 
           # Attempt export release for stripped optimized binary, fallback to debug if needed
-          godot --headless --verbose --export-release "Android" build/android/InfiniteRunner-Lite.apk || \
-          godot --headless --verbose --export-debug "Android" build/android/InfiniteRunner-Lite.apk
+          timeout 300 godot --headless --export-release "Android" build/android/InfiniteRunner-Lite.apk || \
+          timeout 300 godot --headless --export-debug "Android" build/android/InfiniteRunner-Lite.apk
 
       - name: Verify Builds
         run: |
