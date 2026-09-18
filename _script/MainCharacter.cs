@@ -207,6 +207,29 @@ public partial class MainCharacter : CharacterBody3D
 		Cube = GD.Load<PackedScene>("res://_scenes/decor/crate.tscn");
 
 		ApplyToonOutline();
+		ConfigureModelAnimationLoops();
+	}
+
+	// KayKit Knight.glb membawa 76 clip; tanpa konfigurasi ini semua clip
+	// default TIDAK loop → Idle/Run berhenti setelah 1 siklus (seolah macet).
+	// Loop dipaksa di sini agar tidak tergantung setting .import.
+	private void ConfigureModelAnimationLoops()
+	{
+		var player = GetNodeOrNull<AnimationPlayer>("RobotArmature/PlayerModel/AnimationPlayer");
+		var lib = player?.GetAnimationLibrary("");
+		if (lib == null) return;
+
+		// Loop panjang: gerak dasar
+		foreach (string n in new[] { "Idle", "Jump_Idle", "Running_A", "Running_B", "Sit_Floor_Idle" })
+		{
+			if (lib.HasAnimation(n)) lib.GetAnimation(n).LoopMode = Animation.LoopModeEnum.Linear;
+		}
+		// Sekali main: serangan & transisi
+		foreach (string n in new[] { "Throw", "Unarmed_Melee_Attack_Kick", "Jump_Full_Long", "Jump_Start", "Jump_Land",
+			"Hit_A", "Hit_B", "Death_A", "Death_B", "Cheer", "Interact", "PickUp", "Use_Item", "Dodge_Forward" })
+		{
+			if (lib.HasAnimation(n)) lib.GetAnimation(n).LoopMode = Animation.LoopModeEnum.None;
+		}
 	}
 
 	private void ApplyToonOutline()

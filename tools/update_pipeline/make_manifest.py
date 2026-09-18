@@ -36,6 +36,9 @@ def main() -> int:
     ap.add_argument("--base-name", default="assets_v1.pck")
     ap.add_argument("--patch-name", required=True)
     ap.add_argument("--apk-name", default="InfiniteRunner-Lite.apk")
+    ap.add_argument("--changed-files", default="",
+                    help="File teks berisi daftar path yang berubah (satu per baris). "
+                         "Dipakai untuk mengisi flag requires_restart / needs_new_apk.")
     args = ap.parse_args()
 
     def pack_entry(name: str, order: int, is_patch: bool) -> dict:
@@ -51,10 +54,30 @@ def main() -> int:
             "order": order,
         }
 
+    changed: list[str] = []
+    if args.changed_files and os.path.exists(args.changed_files):
+        with open(args.changed_files, encoding="utf-8") as f:
+            changed = [line.strip() for line in f if line.strip()]
+
+    # Semantik "update data game" ala Mobile Legends:
+    # - requires_restart: file yang hanya dibaca saat boot berubah
+    #   (project.godot) -> client sarankan restart otomatis setelah unduh.
+    # - needs_new_apk: kode C# berubah. Sumber .cs TIDAK dieksekusi dari
+    #   .pck (assembly ter-kompilasi ke dalam APK), jadi pemain dipersilakan
+    #   mengunduh APK baru — game tetap jalan dengan kode lama.
+    def any_changed(pred) -> bool:
+        return any(pred(c) for c in changed)
+
+    requires_restart = any_changed(lambda c: c == "project.godot" or c == "export_presets.cfg")
+    needs_new_apk = any_changed(lambda c: c.startswith("_script/") or c.endswith(".csproj") or c.endswith(".sln"))
+
     manifest = {
         "version": args.version,
         "version_code": int(args.version_code),
         "apk_url": f"{args.release_base_url}/{args.apk_name}",
+        "requires_restart": requires_restart,
+        "needs_new_apk": needs_new_apk,
+        "changed_files_count": len(changed),
         "packs": [
             pack_entry(args.base_name, order=1, is_patch=False),
             pack_entry(args.patch_name, order=2, is_patch=True),
