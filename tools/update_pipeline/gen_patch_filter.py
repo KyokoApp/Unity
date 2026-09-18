@@ -38,6 +38,12 @@ NEVER_INCLUDE_PREFIXES = (
 
 ALWAYS_INCLUDE = ("project.godot",)
 
+# File yang hidupnya di APK (bukan di paket aset) — bootstrapper & script
+# tidak boleh ikut patch meski berada di bawah prefix konten.
+NEVER_INCLUDE_FILES = (
+    "_scenes/bootstrapper.tscn",
+)
+
 
 def read_baseline() -> str:
     if not os.path.exists(BASELINE_FILE):
@@ -65,6 +71,8 @@ def git_changed_files(baseline: str) -> list[str]:
 def is_pack_relevant(path: str) -> bool:
     if path in ALWAYS_INCLUDE:
         return True
+    if path in NEVER_INCLUDE_FILES:
+        return False
     if any(path.startswith(p) for p in NEVER_INCLUDE_PREFIXES):
         return False
     if path.endswith(".cs") or path.endswith(".uid"):

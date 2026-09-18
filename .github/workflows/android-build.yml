@@ -158,6 +158,53 @@ jobs:
           timeout 300 godot --headless --export-release "Android" build/android/InfiniteRunner-Lite.apk || \
           timeout 300 godot --headless --export-debug "Android" build/android/InfiniteRunner-Lite.apk
 
+      - name: Trim APK (buang arsip statis .a sisa template) & Re-sign
+        run: |
+          # Template export Godot Mono ikut mem-paket lib/*/**.a (arsip statis
+          # link-time, ~60MB!) yang tidak bisa dan tidak akan dimuat Android
+          # runtime (loader hanya memuat .so). Membuangnya memangkas APK
+          # secara signifikan. Setelah itu APK di-zipalign & di-sign ulang
+          # dengan keystore release yang sama (edit zip membatalkan signature).
+          APK="build/android/InfiniteRunner-Lite.apk"
+          python3 - <<'EOF'
+          import zipfile, shutil, os
+          src = "build/android/InfiniteRunner-Lite.apk"
+          dst = src + ".trimmed"
+          removed, kept = [], 0
+          with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dst, "w") as zout:
+              for info in zin.infolist():
+                  if info.filename.startswith("lib/") and info.filename.endswith(".a"):
+                      removed.append((info.filename, info.compress_size))
+                      continue
+                  data = zin.read(info.filename)
+                  # Pertahankan STORE vs DEFLATE agar perilaku muat .so/dex tidak berubah
+                  comp = zipfile.ZIP_DEFLATED if info.compress_type == zipfile.ZIP_DEFLATED else zipfile.ZIP_STORED
+                  zi = zipfile.ZipInfo(info.filename, date_time=info.date_time)
+                  zi.compress_type = comp
+                  zi.external_attr = info.external_attr
+                  zout.writestr(zi, data)
+                  kept += 1
+          saved = sum(s for _, s in removed)
+          print(f"Membuang {len(removed)} arsip statis ({saved/1e6:.1f} MB):")
+          for name, s in removed: print(f"  - {name} ({s/1e6:.2f} MB)")
+          print(f"Entri dipertahankan: {kept}")
+          os.replace(dst, src)
+          print(f"APK setelah trim: {os.path.getsize(src)/1e6:.1f} MB")
+          EOF
+
+          ZIPALIGN=$(ls "$ANDROID_HOME"/build-tools/*/zipalign | head -1)
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | head -1)
+          "$ZIPALIGN" -f -p 4 "$APK" "$APK.aligned" && mv "$APK.aligned" "$APK"
+          "$APKSIGNER" sign \
+            --ks "$GODOT_ANDROID_KEYSTORE_RELEASE_PATH" \
+            --ks-key-alias "$GODOT_ANDROID_KEYSTORE_RELEASE_USER" \
+            --ks-pass "pass:$GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD" \
+            --key-pass "pass:$GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD" \
+            --out "$APK.signed" "$APK"
+          "$APKSIGNER" verify --verbose "$APK.signed"
+          mv "$APK.signed" "$APK"
+          echo "APK final setelah trim+sign: $(stat -c%s "$APK") bytes"
+
       - name: Verify Builds
         run: |
           for f in "build/android/InfiniteRunner-Lite.apk" "build/android/assets_v1.pck" "build/android/$PATCH_NAME"; do
