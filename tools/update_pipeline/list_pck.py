@@ -23,84 +23,83 @@ def read_pck_dir(path: str):
     def u32(p):
         return struct.unpack("<I", buf[p:p + 4])[0] if 0 <= p <= fsize - 4 else None
 
-    def valid_off_size(p):
-        """QQ di p harus offset/size yang masuk akal."""
+    def u64(p):
+        return struct.unpack("<Q", buf[p:p + 8])[0] if 0 <= p <= fsize - 8 else None
+
+    def valid_offs(p):
+        """QQ di p = (offset, size) yang masuk akal; offset relatif terhadap file_base."""
         if p + 16 > fsize:
-            return False
+            return None
         offs, size = struct.unpack("<QQ", buf[p:p + 16])
-        return 100 <= offs < fsize and 0 <= size <= fsize and offs + size <= fsize + 16
-
-    def valid_name(p):
-        """U32 di p terlihat seperti panjang path dan diikuti nama res://."""
-        pl = u32(p)
-        if pl is None or pl < 7 or pl > 4096:
+        if offs > fsize or size > fsize or offs + size > fsize + 4096:
             return None
-        if buf[p + 4:p + 10] != b"res://":
-            return None
-        return pl
+        return offs, size
 
-    def walk(dir_off, count):
-        pos = dir_off + 4
+    def parse(dir_off, count, mode):
+        pos = dir_off + 4  # lewati count
         entries = []
         for i in range(count):
-            pl = valid_name(pos)
-            if pl is None:
-                return None, i, pos
-            name_end = pos + 4 + pl
-            name = buf[pos + 4:name_end].rstrip(b"\x00").decode("utf-8", "replace")
-            k_max = min(5, fsize - name_end)
-            got = False
-            k_start = 1 if buf[name_end:name_end + 1] == b"\x00" else 0
-            for k in range(k_start, k_max + 1):
-                p2 = name_end + k
-                if k > 0 and buf[name_end + k - 1] != 0:
-                    break  # nol diizinkan saja; kalau bukan nol, berhenti
-                if valid_off_size(p2):
-                    offs, size = struct.unpack("<QQ", buf[p2:p2 + 16])
-                    pos = p2 + 16 + 16  # +md5
-                    entries.append((name, size))
-                    got = True
+            pl = u32(pos)
+            if pl is None or pl < 6 or pl > 4096 or pos + 4 + pl > fsize:
+                return None
+            if buf[pos + 4:pos + 10] != b"res://":
+                return None
+            name = buf[pos + 4:pos + 4 + pl].decode("utf-8", "replace")
+            tail = pos + 4 + pl
+            os_ = None
+            for k in range(0, (7 if mode == "adaptive" else 1)):
+                p2 = tail + k
+                if k > 0 and buf[tail + k - 1] != 0 and buf[tail + k - 1] < 128:
+                    # padding hanya zeros; kalau byte non-nol kecil itu bagian Q, berhenti
                     break
-            if not got:
-                return None, i, pos
+                os_ = valid_offs(p2)
+                if os_:
+                    offs, size = os_
+                    pos2 = p2 + 16 + 16 + 4  # +md5 +flags
+                    break
+            if os_ is None:
+                return None
+            entries.append((name, size))
             if i == count - 1:
-                break
-            # cari awal entry berikut (mungkin ada flags/pad 0..12 byte)
-            nxt = None
-            for j in range(13):
-                if pos + j >= fsize:
-                    break
-                if j > 0 and buf[pos + j - 1] != 0 and buf[pos + j - 1] > 127:
-                    break  # padding = nol; flags kecil diabaikan (I32 LE umumnya byte akhir nol)
-                if valid_name(pos + j) is not None:
-                    nxt = pos + j
-                    break
-            if nxt is None:
-                return None, i + 1, pos
-            pos = nxt
-        if fsize - pos <= 72:
-            return entries, count, pos
-        return None, count, pos
+                return entries if fsize - pos2 <= 72 else None
+            # entry berikutnya tepat di pos2 (strict) atau geser kecil (adaptive)
+            if mode == "adaptive":
+                nxt = None
+                for j in range(0, 13):
+                    pl2 = u32(pos2 + j)
+                    if pl2 is not None and 6 <= pl2 <= 4096 and buf[pos2 + j + 4:pos2 + j + 10] == b"res://":
+                        nxt = pos2 + j
+                        break
+                if nxt is None:
+                    return None
+                pos = nxt
+            else:
+                pos = pos2
+        return None
 
-    best = (0, -1, -1)
+    cands = []
+    doff32 = u64(32)  # dir_offset V3 persis di header (offset 32)
+    if doff32 is not None and 0 < doff32 < fsize:
+        cands.append(doff32)
     for h in hits:
-        for cback in (4, 8, 12, 16, 20):
-            count = u32(h - cback)
-            if count is None or count == 0 or count > 50000:
-                continue
-            got, done, pos = walk(h - cback, count)
+        for cback in (8, 12, 16):  # count sebelum [slen][name]
+            cp = h - cback
+            if cp >= 0:
+                cands.append(cp)
+    for cand in cands:
+        count = u32(cand)
+        if count is None or count == 0 or count > 50000:
+            continue
+        for mode in ("strict", "adaptive"):
+            got = parse(cand, count, mode)
             if got:
                 return got
-            if done > best[0]:
-                best = (done, h, -1)
 
     tail = buf[-48:].hex() if fsize > 48 else buf.hex()
-    sample = [buf[h:h + 40].split(b"\x00")[0].decode("utf-8", "replace") for h in hits[:4]]
     raise SystemExit(
         f"Gagal parse direktori PCK {path} (pack_ver={pack_ver}, hits={len(hits)}, "
-        f"fsize={fsize}, best_progress={best[0]})\n"
-        f"first hits: {hits[:6]}\nlast hits: {hits[-6:] if hits else []}\n"
-        f"sampel: {sample}\nhex -48..EOF: {tail}")
+        f"fsize={fsize}, doff32={u64(32)})\nfirst hits: {hits[:4]}\n"
+        f"last hits: {hits[-6:] if hits else []}\nhex -48..EOF: {tail}")
 
 
 
