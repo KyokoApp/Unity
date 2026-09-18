@@ -7,6 +7,9 @@ config/description="Procedural world generation demo project, including random i
 run/main_scene="res://_scenes/bootstrapper.tscn"
 config/features=PackedStringArray("4.5", "C#", "Mobile")
 config/icon="res://icon.png"
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.03, 0.04, 0.055, 1)
+boot_splash/minimum_display_time=0
 
 [display]
 

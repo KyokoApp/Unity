@@ -718,23 +718,36 @@ public partial class MainCharacter : CharacterBody3D
 		}
 	}
 
+	private float _helpersAccum = 0f;
+	private string _lastHelperText = "";
+
 	public void UpdateHelpers(float deltaFloat)
 	{
-		string text = CharacterName+ "\n" + TerrainManager.Instance.CameraInChunk();
 		if (PopupInfo == null)
 		{
-			PopupInfo = Debug.SetTextHelper(text, CameraPivot.Position, CameraPivot);
+			string initText = CharacterName + "\n" + TerrainManager.Instance.CameraInChunk();
+			PopupInfo = Debug.SetTextHelper(initText, CameraPivot.Position, CameraPivot);
 			PopupInfo.MaxViewDistance = 1000;
+			_lastHelperText = initText;
+#if GODOT_ANDROID
+				PopupInfo.SetSize(50); // cukup set sekali (sebelumnya tiap frame)
+#endif
 		}
 		if (PopupInfo != null)
 		{
-			text = text;// + "\n" + CurrentAction + " " + TerrainManager.Instance.GetTerrainHeightAtGlobalCoordinate(new Vector2(Position.X, Position.Z)).ToString();
-						//Mathf.RadToDeg(GetFloorAngle()) + " Pos: X: " + string.Format("{0:0. #}", Position.X) + " Y: " + string.Format("{0:0. #}", Position.Y) + " Z: " + string.Format("{0:0. #}", Position.Z) ;
-						//GD.Print(TerrainGenerator.Instance.CameraInChunk());
-			PopupInfo.SetText(text);
-#if GODOT_ANDROID
-				PopupInfo.SetSize(50);
-#endif
+			// Teks (nama + chunk) dihitung ulang hanya 4x/detik & SetText hanya bila
+			// berubah; posisi tetap di-track tiap frame agar label mengikuti karakter.
+			_helpersAccum += deltaFloat;
+			if (_helpersAccum >= 0.25f)
+			{
+				_helpersAccum = 0f;
+				string text = CharacterName + "\n" + TerrainManager.Instance.CameraInChunk();
+				if (text != _lastHelperText)
+				{
+					_lastHelperText = text;
+					PopupInfo.SetText(text);
+				}
+			}
 			PopupInfo.Position = CameraPivot.Position + Vector3.Down * 0.7f;
 			//GD.Print("Position " + PopupInfo.Position);
 		}

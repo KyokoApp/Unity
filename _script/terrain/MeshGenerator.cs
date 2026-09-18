@@ -324,7 +324,8 @@ namespace Bouncerock.Terrain
 				array[(int)ArrayMesh.ArrayType.Normal] = Variant.CreateFrom(bakedNormals);
 				array[(int)ArrayMesh.ArrayType.Color] = Variant.CreateFrom(vertexColors);
 				arrayMesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, array);
-				arrayMesh.RegenNormalMaps();
+				// RegenNormalMaps() DIHAPUS: bakedNormals sudah dipasok di atas —
+				// regen hanya membuang CPU dan menimpa normal hasil bake.
 				//arrayMesh.CreateTrimeshShape();
 				//GD.Print("Creating mesh DONE"); 
 			});

@@ -213,6 +213,11 @@ public partial class EnvironmentManager : WorldEnvironment
         return currentTime.ToString();
     }
 
+    // Lighting & regen noise awan hanya di-update 10x/detik: perubahannya sangat
+    // lambat, sedangkan re-bake NoiseTexture2D setiap frame membebani CPU mobile.
+    private double _envUpdateAccum = 0.0;
+    private const double EnvUpdateInterval = 0.1;
+
     public override void _Process(double delta)
     {
         currentTime += ((float)delta / secondsPerHour) * CycleSpeed;
@@ -227,8 +232,13 @@ public partial class EnvironmentManager : WorldEnvironment
         UseOverride ? 1.0f : 0.0f,
         (float)delta * OverrideFadeSpeed);
 
-        UpdateLighting();
-        UpdateClouds(delta);
+        _envUpdateAccum += delta;
+        if (_envUpdateAccum >= EnvUpdateInterval)
+        {
+            UpdateLighting();
+            UpdateClouds(_envUpdateAccum);
+            _envUpdateAccum = 0.0;
+        }
     }
     private void ResetGradient(Gradient g)
     {
@@ -315,18 +325,31 @@ public partial class EnvironmentManager : WorldEnvironment
         GD.Print("New clouds: " + CurrentCloud);
     }
 
+    private NoiseTexture2D _cloudNoiseTexture;
+    private FastNoiseLite _cloudNoiseLite;
+    private float _lastCloudOffsetX = -99999f;
+
     private void UpdateClouds(double delta)
     {
 
         if (skyMaterial != null)
         {
-            NoiseTexture2D noiseTexture = skyMaterial.SkyCover as NoiseTexture2D;
-            FastNoiseLite noiseLite = noiseTexture.Noise as FastNoiseLite;
+            // Cache referensi supaya tidak query native setiap tick.
+            if (_cloudNoiseTexture == null)
+            {
+                _cloudNoiseTexture = skyMaterial.SkyCover as NoiseTexture2D;
+                _cloudNoiseLite = _cloudNoiseTexture?.Noise as FastNoiseLite;
+            }
+            if (_cloudNoiseLite == null) return;
 
             float normalizedTOD = MathExt.InvLerp(0, 24, currentTime);
             float timeOfDay = MathExt.Lerp(0, 360, normalizedTOD * CloudsSpeed);
-            Vector3 offset = new Vector3(timeOfDay, 0, 0);
-            noiseLite.Offset = offset;
+            // Menulis Offset memicu re-bake noise texture — hanya bila benar-benar bergeser.
+            if (Mathf.Abs(timeOfDay - _lastCloudOffsetX) > 0.5f)
+            {
+                _lastCloudOffsetX = timeOfDay;
+                _cloudNoiseLite.Offset = new Vector3(timeOfDay, 0, 0);
+            }
             // Blending
             if (previousGradient != null && CurrentGradient != null && gradientLerpValue < 1f)
             {
@@ -336,7 +359,7 @@ public partial class EnvironmentManager : WorldEnvironment
 
                 Gradient grad = InterpolateGradients(previousGradient, CurrentGradient, t);
 
-                noiseTexture.ColorRamp = grad;
+                _cloudNoiseTexture.ColorRamp = grad;
 
                 // GD.Print($"Blending: {t}");
             }

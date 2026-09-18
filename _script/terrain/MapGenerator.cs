@@ -28,18 +28,39 @@ namespace Bouncerock.Terrain
 				+ "/Islands/";
 		//This is where new chunks are generated and assembled.
 
+		// Seed deterministik per chunk: dunia konsisten antar-run DAN aman dipakai
+		// dari thread pool (tidak memakai RNG bersama / DateTime.Now lagi).
+		private static int ChunkSeed(int worldSeed, Vector2 chunk)
+		{
+			unchecked
+			{
+				return worldSeed ^ ((int)chunk.X * 73856093) ^ ((int)chunk.Y * 19349663);
+			}
+		}
+
 		public static async Task<Map> GenerateMapAsync(Vector2 sampleCentre)
+		{
+			// Tangkap referensi data DI main thread (read-only, aman dibagikan antar
+			// thread), lalu seluruh perhitungan noise + penempatan objek dipindah ke
+			// thread pool supaya main thread tidak lagi stutter setiap chunk baru.
+			MapGenerationSettings mapSettings = TerrainManager.Instance.CurrentMapSettings;
+			int worldSeed = TerrainManager.Instance.Seed;
+			return await Task.Run(() => GenerateMapOnThread(sampleCentre, mapSettings, worldSeed));
+		}
+
+		private static Map GenerateMapOnThread(Vector2 sampleCentre, MapGenerationSettings mapSettings, int worldSeed)
 		{
 			Vector2 offset = new Vector2(
 				-(TerrainMeshSettings.numVertsPerLine / 2) + sampleCentre.X,
 				(TerrainMeshSettings.numVertsPerLine / 2) - sampleCentre.Y);
 
 			Map map = new Map(Map.Origins.Generated);
+			System.Random rng = new System.Random(ChunkSeed(worldSeed, sampleCentre));
 
 			try
 			{
 				// Base heightmap
-				TerrainPass basePass = TerrainManager.Instance.CurrentMapSettings.Passes[0];
+				TerrainPass basePass = mapSettings.Passes[0];
 				float[,] heightMap = GenerateHeightMapSimplex(
 					TerrainMeshSettings.numVertsPerLine,
 					TerrainMeshSettings.numVertsPerLine,
@@ -49,9 +70,9 @@ namespace Bouncerock.Terrain
 				heightMap = ApplyContrast(heightMap, basePass.Contrast);
 
 				// Additive passes
-				for (int i = 1; i < TerrainManager.Instance.CurrentMapSettings.Passes.Count; i++)
+				for (int i = 1; i < mapSettings.Passes.Count; i++)
 				{
-					TerrainPass pass = TerrainManager.Instance.CurrentMapSettings.Passes[i];
+					TerrainPass pass = mapSettings.Passes[i];
 					float[,] heightMapTemp = GenerateHeightMapSimplex(
 						TerrainMeshSettings.numVertsPerLine,
 						TerrainMeshSettings.numVertsPerLine,
@@ -66,11 +87,11 @@ namespace Bouncerock.Terrain
 
 				List<WorldItem> _worldItems = new List<WorldItem>();
 
-				foreach (WorldItemSettings naturalObject in TerrainManager.Instance.CurrentMapSettings.NaturalObjects)
+				foreach (WorldItemSettings naturalObject in mapSettings.NaturalObjects)
 				{
 					if (naturalObject.Concentration > 1)
 					{
-						List<WorldItem> items = await GenerateStaticElements(heightMap, naturalObject);
+						List<WorldItem> items = GenerateStaticElements(heightMap, naturalObject, rng);
 						if (items.Count > 0)
 						{
 							_worldItems.AddRange(items);
@@ -78,17 +99,17 @@ namespace Bouncerock.Terrain
 					}
 					else
 					{
-						WorldItem item = await DetermineItemPresence(heightMap, naturalObject);
+						WorldItem item = DetermineItemPresence(heightMap, naturalObject, rng);
 						if (item != null && item.ModelAddress != ""){_worldItems.Add(item);}
-						
+
 					}
 				}
 
-				foreach (WorldItemSettings gameplayObject in TerrainManager.Instance.CurrentMapSettings.GameplayObjects)
+				foreach (WorldItemSettings gameplayObject in mapSettings.GameplayObjects)
 				{
 					if (gameplayObject.Concentration > 1)
 					{
-						List<WorldItem> items = await GenerateStaticElements(heightMap, gameplayObject);
+						List<WorldItem> items = GenerateStaticElements(heightMap, gameplayObject, rng);
 						if (items.Count > 0)
 						{
 							_worldItems.AddRange(items);
@@ -96,7 +117,7 @@ namespace Bouncerock.Terrain
 					}
 					else
 					{
-						WorldItem item = await DetermineItemPresence(heightMap, gameplayObject);
+						WorldItem item = DetermineItemPresence(heightMap, gameplayObject, rng);
 						if (item != null && item.ModelAddress != ""){_worldItems.Add(item);}
 					}
 				}
@@ -294,21 +315,19 @@ namespace Bouncerock.Terrain
 			}
 		}
 
-		static async Task<WorldItem> DetermineItemPresence(float[,] heightmap, WorldItemSettings settings)
+		static WorldItem DetermineItemPresence(float[,] heightmap, WorldItemSettings settings, System.Random rng)
 		{
 			WorldItem item = new WorldItem();
 			item.GridLocation = Vector2.Zero;
 			item.settings = settings;
 			item.ModelAddress = "";
-			RandomNumberGenerator rnd = new RandomNumberGenerator();
-			rnd.Seed = (ulong)DateTime.Now.ToBinary();
-			float chance = rnd.RandfRange(0, 1);
+			float chance = (float)rng.NextDouble();
 			//GD.Print("Item present " + naturalObject.ObjectName + " chance " + chance);
 			if (settings.Concentration >= chance)
 			{
 				Vector2 location = new Vector2();
-				location.X = rnd.RandfRange(0, TerrainMeshSettings.numVertsPerLine);
-				location.Y = rnd.RandfRange(0, TerrainMeshSettings.numVertsPerLine);
+				location.X = (float)rng.NextDouble() * TerrainMeshSettings.numVertsPerLine;
+				location.Y = (float)rng.NextDouble() * TerrainMeshSettings.numVertsPerLine;
 
 				/////////////////////////////////////////////
 				WorldItem itm = new WorldItem();
@@ -318,11 +337,6 @@ namespace Bouncerock.Terrain
 				//GD.Print("INGRIDLOC " + itm.GridLocation);
 				itm.ItemName = settings.Name;
 				itm.ModelAddress = settings.Path;
-				if (settings.MinSize != settings.MaxSize)
-				{
-					rnd.Seed = (ulong)location.X;
-					itm.Scale = Vector3.One * rnd.RandfRange(settings.MinSize, settings.MaxSize);
-				}
 
 				//Excluding conditions
 				Vector2 inGridLocation = new Vector2(25 - itm.GridLocation.X, 25 - itm.GridLocation.Y);
@@ -338,43 +352,28 @@ namespace Bouncerock.Terrain
 				float rotY = 0;
 				if (settings.RandomizeYRotation)
 				{
-					float rotation = TerrainManager.Instance.TerrainDetailsRandom.RandfRange(0, 360);
-					//GD.Print("rad " + rotation);
-					rotY = Mathf.DegToRad(rotation);
-					//GD.Print("deg " + rotation);
-					//objectToSpawn.relevantItem.RotateY(rotation);
-
-					// item.Model.RotateY(rotation);
+					rotY = Mathf.DegToRad((float)rng.NextDouble() * 360f);
 				}
 				if (settings.RandomizeTiltAngle != 0)
 				{
-
-					float rotation = TerrainManager.Instance.TerrainDetailsRandom.RandfRange(0, settings.RandomizeTiltAngle);
-					rotation = Mathf.DegToRad(rotation);
-					rotZ = rotation;
-					//item.Model.RotateZ(rotation);
-					//objectToSpawn.relevantItem.RotateZ(rotation);
-					//GD.Print(rotation);
-					float rotation2 = TerrainManager.Instance.TerrainDetailsRandom.RandfRange(0, settings.RandomizeTiltAngle);
-					rotation2 = Mathf.DegToRad(rotation2);
-					rotX = rotation2;//item.Model.RotateX(rotation2);
-									 // objectToSpawn.relevantItem.RotateX(rotation2);
+					rotZ = Mathf.DegToRad((float)rng.NextDouble() * settings.RandomizeTiltAngle);
+					rotX = Mathf.DegToRad((float)rng.NextDouble() * settings.RandomizeTiltAngle);
 				}
 				itm.Rotation = new Vector3(rotX, rotY, rotZ);
-				itm.Scale = Vector3.One * TerrainManager.Instance.TerrainDetailsRandom.RandfRange(settings.MinSize, settings.MaxSize);
+				itm.Scale = Vector3.One * Mathf.Lerp(settings.MinSize, settings.MaxSize, (float)rng.NextDouble());
 				itm.Hash = "";
 				return itm;
 			}
 			return item;
 		}
 
-		static async Task<List<WorldItem>> GenerateStaticElements(float[,] heightmap, WorldItemSettings settings)
+		static List<WorldItem> GenerateStaticElements(float[,] heightmap, WorldItemSettings settings, System.Random rng)
 		{
 
 			//List<Vector2> locations = await PoissonDiscSampling.Test(Vector2.One * (TerrainMeshSettings.numVertsPerLine-3), Vector2.Zero, 10);
-			int seed = (int)DateTime.Now.ToBinary();
+			int seed = rng.Next(); // deterministik per (chunk, urutan objek)
 			//int minSpacing = Math.Clamp(70-(int)naturalObject.Concentration, 5,30);
-			List<Vector2> locations = await PoissonDiscSampling.GeneratePoints(Vector2.Zero, 10, Vector2.One * TerrainMeshSettings.numVertsPerLine, (int)settings.Concentration, seed);
+			List<Vector2> locations = PoissonDiscSampling.GeneratePoints(Vector2.Zero, 10, Vector2.One * TerrainMeshSettings.numVertsPerLine, (int)settings.Concentration, seed).GetAwaiter().GetResult();
 			//GD.Print("Poisson disc loc: " + locations.Count + " elements ");
 
 			List<WorldItem> generated = new List<WorldItem>();
@@ -391,9 +390,7 @@ namespace Bouncerock.Terrain
 					itm.ModelAddress = settings.Path;
 					if (settings.MinSize != settings.MaxSize)
 					{
-						RandomNumberGenerator rnd = new RandomNumberGenerator();
-						rnd.Seed = (ulong)location.X;
-						itm.Scale = Vector3.One * rnd.RandfRange(settings.MinSize, settings.MaxSize);
+						itm.Scale = Vector3.One * Mathf.Lerp(settings.MinSize, settings.MaxSize, (float)rng.NextDouble());
 					}
 
 					//Excluding conditions
@@ -411,30 +408,15 @@ namespace Bouncerock.Terrain
 					float rotY = 0;
 					if (settings.RandomizeYRotation)
 					{
-						float rotation = TerrainManager.Instance.TerrainDetailsRandom.RandfRange(0, 360);
-						//GD.Print("rad " + rotation);
-						rotY = Mathf.DegToRad(rotation);
-						//GD.Print("deg " + rotation);
-						//objectToSpawn.relevantItem.RotateY(rotation);
-
-						// item.Model.RotateY(rotation);
+						rotY = Mathf.DegToRad((float)rng.NextDouble() * 360f);
 					}
 					if (settings.RandomizeTiltAngle != 0)
 					{
-
-						float rotation = TerrainManager.Instance.TerrainDetailsRandom.RandfRange(0, settings.RandomizeTiltAngle);
-						rotation = Mathf.DegToRad(rotation);
-						rotZ = rotation;
-						//item.Model.RotateZ(rotation);
-						//objectToSpawn.relevantItem.RotateZ(rotation);
-						//GD.Print(rotation);
-						float rotation2 = TerrainManager.Instance.TerrainDetailsRandom.RandfRange(0, settings.RandomizeTiltAngle);
-						rotation2 = Mathf.DegToRad(rotation2);
-						rotX = rotation2;//item.Model.RotateX(rotation2);
-										 // objectToSpawn.relevantItem.RotateX(rotation2);
+						rotZ = Mathf.DegToRad((float)rng.NextDouble() * settings.RandomizeTiltAngle);
+						rotX = Mathf.DegToRad((float)rng.NextDouble() * settings.RandomizeTiltAngle);
 					}
 					itm.Rotation = new Vector3(rotX, rotY, rotZ);
-					itm.Scale = Vector3.One * TerrainManager.Instance.TerrainDetailsRandom.RandfRange(settings.MinSize, settings.MaxSize);
+					itm.Scale = Vector3.One * Mathf.Lerp(settings.MinSize, settings.MaxSize, (float)rng.NextDouble());
 					itm.Hash = "";
 					itm.ItemName = "Decor-" + itm.ModelAddress + i;
 

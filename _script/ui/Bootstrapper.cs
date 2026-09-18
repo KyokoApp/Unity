@@ -77,7 +77,15 @@ public partial class Bootstrapper : Control
         public Dictionary<string, PackStateEntry> Packs { get; set; } = new();
     }
 
-    private enum Phase { Idle, FetchManifest, Downloading, Loading, Error }
+    private enum Phase { Idle, FetchManifest, Downloading, Loading, WorldBuild, Error }
+
+    // --- SATU layar loading: overlay ini tetap di atas sampai dunia siap dimainkan ---
+    private string _threadedScenePath;     // scene utama yang sedang di-load via thread
+    private Node _mainSceneInstance;       // instance main.tscn (di root, di bawah overlay ini)
+    private double _worldReadyDeadline;    // batas waktu menunggu TerrainManager.Initialized (msec)
+    private double _mainSpawnDeadline;     // batas waktu menunggu TerrainManager muncul (msec)
+    private const double WorldReadyTimeoutSec = 60.0; // pengaman: jangan kunci user selamanya
+    private const double MainSpawnTimeoutSec = 20.0;
 
     private ManifestData _manifest = new();
     private readonly List<PackInfo> _pendingPacks = new();
@@ -646,6 +654,11 @@ public partial class Bootstrapper : Control
 
     public override void _Process(double delta)
     {
+        if (_phase == Phase.WorldBuild)
+        {
+            PollWorldBuild(delta);
+            return;
+        }
         if (_downloader == null) return;
         if (_phase != Phase.FetchManifest && _phase != Phase.Downloading) return;
 
@@ -1031,12 +1044,101 @@ public partial class Bootstrapper : Control
 
     private void TransitionToMainScene()
     {
-        GD.Print("Masuk ke scene utama: " + TargetMainScene);
-        Error err = GetTree().ChangeSceneToFile(TargetMainScene);
-        if (err != Error.Ok)
+        // Dulu: ChangeSceneToFile() -> scene utama dimuat, lalu dunia dibangun di
+        // balik loading screen KEDUA di dalam game. Sekarang SATU layar saja:
+        // overlay bootstrapper tetap tampil sambil scene utama dimuat (threaded)
+        // dan TerrainManager membangun dunia sampai Initialized.
+        GD.Print("Memuat scene utama (threaded): " + TargetMainScene);
+        _phase = Phase.WorldBuild;
+        StatusLabel?.SetText("Membangun dunia...");
+        DetailLabel?.SetText("");
+        if (SpeedLabel != null) SpeedLabel.Text = "";
+        if (ProgressBar != null) ProgressBar.Value = 100;
+        _mainSceneInstance = null;
+        _threadedScenePath = TargetMainScene;
+        ResourceLoader.LoadThreadedRequest(_threadedScenePath);
+    }
+
+    private void PollWorldBuild(double delta)
+    {
+        // Tahap 1: tunggu scene utama selesai dimuat dari thread.
+        if (_threadedScenePath != null)
         {
-            ShowError($"Gagal membuka scene utama '{TargetMainScene}'. Error: {err}");
+            var status = ResourceLoader.LoadThreadedGetStatus(_threadedScenePath);
+            switch (status)
+            {
+                case ResourceLoader.ThreadLoadStatus.InProgress:
+                    return;
+                case ResourceLoader.ThreadLoadStatus.Failed:
+                case ResourceLoader.ThreadLoadStatus.InvalidResource:
+                    _threadedScenePath = null;
+                    ShowError("Gagal memuat scene utama: " + TargetMainScene);
+                    return;
+            }
+
+            // Loaded: instantiate & pasang KE BAWAH overlay ini agar proses
+            // pembangunan dunia (beberapa detik) tetap tertutup layar ini.
+            PackedScene packed = null;
+            try { packed = ResourceLoader.LoadThreadedGet(_threadedScenePath) as PackedScene; }
+            catch (Exception ex) { GD.PrintErr("LoadThreadedGet gagal: " + ex.Message); }
+            _threadedScenePath = null;
+            if (packed == null)
+            {
+                ShowError("Scene utama tidak valid: " + TargetMainScene);
+                return;
+            }
+
+            _mainSceneInstance = packed.Instantiate();
+            var root = GetTree().Root;
+            root.AddChild(_mainSceneInstance);
+            GetTree().CurrentScene = _mainSceneInstance;
+            // Naikkan overlay ini ke urutan teratas agar menutupi dunia yang sedang dibangun.
+            root.MoveChild(this, root.GetChildCount() - 1);
+
+            double nowMs = Time.GetTicksMsec();
+            _worldReadyDeadline = nowMs + WorldReadyTimeoutSec * 1000.0;
+            _mainSpawnDeadline = nowMs + MainSpawnTimeoutSec * 1000.0;
+            return;
         }
+
+        // Tahap 2: tunggu TerrainManager menandai dunia Initialized.
+        var tm = Bouncerock.Terrain.TerrainManager.Instance;
+        bool worldReady = tm != null &&
+            tm.CurrentLoadStatus == Bouncerock.Terrain.TerrainManager.LoadStatuses.Initialized;
+
+        double now = Time.GetTicksMsec();
+        if (!worldReady && tm == null && now > _mainSpawnDeadline)
+        {
+            // Dunia tidak pernah mulai (mis. scene beda) — jangan kunci user.
+            GD.PrintErr("[Bootstrapper] TerrainManager tidak ditemukan; membuka layar lebih awal.");
+            worldReady = true;
+        }
+        if (!worldReady && now > _worldReadyDeadline)
+        {
+            GD.PrintErr("[Bootstrapper] Timeout menunggu dunia siap; membuka layar.");
+            worldReady = true;
+        }
+        if (!worldReady) return;
+
+        FinishLoading();
+    }
+
+    private void FinishLoading()
+    {
+        // Hentikan video loading & matikan loading screen in-game (sekarang jadi
+        // jaring pengaman saja — seharusnya sudah tidak pernah terlihat).
+        if (VideoPlayer != null)
+        {
+            VideoPlayer.Stop();
+            VideoPlayer.Visible = false;
+        }
+        if (Bouncerock.UI.GlobalUIManager.Instance != null &&
+            Bouncerock.UI.GlobalUIManager.Instance.LoadingUI != null)
+        {
+            Bouncerock.UI.GlobalUIManager.Instance.LoadingUI.Visible = false;
+        }
+        _phase = Phase.Idle;
+        QueueFree();
     }
 
     // ---------------------------------------------------------------
