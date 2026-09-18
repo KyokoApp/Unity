@@ -3,37 +3,20 @@
 [ext_resource type="Script" uid="uid://d3kmep6y2n4vj" path="res://_script/ui/Bootstrapper.cs" id="1_bootstrapper"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_bg"]
-bg_color = Color(0.08, 0.1, 0.14, 0.85)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.2, 0.35, 0.55, 0.8)
+bg_color = Color(0.08, 0.1, 0.14, 0.6)
+border_width_top = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.45, 0.7, 0.5)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_fill"]
+bg_color = Color(0.2, 0.7, 1.0, 0.95)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button"]
+bg_color = Color(0.18, 0.45, 0.85, 0.9)
 corner_radius_top_left = 6
 corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_fill"]
-bg_color = Color(0.25, 0.65, 1.0, 1)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button"]
-bg_color = Color(0.18, 0.45, 0.85, 0.9)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
-bg_color = Color(0.25, 0.55, 0.95, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
 
 [node name="Bootstrapper" type="Control" node_paths=PackedStringArray("ProgressBar", "StatusLabel", "DetailLabel", "SpeedLabel", "RetryButton", "ManifestRequest", "DownloadRequest", "VideoPlayer")]
 layout_mode = 3
@@ -43,11 +26,11 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_bootstrapper")
-ProgressBar = NodePath("BottomContainer/ProgressBar")
-StatusLabel = NodePath("BottomContainer/HBoxInfo/StatusLabel")
-DetailLabel = NodePath("BottomContainer/HBoxInfo/DetailLabel")
-SpeedLabel = NodePath("BottomContainer/HBoxInfo/SpeedLabel")
-RetryButton = NodePath("BottomContainer/RetryButton")
+ProgressBar = NodePath("BottomHUD/ProgressBar")
+StatusLabel = NodePath("BottomHUD/HBoxInfo/StatusLabel")
+DetailLabel = NodePath("BottomHUD/HBoxInfo/DetailLabel")
+SpeedLabel = NodePath("BottomHUD/HBoxInfo/SpeedLabel")
+RetryButton = NodePath("BottomHUD/RetryButton")
 ManifestRequest = NodePath("ManifestRequest")
 DownloadRequest = NodePath("DownloadRequest")
 VideoPlayer = NodePath("VideoStreamPlayer")
@@ -59,7 +42,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.04, 0.05, 0.08, 1)
+color = Color(0.03, 0.04, 0.06, 1)
 
 [node name="VideoStreamPlayer" type="VideoStreamPlayer" parent="."]
 layout_mode = 1
@@ -68,79 +51,72 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+volume_db = -80.0
 autoplay = true
 expand = true
 loop = true
+bus = &"Master"
 
-[node name="BottomGradient" type="ColorRect" parent="."]
+[node name="BottomHUD" type="VBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -140.0
+offset_left = 24.0
+offset_top = -42.0
+offset_right = -24.0
+offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 0
-color = Color(0, 0, 0, 0.55)
+theme_override_constants/separation = 4
 
-[node name="BottomContainer" type="VBoxContainer" parent="."]
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 40.0
-offset_top = -110.0
-offset_right = -40.0
-offset_bottom = -25.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_constants/separation = 8
-
-[node name="HBoxInfo" type="HBoxContainer" parent="BottomContainer"]
+[node name="HBoxInfo" type="HBoxContainer" parent="BottomHUD"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="StatusLabel" type="Label" parent="BottomContainer/HBoxInfo"]
+[node name="StatusLabel" type="Label" parent="BottomHUD/HBoxInfo"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 12
 text = "Memeriksa pembaruan..."
 
-[node name="DetailLabel" type="Label" parent="BottomContainer/HBoxInfo"]
+[node name="DetailLabel" type="Label" parent="BottomHUD/HBoxInfo"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.95, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
-theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.9, 0.95, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 12
 text = ""
 horizontal_alignment = 1
 
-[node name="SpeedLabel" type="Label" parent="BottomContainer/HBoxInfo"]
+[node name="SpeedLabel" type="Label" parent="BottomHUD/HBoxInfo"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.8, 1.0, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
-theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.4, 0.85, 1.0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 12
 text = ""
 horizontal_alignment = 2
 
-[node name="ProgressBar" type="ProgressBar" parent="BottomContainer"]
-custom_minimum_size = Vector2(0, 14)
+[node name="ProgressBar" type="ProgressBar" parent="BottomHUD"]
+custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 theme_override_styles/background = SubResource("StyleBoxFlat_progress_bg")
 theme_override_styles/fill = SubResource("StyleBoxFlat_progress_fill")
 show_percentage = false
 
-[node name="RetryButton" type="Button" parent="BottomContainer"]
+[node name="RetryButton" type="Button" parent="BottomHUD"]
 visible = false
-custom_minimum_size = Vector2(160, 36)
+custom_minimum_size = Vector2(140, 32)
 layout_mode = 2
 size_flags_horizontal = 4
 theme_override_styles/normal = SubResource("StyleBoxFlat_button")
-theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_button")
 text = "Coba Lagi"
 
 [node name="ManifestRequest" type="HTTPRequest" parent="."]
