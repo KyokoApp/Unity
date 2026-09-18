@@ -179,6 +179,36 @@ jobs:
             --patch-name "$PATCH_NAME" \
             --apk-name InfiniteRunner-Lite.apk
 
+      - name: APK Size Report (apk_report.txt)
+        run: |
+          python3 - <<'EOF' | tee build/android/apk_report.txt
+          import zipfile, collections
+          p = "build/android/InfiniteRunner-Lite.apk"
+          z = zipfile.ZipFile(p)
+          infos = z.infolist()
+          groups = collections.defaultdict(lambda: [0, 0])
+          for i in infos:
+              top = i.filename.split("/")[0] if "/" in i.filename else "(root)"
+              groups[top][0] += i.compress_size
+              groups[top][1] += i.file_size
+          print(f"APK: {p}")
+          import os
+          print(f"Ukuran total: {os.path.getsize(p)/1e6:.1f} MB")
+          print("\n== Ukuran per grup ==")
+          for g, (c, u) in sorted(groups.items(), key=lambda kv: -kv[1][0]):
+              print(f"{c/1e6:9.2f} MB  ({u/1e6:9.2f} MB tak-terkompresi)  {g}/")
+          print("\n== 25 entri terbesar ==")
+          for i in sorted(infos, key=lambda x: -x.compress_size)[:25]:
+              print(f"{i.compress_size/1e6:9.2f} MB  ({i.file_size/1e6:9.2f} MB)  {i.filename}")
+          if os.path.exists("videos/loading.ogv"):
+              print(f"\nloading.ogv: {os.path.getsize('videos/loading.ogv')/1e6:.2f} MB")
+          EOF
+          APK_MB=$(python3 -c "import os; print(f\"{os.path.getsize('build/android/InfiniteRunner-Lite.apk')/1e6:.1f}\")")
+          echo "Ukuran APK Lite: ${APK_MB} MB"
+          if python3 -c "import os,sys; sys.exit(0 if os.path.getsize('build/android/InfiniteRunner-Lite.apk') > 100_000_000 else 1)"; then
+            echo "::warning::APK ${APK_MB}MB melebihi target 100MB - lihat apk_report.txt untuk rincian."
+          fi
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -188,6 +218,7 @@ jobs:
             build/android/assets_v1.pck
             build/android/patch_*.pck
             build/android/version.json
+            build/android/apk_report.txt
 
       - name: Create or Update GitHub Release
         env:
@@ -213,7 +244,7 @@ jobs:
             done
           fi
 
-          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/assets_v1.pck build/android/$PATCH_NAME build/android/version.json"
+          RELEASE_FILES="build/android/InfiniteRunner-Lite.apk build/android/assets_v1.pck build/android/$PATCH_NAME build/android/version.json build/android/apk_report.txt"
           if gh release view android-apk >/dev/null 2>&1; then
             echo "Release android-apk exists, uploading assets..."
             gh release upload android-apk $RELEASE_FILES --clobber
