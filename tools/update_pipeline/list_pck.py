@@ -39,42 +39,50 @@ def read_pck_dir(path: str):
         pos = dir_off + 4  # lewati count
         entries = []
         for i in range(count):
-            pl = u32(pos)
-            if pl is None or pl < 6 or pl > 4096 or pos + 4 + pl > fsize:
+            if pos + 4 >= fsize:
                 return None
-            if buf[pos + 4:pos + 10] != b"res://":
+            sl = u32(pos)
+            if sl is None or sl < 5 or sl > 4096:
                 return None
-            name = buf[pos + 4:pos + 4 + pl].decode("utf-8", "replace")
-            tail = pos + 4 + pl
-            os_ = None
-            for k in range(0, (7 if mode == "adaptive" else 1)):
-                p2 = tail + k
-                if k > 0 and buf[tail + k - 1] != 0 and buf[tail + k - 1] < 128:
-                    # padding hanya zeros; kalau byte non-nol kecil itu bagian Q, berhenti
+            npos = pos + 4
+            if npos + sl > fsize:
+                return None
+            raw = buf[npos:npos + sl]
+            name = raw.split(b"\x00")[0].decode("utf-8", "replace")
+            if len(name) < 4 or any(ord(c) < 32 for c in name):
+                return None
+            qs = npos + sl  # posisi setelah nama (nul mungkin termasuk sl)
+            # geser melewati terminator/padding zeros (maks 4), pilih kandidat pertama
+            # yang menghasilkan pasangan (offs,size) yang masuk akal
+            if mode == "direct_q" or mode == "direct_q_flags":
+                got = None
+                extra = 4 if mode == "direct_q_flags" else 0
+                if qs + 32 + extra <= fsize:
+                    offs, size = struct.unpack("<QQ", buf[qs:qs + 16])
+                    if offs <= fsize + 8192 and size <= fsize + 8192 and offs + size <= fsize + 16384:
+                        entries.append((name, size))
+                        if i == count - 1:
+                            return entries if fsize - (qs + 32 + extra) <= 72 else None
+                        pos = qs + 32 + extra
+                        continue
+                return None
+            got = None
+            for k in range(0, 5):
+                p2 = qs + k
+                if p2 + 16 > fsize:
                     break
-                os_ = valid_offs(p2)
-                if os_:
-                    offs, size = os_
-                    pos2 = p2 + 16 + 16 + 4  # +md5 +flags
+                if k > 0 and buf[qs + k - 1] != 0:
+                    break  # di luar nol: berhenti
+                offs, size = struct.unpack("<QQ", buf[p2:p2 + 16])
+                if offs <= fsize + 8192 and size <= fsize + 8192 and offs + size <= fsize + 16384:
+                    got = (offs, size, p2 + 16 + 16 + 4)  # +md5 +flags
                     break
-            if os_ is None:
+            if got is None:
                 return None
+            offs, size, pos = got
             entries.append((name, size))
             if i == count - 1:
-                return entries if fsize - pos2 <= 72 else None
-            # entry berikutnya tepat di pos2 (strict) atau geser kecil (adaptive)
-            if mode == "adaptive":
-                nxt = None
-                for j in range(0, 13):
-                    pl2 = u32(pos2 + j)
-                    if pl2 is not None and 6 <= pl2 <= 4096 and buf[pos2 + j + 4:pos2 + j + 10] == b"res://":
-                        nxt = pos2 + j
-                        break
-                if nxt is None:
-                    return None
-                pos = nxt
-            else:
-                pos = pos2
+                return entries if fsize - pos <= 72 else None
         return None
 
     cands = []
@@ -90,7 +98,7 @@ def read_pck_dir(path: str):
         count = u32(cand)
         if count is None or count == 0 or count > 50000:
             continue
-        for mode in ("strict", "adaptive"):
+        for mode in ("scan", "direct_q", "direct_q_flags"):
             got = parse(cand, count, mode)
             if got:
                 return got
