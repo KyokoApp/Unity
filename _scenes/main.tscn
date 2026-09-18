@@ -161,7 +161,7 @@ size_flags_vertical = 3
 [node name="UI" type="CanvasLayer" parent="." unique_id=2062801815 node_paths=PackedStringArray("MobileUI", "LoadingUI")]
 layer = 10
 script = ExtResource("3_7t23k")
-MobileUI = NodePath("Control2")
+MobileUI = NodePath("ScreenSpaceUI/Control2")
 LoadingUI = NodePath("LoadingScreen")
 
 [node name="ScreenSpaceUI" type="Control" parent="UI" unique_id=896018232 node_paths=PackedStringArray("Distance", "ActionBar", "MojoBar", "Score", "Multiplier", "Record", "TimeOfDay")]
@@ -428,7 +428,7 @@ offset_bottom = 645.0
 size_flags_horizontal = 3
 text = "Version 1.0a"
 
-[node name="Control2" type="Control" parent="UI" unique_id=1007481590]
+[node name="Control2" type="Control" parent="UI/ScreenSpaceUI" unique_id=1007481590]
 visible = true
 layout_mode = 3
 anchors_preset = 3
@@ -444,7 +444,7 @@ grow_horizontal = 0
 grow_vertical = 0
 mouse_filter = 2
 
-[node name="AttackButton" type="Control" parent="UI/Control2" unique_id=113595026]
+[node name="AttackButton" type="Control" parent="UI/ScreenSpaceUI/Control2" unique_id=113595026]
 layout_mode = 0
 offset_left = 220.0
 offset_top = 220.0
@@ -459,7 +459,7 @@ BaseColor = Color(1, 1, 1, 0.28)
 PressedColor = Color(1, 1, 1, 0.55)
 BorderColor = Color(1, 1, 1, 0.85)
 
-[node name="JumpButton" type="Control" parent="UI/Control2" unique_id=1053755752]
+[node name="JumpButton" type="Control" parent="UI/ScreenSpaceUI/Control2" unique_id=1053755752]
 layout_mode = 0
 offset_left = 80.0
 offset_top = 240.0
@@ -474,7 +474,7 @@ BaseColor = Color(1, 1, 1, 0.22)
 PressedColor = Color(1, 1, 1, 0.50)
 BorderColor = Color(1, 1, 1, 0.75)
 
-[node name="DashButton" type="Control" parent="UI/Control2" unique_id=862352751]
+[node name="DashButton" type="Control" parent="UI/ScreenSpaceUI/Control2" unique_id=862352751]
 layout_mode = 0
 offset_left = 240.0
 offset_top = 80.0
@@ -489,7 +489,7 @@ BaseColor = Color(1, 1, 1, 0.22)
 PressedColor = Color(1, 1, 1, 0.50)
 BorderColor = Color(1, 1, 1, 0.75)
 
-[node name="FlyButton" type="Control" parent="UI/Control2" unique_id=1345775207]
+[node name="FlyButton" type="Control" parent="UI/ScreenSpaceUI/Control2" unique_id=1345775207]
 layout_mode = 0
 offset_left = 110.0
 offset_top = 110.0
@@ -504,7 +504,7 @@ BaseColor = Color(1, 1, 1, 0.20)
 PressedColor = Color(1, 1, 1, 0.50)
 BorderColor = Color(1, 1, 1, 0.70)
 
-[node name="LightButton" type="Control" parent="UI/Control2" unique_id=2094996649]
+[node name="LightButton" type="Control" parent="UI/ScreenSpaceUI/Control2" unique_id=2094996649]
 layout_mode = 0
 offset_left = 20.0
 offset_top = 150.0

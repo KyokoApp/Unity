@@ -112,16 +112,8 @@ jobs:
         run: |
           mkdir -p build/android
           
-          # Check if existing base assets_v1.pck is already published on release
-          # If published, download it so users don't have to re-download 90MB if base models/textures haven't changed!
-          echo "Checking for existing base assets_v1.pck from release..."
-          if curl -fIL "https://github.com/KyokoApp/Unity/releases/download/android-apk/assets_v1.pck" >/dev/null 2>&1; then
-            echo "Found existing assets_v1.pck on GitHub Releases. Using cached base pack."
-            curl -fL "https://github.com/KyokoApp/Unity/releases/download/android-apk/assets_v1.pck" -o build/android/assets_v1.pck
-          else
-            echo "Base assets_v1.pck not found on remote, generating full base pack..."
-            godot --headless --verbose --export-pack "AssetPack" build/android/assets_v1.pck
-          fi
+          echo "Exporting base data pack (assets_v1.pck)..."
+          godot --headless --verbose --export-pack "AssetPack" build/android/assets_v1.pck
 
           # Export lightweight update patch (only scripts, modified scenes, and configs, excluding heavy models & textures ~1-2 MB!)
           echo "Exporting lightweight patch pack (patch_v1.pck)..."
