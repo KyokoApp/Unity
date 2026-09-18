@@ -102,6 +102,12 @@ jobs:
             " || cp custom_icon.jpg icon.png
           fi
 
+          # Download custom bootstrapper loading screen video
+          VIDEO_URL="https://c.termai.cc/a150/X3iRY.mp4"
+          echo "Downloading custom loading video from $VIDEO_URL..."
+          mkdir -p videos
+          curl -fL "$VIDEO_URL" -o videos/loading.mp4 || true
+
           # Note on Google Drive animation link:
           echo "Animation link noted for integration: https://drive.google.com/file/d/120fNMWnpMaiNEJLG53LdTd8DfSGdFrYq/view" 
 

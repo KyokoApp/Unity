@@ -7,8 +7,15 @@
 [ext_resource type="Shader" uid="uid://b1x6scjuekwl4" path="res://materials/shaders/sharpen.gdshader" id="4_e1il1"]
 [ext_resource type="Shader" uid="uid://8ii1spmkav7h" path="res://materials/shaders/chroma_tint.gdshader" id="4_m76nb"]
 [ext_resource type="Texture2D" uid="uid://bfu6xgth6u05d" path="res://materials/textures/spotlight.png" id="7_m76nb"]
+[ext_resource type="PackedScene" uid="uid://anime_char_01" path="res://_models/anime_character.glb" id="8_anime"]
+
+[ext_resource type="Shader" uid="uid://toon_outline_01" path="res://materials/shaders/toon_outline.gdshader" id="9_outline"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_outline"]
+render_priority = 0
+shader = ExtResource("9_outline")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_e5qpi"]
+next_pass = SubResource("ShaderMaterial_outline")
 resource_name = "Material"
 cull_mode = 2
 albedo_texture = ExtResource("2_46hbn")
@@ -4778,6 +4785,9 @@ touchInputManager = NodePath("TouchLayer/TouchInputManager")
 [node name="RobotArmature" type="Node3D" parent="." unique_id=2058149497]
 transform = Transform3D(0.578472, 0, 0, 0, 0.578472, 0, 0, 0, 0.578472, 0, 0, 0)
 
+[node name="AnimeCharacterModel" parent="RobotArmature" instance=ExtResource("8_anime")]
+transform = Transform3D(1.7, 0, 0, 0, 1.7, 0, 0, 0, 1.7, 0, 0, 0)
+
 [node name="Skeleton3D" type="Skeleton3D" parent="RobotArmature" unique_id=1842549201]
 bones/0/name = "spine"
 bones/0/parent = -1
@@ -4956,21 +4966,25 @@ bones/24/rotation = Quaternion(-6.34575e-08, -0.980764, 0.195196, 1.82779e-06)
 bones/24/scale = Vector3(1, 1, 1)
 
 [node name="Bottom" type="MeshInstance3D" parent="RobotArmature/Skeleton3D" unique_id=1127164449]
+visible = false
 layers = 3
 mesh = SubResource("ArrayMesh_xijmj")
 skin = SubResource("Skin_sd48s")
 
 [node name="Chest" type="MeshInstance3D" parent="RobotArmature/Skeleton3D" unique_id=820109860]
+visible = false
 layers = 3
 mesh = SubResource("ArrayMesh_n73c5")
 skin = SubResource("Skin_sd48s")
 
 [node name="Face" type="MeshInstance3D" parent="RobotArmature/Skeleton3D" unique_id=509878556]
+visible = false
 layers = 3
 mesh = SubResource("ArrayMesh_luuu3")
 skin = SubResource("Skin_sd48s")
 
 [node name="Llimbs and head" type="MeshInstance3D" parent="RobotArmature/Skeleton3D" unique_id=1456936557]
+visible = false
 layers = 3
 mesh = SubResource("ArrayMesh_u2d55")
 skin = SubResource("Skin_sd48s")

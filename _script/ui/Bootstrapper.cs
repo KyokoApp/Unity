@@ -10,6 +10,7 @@ public partial class Bootstrapper : Control
     [Export] public Label DetailLabel;
     [Export] public Label SpeedLabel;
     [Export] public Button RetryButton;
+    [Export] public VideoStreamPlayer VideoPlayer;
     [Export] public HttpRequest ManifestRequest;
     [Export] public HttpRequest DownloadRequest;
 
@@ -49,6 +50,17 @@ public partial class Bootstrapper : Control
         ManifestRequest.RequestCompleted += OnManifestRequestCompleted;
         DownloadRequest.RequestCompleted += OnDownloadRequestCompleted;
 
+                // Load custom loading screen video if available
+        string videoPath = "res://videos/loading.mp4";
+        if (FileAccess.FileExists(videoPath) && VideoPlayer != null)
+        {
+            var stream = ResourceLoader.Load<VideoStream>(videoPath);
+            if (stream != null)
+            {
+                VideoPlayer.Stream = stream;
+                VideoPlayer.Play();
+            }
+        }
         StartUpdateCheck();
     }
 
@@ -382,6 +394,17 @@ public partial class Bootstrapper : Control
 
     private void OnRetryPressed()
     {
+                // Load custom loading screen video if available
+        string videoPath = "res://videos/loading.mp4";
+        if (FileAccess.FileExists(videoPath) && VideoPlayer != null)
+        {
+            var stream = ResourceLoader.Load<VideoStream>(videoPath);
+            if (stream != null)
+            {
+                VideoPlayer.Stream = stream;
+                VideoPlayer.Play();
+            }
+        }
         StartUpdateCheck();
     }
 }

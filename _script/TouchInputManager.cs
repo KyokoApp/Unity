@@ -196,8 +196,7 @@ public partial class TouchInputManager : Node2D
                 Input.ActionRelease("run");
             }
 
-            // Map continuous direction to standard 4-way UI actions
-            UpdateDirectionalActions(dir);
+            // Pure smooth continuous analog vector without conflicting 4-way D-Pad simulation
         }
         else if (index == cameraTouchIndex)
         {

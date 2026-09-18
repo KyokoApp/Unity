@@ -6,7 +6,7 @@ config/name="Runtime Procedural World Generation (4.5)"
 config/description="Procedural world generation demo project, including random items or obstacles spawns and with physics enabled. Comes with a third-person infinite runner showcase project."
 run/main_scene="res://_scenes/bootstrapper.tscn"
 config/features=PackedStringArray("4.5", "C#", "Mobile")
-config/icon="res://icon.svg"
+config/icon="res://icon.png"
 
 [display]
 
