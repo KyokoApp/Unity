@@ -66,6 +66,9 @@ public partial class Bootstrapper : Control
     {
         public string Version = "1.0.0";
         public string ApkUrl = "";
+        public string ApkSha256 = "";
+        public long ApkSize = 0;
+        public int VersionCodeInt = 0;
         public bool RequiresRestart = false;
         public bool NeedsNewApk = false;
         public List<PackInfo> Packs = new();
@@ -82,7 +85,9 @@ public partial class Bootstrapper : Control
         public Dictionary<string, PackStateEntry> Packs { get; set; } = new();
     }
 
-    private enum Phase { Idle, FetchManifest, Downloading, Loading, WorldBuild, RestartPrompt, Error }
+    private enum Phase { Idle, FetchManifest, Downloading, Loading, WorldBuild, RestartPrompt, Error, ApkDownload }
+
+    private const string ApkUserPath = "user://InfiniteRunner-Lite.apk"; // APK hasil unduh in-app
 
     // --- SATU layar loading: overlay ini tetap di atas sampai dunia siap dimainkan ---
     private string _threadedScenePath;     // scene utama yang sedang di-load via thread
@@ -674,7 +679,7 @@ public partial class Bootstrapper : Control
             return;
         }
         if (_downloader == null) return;
-        if (_phase != Phase.FetchManifest && _phase != Phase.Downloading) return;
+        if (_phase != Phase.FetchManifest && _phase != Phase.Downloading && _phase != Phase.ApkDownload) return;
 
         bool stillRunning = _downloader.Pump();
         UpdateDownloadUi(delta);
@@ -684,6 +689,7 @@ public partial class Bootstrapper : Control
             if (_downloader.State == ResumableDownloader.DownState.Done)
             {
                 if (_phase == Phase.FetchManifest) OnManifestDownloaded();
+                else if (_phase == Phase.ApkDownload) OnApkDownloaded();
                 else OnPackDownloaded();
             }
             else
@@ -708,6 +714,17 @@ public partial class Bootstrapper : Control
 
         long done = _downloader.BytesSaved;
         long total = _downloader.ExpectedTotal;
+
+        if (_phase == Phase.ApkDownload)
+        {
+            double pct = total > 0 ? (double)done / total * 100.0 : 0.0;
+            if (ProgressBar != null) ProgressBar.Value = Math.Clamp(pct, 0.0, 100.0);
+            StatusLabel?.SetText("Mengunduh APK v" + _manifest.Version + " di dalam aplikasi...");
+            DetailLabel?.SetText(total > 0
+                ? $"{done / (1024.0 * 1024.0):F1} MB / {total / (1024.0 * 1024.0):F1} MB [{pct:F0}%] — putus pun lanjut (resume)"
+                : $"{done / (1024.0 * 1024.0):F1} MB — bisa resume");
+            return;
+        }
 
         if (_phase == Phase.Downloading)
         {
@@ -815,7 +832,11 @@ public partial class Bootstrapper : Control
         // Kode C# tidak bisa hot-update via .pck. JANGAN diam-diam lanjut dengan
         // kode usang (bug tampak 'tidak pernah berubah') — tampilkan prompt
         // eksplisit: unduh APK terbaru (1 ketuk) atau lanjut sadar-risiko.
-        if (_manifest.NeedsNewApk)
+        // Hanya minta APK baru bila kode yang TERPASANG memang lebih tua dari
+        // manifest (setelah APK terbaru terpasang, prompt berhenti sendiri).
+        bool needNewApkNow = _manifest.NeedsNewApk &&
+            (_manifest.VersionCodeInt == 0 || BuildInfo.VersionCode < _manifest.VersionCodeInt);
+        if (needNewApkNow)
         {
             ShowApkUpdatePrompt(versiInfo);
             return;
@@ -824,7 +845,9 @@ public partial class Bootstrapper : Control
         PlanDownloads();
     }
 
-    private Button _apkUpdateButton;
+    private Button _apkInAppButton;
+    private Button _apkBrowserButton;
+    private Button _apkInstallButton;
     private Button _apkSkipButton;
 
     private void ShowApkUpdatePrompt(string versiInfo)
@@ -832,35 +855,110 @@ public partial class Bootstrapper : Control
         StatusLabel?.SetText("PERBARUI APLIKASI DIPERLUKAN\n" + versiInfo +
             "\n\nPerbaikan & fitur baru ada di dalam APK, bukan unduhan data. " +
             "Tanpa APK v" + _manifest.Version + " game tetap memakai kode lama.");
-        DetailLabel?.SetText("Ketuk 'Unduh APK Terbaru', pasang, lalu buka lagi.");
         if (ProgressBar != null) ProgressBar.Value = 100;
 
-        if (_apkUpdateButton == null && RetryButton != null && RetryButton.GetParent() != null)
+        if (_apkInAppButton == null && RetryButton != null && RetryButton.GetParent() != null)
         {
-            _apkUpdateButton = new Button { Text = "Unduh APK Terbaru (v" + _manifest.Version + ")", Visible = true };
-            _apkSkipButton = new Button { Text = "Lewati — lanjut kode lama", Visible = true };
+            _apkInAppButton = new Button { Visible = true };
+            _apkBrowserButton = new Button { Visible = true };
+            _apkInstallButton = new Button { Visible = false };
+            _apkSkipButton = new Button { Visible = true };
             var parent = RetryButton.GetParent();
-            parent.AddChild(_apkUpdateButton);
+            parent.AddChild(_apkInAppButton);
+            parent.AddChild(_apkBrowserButton);
+            parent.AddChild(_apkInstallButton);
             parent.AddChild(_apkSkipButton);
-            _apkUpdateButton.Pressed += () =>
-            {
-                GD.Print("[Bootstrapper] Membuka URL APK: " + _manifest.ApkUrl);
-                OS.ShellOpen(_manifest.ApkUrl);
-            };
+            _apkInAppButton.Pressed += StartApkDownload;
+            _apkBrowserButton.Pressed += () => { OS.ShellOpen(_manifest.ApkUrl); };
+            _apkInstallButton.Pressed += InstallDownloadedApk;
             _apkSkipButton.Pressed += () =>
             {
-                _apkUpdateButton.Visible = false;
-                _apkSkipButton.Visible = false;
+                SetApkButtonsVisible(false, false, false, false);
                 DetailLabel?.SetText(versiInfo + "  (mode kode lama)");
                 PlanDownloads();
             };
         }
-        else if (_apkUpdateButton != null)
+
+        bool apkReady = IsDownloadedApkReady();
+        _apkInAppButton.Text = "Unduh di Aplikasi (" + MbText(_manifest.ApkSize) + ", bisa resume)";
+        _apkBrowserButton.Text = "Unduh via Browser";
+        _apkInstallButton.Text = "PASANG APK v" + _manifest.Version + " SEKARANG";
+        _apkSkipButton.Text = "Lewati — lanjut kode lama";
+        SetApkButtonsVisible(!apkReady, true, apkReady, true);
+        DetailLabel?.SetText(apkReady
+            ? "APK sudah terunduh penuh & terverifikasi. Ketuk PASANG, lalu izinkan 'instal dari sumber ini' (sekali saja)."
+            : "Disarankan: unduh di aplikasi — putus di tengah jalan TIDAK mengulang dari nol.");
+    }
+
+    private void SetApkButtonsVisible(bool inApp, bool browser, bool install, bool skip)
+    {
+        if (_apkInAppButton != null) _apkInAppButton.Visible = inApp;
+        if (_apkBrowserButton != null) _apkBrowserButton.Visible = browser;
+        if (_apkInstallButton != null) _apkInstallButton.Visible = install;
+        if (_apkSkipButton != null) _apkSkipButton.Visible = skip;
+    }
+
+    private static string MbText(long bytes)
+    {
+        return bytes > 0 ? ((bytes / (1024.0 * 1024.0))).ToString("F0") + "MB" : "±46MB";
+    }
+
+    private bool IsDownloadedApkReady()
+    {
+        if (!FileAccess.FileExists(ApkUserPath)) return false;
+        if (!string.IsNullOrEmpty(_manifest.ApkSha256) && VerifyHashes)
         {
-            _apkUpdateButton.Text = "Unduh APK Terbaru (v" + _manifest.Version + ")";
-            _apkUpdateButton.Visible = true;
-            _apkSkipButton.Visible = true;
+            string localSha = ResumableDownloader.ComputeSha256(ApkUserPath);
+            return string.Equals(localSha, _manifest.ApkSha256, StringComparison.OrdinalIgnoreCase);
         }
+        if (_manifest.ApkSize > 0)
+        {
+            using var fa = FileAccess.Open(ApkUserPath, FileAccess.ModeFlags.Read);
+            return fa != null && (long)fa.GetLength() == _manifest.ApkSize;
+        }
+        return true;
+    }
+
+    private void StartApkDownload()
+    {
+        if (string.IsNullOrEmpty(_manifest.ApkUrl))
+        {
+            DetailLabel?.SetText("URL APK tidak tersedia di manifest. Coba tombol Browser.");
+            return;
+        }
+        SetApkButtonsVisible(false, false, false, false);
+        _phase = Phase.ApkDownload;
+        _lastSpeedBytes = -1;
+        if (ProgressBar != null) ProgressBar.Value = 0;
+        StatusLabel?.SetText("Menyiapkan unduhan APK...");
+        BeginDownloader(_manifest.ApkUrl, ApkUserPath, _manifest.ApkSha256, _manifest.ApkSize);
+    }
+
+    private void OnApkDownloaded()
+    {
+        _phase = Phase.Idle;
+        _downloader = null;
+        if (ProgressBar != null) ProgressBar.Value = 100;
+        bool ready = IsDownloadedApkReady();
+        if (!ready)
+        {
+            ShowError("APK selesai diunduh tapi verifikasi gagal. Ketuk Unduh di Aplikasi untuk memperbaiki (resume).");
+            SetApkButtonsVisible(true, true, false, true);
+            return;
+        }
+        StatusLabel?.SetText("APK v" + _manifest.Version + " siap dipasang!");
+        SetApkButtonsVisible(false, false, true, true);
+        DetailLabel?.SetText("Ketuk PASANG SEKARANG. Bila Android bertanya, izinkan 'instal aplikasi dari sumber ini' (sekali saja).");
+    }
+
+    private void InstallDownloadedApk()
+    {
+        string apkGlobal = ProjectSettings.GlobalizePath(ApkUserPath);
+        GD.Print("[Bootstrapper] Membuka installer untuk: " + apkGlobal);
+        Error err = OS.ShellOpen("file://" + apkGlobal);
+        DetailLabel?.SetText(err == Error.Ok
+            ? "Installer Android terbuka. Setelah pasang, buka lagi gamenya."
+            : "Installer gagal terbuka (" + err + "). Unduh lewat tombol Browser sebagai cadangan.");
     }
 
     private void OnDownloaderFailed(string message)
@@ -880,6 +978,18 @@ public partial class Bootstrapper : Control
             // Offline mode: muat paket lokal bila manifest terakhir lengkap.
             if (TryOfflineContinue()) return;
             ShowError("Gagal memeriksa pembaruan. Periksa koneksi internet. (" + message + ")");
+            return;
+        }
+
+        if (_phase == Phase.ApkDownload)
+        {
+            // Unduhan APK in-app gagal: .part tersimpan — ketuk ulang tombol
+            // untuk MELANJUTKAN (resume), bukan mengulang dari nol.
+            _phase = Phase.Idle;
+            _downloader = null;
+            StatusLabel?.SetText("Unduhan APK terputus (" + message + ").");
+            DetailLabel?.SetText("Ketuk 'Unduh di Aplikasi' lagi — byte yang sudah masuk TIDAK hilang (resume otomatis).");
+            SetApkButtonsVisible(true, true, false, true);
             return;
         }
 
@@ -904,6 +1014,12 @@ public partial class Bootstrapper : Control
                 manifest.RequiresRestart = true;
             if (root.TryGetProperty("needs_new_apk", out var napkProp) && napkProp.ValueKind == JsonValueKind.True)
                 manifest.NeedsNewApk = true;
+            if (root.TryGetProperty("version_code", out var vcProp) && vcProp.ValueKind == JsonValueKind.Number)
+                manifest.VersionCodeInt = vcProp.GetInt32();
+            if (root.TryGetProperty("apk_sha256", out var asProp))
+                manifest.ApkSha256 = asProp.GetString() ?? "";
+            if (root.TryGetProperty("apk_size", out var aszProp) && aszProp.ValueKind == JsonValueKind.Number)
+                manifest.ApkSize = aszProp.GetInt64();
 
             if (root.TryGetProperty("packs", out var packsProp) && packsProp.ValueKind == JsonValueKind.Array)
             {
