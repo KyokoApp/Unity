@@ -86,12 +86,21 @@ jobs:
           echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=androiddebugkey" >> $GITHUB_ENV
           echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=android" >> $GITHUB_ENV
 
-      - name: Verify App Icon and Loading Video
+      - name: Verify App Icon and Convert Loading Video to OGV
         run: |
           mkdir -p videos
-          if [ -f "Amv/Proyek Baru 28 [7EB4FCC].mp4" ] && [ ! -f "videos/loading.mp4" ]; then
+          if [ -f "Amv/Proyek Baru 28 [7EB4FCC].mp4" ]; then
             cp "Amv/Proyek Baru 28 [7EB4FCC].mp4" videos/loading.mp4
           fi
+
+          echo "Installing ffmpeg to convert loading video to native Godot Theora OGV..."
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+
+          if [ -f "videos/loading.mp4" ]; then
+            echo "Converting videos/loading.mp4 to videos/loading.ogv (muted, optimized for mobile)..."
+            ffmpeg -y -i videos/loading.mp4 -an -c:v libtheora -q:v 6 -vf "scale=1280:-2" videos/loading.ogv || true
+          fi
+
           ls -lh icon*
           ls -lh videos/
       - name: Initialize Godot Project and Import Resources

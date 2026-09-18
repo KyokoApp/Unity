@@ -7,7 +7,7 @@
 [ext_resource type="Shader" uid="uid://b1x6scjuekwl4" path="res://materials/shaders/sharpen.gdshader" id="4_e1il1"]
 [ext_resource type="Shader" uid="uid://8ii1spmkav7h" path="res://materials/shaders/chroma_tint.gdshader" id="4_m76nb"]
 [ext_resource type="Texture2D" uid="uid://bfu6xgth6u05d" path="res://materials/textures/spotlight.png" id="7_m76nb"]
-[ext_resource type="PackedScene" uid="uid://anime_char_01" path="res://_models/anime_character.glb" id="8_anime"]
+[ext_resource type="PackedScene" uid="uid://anime_char_01" path="res://_models/mannequin_f.glb" id="8_anime"]
 
 [ext_resource type="Shader" uid="uid://toon_outline_01" path="res://materials/shaders/toon_outline.gdshader" id="9_outline"]
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_outline"]
@@ -4785,7 +4785,7 @@ touchInputManager = NodePath("TouchLayer/TouchInputManager")
 [node name="RobotArmature" type="Node3D" parent="." unique_id=2058149497]
 transform = Transform3D(0.578472, 0, 0, 0, 0.578472, 0, 0, 0, 0.578472, 0, 0, 0)
 
-[node name="AnimeCharacterModel" parent="RobotArmature" instance=ExtResource("8_anime")]
+[node name="MannequinCharacterModel" parent="RobotArmature" instance=ExtResource("8_anime")]
 transform = Transform3D(1.7, 0, 0, 0, 1.7, 0, 0, 0, 1.7, 0, 0, 0)
 
 [node name="Skeleton3D" type="Skeleton3D" parent="RobotArmature" unique_id=1842549201]

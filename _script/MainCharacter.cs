@@ -543,21 +543,17 @@ public partial class MainCharacter : CharacterBody3D
 
 		if (inputDir.LengthSquared() > 0.01f)
 		{
-			// Calculate movement vector relative to Camera orientation
-			Vector3 camForward = -PlayerCamera.GlobalTransform.Basis.Z;
-			camForward.Y = 0;
-			camForward = camForward.Normalized();
+			// Calculate true forward and right direction from CameraPivot yaw angle
+			float camYawRad = Mathf.DegToRad(cam_rot_y);
+			Vector3 camForward = new Vector3(-Mathf.Sin(camYawRad), 0, -Mathf.Cos(camYawRad)).Normalized();
+			Vector3 camRight = new Vector3(Mathf.Cos(camYawRad), 0, -Mathf.Sin(camYawRad)).Normalized();
 
-			Vector3 camRight = PlayerCamera.GlobalTransform.Basis.X;
-			camRight.Y = 0;
-			camRight = camRight.Normalized();
-
-			// Analog up (negative Y) moves forward along camera; analog right (positive X) moves right
+			// Analog up (negative Y) moves straight forward in camera view; analog right (positive X) moves right
 			Vector3 targetMoveDir = (camRight * inputDir.X + camForward * -inputDir.Y).Normalized();
 			CurrentInput.Direction = targetMoveDir;
 
-			// Smoothly rotate character mesh heading towards moving direction
-			float targetAngle = Mathf.Atan2(-targetMoveDir.X, -targetMoveDir.Z);
+			// Smoothly rotate character body towards target move direction without infinite feedback loop
+			float targetAngle = Mathf.Atan2(targetMoveDir.X, targetMoveDir.Z);
 			Rotation = new Vector3(Rotation.X, Mathf.LerpAngle(Rotation.Y, targetAngle, deltaFloat * 12f), Rotation.Z);
 		}
 		else

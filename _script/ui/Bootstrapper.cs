@@ -51,7 +51,8 @@ public partial class Bootstrapper : Control
         DownloadRequest.RequestCompleted += OnDownloadRequestCompleted;
 
                 // Load custom loading screen video if available
-        string videoPath = "res://videos/loading.mp4";
+        string videoPath = "res://videos/loading.ogv";
+        if (!FileAccess.FileExists(videoPath)) videoPath = "res://videos/loading.mp4";
         if (FileAccess.FileExists(videoPath) && VideoPlayer != null)
         {
             var stream = GD.Load<VideoStream>(videoPath);
@@ -399,7 +400,8 @@ public partial class Bootstrapper : Control
     private void OnRetryPressed()
     {
                 // Load custom loading screen video if available
-        string videoPath = "res://videos/loading.mp4";
+        string videoPath = "res://videos/loading.ogv";
+        if (!FileAccess.FileExists(videoPath)) videoPath = "res://videos/loading.mp4";
         if (FileAccess.FileExists(videoPath) && VideoPlayer != null)
         {
             var stream = GD.Load<VideoStream>(videoPath);
