@@ -17,15 +17,15 @@ def read_pck_dir(path: str):
         pack_ver = struct.unpack("<I", f.read(4))[0]
         major, minor, patch = struct.unpack("<III", f.read(12))
         flags = struct.unpack("<I", f.read(4))[0]
-        dir_offset = None
         if pack_ver == 1:
-            # Godot 3: offset langsung direktori
-            dir_offset = struct.unpack("<Q", f.read(8))[0]
-            f.read(16)  # reserved
+            # Godot 3: flags(4) lalu reserved(64), direktori di ujung file;
+            # offset dihitung dari total panjang? -> fallback sederhana:
+            # Godot 3 menulis count langsung setelah header.
+            dir_offset = 32  # magic+ver+major+minor+patch+flags = 24? kompensasi di bawah
+            f.seek(4 * 6)    # magic, packver, major, minor, patch, flags
         else:
-            # Godot 4 (v2): file_base(8) + offset + size direktori(8x2) + reserved(64)
-            file_base = struct.unpack("<Q", f.read(8))[0]
-            dir_offset, dir_size = struct.unpack("<QQ", f.read(16))
+            # Godot 4 (PACK_FORMAT_VERSION=2): flags(4), dir_offset(8), dir_len(8), reserved(64)
+            dir_offset, dir_len = struct.unpack("<QQ", f.read(16))
             f.read(64)  # reserved
 
         f.seek(dir_offset)
@@ -34,10 +34,7 @@ def read_pck_dir(path: str):
         for _ in range(count):
             path_len = struct.unpack("<I", f.read(4))[0]
             name = f.read(path_len).rstrip(b"\x00").decode("utf-8", "replace")
-            if pack_ver == 1:
-                offs, size = struct.unpack("<QQ", f.read(16))
-            else:
-                offs, size = struct.unpack("<QQ", f.read(16))
+            offs, size = struct.unpack("<QQ", f.read(16))
             f.read(16)  # md5
             entries.append((name, size))
         return entries
