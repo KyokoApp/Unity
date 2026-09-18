@@ -24,8 +24,14 @@ namespace Bouncerock.Terrain
 
 
 
-		static string documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-				+ "/Islands/";
+		/// <summary>
+		/// Where chunk saves live. This used to be a static field built from
+		/// SpecialFolder.MyDocuments, which is empty on Android, so chunk saves silently went
+		/// nowhere on a phone while SoftwareManager had its own (uncalled) path logic.
+		/// Everything now routes through SoftwareManager so there is exactly one writable root.
+		/// </summary>
+		private static string documentspath => SoftwareManager.GetDocumentsPath() + "/Islands/";
+
 		//This is where new chunks are generated and assembled.
 
 		public static async Task<Map> GenerateMapAsync(Vector2 sampleCentre)
@@ -164,7 +170,7 @@ namespace Bouncerock.Terrain
 
 		private static float[,] ApplyBlend(float[,] heightMap1, float[,] heightMap2, TerrainPass pass)
 		{
-			const float TRANSPARENT = -201f;
+			const float TRANSPARENT = TerrainMeshSettings.InvalidHeight;
 
 			int width = heightMap1.GetLength(0);
 			int height = heightMap1.GetLength(1);
@@ -288,9 +294,7 @@ namespace Bouncerock.Terrain
 			}
 			catch (Exception)
 			{
-				//GD.Print("out of bounds" + location.X +"/"+location.Y);
-				// Return -201 if any exception occurs (e.g., out of bounds).
-				return -201;
+				return TerrainMeshSettings.InvalidHeight;
 			}
 		}
 
@@ -543,7 +547,7 @@ namespace Bouncerock.Terrain
 
 					if (v < settings.MinHeight || v > settings.MaxHeight)
 					{
-						values[x, y] = -201f; // sentinel = transparent
+						values[x, y] = TerrainMeshSettings.InvalidHeight; // sentinel = transparent
 					}
 				}
 			}*/
@@ -611,9 +615,6 @@ namespace Bouncerock.Terrain
 
 		public void SaveUnibyte(string name)
 		{
-			string documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-				+ "/Islands/";
-
 			int width = heightMap.GetLength(0);
 			int height = heightMap.GetLength(1);
 
@@ -639,8 +640,6 @@ namespace Bouncerock.Terrain
 
 		public void SaveMapDetails(string name)
 		{
-			string documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-				+ "/Islands/";
 			byte[] buffer = FileWriter.SerializeToBinary(DecorElements);
 			GD.Print("Writing binaries " + buffer.Length);
 			FileWriter.BinaryToISL(buffer, documentspath + name + "_D");

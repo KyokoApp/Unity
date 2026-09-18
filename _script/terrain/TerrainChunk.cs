@@ -169,47 +169,67 @@ namespace Bouncerock.Terrain
 
 		//returns the height on the grid at given location. Location is express as local 
 
+		/// <summary>
+		/// Height at a chunk-local grid position, or TerrainMeshSettings.InvalidHeight when the
+		/// position falls outside the heightmap.
+		///
+		/// Previously this relied on catching IndexOutOfRangeException. Using an exception for
+		/// normal out-of-bounds lookups costs a lot on a phone (this is called for every entity
+		/// every frame), and its sibling GetInclinationAtChunkMapLocation had no such guard at
+		/// all, so it could throw.
+		/// </summary>
 		public float GetHeightAtChunkMapLocation(Vector2 location)
 		{
-			try
-			{
-				// Clamp the x and y indices to ensure they are within bounds.
-				int xClamped = Mathf.RoundToInt(location.X);
-				int yClamped = Mathf.RoundToInt(location.Y);
+			int x = Mathf.RoundToInt(location.X);
+			int y = Mathf.RoundToInt(location.Y);
 
-				// Access the height map with clamped indices.
-				return _map.heightMap[xClamped, yClamped];
-			}
-			catch (Exception)
+			if (_map?.heightMap == null) return TerrainMeshSettings.InvalidHeight;
+			if (x < 0 || y < 0 || x >= _map.heightMap.GetLength(0) || y >= _map.heightMap.GetLength(1))
 			{
-				//GD.Print("out of bounds" + location.X +"/"+location.Y);
-				// Return -201 if any exception occurs (e.g., out of bounds).
-				return -201;
+				return TerrainMeshSettings.InvalidHeight;
 			}
+
+			return _map.heightMap[x, y];
 		}
 
+		/// <summary>
+		/// Slope in degrees at a chunk-local grid position, or InvalidHeight when the sample
+		/// (which reaches one cell up and to the right) would leave the heightmap.
+		/// </summary>
 		public float GetInclinationAtChunkMapLocation(Vector2 location)
 		{
-			int xClamped = Mathf.CeilToInt(location.X);
-			int yClamped = Mathf.CeilToInt(location.Y);
-			float height = _map.heightMap[xClamped, yClamped];
+			int x = Mathf.CeilToInt(location.X);
+			int y = Mathf.CeilToInt(location.Y);
 
-			Vector3 v1 = new Vector3(xClamped, height, yClamped);
-			Vector3 v2 = new Vector3(xClamped, _map.heightMap[xClamped, yClamped + 1], yClamped + 1);
-			Vector3 v3 = new Vector3(xClamped + 1, _map.heightMap[xClamped + 1, yClamped + 1], yClamped + 1);
-			Vector3 v4 = new Vector3(xClamped + 1, _map.heightMap[xClamped + 1, yClamped], yClamped);
+			if (_map?.heightMap == null) return TerrainMeshSettings.InvalidHeight;
 
-			//float inclination = MathExt.CalculateInclination(verticle1,verticle2,verticle3,verticle4);
+			int w = _map.heightMap.GetLength(0);
+			int h = _map.heightMap.GetLength(1);
+
+			// This sampler reads (x+1, y+1), so it needs one cell of headroom on both axes.
+			if (x < 0 || y < 0 || x + 1 >= w || y + 1 >= h)
+			{
+				return TerrainMeshSettings.InvalidHeight;
+			}
+
+			float height = _map.heightMap[x, y];
+
+			Vector3 v1 = new Vector3(x, height, y);
+			Vector3 v2 = new Vector3(x, _map.heightMap[x, y + 1], y + 1);
+			Vector3 v3 = new Vector3(x + 1, _map.heightMap[x + 1, y + 1], y + 1);
 
 			Vector3 add = v2 - v1;
-			Vector3 normal = add.Cross(v3 - v1).Normalized();
+			Vector3 cross = add.Cross(v3 - v1);
+			if (cross.LengthSquared() < 0.000001f) return 0f; // degenerate sample, treat as flat
+
+			Vector3 normal = cross.Normalized();
 
 			// Compute the angle between the normal and the world up vector
-			float inclination = Mathf.Acos(normal.Dot(Vector3.Up)) * 57.29578f;
-
+			float inclination = Mathf.Acos(Mathf.Clamp(normal.Dot(Vector3.Up), -1f, 1f)) * 57.29578f;
 
 			return inclination;
 		}
+
 		public float[,] GetHeightmap()
 		{
 			if (_map.heightMap != null) { return _map.heightMap; }

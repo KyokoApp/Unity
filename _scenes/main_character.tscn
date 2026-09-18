@@ -10,6 +10,12 @@
 [ext_resource type="PackedScene" uid="uid://anime_char_01" path="res://_models/mannequin_f.glb" id="8_anime"]
 
 [ext_resource type="Shader" uid="uid://toon_outline_01" path="res://materials/shaders/toon_outline.gdshader" id="9_outline"]
+[ext_resource type="PackedScene" path="res://_models/anime_character.glb" id="10_anime_glb"]
+[ext_resource type="PackedScene" path="res://_models/ual_anims.glb" id="11_ual_glb"]
+[ext_resource type="BoneMap" path="res://_models/retarget/bonemap_ual_mannequin.tres" id="12_bm_ual"]
+[ext_resource type="BoneMap" path="res://_models/retarget/bonemap_vrm_anime.tres" id="13_bm_vrm"]
+[ext_resource type="Script" path="res://_script/character/AnimeCharacterRig.cs" id="14_rig"]
+
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_outline"]
 render_priority = 0
 shader = ExtResource("9_outline")
@@ -5127,3 +5133,18 @@ surface_material_override/0 = SubResource("StandardMaterial3D_sb554")
 
 [connection signal="area_entered" from="CameraPivot/Camera3D/Area3D" to="CameraPivot/Camera3D" method="OnBodyEntered"]
 [connection signal="area_exited" from="CameraPivot/Camera3D/Area3D" to="CameraPivot/Camera3D" method="OnBodyExited"]
+
+[node name="AnimeRigMount" type="Node3D" parent="."]
+
+[node name="AnimeCharacterRig" type="Node" parent="." node_paths=PackedStringArray("TargetPlayer")]
+script = ExtResource("14_rig")
+Enabled = true
+AnimeCharacterScene = ExtResource("10_anime_glb")
+UalAnimationsScene = ExtResource("11_ual_glb")
+UalBoneMap = ExtResource("12_bm_ual")
+AnimeBoneMap = ExtResource("13_bm_vrm")
+MountPoint = NodePath("../AnimeRigMount")
+TargetPlayer = NodePath("../AnimationPlayer")
+LegacyModelToHide = NodePath("../RobotArmature")
+ModelScale = 1.7
+ModelOffset = Vector3(0, 0, 0)

@@ -224,7 +224,8 @@ namespace Bouncerock.Terrain
 		}
 
 		//This returns the height at a specific world space coordinate
-		//Returns -201 if a value couldn't be determined, since 200 is the lowest elevation possible
+		//Returns TerrainMeshSettings.InvalidHeight if a value couldn't be determined,
+		//since 200 is the lowest elevation possible
 		public float GetTerrainHeightAtGlobalCoordinate(Vector2 location)
 		{
 			int chunkCoordX = Mathf.RoundToInt(location.X / meshWorldSize);
@@ -243,7 +244,7 @@ namespace Bouncerock.Terrain
 				//inGridLocation goes from -25 to +25 since the size of a chunk is 50
 				//Interrogate the relevant chunk
 			}
-			return -201;
+			return TerrainMeshSettings.InvalidHeight;
 		}
 
 		public float GetTerrainInclinationAtGlobalCoordinate(Vector2 location)
@@ -265,7 +266,7 @@ namespace Bouncerock.Terrain
 				return chunksDictionary[chunkLoc].GetInclinationAtChunkMapLocation(inGridLocation);
 
 			}
-			return -201;
+			return TerrainMeshSettings.InvalidHeight;
 		}
 		public Vector2 WorldspaceToChunkCoordinate(Vector2 coordinates)
 		{

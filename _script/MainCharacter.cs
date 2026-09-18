@@ -59,8 +59,6 @@ public partial class MainCharacter : CharacterBody3D
 
 	[Export] public MeshInstance3D Faraway;
 
-	float mouse_speed = 0.05f;
-
 	[Export]
 	public float WalkingSpeed = 4;
 	[Export]
@@ -108,6 +106,9 @@ public partial class MainCharacter : CharacterBody3D
 		bool fly = false;
 		bool sit = false;
 		public Vector3 Direction = Vector3.Zero;
+
+		/// <summary>Analog stick deflection, 0..1. Drives walk/run speed blending.</summary>
+		public float AnalogMagnitude = 0f;
 
 		public Vector3 CameraDirection = Vector3.Zero;
 
@@ -199,7 +200,6 @@ public partial class MainCharacter : CharacterBody3D
 	protected virtual void Initialization()
 	{
 		//Faraway = GetNode("/root/Faraway") as MeshInstance3D;
-		Input.MouseMode = Input.MouseModeEnum.Captured;
 		FloorMaxAngle = Mathf.DegToRad(50);
 		GameManager.Instance.SetMainCamera(PlayerCamera);
 		GameManager.Instance.SetMainCharacter(this);
@@ -219,10 +219,20 @@ public partial class MainCharacter : CharacterBody3D
 		outlineMat.SetShaderParameter("outline_color", new Color(0.08f, 0.08f, 0.1f, 1.0f));
 		outlineMat.SetShaderParameter("outline_width", 2.2f);
 
+		// Both rigs get the outline. AnimeCharacterRig runs in _Ready() as a child node, so it
+		// has already mounted the anime model by the time we get here; RobotArmature is hidden
+		// once that succeeds, but walking it costs nothing and keeps the old rig outlined if
+		// the swap is switched off in the inspector.
 		Node armature = GetNodeOrNull("RobotArmature");
 		if (armature != null)
 		{
 			ApplyOutlineRecursive(armature, outlineMat);
+		}
+
+		Node animeMount = GetNodeOrNull("AnimeRigMount");
+		if (animeMount != null)
+		{
+			ApplyOutlineRecursive(animeMount, outlineMat);
 		}
 	}
 
@@ -266,7 +276,7 @@ public partial class MainCharacter : CharacterBody3D
 			int maxAttempts = 500;
 			int attempts = 0;
 			float step = radius;
-			if (height != -201)
+			if (!Bouncerock.Terrain.TerrainMeshSettings.IsInvalidHeight(height))
 			{
 				GD.Print("original pos " + position);
 
@@ -449,51 +459,6 @@ public partial class MainCharacter : CharacterBody3D
 
 	}
 
-	/*public override void _Input(InputEvent keyEvent)
-		{
-			
-			if (keyEvent is InputEventMouseButton _mouseButton)
-			{
-				switch (_mouseButton.ButtonIndex)
-				{
-					case MouseButton.Right:
-					Input.MouseMode = _mouseButton.Pressed? Input.MouseModeEnum.Captured:Input.MouseModeEnum.Visible;
-					break;
-				}
-				if (_mouseButton.ButtonIndex == MouseButton.Left && _mouseButton.Pressed)
-				{
-					RigidBody3D newCube = Cube.Instantiate() as RigidBody3D;
-					GetTree().Root.AddChild(newCube);
-					Vector3 forwardDirection = GlobalTransform.Basis.Z;
-
-					newCube.Position = GlobalTransform.Origin + (forwardDirection*2)+Vector3.Up;
-
-					Vector3 velocityDirection = (forwardDirection*2 + Vector3.Up).Normalized();
-        			newCube.LinearVelocity = velocityDirection * 5;
-
-					//newCube.Position = this.Position + Vector3.Back +Vector3.Up;
-				//	newCube.Rotation = this.Rotation;
-					//newCube.LinearVelocity = (Vector3.Back+Vector3.Up)*10;
-				}
-			}
-			if (keyEvent is InputEventMouseMotion motion)
-			{
-				cam_rot_x = Mathf.Clamp((cam_rot_x +(-motion.Relative.Y * mouse_speed)), -25,60);
-				cam_rot_y += -motion.Relative.X * mouse_speed;
-			}
-			if (Input.IsActionPressed("action"))
-			{
-				float height = TerrainManager.Instance.GetTerrainHeightAtGlobalCoordinate(new Vector2(GlobalPosition.X, GlobalPosition.Z));
-
-				float degree = TerrainManager.Instance.GetTerrainInclinationAtGlobalCoordinate(new Vector2(GlobalPosition.X, GlobalPosition.Z));
-
-				Vector3 location = new Vector3(GlobalPosition.X, height, GlobalPosition.Z);
-				GD.Print("Degree inclination: " + degree);
-				
-				
-			}
-
-		}*/
 
 	protected void UpdateAnimations()
 	{
@@ -551,6 +516,57 @@ public partial class MainCharacter : CharacterBody3D
 
 	}
 
+	// ------------------------------------------------------------------
+	// Movement tuning. These were previously hardcoded inside the method,
+	// which made the character feel "stiff": any stick deflection past the
+	// deadzone instantly snapped the character to full speed.
+	// ------------------------------------------------------------------
+
+	/// <summary>Stick magnitude below this is treated as "walk", above it we blend into a run.</summary>
+	[Export] public float RunStickThreshold = 0.55f;
+
+	/// <summary>How fast the body turns to face the travel direction (radians/sec response).</summary>
+	[Export] public float TurnResponse = 14f;
+
+	/// <summary>Ground acceleration / braking, in units per second squared.</summary>
+	[Export] public float GroundAcceleration = 55f;
+
+	/// <summary>How strongly the analog magnitude scales speed between 0 and 1.</summary>
+	[Export] public float AnalogSpeedCurve = 1f;
+
+	/// <summary>Vertical camera limits, in degrees. Pitch used to be unclamped on Android.</summary>
+	[Export] public float CameraPitchMin = -25f;
+	[Export] public float CameraPitchMax = 60f;
+
+	/// <summary>
+	/// Builds the world-space movement direction from the analog stick, using the actual
+	/// camera basis. Reading CameraPivot.GlobalTransform.Basis (instead of re-deriving the
+	/// yaw by hand) means the direction stays correct even if the pivot gets reparented or
+	/// its rotation is driven from somewhere else.
+	/// </summary>
+	private Vector3 AnalogToWorldDirection(Vector2 inputDir)
+	{
+		Basis camBasis = CameraPivot.GlobalTransform.Basis;
+
+		// Flatten onto the ground plane so looking up/down never tilts the walk direction.
+		Vector3 camForward = new Vector3(camBasis.Z.X, 0f, camBasis.Z.Z);
+		Vector3 camRight = new Vector3(camBasis.X.X, 0f, camBasis.X.Z);
+
+		if (camForward.LengthSquared() < 0.0001f)
+		{
+			// Camera pointing straight down: fall back to the character's own facing.
+			camForward = new Vector3(-Mathf.Sin(Rotation.Y), 0f, -Mathf.Cos(Rotation.Y));
+			camRight = new Vector3(Mathf.Cos(Rotation.Y), 0f, -Mathf.Sin(Rotation.Y));
+		}
+
+		camForward = camForward.Normalized();
+		camRight = camRight.Normalized();
+
+		// Stick up (negative Y on screen) means "away from the camera" = camForward.
+		// Godot's -Z is forward, hence the sign on the forward term.
+		return (camRight * inputDir.X - camForward * inputDir.Y).Normalized();
+	}
+
 	protected void UpdateMovement(float deltaFloat)
 	{
 		Vector3 velocity = Velocity;
@@ -561,43 +577,55 @@ public partial class MainCharacter : CharacterBody3D
 			velocity.Y = JumpVelocity * JumpVelocityMultiplier;
 		}
 
-		// Get the input direction and handle the movement/deceleration.
+		// ------------------------------------------------------------------
+		// Analog input. Touch stick first; keyboard/gamepad axes as fallback.
+		// Both produce a Vector2 whose LENGTH carries the analog magnitude.
+		// ------------------------------------------------------------------
 		Vector2 inputDir = Vector2.Zero;
-		if (touchInputManager != null && touchInputManager.MoveVector != Vector2.Zero)
+		if (touchInputManager != null)
 		{
-			// Analog stick: X is horizontal (-1 left, 1 right), Y is vertical (-1 up/forward, 1 down/backward)
-			inputDir = new Vector2(touchInputManager.MoveVector.X, touchInputManager.MoveVector.Y);
+			inputDir = touchInputManager.MoveVector;
 		}
-		else
+		if (inputDir.LengthSquared() < 0.0001f)
 		{
 			inputDir = Input.GetVector("ui_left", "ui_right", "ui_up", "ui_down");
 		}
 
-		if (inputDir.LengthSquared() > 0.01f)
+		float stickMagnitude = Mathf.Clamp(inputDir.Length(), 0f, 1f);
+
+		if (stickMagnitude > 0.01f)
 		{
-			// Calculate true forward and right direction from CameraPivot yaw angle
-			float camYawRad = Mathf.DegToRad(cam_rot_y);
-			Vector3 camForward = new Vector3(-Mathf.Sin(camYawRad), 0, -Mathf.Cos(camYawRad)).Normalized();
-			Vector3 camRight = new Vector3(Mathf.Cos(camYawRad), 0, -Mathf.Sin(camYawRad)).Normalized();
-
-			// Analog up (negative Y) moves straight forward in camera view; analog right (positive X) moves right
-			Vector3 targetMoveDir = (camRight * inputDir.X + camForward * -inputDir.Y).Normalized();
+			Vector3 targetMoveDir = AnalogToWorldDirection(inputDir);
 			CurrentInput.Direction = targetMoveDir;
+			CurrentInput.AnalogMagnitude = stickMagnitude;
 
-			// Smoothly rotate character body towards target move direction without infinite feedback loop
+			// Turn the body towards the travel direction. Exponential smoothing keeps the
+			// turn rate identical at 30, 60 or 120 fps (the old deltaFloat * 12f factor did not).
 			float targetAngle = Mathf.Atan2(targetMoveDir.X, targetMoveDir.Z);
-			Rotation = new Vector3(Rotation.X, Mathf.LerpAngle(Rotation.Y, targetAngle, deltaFloat * 12f), Rotation.Z);
+			float turnT = 1f - Mathf.Exp(-TurnResponse * deltaFloat);
+			Rotation = new Vector3(Rotation.X, Mathf.LerpAngle(Rotation.Y, targetAngle, turnT), Rotation.Z);
 		}
 		else
 		{
 			CurrentInput.Direction = Vector3.Zero;
+			CurrentInput.AnalogMagnitude = 0f;
 		}
+
+		// ------------------------------------------------------------------
+		// Speed selection. Stick magnitude drives speed continuously:
+		//   light push  -> slow walk
+		//   past RunStickThreshold -> blends up to RunningSpeed
+		// ------------------------------------------------------------------
+		float runBlend = Mathf.Clamp((stickMagnitude - RunStickThreshold) / Mathf.Max(0.01f, 1f - RunStickThreshold), 0f, 1f);
+		float maxSpeedForStick = Mathf.Lerp(WalkingSpeed, RunningSpeed, Mathf.SmoothStep(0f, 1f, runBlend));
+
 		if (IsOnFloor())
 		{
 			if (Action > 0)
 			{
-				speed = CurrentAction == CharacterActions.Running ? RunningSpeed : WalkingSpeed;
-				speed = speed * SpeedMultiplier;
+				// Sprinting only while stamina remains and the state machine agrees.
+				bool wantsSprint = CurrentAction == CharacterActions.Running || runBlend > 0f;
+				speed = (wantsSprint ? maxSpeedForStick : Mathf.Min(maxSpeedForStick, WalkingSpeed)) * SpeedMultiplier;
 			}
 		}
 		if (!IsOnFloor())
@@ -611,35 +639,39 @@ public partial class MainCharacter : CharacterBody3D
 			}
 			else if (CurrentAction == CharacterActions.Gliding)
 			{
-				//Action = Mathf.Clamp(Action - (deltaFloat * 10), 0, 100);
 				velocity.Y = -1;
-				//float t = Mathf.MoveToward((float)(speed - WalkingSpeed) / (RunningSpeed - WalkingSpeed), 0, 1);
-				speed = RunningSpeed;
-				speed = speed * SpeedMultiplier;
+				speed = RunningSpeed * SpeedMultiplier;
 			}
 			else
 			{
-				Action = Mathf.Clamp(Action + (int)deltaFloat, 0, 100);
+				Action = Mathf.Clamp(Action + deltaFloat, 0, 100);
 				velocity.Y -= gravity * deltaFloat;
-				//float ratio = (speed - WalkingSpeed) / (RunningSpeed - WalkingSpeed);
-				//float newRatio = Mathf.MoveToward(ratio, 0, deltaFloat * 1.5f); // adjust the 1.5f as needed
-				//speed = Mathf.Lerp(WalkingSpeed, RunningSpeed, newRatio);
 				float t = Mathf.MoveToward((float)(speed - WalkingSpeed) / (RunningSpeed - WalkingSpeed), 0, 1);
 				speed = Mathf.Lerp(WalkingSpeed, RunningSpeed, t);
-
 			}
-
 		}
+
+		// ------------------------------------------------------------------
+		// Horizontal velocity. Accelerating towards the target instead of assigning it
+		// outright is what removes the last bit of "snapping" from the controls.
+		// ------------------------------------------------------------------
+		Vector2 targetHorizontal;
 		if (CurrentInput.Direction != Vector3.Zero)
 		{
-			velocity.X = CurrentInput.Direction.X * speed;
-			velocity.Z = CurrentInput.Direction.Z * speed;
+			// Analog curve: 1.0 = fully linear, >1 = slower at low stick, snappier near full.
+			float analogScale = Mathf.Pow(stickMagnitude, AnalogSpeedCurve);
+			targetHorizontal = new Vector2(CurrentInput.Direction.X, CurrentInput.Direction.Z) * (speed * analogScale);
 		}
 		else
 		{
-			velocity.X = Mathf.MoveToward(Velocity.X, 0, speed);
-			velocity.Z = Mathf.MoveToward(Velocity.Z, 0, speed);
+			targetHorizontal = Vector2.Zero;
 		}
+
+		float accel = GroundAcceleration * (IsOnFloor() ? 1f : 0.35f);
+		float maxStep = accel * deltaFloat;
+
+		velocity.X = Mathf.MoveToward(velocity.X, targetHorizontal.X, maxStep);
+		velocity.Z = Mathf.MoveToward(velocity.Z, targetHorizontal.Y, maxStep);
 
 		if (Position.Y < -100)
 		{
@@ -653,17 +685,23 @@ public partial class MainCharacter : CharacterBody3D
 
 	protected void UpdateCamera(float deltaFloat)
 	{
-#if GODOT_ANDROID
+		// Consume (not read) the touch delta: TouchInputManager accumulates drag events and
+		// zeroes them here, so the camera stops the moment the finger stops.
+		Vector2 camDelta = Vector2.Zero;
 		if (touchInputManager != null)
 		{
-			CameraRotationAxis.X = touchInputManager.CameraRotationAxis.X;
-			CameraRotationAxis.Y = touchInputManager.CameraRotationAxis.Y;
+			camDelta = touchInputManager.ConsumeCameraDelta();
 		}
-#endif
+		CameraRotationAxis.X = camDelta.X;
+		CameraRotationAxis.Y = camDelta.Y;
+
 		float targetFov = 75;
 		float fovLerpTime = 0.5f; // adjust this value to control the speed of the FOV change
 
-		if (CurrentInput.Direction.Z != 0)
+		// Use the full movement magnitude: the old `Direction.Z != 0` test missed strafing
+		// entirely, so the FOV never widened when running sideways.
+		float moveAmount = CurrentInput.AnalogMagnitude;
+		if (moveAmount > 0.01f)
 		{
 			if (CurrentAction == CharacterActions.Running || CurrentAction == CharacterActions.Gliding)
 			{
@@ -674,19 +712,27 @@ public partial class MainCharacter : CharacterBody3D
 				targetFov = 75;
 			}
 		}
+
 		if (CameraRotationAxis != Vector3.Zero)
 		{
-			cam_rot_x -= CameraRotationAxis.Y;
-			cam_rot_y += Mathf.Clamp(CameraRotationAxis.X, -25, 60);
-			// Reset CameraRotationAxis after applying delta so it doesn't spin infinitely!
+			// Pitch is clamped on every platform now; on Android it previously wasn't, so the
+			// camera could roll over the character's head.
+			cam_rot_x = Mathf.Clamp(cam_rot_x - CameraRotationAxis.Y, CameraPitchMin, CameraPitchMax);
+			cam_rot_y += CameraRotationAxis.X;
+
+			// Keep yaw in -180..180 so it never drifts into huge values on a long session.
+			if (cam_rot_y > 180f) cam_rot_y -= 360f;
+			else if (cam_rot_y < -180f) cam_rot_y += 360f;
+
 			CameraRotationAxis = Vector3.Zero;
 		}
-		PlayerCamera.Fov = Mathf.Lerp(PlayerCamera.Fov, targetFov, fovLerpTime * deltaFloat);
+
+		// Frame-rate independent FOV easing.
+		float fovT = 1f - Mathf.Exp(-fovLerpTime * 6f * deltaFloat);
+		PlayerCamera.Fov = Mathf.Lerp(PlayerCamera.Fov, targetFov, fovT);
 
 		// Camera pivot rotates horizontally (Y yaw) and vertically (X pitch) independently from character body
 		CameraPivot.RotationDegrees = new Vector3(cam_rot_x, cam_rot_y, 0);
-
-		//RotateObjectLocal(Vector3.Right, Mathf.DegToRad(-pitch));
 	}
 
 	public void AddAction(int action)
@@ -754,9 +800,15 @@ public partial class MainCharacter : CharacterBody3D
 		}*/
 	}
 
+	/// <summary>
+	/// Touch-only input handling. This project ships as an Android build, so the previous
+	/// mouse / mouse-motion / gamepad branches have been removed along with their
+	/// GODOT_WINDOWS blocks.
+	/// </summary>
 	public override void _Input(InputEvent keyEvent)
 	{
 		CurrentInput.Reset();
+
 		if (Input.IsActionPressed("run"))
 		{
 			CurrentInput.SetRun();
@@ -769,103 +821,24 @@ public partial class MainCharacter : CharacterBody3D
 		{
 			CurrentInput.SetFly();
 		}
-		
 		if (Input.IsActionPressed("sit"))
 		{
 			CurrentInput.SetSit();
 		}
-#if GODOT_WINDOWS
+
 		if (Input.IsActionJustPressed("torch"))
 		{
 			SpotLight.Visible = !SpotLight.Visible;
 		}
-		if (keyEvent is InputEventMouseButton _mouseButton)
+
+		// JustPressed, not IsActionPressed: the old code ran this on *every* input event while
+		// the button was held, and it also spawned a crate inline *and* called LaunchAttack()
+		// (which spawns another one) — so a single tap produced two crates. LaunchAttack()
+		// already owns spawning plus the cooldown, so it is the only caller now.
+		if (Input.IsActionJustPressed("attack"))
 		{
-			switch (_mouseButton.ButtonIndex)
-			{
-				case MouseButton.Right:
-					Input.MouseMode = _mouseButton.Pressed ? Input.MouseModeEnum.Captured : Input.MouseModeEnum.Visible;
-					break;
-			}
-			if (_mouseButton.ButtonIndex == MouseButton.Left && _mouseButton.Pressed)
-			{
-				CurrentInput.SetAttack();
-
-				//Toss a crate
-				/*Animator.Set("parameters/conditions/tossing", true);
-				RigidBody3D newCube = Cube.Instantiate() as RigidBody3D;
-				GetTree().Root.AddChild(newCube);
-				Crates.Add(newCube);
-				Vector3 forwardDirection = GlobalTransform.Basis.Z;
-
-				newCube.Position = GlobalTransform.Origin + (forwardDirection*2)+Vector3.Up;
-
-				Vector3 velocityDirection = (forwardDirection*2 + Vector3.Up).Normalized();
-				newCube.LinearVelocity = velocityDirection * 10;*/
-
-			}
+			CurrentInput.SetAttack();
+			LaunchAttack();
 		}
-#endif
-#if GODOT_ANDROID
-			if (Input.IsActionPressed("torch"))
-			{
-				SpotLight.Visible = !SpotLight.Visible;
-			}
-			if (Input.IsActionPressed("attack"))
-			{
-				CurrentInput.SetAttack();
-					
-					//Toss a crate
-					Animator.Set("parameters/conditions/tossing", true);
-					RigidBody3D newCube = Cube.Instantiate() as RigidBody3D;
-					GetTree().Root.AddChild(newCube);
-					Vector3 forwardDirection = GlobalTransform.Basis.Z;
-
-					newCube.Position = GlobalTransform.Origin + (forwardDirection*2)+Vector3.Up;
-
-					Vector3 velocityDirection = (forwardDirection*2 + Vector3.Up).Normalized();
-        			newCube.LinearVelocity = velocityDirection * 10;
-					
-    				LaunchAttack();
-			}
-#endif
-#if GODOT_WINDOWS
-		if (keyEvent is InputEventJoypadMotion joypadMotionEvent)
-		{
-			// Get the joystick axis values
-			JoyAxis axis = joypadMotionEvent.Axis; // X-axis of the joystick
-			if (axis == JoyAxis.RightX || axis == JoyAxis.RightY)//axis goes from -1 to 0
-			{
-				// Get the joystick axis values
-				if (axis == JoyAxis.RightY)
-				{
-					CameraRotationAxis.Y = joypadMotionEvent.AxisValue;
-				}
-				if (axis == JoyAxis.RightX)
-				{
-					CameraRotationAxis.X = joypadMotionEvent.AxisValue;
-				}
-			}
-			//GD.Print(axis + joypadMotionEvent.AxisValue.ToString());
-		}
-
-		if (keyEvent is InputEventMouseMotion motion)
-		{
-			cam_rot_x = Mathf.Clamp((cam_rot_x + (-motion.Relative.Y * mouse_speed)), -25, 60);
-			cam_rot_y += -motion.Relative.X * mouse_speed;
-		}
-#endif
-		if (Input.IsActionPressed("run"))
-		{
-			CurrentInput.SetRun();
-			float height = TerrainManager.Instance.GetTerrainHeightAtGlobalCoordinate(new Vector2(GlobalPosition.X, GlobalPosition.Z));
-
-			float degree = TerrainManager.Instance.GetTerrainInclinationAtGlobalCoordinate(new Vector2(GlobalPosition.X, GlobalPosition.Z));
-
-			Vector3 location = new Vector3(GlobalPosition.X, height, GlobalPosition.Z);
-			//GD.Print("Degree inclination: " + degree);
-
-		}
-
 	}
 }

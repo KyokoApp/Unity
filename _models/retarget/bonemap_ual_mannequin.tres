@@ -1,0 +1,66 @@
+[gd_resource type="BoneMap" load_steps=2 format=3]
+
+; Universal Animation Library 2 / Unreal-style mannequin -> SkeletonProfileHumanoid
+; Maps source bone names onto Godot's SkeletonProfileHumanoid so that animations can be
+; retargeted between the two rigs. Godot uses this to correct for the different rest
+; orientations of each skeleton, which a raw quaternion copy cannot do.
+
+[sub_resource type="SkeletonProfileHumanoid" id="SkeletonProfileHumanoid_1"]
+
+[resource]
+profile = SubResource("SkeletonProfileHumanoid_1")
+bone_map = {
+&"Head": &"Head",
+&"ball_l": &"LeftToes",
+&"ball_r": &"RightToes",
+&"calf_l": &"LeftLowerLeg",
+&"calf_r": &"RightLowerLeg",
+&"clavicle_l": &"LeftShoulder",
+&"clavicle_r": &"RightShoulder",
+&"foot_l": &"LeftFoot",
+&"foot_r": &"RightFoot",
+&"hand_l": &"LeftHand",
+&"hand_r": &"RightHand",
+&"index_01_l": &"LeftIndexProximal",
+&"index_01_r": &"RightIndexProximal",
+&"index_02_l": &"LeftIndexIntermediate",
+&"index_02_r": &"RightIndexIntermediate",
+&"index_03_l": &"LeftIndexDistal",
+&"index_03_r": &"RightIndexDistal",
+&"lowerarm_l": &"LeftLowerArm",
+&"lowerarm_r": &"RightLowerArm",
+&"middle_01_l": &"LeftMiddleProximal",
+&"middle_01_r": &"RightMiddleProximal",
+&"middle_02_l": &"LeftMiddleIntermediate",
+&"middle_02_r": &"RightMiddleIntermediate",
+&"middle_03_l": &"LeftMiddleDistal",
+&"middle_03_r": &"RightMiddleDistal",
+&"neck_01": &"Neck",
+&"pelvis": &"Hips",
+&"pinky_01_l": &"LeftLittleProximal",
+&"pinky_01_r": &"RightLittleProximal",
+&"pinky_02_l": &"LeftLittleIntermediate",
+&"pinky_02_r": &"RightLittleIntermediate",
+&"pinky_03_l": &"LeftLittleDistal",
+&"pinky_03_r": &"RightLittleDistal",
+&"ring_01_l": &"LeftRingProximal",
+&"ring_01_r": &"RightRingProximal",
+&"ring_02_l": &"LeftRingIntermediate",
+&"ring_02_r": &"RightRingIntermediate",
+&"ring_03_l": &"LeftRingDistal",
+&"ring_03_r": &"RightRingDistal",
+&"root": &"Root",
+&"spine_01": &"Spine",
+&"spine_02": &"Chest",
+&"spine_03": &"UpperChest",
+&"thigh_l": &"LeftUpperLeg",
+&"thigh_r": &"RightUpperLeg",
+&"thumb_01_l": &"LeftThumbMetacarpal",
+&"thumb_01_r": &"RightThumbMetacarpal",
+&"thumb_02_l": &"LeftThumbProximal",
+&"thumb_02_r": &"RightThumbProximal",
+&"thumb_03_l": &"LeftThumbDistal",
+&"thumb_03_r": &"RightThumbDistal",
+&"upperarm_l": &"LeftUpperArm",
+&"upperarm_r": &"RightUpperArm",
+}

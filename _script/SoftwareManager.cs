@@ -58,33 +58,61 @@ namespace Bouncerock
 		{
 			GD.Print("Starting Software Manager");
 			Initialized = true;
+			SetPersistentPaths();
 			//Debug.DebugStartSession();
 			GameManager gameManager = GetParent().GetNode<GameManager>("GameManager");
 			if (gameManager == null) {GD.Print("Couldn't find GameManager");}
 			gameManager.Initialize();
 		}
 
-		protected void SetPersistentPaths()
-        {
-			#if GODOT_WINDOWS 
-				persistentpath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData)
-				+ "/Bouncerock";
-				documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-					+ "/Bouncerock";
-				if(!Directory.Exists(persistentpath))
-					{
-						Directory.CreateDirectory(persistentpath);
-					}
-				if(!Directory.Exists(documentspath))
-					{
-						Directory.CreateDirectory(documentspath);
-					}
-			#endif
-			#if GODOT_ANDROID
-						/*persistentpath = Application.persistentDataPath;
-						documentspath = persistentpath
-							+ "/Docs";*/
-			#endif
+		/// <summary>
+		/// Resolves the writable directories for this platform and creates them.
+		///
+		/// This used to be dead code: it was never called, and its Android branch was fully
+		/// commented out, so on a phone both paths stayed "" while MapGenerator still tried to
+		/// read/write .isl chunk saves. It is now invoked from _Ready() and uses Godot's own
+		/// user:// directory, which maps to the app's private storage on Android.
+		/// </summary>
+		public static void SetPersistentPaths()
+		{
+			if (!string.IsNullOrEmpty(persistentpath) && !string.IsNullOrEmpty(documentspath))
+			{
+				return; // already resolved
+			}
+
+			// user:// is the only writable root guaranteed across every Godot platform:
+			//   Android -> /storage/emulated/0/Android/data/<pkg>/files
+			//   others  -> %APPDATA%/Godot/app_userdata/<project>
+			persistentpath = ProjectSettings.GlobalizePath("user://").TrimEnd('/');
+			documentspath = persistentpath + "/Docs";
+
+			TryCreateDirectory(persistentpath);
+			TryCreateDirectory(documentspath);
+
+			GD.Print("[SoftwareManager] persistent path = " + persistentpath);
+			GD.Print("[SoftwareManager] documents path = " + documentspath);
+		}
+
+		private static void TryCreateDirectory(string path)
+		{
+			if (string.IsNullOrEmpty(path)) return;
+			try
+			{
+				if (!Directory.Exists(path))
+				{
+					Directory.CreateDirectory(path);
+				}
+			}
+			catch (System.Exception e)
+			{
+				GD.PrintErr("[SoftwareManager] could not create " + path + ": " + e.Message);
+			}
+		}
+
+		public static string GetDocumentsPath()
+		{
+			SetPersistentPaths();
+			return documentspath;
 		}
 
 		public static string GetManifestPath()

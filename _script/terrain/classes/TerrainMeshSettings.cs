@@ -22,6 +22,16 @@ namespace Bouncerock.Terrain
 		
 		//public static int ChunkSize = 120;
 
+		/// <summary>
+		/// Sentinel returned when a height cannot be determined (out of bounds, chunk not loaded).
+		/// 200 is the lowest possible elevation, so -201 can never collide with a real height.
+		/// This used to be a bare literal duplicated across four files.
+		/// </summary>
+		public const float InvalidHeight = -201f;
+
+		/// <summary>True when a height value is the InvalidHeight sentinel rather than real data.</summary>
+		public static bool IsInvalidHeight(float h) { return h == InvalidHeight; }
+
 		public static float meshScale = 1f;
 		public static bool useFlatShading = false;
 

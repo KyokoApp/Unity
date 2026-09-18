@@ -1,0 +1,66 @@
+[gd_resource type="BoneMap" load_steps=2 format=3]
+
+; VRM (J_Bip_*) anime character -> SkeletonProfileHumanoid
+; Maps source bone names onto Godot's SkeletonProfileHumanoid so that animations can be
+; retargeted between the two rigs. Godot uses this to correct for the different rest
+; orientations of each skeleton, which a raw quaternion copy cannot do.
+
+[sub_resource type="SkeletonProfileHumanoid" id="SkeletonProfileHumanoid_1"]
+
+[resource]
+profile = SubResource("SkeletonProfileHumanoid_1")
+bone_map = {
+&"J_Bip_C_Chest": &"Chest",
+&"J_Bip_C_Head": &"Head",
+&"J_Bip_C_Hips": &"Hips",
+&"J_Bip_C_Neck": &"Neck",
+&"J_Bip_C_Spine": &"Spine",
+&"J_Bip_C_UpperChest": &"UpperChest",
+&"J_Bip_L_Foot": &"LeftFoot",
+&"J_Bip_L_Hand": &"LeftHand",
+&"J_Bip_L_Index1": &"LeftIndexProximal",
+&"J_Bip_L_Index2": &"LeftIndexIntermediate",
+&"J_Bip_L_Index3": &"LeftIndexDistal",
+&"J_Bip_L_Little1": &"LeftLittleProximal",
+&"J_Bip_L_Little2": &"LeftLittleIntermediate",
+&"J_Bip_L_Little3": &"LeftLittleDistal",
+&"J_Bip_L_LowerArm": &"LeftLowerArm",
+&"J_Bip_L_LowerLeg": &"LeftLowerLeg",
+&"J_Bip_L_Middle1": &"LeftMiddleProximal",
+&"J_Bip_L_Middle2": &"LeftMiddleIntermediate",
+&"J_Bip_L_Middle3": &"LeftMiddleDistal",
+&"J_Bip_L_Ring1": &"LeftRingProximal",
+&"J_Bip_L_Ring2": &"LeftRingIntermediate",
+&"J_Bip_L_Ring3": &"LeftRingDistal",
+&"J_Bip_L_Shoulder": &"LeftShoulder",
+&"J_Bip_L_Thumb1": &"LeftThumbMetacarpal",
+&"J_Bip_L_Thumb2": &"LeftThumbProximal",
+&"J_Bip_L_Thumb3": &"LeftThumbDistal",
+&"J_Bip_L_ToeBase": &"LeftToes",
+&"J_Bip_L_UpperArm": &"LeftUpperArm",
+&"J_Bip_L_UpperLeg": &"LeftUpperLeg",
+&"J_Bip_R_Foot": &"RightFoot",
+&"J_Bip_R_Hand": &"RightHand",
+&"J_Bip_R_Index1": &"RightIndexProximal",
+&"J_Bip_R_Index2": &"RightIndexIntermediate",
+&"J_Bip_R_Index3": &"RightIndexDistal",
+&"J_Bip_R_Little1": &"RightLittleProximal",
+&"J_Bip_R_Little2": &"RightLittleIntermediate",
+&"J_Bip_R_Little3": &"RightLittleDistal",
+&"J_Bip_R_LowerArm": &"RightLowerArm",
+&"J_Bip_R_LowerLeg": &"RightLowerLeg",
+&"J_Bip_R_Middle1": &"RightMiddleProximal",
+&"J_Bip_R_Middle2": &"RightMiddleIntermediate",
+&"J_Bip_R_Middle3": &"RightMiddleDistal",
+&"J_Bip_R_Ring1": &"RightRingProximal",
+&"J_Bip_R_Ring2": &"RightRingIntermediate",
+&"J_Bip_R_Ring3": &"RightRingDistal",
+&"J_Bip_R_Shoulder": &"RightShoulder",
+&"J_Bip_R_Thumb1": &"RightThumbMetacarpal",
+&"J_Bip_R_Thumb2": &"RightThumbProximal",
+&"J_Bip_R_Thumb3": &"RightThumbDistal",
+&"J_Bip_R_ToeBase": &"RightToes",
+&"J_Bip_R_UpperArm": &"RightUpperArm",
+&"J_Bip_R_UpperLeg": &"RightUpperLeg",
+&"Root": &"Root",
+}

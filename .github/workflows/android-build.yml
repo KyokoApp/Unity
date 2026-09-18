@@ -68,26 +68,49 @@ jobs:
           rm -rf godot_mono.zip export_templates.tpz godot_mono export_templates_temp
 
       - name: Configure Keystore and Godot Editor Settings
+        env:
+          # Stored as repository secrets, NOT in the tree. The keystore itself used to be
+          # committed with its password in plaintext, which meant anyone with read access to
+          # the repo could sign an APK that Android would happily install as an "update".
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          KEYSTORE_PATH="$(pwd)/.keystore/permanent.keystore"
-          if [ ! -f "$KEYSTORE_PATH" ]; then
-            echo "Keystore not found at $KEYSTORE_PATH, creating deterministic fallback..."
-            mkdir -p .keystore
-            keytool -keyalg RSA -genkeypair -alias permanentkey -keypass permanentpass123 -keystore "$KEYSTORE_PATH" -storepass permanentpass123 -dname "CN=AnimeRunner,OU=Dev,O=KyokoApp,C=ID" -validity 20000 -deststoretype pkcs12
+          set -euo pipefail
+
+          if [ -z "${KEYSTORE_B64:-}" ] || [ -z "${KEYSTORE_PASSWORD:-}" ]; then
+            echo "::error::Missing ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD secrets."
+            echo "Add them under Settings > Secrets and variables > Actions, then re-run."
+            echo "Generate the base64 blob with:  base64 -w0 permanent.keystore"
+            exit 1
           fi
-          
+
+          KEY_ALIAS="${KEY_ALIAS:-permanentkey}"
+          KEY_PASSWORD="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+
+          mkdir -p .keystore
+          KEYSTORE_PATH="$(pwd)/.keystore/release.keystore"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          echo "Keystore restored from secret ($(stat -c%s "$KEYSTORE_PATH") bytes)."
+
           EDITOR_SETTINGS_DIR="$HOME/.config/godot"
           mkdir -p "$EDITOR_SETTINGS_DIR"
-          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\nexport/android/debug_keystore = "%s"\nexport/android/debug_keystore_user = "permanentkey"\nexport/android/debug_keystore_pass = "permanentpass123"\n' "$ANDROID_HOME" "$JAVA_HOME" "$KEYSTORE_PATH" > "$EDITOR_SETTINGS_DIR/editor_settings-4.tres"
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\nexport/android/debug_keystore = "%s"\nexport/android/debug_keystore_user = "%s"\nexport/android/debug_keystore_pass = "%s"\n' \
+            "$ANDROID_HOME" "$JAVA_HOME" "$KEYSTORE_PATH" "$KEY_ALIAS" "$KEY_PASSWORD" \
+            > "$EDITOR_SETTINGS_DIR/editor_settings-4.tres"
           cp "$EDITOR_SETTINGS_DIR/editor_settings-4.tres" "$EDITOR_SETTINGS_DIR/editor_settings-4.5.tres"
 
-          # Setup keystore for debug and release in Godot
-          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
-          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=permanentkey" >> $GITHUB_ENV
-          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=permanentpass123" >> $GITHUB_ENV
-          echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
-          echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=permanentkey" >> $GITHUB_ENV
-          echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=permanentpass123" >> $GITHUB_ENV
+          # Hand the keystore to Godot for both debug and release exports.
+          {
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$KEYSTORE_PATH"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=$KEY_ALIAS"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=$KEY_PASSWORD"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$KEYSTORE_PATH"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=$KEY_ALIAS"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=$KEY_PASSWORD"
+          } >> $GITHUB_ENV
 
       - name: Verify App Icon and Convert Loading Video to OGV
         run: |

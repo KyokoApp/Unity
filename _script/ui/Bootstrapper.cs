@@ -50,22 +50,7 @@ public partial class Bootstrapper : Control
         ManifestRequest.RequestCompleted += OnManifestRequestCompleted;
         DownloadRequest.RequestCompleted += OnDownloadRequestCompleted;
 
-                // Load custom loading screen video if available
-        string videoPath = "res://videos/loading.ogv";
-        if (!FileAccess.FileExists(videoPath)) videoPath = "res://videos/loading.mp4";
-        if (FileAccess.FileExists(videoPath) && VideoPlayer != null)
-        {
-            var stream = GD.Load<VideoStream>(videoPath);
-            if (stream == null)
-            {
-                GD.Print("VideoStream loading fallback to VideoStreamTheora / general stream...");
-            }
-            if (stream != null)
-            {
-                VideoPlayer.Stream = stream;
-                VideoPlayer.Play();
-            }
-        }
+        PlayLoadingVideo();
         StartUpdateCheck();
     }
 
@@ -277,6 +262,16 @@ public partial class Bootstrapper : Control
         _pendingPacks.RemoveAt(0);
 
         string savePath = $"user://{_currentDownloadingPack.Name}";
+
+        // Reuse a local copy that still matches the manifest hash. Saves the player a full
+        // re-download of the 100+ MB base pack on every launch.
+        if (IsLocalPackValid(_currentDownloadingPack, savePath))
+        {
+            GD.Print($"Local copy of {_currentDownloadingPack.Name} is already valid, skipping download.");
+            DownloadNextPack(packsToLoad);
+            return;
+        }
+
         DownloadRequest.DownloadFile = savePath;
 
         StatusLabel.Text = $"Mengunduh {_currentDownloadingPack.Name}...";
@@ -328,6 +323,32 @@ public partial class Bootstrapper : Control
         {
             ShowError($"Ukuran file tidak cocok (Diterima {downloadedBytes}B, diharapkan {_currentDownloadingPack.Size}B).");
             return;
+        }
+
+        // Size alone is not integrity: a truncated or tampered download that happens to match
+        // the byte count used to be accepted and then loaded with LoadResourcePack(replaceFiles:true).
+        // The manifest already carries a sha256 per pack, so verify against it before loading.
+        if (!string.IsNullOrEmpty(_currentDownloadingPack.Sha256))
+        {
+            StatusLabel.Text = $"Memeriksa integritas {_currentDownloadingPack.Name}...";
+            string actual = ComputeSha256Hex(downloadedFilePath);
+            if (string.IsNullOrEmpty(actual))
+            {
+                ShowError($"Gagal menghitung checksum {_currentDownloadingPack.Name}.");
+                return;
+            }
+            if (!string.Equals(actual, _currentDownloadingPack.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                GD.PrintErr($"SHA256 mismatch for {_currentDownloadingPack.Name}: expected {_currentDownloadingPack.Sha256}, got {actual}");
+                // Remove the bad file so the retry starts from a clean slate.
+                DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(downloadedFilePath));
+                ShowError($"File {_currentDownloadingPack.Name} rusak (checksum tidak cocok). Coba unduh ulang.");
+                return;
+            }
+        }
+        else
+        {
+            GD.PrintErr($"Manifest tidak menyertakan sha256 untuk {_currentDownloadingPack.Name}; integritas TIDAK diverifikasi.");
         }
 
         GD.Print($"Successfully verified {_currentDownloadingPack.Name} ({downloadedBytes} bytes).");
@@ -390,6 +411,89 @@ public partial class Bootstrapper : Control
         }
     }
 
+    /// <summary>
+    /// Streams a file through SHA-256 without loading it whole into memory (a base pack is
+    /// 100+ MB, which matters on phones). Returns lowercase hex, or "" on failure.
+    /// </summary>
+    private static string ComputeSha256Hex(string godotPath)
+    {
+        string absPath = ProjectSettings.GlobalizePath(godotPath);
+        if (!System.IO.File.Exists(absPath))
+        {
+            GD.PrintErr($"ComputeSha256Hex: no such file {absPath}");
+            return "";
+        }
+
+        try
+        {
+            using var fs = new System.IO.FileStream(
+                absPath,
+                System.IO.FileMode.Open,
+                System.IO.FileAccess.Read,
+                System.IO.FileShare.Read,
+                65536,
+                System.IO.FileOptions.SequentialScan);
+
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            byte[] hash = sha.ComputeHash(fs);
+
+            var sb = new System.Text.StringBuilder(hash.Length * 2);
+            foreach (byte b in hash)
+            {
+                sb.Append(b.ToString("x2"));
+            }
+            return sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"ComputeSha256Hex failed for {absPath}: {ex.Message}");
+            return "";
+        }
+    }
+
+    /// <summary>
+    /// True when the local copy exists and matches both the manifest size and sha256.
+    /// A pack with no hash in the manifest is treated as "unknown", i.e. not reusable,
+    /// so we always re-download rather than trust an unverifiable file.
+    /// </summary>
+    private static bool IsLocalPackValid(PackInfo pack, string godotPath)
+    {
+        if (string.IsNullOrEmpty(pack.Sha256)) return false;
+        if (!FileAccess.FileExists(godotPath)) return false;
+
+        using var fa = FileAccess.Open(godotPath, FileAccess.ModeFlags.Read);
+        if (fa == null) return false;
+        if (pack.Size > 0 && (long)fa.GetLength() != pack.Size) return false;
+        fa.Close();
+
+        return string.Equals(ComputeSha256Hex(godotPath), pack.Sha256, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Starts the loading-screen video. This block was copy-pasted verbatim into both
+    /// _Ready() and OnRetryPressed(); it now lives in one place.
+    /// </summary>
+    private void PlayLoadingVideo()
+    {
+        if (VideoPlayer == null) return;
+        if (VideoPlayer.IsPlaying()) return;
+
+        // .ogv is what CI produces (Godot's Theora stream); .mp4 is only a fallback.
+        string videoPath = "res://videos/loading.ogv";
+        if (!FileAccess.FileExists(videoPath)) videoPath = "res://videos/loading.mp4";
+        if (!FileAccess.FileExists(videoPath)) return;
+
+        var stream = GD.Load<VideoStream>(videoPath);
+        if (stream == null)
+        {
+            GD.PrintErr($"Could not load {videoPath} as a VideoStream.");
+            return;
+        }
+
+        VideoPlayer.Stream = stream;
+        VideoPlayer.Play();
+    }
+
     private void ShowError(string message)
     {
         StatusLabel.Text = message;
@@ -399,22 +503,7 @@ public partial class Bootstrapper : Control
 
     private void OnRetryPressed()
     {
-                // Load custom loading screen video if available
-        string videoPath = "res://videos/loading.ogv";
-        if (!FileAccess.FileExists(videoPath)) videoPath = "res://videos/loading.mp4";
-        if (FileAccess.FileExists(videoPath) && VideoPlayer != null)
-        {
-            var stream = GD.Load<VideoStream>(videoPath);
-            if (stream == null)
-            {
-                GD.Print("VideoStream loading fallback to VideoStreamTheora / general stream...");
-            }
-            if (stream != null)
-            {
-                VideoPlayer.Stream = stream;
-                VideoPlayer.Play();
-            }
-        }
+        PlayLoadingVideo();
         StartUpdateCheck();
     }
 }

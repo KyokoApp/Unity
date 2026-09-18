@@ -12,3 +12,15 @@ mono_crash.*.json
 bin/
 obj/
 *.user
+
+# Build output from the Android export step
+build/
+
+# Generated at build time by CI (ffmpeg converts Amv/*.mp4 -> videos/loading.ogv)
+videos/loading.mp4
+videos/*.ogv
+videos/*.ogv.import
+
+# Signing material must never be committed
+.keystore/*.keystore
+*.jks
