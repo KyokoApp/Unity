@@ -23,78 +23,102 @@ def read_pck_dir(path: str):
     def u32(p):
         return struct.unpack("<I", buf[p:p + 4])[0] if 0 <= p <= fsize - 4 else None
 
-    # Struktur direktori: [count(I)] [ entry x count ]
-    # entry: [path_len(I)][name(+nul?)][tail] dgn tail: offset(Q)+size(Q)+md5(16) (+flags dsb.)
-    tails = (16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64)
-    TAIL_REQUIRED = 16  # offset+size wajib ada di awal tail
+    def next_entry_start(pos):
+        """Cari awal entry berikutnya dalam jendela kecil (padding/flags)."""
+        for step in range(0, 13):
+            pl = u32(pos + step)
+            if pl is None or pl < 3 or pl > 4096:
+                continue
+            name_off = pos + step + 4
+            if buf[name_off:name_off + 6] != b"res://":
+                continue
+            # nama harus diakhiri nul atau data-tail valid
+            return pos + step
+        return None
 
-    def walk(dir_off, count, nul, tail):
-        pos = dir_off + 4
+    def walk(dir_off, count):
+        """Parse adaptif dari count entry; abaikan padding/flags kecil antar entry."""
+        pos = next_entry_start(dir_off + 4)
+        if pos is None:
+            return None
         entries = []
         for _ in range(count):
             pl = u32(pos)
-            if pl is None or pl < 3 or pl > 4096 or pl <= (1 if nul else 0):
+            if pl is None or pl < 3 or pl > 4096:
                 return None
-            pos += 4
-            name_len = pl - (1 if nul else 0)
-            if pos + pl > fsize:
+            name_off = pos + 4
+            if name_off + pl > fsize:
                 return None
-            raw = buf[pos:pos + name_len]
-            if nul and buf[pos + name_len] != 0:
-                return None
-            try:
-                name = raw.decode("utf-8")
-            except UnicodeDecodeError:
-                return None
+            raw = buf[name_off:name_off + pl]
+            if raw.endswith(b"\x00"):
+                raw = raw[:-1]
+            name = raw.decode("utf-8", "replace")
             if not name.startswith("res://"):
                 return None
-            pos += pl
-            if pos + TAIL_REQUIRED > fsize:
+            pos = name_off + pl
+            # offset+size (16B) + md5 (16B) wajib ada
+            if pos + 32 > fsize:
                 return None
             offs, size = struct.unpack("<QQ", buf[pos:pos + 16])
-            if size > fsize + 64 * 1024 * 1024:
-                return None
+            pos += 32
             entries.append((name, size))
-            pos += tail
-        if pos == fsize:
+            # loncat ke entry berikut (padding/flags kecil), kecuali entry terakhir
+            if len(entries) < count:
+                nxt = next_entry_start(pos)
+                if nxt is None or nxt - pos > 12:
+                    return None
+                pos = nxt
+        # setelah semua entry: boleh ada trailer (padding/magic/md5 cks)
+        # dir v3 diakhiri: md5(16)+GDPK(4)? toleransi sampai 44 byte
+        if fsize - pos <= 44:
             return entries
         return None
 
-    best = 0
+    best_chain = 0
     for h in hits:
-        for nul in (0, 1):
-            for tail in tails:
-                count = u32(h - 8)
-                # count tepat 8 byte sebelum nama: [count][plen][name]
-                if count is None or count == 0 or count > 20000:
-                    continue
-                result = walk(h - 8, count, nul, tail)
-                if result:
-                    return result
-                # diagnosa: hitung rantai maksimum dari candidate ini
-                pos = h - 4
-                # posisi plen kandidat = h-4; langkah: plenI + name + tail
-                pl = u32(pos)
-                chain = 0
-                if pl and 3 <= pl <= 4096:
-                    pos2 = pos + 4 + pl + tail
-                    chain = 1
-                    for _ in range(3):
-                        pl2 = u32(pos2)
-                        if pl2 is None or pl2 < 3 or pl2 > 4096:
-                            break
-                        if pos2 + 4 + pl2 > fsize:
-                            break
-                        seg = buf[pos2 + 4:pos2 + 4 + min(pl2, 16)]
-                        if not seg.startswith(b"res://"):
-                            break
-                        pos2 = pos2 + 4 + pl2 + tail
-                        chain += 1
-                best = max(best, chain)
+        for cback in (8, 12, 16, 20):
+            count = u32(h - cback)
+            if count is None or count == 0 or count > 50000:
+                continue
+            got = walk(h - cback, count)
+            if got:
+                return got
+        # diagnosa rantai terpanjang (tanpa count): mulai dari plen@h-4
+        pos = h - 4
+        chain = 0
+        while chain < 5000:
+            pl = u32(pos)
+            if pl is None or pl < 3 or pl > 4096:
+                break
+            noff = pos + 4
+            if buf[noff:noff + 6] != b"res://":
+                break
+            nxt = next_entry_start(noff + pl + 32)
+            if nxt is None:
+                break
+            chain += 1
+            pos = nxt
+        best_chain = max(best_chain, chain)
+        # lacak percobaan terbaik untuk diagnosa (manual chain tanpa count)
+        # (skip: hanya hitung res hits)
 
+    # diagnosa: ambil 4 entry dari hit pertama yang valid struktur lokalnya saja
+    sample = []
+    for h in hits[:80]:
+        pl = u32(h - 4)
+        if pl and 3 <= pl <= 4096 and buf[h:h + 6] == b"res://":
+            raw = buf[h:h + min(pl, 60)].split(b"\x00")[0]
+            sample.append(raw.decode("utf-8", "replace"))
+        if len(sample) >= 4:
+            break
+
+    tail = buf[-48:].hex() if fsize > 48 else buf.hex()
+    around = buf[hits[-1] - 16:hits[-1] + 16].hex() if hits else "-"
     raise SystemExit(
         f"Gagal parse direktori PCK {path} (pack_ver={pack_ver}, hits={len(hits)}, "
-        f"fsize={fsize}, best_chain={best}, first_hits={hits[:3]}, last_hits={hits[-2:] if hits else []})")
+        f"fsize={fsize}, best_chain={best_chain})\n"
+        f"sample offsets: {hits[:6]}\nlast hits: {hits[-6:] if hits else []}\n"
+        f"sampel nama: {sample}\nhex -48..EOF: {tail}\nhex di sekitar hit terakhir: {around}")
 
 
 
