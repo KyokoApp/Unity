@@ -9,6 +9,10 @@ update. Patch bersifat kumulatif terhadap assets_v1.pck.
 
 Script ini menulis ulang baris `export_filter` / `include_filter` di blok
 [preset.6] ("PatchPack") pada export_presets.cfg.
+
+CATATAN: project.godot/project.binary sengaja DIKECUALIKAN meski versi
+berubah — mengekspornya membuat exporter menyeret main scene + autoload
+(deps-closure) sehingga patch membengkak seukuran paket aset penuh.
 """
 import os
 import re
@@ -36,7 +40,12 @@ NEVER_INCLUDE_PREFIXES = (
     "docs/",
 )
 
-ALWAYS_INCLUDE = ("project.godot",)
+# PENTING: project.godot JANGAN ikut patch. Mengekspor project.godot
+# membuat exporter membawa project.binary + main scene + seluruh autoload
+# (bootstrapper -> _scenes/main.tscn -> SELURUH game) sebagai deps-closure
+# -> patch membengkak sebesar assets penuh. Versi update dibawa oleh
+# version.json di release, bukan oleh project.godot di pck.
+ALWAYS_INCLUDE = ()
 
 # Exclude_filter PatchPack dipaksa slim: glob luas seperti `_models/*` AKAN
 # menutupi include_filter (exclude menang di exporter Godot!) sehingga model
@@ -48,6 +57,8 @@ SLIM_PATCH_EXCLUDES = "Universal Animation Library 2[Standard]/*, Amv/*, videos/
 # tidak boleh ikut patch meski berada di bawah prefix konten.
 NEVER_INCLUDE_FILES = (
     "_scenes/bootstrapper.tscn",
+    "project.godot",
+    "project.binary",
 )
 
 

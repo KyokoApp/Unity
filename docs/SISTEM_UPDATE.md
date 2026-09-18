@@ -189,3 +189,12 @@ berdasarkan `git diff` baseline→HEAD):
   (`_scenes/`, `_models/`, `materials/`) dan baseline bukan HEAD terbaru.
 - **Ukuran APK naik tiba-tiba** → cek step *Verify Builds*; kemungkinan ada file besar baru
   di folder yang ikut APK (lihat checklist bagian 2).
+
+## Patch tidak boleh berisi project.godot
+Ekspor `project.godot` otomatis menyeret `project.binary` + main scene +
+seluruh autoload sebagai deps-closure (autoload bootstrapper mereferensikan
+`res://_scenes/main.tscn`, jadi seluruh game ikut). Itulah penyebab patch
+v1.0.142–v1.0.152 membengkak ±50 MB (sama penuhnya dengan assets penuh).
+Solusinya: `ALWAYS_INCLUDE` dikosongkan dan `project.godot`/`project.binary`
+masuk `NEVER_INCLUDE_FILES` di `tools/update_pipeline/gen_patch_filter.py`.
+Nomor versi update tetap dapat diketahui klien dari `version.json`.
