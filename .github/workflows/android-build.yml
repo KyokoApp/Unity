@@ -97,22 +97,8 @@ jobs:
             " || cp custom_icon.jpg icon.png
           fi
 
-          # Attempt downloading Google Drive animation assets
-          GDRIVE_FILE_ID="120fNMWnpMaiNEJLG53LdTd8DfSGdFrYq"
-          echo "Attempting to fetch animation package from Google Drive ($GDRIVE_FILE_ID)..."
-          GDRIVE_URL="https://drive.usercontent.google.com/download?id=${GDRIVE_FILE_ID}&export=download&confirm=t"
-          curl -sL "$GDRIVE_URL" -o gdrive_asset.tmp || true
-          
-          if file gdrive_asset.tmp | grep -qi "zip\|gzip\|data"; then
-            echo "Downloaded valid archive from Google Drive. Extracting..."
-            mkdir -p imported_anims
-            unzip -q gdrive_asset.tmp -d imported_anims || true
-            echo "Extracted files:"
-            ls -la imported_anims
-          else
-            echo "Google Drive file could not be downloaded directly (may require OAuth or virus scan confirmation)."
-          fi
-          rm -f gdrive_asset.tmp
+          # Note on Google Drive animation link:
+          echo "Animation link noted for integration: https://drive.google.com/file/d/120fNMWnpMaiNEJLG53LdTd8DfSGdFrYq/view" 
 
       - name: Initialize Godot Project and Import Resources
         run: |
