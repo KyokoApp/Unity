@@ -205,6 +205,38 @@ public partial class MainCharacter : CharacterBody3D
 		GameManager.Instance.SetMainCharacter(this);
 
 		Cube = GD.Load<PackedScene>("res://_scenes/decor/crate.tscn");
+
+		ApplyToonOutline();
+	}
+
+	private void ApplyToonOutline()
+	{
+		Shader outlineShader = GD.Load<Shader>("res://materials/shaders/toon_outline.gdshader");
+		if (outlineShader == null) return;
+
+		var outlineMat = new ShaderMaterial();
+		outlineMat.Shader = outlineShader;
+		outlineMat.SetShaderParameter("outline_color", new Color(0.08f, 0.08f, 0.1f, 1.0f));
+		outlineMat.SetShaderParameter("outline_width", 2.2f);
+
+		Node armature = GetNodeOrNull("RobotArmature");
+		if (armature != null)
+		{
+			ApplyOutlineRecursive(armature, outlineMat);
+		}
+	}
+
+	private void ApplyOutlineRecursive(Node node, Material outlineMat)
+	{
+		if (node is MeshInstance3D meshInstance)
+		{
+			meshInstance.MaterialOverlay = outlineMat;
+		}
+
+		foreach (Node child in node.GetChildren())
+		{
+			ApplyOutlineRecursive(child, outlineMat);
+		}
 	}
 
 	public override void _PhysicsProcess(double delta)
