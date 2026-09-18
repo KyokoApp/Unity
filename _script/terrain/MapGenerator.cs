@@ -30,7 +30,9 @@ namespace Bouncerock.Terrain
 		/// nowhere on a phone while SoftwareManager had its own (uncalled) path logic.
 		/// Everything now routes through SoftwareManager so there is exactly one writable root.
 		/// </summary>
-		private static string documentspath => SoftwareManager.GetDocumentsPath() + "/Islands/";
+		public static string DocumentsPath => SoftwareManager.GetDocumentsPath() + "/Islands/";
+
+		private static string documentspath => DocumentsPath;
 
 		//This is where new chunks are generated and assembled.
 
@@ -634,7 +636,7 @@ namespace Bouncerock.Terrain
 					i = i + 2;
 				}
 			}
-			FileWriter.BinaryToISL(buffer, documentspath + name);
+			FileWriter.BinaryToISL(buffer, MapGenerator.DocumentsPath + name);
 
 		}
 
@@ -642,7 +644,7 @@ namespace Bouncerock.Terrain
 		{
 			byte[] buffer = FileWriter.SerializeToBinary(DecorElements);
 			GD.Print("Writing binaries " + buffer.Length);
-			FileWriter.BinaryToISL(buffer, documentspath + name + "_D");
+			FileWriter.BinaryToISL(buffer, MapGenerator.DocumentsPath + name + "_D");
 		}
 	}
 

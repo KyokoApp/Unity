@@ -94,6 +94,9 @@ public partial class MainCharacter : CharacterBody3D
 
 	public bool hasGlided = false;
 
+	/// <summary>Cache for UpdateHelpers, so an unchanged label is not rebuilt every frame.</summary>
+	private string _lastHelperText = null;
+
 	private float attackCooldown = 0.5f;
 	private float attackTimer = 0f;
 
@@ -774,10 +777,14 @@ public partial class MainCharacter : CharacterBody3D
 		}
 		if (PopupInfo != null)
 		{
-			text = text;// + "\n" + CurrentAction + " " + TerrainManager.Instance.GetTerrainHeightAtGlobalCoordinate(new Vector2(Position.X, Position.Z)).ToString();
-						//Mathf.RadToDeg(GetFloorAngle()) + " Pos: X: " + string.Format("{0:0. #}", Position.X) + " Y: " + string.Format("{0:0. #}", Position.Y) + " Z: " + string.Format("{0:0. #}", Position.Z) ;
-						//GD.Print(TerrainGenerator.Instance.CameraInChunk());
-			PopupInfo.SetText(text);
+			// Was `text = text;` plus a block of commented-out debug formatting: a self-assignment
+			// the compiler flagged, and dead code. The label is only refreshed when the string
+			// actually changed, so we are not allocating 60 times a second for nothing.
+			if (text != _lastHelperText)
+			{
+				_lastHelperText = text;
+				PopupInfo.SetText(text);
+			}
 #if GODOT_ANDROID
 				PopupInfo.SetSize(50);
 #endif

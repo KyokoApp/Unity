@@ -183,7 +183,8 @@ namespace Bouncerock.Terrain
 			int x = Mathf.RoundToInt(location.X);
 			int y = Mathf.RoundToInt(location.Y);
 
-			if (_map?.heightMap == null) return TerrainMeshSettings.InvalidHeight;
+			// Map is a struct, so ?. does not apply; test the array itself.
+			if (_map.heightMap == null) return TerrainMeshSettings.InvalidHeight;
 			if (x < 0 || y < 0 || x >= _map.heightMap.GetLength(0) || y >= _map.heightMap.GetLength(1))
 			{
 				return TerrainMeshSettings.InvalidHeight;
@@ -201,7 +202,8 @@ namespace Bouncerock.Terrain
 			int x = Mathf.CeilToInt(location.X);
 			int y = Mathf.CeilToInt(location.Y);
 
-			if (_map?.heightMap == null) return TerrainMeshSettings.InvalidHeight;
+			// Map is a struct, so ?. does not apply; test the array itself.
+			if (_map.heightMap == null) return TerrainMeshSettings.InvalidHeight;
 
 			int w = _map.heightMap.GetLength(0);
 			int h = _map.heightMap.GetLength(1);

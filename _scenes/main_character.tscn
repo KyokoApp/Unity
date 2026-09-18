@@ -12,8 +12,6 @@
 [ext_resource type="Shader" uid="uid://toon_outline_01" path="res://materials/shaders/toon_outline.gdshader" id="9_outline"]
 [ext_resource type="PackedScene" path="res://_models/anime_character.glb" id="10_anime_glb"]
 [ext_resource type="PackedScene" path="res://_models/ual_anims.glb" id="11_ual_glb"]
-[ext_resource type="BoneMap" path="res://_models/retarget/bonemap_ual_mannequin.tres" id="12_bm_ual"]
-[ext_resource type="BoneMap" path="res://_models/retarget/bonemap_vrm_anime.tres" id="13_bm_vrm"]
 [ext_resource type="Script" path="res://_script/character/AnimeCharacterRig.cs" id="14_rig"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_outline"]
@@ -5141,8 +5139,6 @@ script = ExtResource("14_rig")
 Enabled = true
 AnimeCharacterScene = ExtResource("10_anime_glb")
 UalAnimationsScene = ExtResource("11_ual_glb")
-UalBoneMap = ExtResource("12_bm_ual")
-AnimeBoneMap = ExtResource("13_bm_vrm")
 MountPoint = NodePath("../AnimeRigMount")
 TargetPlayer = NodePath("../AnimationPlayer")
 LegacyModelToHide = NodePath("../RobotArmature")
