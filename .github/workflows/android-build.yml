@@ -128,10 +128,12 @@ jobs:
         run: |
           python3 tools/update_pipeline/gen_patch_filter.py
           grep -A3 'name="PatchPack"' export_presets.cfg | head -5 || true
-          # Daftar file berubah -> flag requires_restart / needs_new_apk di version.json
-          BASELINE=$(cat tools/update_pipeline/baseline_commit.txt)
+          # Daftar file berubah -> flag requires_restart / needs_new_apk di version.json.
+          # baseline_commit.txt berisi baris komentar '#': lewati seperti di gen_patch_filter.py
+          BASELINE=$(grep -v '^\s*#' tools/update_pipeline/baseline_commit.txt | head -1 | tr -d '[:space:]')
+          echo "Baseline diff: $BASELINE"
           git diff --name-only "$BASELINE" HEAD > build/android/changed_files.txt || true
-          wc -l build/android/changed_files.txt || true
+          wc -l build/android/changed_files.txt && head -20 build/android/changed_files.txt
 
       - name: Export Base Data Pack and Patch-Only Pack
         run: |
