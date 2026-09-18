@@ -54,9 +54,9 @@ diperlukan.
 - Robot resmi Godot (`_models/3DGodotRobot.glb`) tetap utuh dan DIANJURKAN
   sebagai fallback (mesh-nya tinggal di-unhide di `RobotArmature` bila
   diperlukan).
-- `mannequin_f.glb` (1.4MB) masih di repo; bila suatu hari mau dipakai dengan
-  `ual_anims.glb`, kedua rig-nya identik (65 bone) dan bisa di-retarget — tapi
-  jalur ini sengaja tidak dipakai karena riwayat T-pose.
+- Aset mannequin/UAL (`mannequin_f.glb` & `ual_anims.glb`) serta direktori
+  `Universal Animation Library 2[Standard]` telah dihapus dari repositori
+  karena riwayat T-pose dan untuk menghemat ukuran repo (>80MB).
 
 ## Catatan edit cepat
 

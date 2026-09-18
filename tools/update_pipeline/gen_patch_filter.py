@@ -34,8 +34,7 @@ PACK_CONTENT_PREFIXES = (
 
 # Folder yang tidak pernah boleh masuk patch (sama seperti exclude_filter).
 NEVER_INCLUDE_PREFIXES = (
-    ".git", ".github/", "Amv/", "images/", "videos/",
-    "Universal Animation Library 2[Standard]/",
+    ".git", ".github/", "Amv/", "videos/",
     "tools/", "build/", "exported/", "_script/",
     "docs/",
 )
@@ -55,7 +54,7 @@ ALWAYS_INCLUDE = ()
 # Tanpa awalan itu tak ada satu pun yang cocok -> include_filter dianggap
 # kosong -> exporter 'selected_resources' MENGEXPORT SELURUH PROYEK
 # (penyebab patch 42-50 MB meski hanya 4 file yang dipilih!).
-SLIM_PATCH_EXCLUDES = "res://Universal Animation Library 2[Standard]/*, res://Amv/*, res://videos/*, res://images/*, res://icon_192.png, res://icon_432.png, res://_scenes/bootstrapper.tscn"
+SLIM_PATCH_EXCLUDES = "res://Amv/*, res://videos/*, res://icon_192.png, res://icon_432.png, res://_scenes/bootstrapper.tscn"
 
 # File yang hidupnya di APK (bukan di paket aset) — bootstrapper & script
 # tidak boleh ikut patch meski berada di bawah prefix konten.
