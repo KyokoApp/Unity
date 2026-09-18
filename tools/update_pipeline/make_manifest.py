@@ -39,6 +39,10 @@ def main() -> int:
     ap.add_argument("--changed-files", default="",
                     help="File teks berisi daftar path yang berubah (satu per baris). "
                          "Dipakai untuk mengisi flag requires_restart / needs_new_apk.")
+    ap.add_argument("--changed-files-skip-base", default="",
+                    help="File teks daftar path berubah SEJAK RILIS SUKSES TERAKHIR. "
+                         "Keputusan skip base pack 50MB diambil dari daftar ini "
+                         "(bukan diff kumulatif patch-baseline yang selalu berubah).")
     args = ap.parse_args()
 
     def pack_entry(name: str, order: int, is_patch: bool) -> dict:
@@ -59,10 +63,12 @@ def main() -> int:
         with open(args.changed_files, encoding="utf-8") as f:
             changed = [line.strip() for line in f if line.strip()]
 
-    # Hemat unduhan ala update game mobile: bila yang berubah HANYA kode
-    # (script C# yang dikompilasi ke APK / berkas CI), konten paket dasar
-    # identik secara fungsi -> JANGAN masukkan assets_v1.pck ke manifest.
-    # Client lama tetap memakai salinan lokal; patch kecil ditumpuk di atasnya.
+    # Hemat unduhan ala update game mobile: bila diff SEJAK RILIS TERAKHIR
+    # hanya berisi kode (script C# yang dikompilasi ke APK / berkas CI),
+    # konten paket dasar identik secara fungsi -> JANGAN masukkan
+    # assets_v1.pck ke manifest. Client memakai base embedded/lokal; patch
+    # kumulatif kecil ditumpuk di atasnya (baseline patch boleh tertinggal,
+    # karena patch lama->baru tetap penuh).
     CODE_ONLY_PREFIXES = ("_script/", ".github/", "tools/", "docs/")
     CODE_ONLY_ROOT = ("README", "LICENSE", ".gitignore", ".gitattributes")
 
@@ -73,8 +79,13 @@ def main() -> int:
             return True
         return False
 
-    base_content_changed = (not changed) or any(
-        not is_code_only_change(c) for c in changed)
+    changed_since_last: list[str] = []
+    if args.changed_files_skip_base and os.path.exists(args.changed_files_skip_base):
+        with open(args.changed_files_skip_base, encoding="utf-8") as f:
+            changed_since_last = [line.strip() for line in f if line.strip()]
+
+    base_content_changed = (not changed_since_last) or any(
+        not is_code_only_change(c) for c in changed_since_last)
 
     # Semantik "update data game" ala Mobile Legends:
     # - requires_restart: file yang hanya dibaca saat boot berubah
