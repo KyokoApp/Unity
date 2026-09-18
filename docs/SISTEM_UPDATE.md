@@ -148,6 +148,17 @@ Langkah:
 > (versionCode naik otomatis di CI). Update konten murni (scene/tekstur/model) cukup via
 > patch tanpa APK baru.
 
+### 3.1 Semantik "update data game" ala Mobile Legends
+
+`version.json` kini membawa tiga flag (diisi otomatis oleh `make_manifest.py`
+berdasarkan `git diff` baseline→HEAD):
+
+| Flag | Terpicu saat | Perilaku client |
+|---|---|---|
+| `requires_restart` | `project.godot` / `export_presets.cfg` berubah | Setelah paket terunduh & termuat, Bootstrapper menampilkan layar "Pembaruan diterapkan" lalu **menutup aplikasi otomatis (8 dtk)** atau lewat tombol "Tutup Sekarang". Saat dibuka lagi, patch langsung aktif — **tanpa instal ulang APK**, seperti update data game. |
+| `needs_new_apk` | file `_script/*.cs` / `.csproj` / `.sln` berubah | Client menampilkan pemberitahuan bahwa fitur kode terbaru baru aktif lewat APK baru (`apk_url` di manifest menunjuk lokasi). Game **tetap berjalan normal** dengan kode lama — tidak dipaksa. |
+| — (tanpa flag) | hanya scene/aset/shader | Full hot-apply: `LoadResourcePack(..., replaceFiles:true)` langsung mengganti resource; pemain tidak perlu melakukan apa pun. |
+
 ---
 
 ## 4. Struktur File Sistem Ini

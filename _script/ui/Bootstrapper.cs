@@ -63,6 +63,9 @@ public partial class Bootstrapper : Control
     private class ManifestData
     {
         public string Version = "1.0.0";
+        public string ApkUrl = "";
+        public bool RequiresRestart = false;
+        public bool NeedsNewApk = false;
         public List<PackInfo> Packs = new();
     }
 
@@ -77,7 +80,7 @@ public partial class Bootstrapper : Control
         public Dictionary<string, PackStateEntry> Packs { get; set; } = new();
     }
 
-    private enum Phase { Idle, FetchManifest, Downloading, Loading, WorldBuild, Error }
+    private enum Phase { Idle, FetchManifest, Downloading, Loading, WorldBuild, RestartPrompt, Error }
 
     // --- SATU layar loading: overlay ini tetap di atas sampai dunia siap dimainkan ---
     private string _threadedScenePath;     // scene utama yang sedang di-load via thread
@@ -96,6 +99,8 @@ public partial class Bootstrapper : Control
     private long _totalPlanBytes;
     private long _completedPlanBytes;
     private bool _manifestTriedApi;
+    private int _downloadedThisRun;      // berapa paket baru diunduh sesi ini (untuk keputusan restart)
+    private double _restartCountdown;    // hitung mundur auto-close ala update data game
 
     // ---------------------------------------------------------------
     // ResumableDownloader: HTTP GET dengan redirect, Range-resume,
@@ -654,6 +659,13 @@ public partial class Bootstrapper : Control
 
     public override void _Process(double delta)
     {
+        if (_phase == Phase.RestartPrompt)
+        {
+            _restartCountdown -= delta;
+            DetailLabel?.SetText($"Otomatis tertutup dalam {Math.Max(0, (int)Math.Ceiling(_restartCountdown))} detik...");
+            if (_restartCountdown <= 0) QuitNow();
+            return;
+        }
         if (_phase == Phase.WorldBuild)
         {
             PollWorldBuild(delta);
@@ -790,6 +802,14 @@ public partial class Bootstrapper : Control
         // Simpan salinan manifest untuk offline mode.
         WriteTextFile(LastManifestPath, json);
         GD.Print($"Manifest v{_manifest.Version}: {_manifest.Packs.Count} paket.");
+
+        // Kode C# tidak bisa hot-update via .pck — beri tahu pemain bahwa
+        // versi kode terbaru hadir lewat APK (game tetap jalan normal).
+        if (_manifest.NeedsNewApk)
+        {
+            StatusLabel?.SetText("Update kode v" + _manifest.Version + " tersedia — unduh APK terbaru untuk fitur penuh. Melanjutkan...");
+            GD.Print("[Bootstrapper] needs_new_apk=true → tetap lanjut; fitur kode aktif setelah update APK. " + _manifest.ApkUrl);
+        }
         PlanDownloads();
     }
 
@@ -828,6 +848,12 @@ public partial class Bootstrapper : Control
 
             if (root.TryGetProperty("version", out var vProp))
                 manifest.Version = vProp.GetString() ?? "1.0.0";
+            if (root.TryGetProperty("apk_url", out var apkProp))
+                manifest.ApkUrl = apkProp.GetString() ?? "";
+            if (root.TryGetProperty("requires_restart", out var rrProp) && rrProp.ValueKind == JsonValueKind.True)
+                manifest.RequiresRestart = true;
+            if (root.TryGetProperty("needs_new_apk", out var napkProp) && napkProp.ValueKind == JsonValueKind.True)
+                manifest.NeedsNewApk = true;
 
             if (root.TryGetProperty("packs", out var packsProp) && packsProp.ValueKind == JsonValueKind.Array)
             {
@@ -864,6 +890,7 @@ public partial class Bootstrapper : Control
         _pendingPacks.Clear();
         _totalPlanBytes = 0;
         _completedPlanBytes = 0;
+        _downloadedThisRun = 0;
 
         foreach (var pack in _manifest.Packs)
         {
@@ -970,6 +997,7 @@ public partial class Bootstrapper : Control
         SaveState();
 
         _completedPlanBytes += PlanSizeOf(_currentPack);
+        _downloadedThisRun++;
         GD.Print($"[Queue] {_currentPack.Name} selesai & terverifikasi.");
 
         DownloadNextPack();
@@ -1039,7 +1067,38 @@ public partial class Bootstrapper : Control
             }
         }
 
+        // --- Update ala "maintenance data game" (Mobile Legends) ---
+        // Scene/aset tadi sudah hot-applied via LoadResourcePack. Bila manifest
+        // menandai perubahan yang hanya aman dari boot segar (project.godot
+        // dsb.), tutup aplikasi agar penerapan 100% — TANPA instal ulang APK.
+        if (_manifest.RequiresRestart && _downloadedThisRun > 0)
+        {
+            ShowRestartPrompt();
+            return;
+        }
+
         CallDeferred(MethodName.TransitionToMainScene);
+    }
+
+    private void ShowRestartPrompt()
+    {
+        _phase = Phase.RestartPrompt;
+        _restartCountdown = 8.0;
+        StatusLabel?.SetText("Pembaruan v" + _manifest.Version + " tersimpan. Aplikasi akan tertutup lalu langsung terbarui.");
+        DetailLabel?.SetText("");
+        if (ProgressBar != null) ProgressBar.Value = 100;
+        if (SpeedLabel != null) SpeedLabel.Text = "";
+        if (RetryButton != null)
+        {
+            RetryButton.Text = "Tutup Sekarang";
+            RetryButton.Visible = true;
+        }
+    }
+
+    private void QuitNow()
+    {
+        GD.Print("[Bootstrapper] Menutup aplikasi untuk penerapan pembaruan (built packs tersimpan di user://).");
+        GetTree().Quit();
     }
 
     private void TransitionToMainScene()
@@ -1221,7 +1280,14 @@ public partial class Bootstrapper : Control
 
     private void OnRetryPressed()
     {
-        if (RetryButton != null) RetryButton.Visible = false;
+        if (_phase == Phase.RestartPrompt)
+        {
+            // Tombol "Tutup Sekarang" pada layar penerapan pembaruan.
+            QuitNow();
+            return;
+        }
+
+        if (RetryButton != null) { RetryButton.Visible = false; RetryButton.Text = "Coba Lagi"; }
         PlayLoadingVideo();
 
         if (_phase == Phase.Error && _manifest.Packs.Count > 0 && _pendingPacks.Count > 0)

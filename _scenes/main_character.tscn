@@ -7,7 +7,7 @@
 [ext_resource type="Shader" uid="uid://b1x6scjuekwl4" path="res://materials/shaders/sharpen.gdshader" id="4_e1il1"]
 [ext_resource type="Shader" uid="uid://8ii1spmkav7h" path="res://materials/shaders/chroma_tint.gdshader" id="4_m76nb"]
 [ext_resource type="Texture2D" uid="uid://bfu6xgth6u05d" path="res://materials/textures/spotlight.png" id="7_m76nb"]
-[ext_resource type="PackedScene" uid="uid://anime_char_01" path="res://_models/mannequin_f.glb" id="8_anime"]
+[ext_resource type="PackedScene" path="res://_models/kaykit/Knight.glb" id="8_anime"]
 
 [ext_resource type="Shader" uid="uid://toon_outline_01" path="res://materials/shaders/toon_outline.gdshader" id="9_outline"]
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_outline"]
@@ -4510,31 +4510,31 @@ _data = {
 }
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_6ssgo"]
-animation = &"Attack1"
+animation = &"Throw"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_eyjky"]
-animation = &"Dive"
+animation = &"Jump_Idle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_xvqic"]
-animation = &"Fall"
+animation = &"Jump_Idle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jo1m3"]
-animation = &"Hurt"
+animation = &"Sit_Floor_Idle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_75rwx"]
 animation = &"Idle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_xoipf"]
-animation = &"Kick"
+animation = &"Unarmed_Melee_Attack_Kick"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_xi5x6"]
-animation = &"LongJump"
+animation = &"Jump_Full_Long"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_nttcr"]
-animation = &"Run"
+animation = &"Running_A"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_p3nql"]
-animation = &"Sprint"
+animation = &"Running_B"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_brgfq"]
 advance_mode = 2
@@ -4785,7 +4785,7 @@ touchInputManager = NodePath("TouchLayer/TouchInputManager")
 [node name="RobotArmature" type="Node3D" parent="." unique_id=2058149497]
 transform = Transform3D(0.578472, 0, 0, 0, 0.578472, 0, 0, 0, 0.578472, 0, 0, 0)
 
-[node name="MannequinCharacterModel" parent="RobotArmature" instance=ExtResource("8_anime")]
+[node name="PlayerModel" parent="RobotArmature" instance=ExtResource("8_anime")]
 transform = Transform3D(1.7, 0, 0, 0, 1.7, 0, 0, 0, 1.7, 0, 0, 0)
 
 [node name="Skeleton3D" type="Skeleton3D" parent="RobotArmature" unique_id=1842549201]
@@ -4998,7 +4998,7 @@ libraries = {
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1724813824]
 active = true
 tree_root = SubResource("AnimationNodeStateMachine_5wvc5")
-anim_player = NodePath("../AnimationPlayer")
+anim_player = NodePath("../RobotArmature/PlayerModel/AnimationPlayer")
 parameters/conditions/falling = false
 parameters/conditions/glide = false
 parameters/conditions/idle = false
