@@ -1,7 +1,8 @@
 name: apk-release
 ## Bangun APK launcher + AIO di runner GitHub (akses internet penuh):
 ## unduh Godot 4.5.2 editor + export templates resmi, siapkan SDK/JDK/keystore,
-## export kedua preset, lalu terbitkan sebagai GitHub Release (prerelease).
+## export kedua preset, lalu terbitkan aset ke GitHub Release $TAG.
+## Diagnostik build ditulis ke release notes agar terbaca via API.
 on:
   push:
     paths:
@@ -50,7 +51,7 @@ jobs:
           mkdir -p tpz
           (cd tpz && unzip -q ../templates.tpz "templates/android_debug.apk" "templates/android_release.apk" "templates/version.txt")
           cp tpz/templates/* "$HOME/.local/share/godot/${GDIR}/"
-          echo "== templates terpasang =="; ls -la "$HOME/.local/share/godot/${GDIR}/"
+          ls -la "$HOME/.local/share/godot/${GDIR}/"
 
       - name: Keystore debug + editor settings (SDK/JDK runner)
         run: |
@@ -63,7 +64,7 @@ jobs:
           echo "android-sdk = $ANDROID_SDK_ROOT"
           echo "java = $JAVA_DIR"
           ls "$ANDROID_SDK_ROOT/build-tools" | tail -3
-          cat > "$HOME/.config/godot/editor_settings-4.5.tres" <<EOF
+          cat > "$HOME/.config/godot/editor_settings-4.5.tres" <<SEOF
           [gd_resource type="EditorSettings" format=1]
 
           [resource]
@@ -72,93 +73,75 @@ jobs:
           export/android/debug_keystore = "$GITHUB_WORKSPACE/exports/android/debug.keystore"
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
-          EOF
+          SEOF
 
       - name: Import proyek (sekali)
-        run: timeout 900 ./godot --headless --path project --import | tail -5
+        run: |
+          RC=0; timeout 900 ./godot --headless --path project --import > "$GITHUB_WORKSPACE/import.log" 2>&1 || RC=$?
+          echo "import.rc=$RC"; tail -8 "$GITHUB_WORKSPACE/import.log"
 
       - name: Bangun pack + manifest (delta sanity)
         run: python3 tools/build_packs.py --godot ./godot | tail -6
 
-      - name: Export APK Launcher + AIO
+      - name: Export APK Launcher + AIO (dengan diagnostik)
         run: |
-          mkdir -p exports/android
           export OUTDIR="$GITHUB_WORKSPACE/exports/android"
-          set -x
-          which unzip java; echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          ldd ./godot 2>&1 | tail -4
           RC0=0; timeout 120 ./godot --headless --path project --quit > "$OUTDIR/quit.log" 2>&1 || RC0=$?
-          echo "quit.rc=$RC0"; head -5 "$OUTDIR/quit.log"
-          RC=0
-          timeout 900 ./godot --headless --verbose --path project --export-debug "Android Launcher" "$OUTDIR/PulauToon-debug.apk" > "$OUTDIR/export.log" 2>&1 || RC=$?
-          echo "export.rc=$RC"; wc -c "$OUTDIR/export.log" || true; ls -la "$OUTDIR"
-          if [ ! -s "$OUTDIR/PulauToon-debug.apk" ]; then
-            echo "::error::rc=$RC log: $(cat '$OUTDIR/export.log' | grep -aiE 'error|fail|cant|missing|not found' | head -4 | tr '\n' ' ' | head -c 700)"
-            echo "::error::head.log: $(head -12 '$OUTDIR/export.log' | tr '\n' ' ' | head -c 400)"
-            echo "::error::search: $(find "$GITHUB_WORKSPACE" "$HOME" -maxdepth 4 -name '*.apk' 2>/dev/null | tr '\n' ' ' | head -c 300)"
-            exit 1
-          fi
-          RC=0
-          timeout 900 ./godot --headless --verbose --path project --export-debug "Android AIO" "$OUTDIR/PulauToon-aio.apk" >> "$OUTDIR/export.log" 2>&1 || RC=$?
-          echo "export-aio.rc=$RC"
-          if [ ! -s "$OUTDIR/PulauToon-aio.apk" ]; then
-            echo "::error::export AIO gagal: $(tail -6 '$OUTDIR/export.log' | tr '\n' ' ' | head -c 200)"
-            exit 1
-          fi
+          RC=0; timeout 900 ./godot --headless --verbose --path project --export-debug "Android Launcher" "$OUTDIR/PulauToon-debug.apk" > "$OUTDIR/export.log" 2>&1 || RC=$?
+          RCA=0; timeout 900 ./godot --headless --verbose --path project --export-debug "Android AIO" "$OUTDIR/PulauToon-aio.apk" > "$OUTDIR/export_aio.log" 2>&1 || RCA=$?
+          {
+            echo "## Diagnostik build $GITHUB_SHA"
+            echo "quit.rc=$RC0 export.rc=$RC export-aio.rc=$RCA"
+            echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+            ls "$ANDROID_SDK_ROOT/build-tools" 2>/dev/null | tail -2
+            echo '### import.log (akhir)'; tail -6 "$GITHUB_WORKSPACE/import.log"
+            echo '### export.log (launcher, akhir)'; tail -25 "$OUTDIR/export.log"
+            echo '### export_aio.log (akhir)'; tail -25 "$OUTDIR/export_aio.log"
+          } > "$OUTDIR/diag.txt" 2>&1
+          echo "[diag] bytes: $(wc -c < "$OUTDIR/diag.txt")"
           ls -la "$OUTDIR/"
 
-      - name: Buat catatan rilis
-        if: success()
+      - name: Terbitkan/perbarui Release + unggah aset (retry)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          cd "$GITHUB_WORKSPACE/exports/android" && sha256sum PulauToon-debug.apk PulauToon-aio.apk > /tmp/SHA256SUMS && cd "$GITHUB_WORKSPACE"
-          cp /tmp/SHA256SUMS SHA256SUMS.txt
+          # 1) simpan diagnostik ke release notes (terbaca via API)
+          if gh release edit "$TAG" --notes-file "$GITHUB_WORKSPACE/exports/android/diag.txt"; then
+            echo "::notice::diagnostik tersimpan di release notes"
+          else
+            echo "::error::gh write ke release notes gagal (token?)"
+            exit 1
+          fi
+          OUTDIR="$GITHUB_WORKSPACE/exports/android"
+          if [ ! -s "$OUTDIR/PulauToon-aio.apk" ]; then
+            echo "::notice::APK belum tersedia — lihat diagnostik di release notes"
+            exit 0
+          fi
+          # 2) notes final + sha + upload aset dengan retry
+          cd "$OUTDIR" && sha256sum PulauToon-debug.apk PulauToon-aio.apk > "$GITHUB_WORKSPACE/SHA256SUMS.txt" && cd "$GITHUB_WORKSPACE"
           {
             echo "## Pulau Toon — APK debug (CI)"
             echo ""
             echo "Commit: \`$GITHUB_SHA\` — dibangun oleh GitHub Actions (runner full-internet)."
             echo ""
-            echo "| APK | Isi | Isi konten | Install langsung? |"
-            echo "| --- | --- | --- | --- |"
-            echo "| PulauToon-aio.apk | launcher + semua pack ter-bundle | Ya (siap dimainkan offline awal; update delta masih bisa) | **Ya — rekomendasi** |"
-            echo "| PulauToon-debug.apk | hanya launcher | Memerlukan server konten (README §3) | Ya, lalu unduh pak saat pertama jalan |"
+            echo "| APK | Isi | Instal |"
+            echo "| --- | --- | --- |"
+            echo "| PulauToon-aio.apk | launcher + semua pack ter-bundle | **Rekomendasi — instal & main langsung** |"
+            echo "| PulauToon-debug.apk | hanya launcher | Perlu server konten (README §3) |"
             echo ""
-            echo "### Cara install (HP Android ARM64, landscape)"
-            echo "1. Unduh APK (rekomendasi AIO) dari aset rilis ini."
-            echo "2. Izinkan instal dari sumber tak dikenal saat diminta ponsel."
-            echo "3. Buka; tombol ▶ untuk mulai. Layar berputar otomatis lanskap."
-            echo ""
-            echo "Detail arsitektur 2 APK + updater delta/hash/resume: README.md §5-§8;"
-            echo "bukti uji lengkap: docs/BUKTI_UJI.md."
-            echo ""
+            echo "Install: unduh APK → izinkan sumber tak dikenal → buka (landscape)."
+            echo "Detail: README.md §5–§8; bukti uji: docs/BUKTI_UJI.md."
             echo '### SHA-256'
             echo '```'; cat SHA256SUMS.txt; echo '```'
           } > notes.md
-          cat notes.md
-
-      - name: Terbitkan/perbarui Release + unggah aset (retry)
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          echo "[diag] permissions repo (via token aktif):"
-          gh api repos/$GITHUB_REPOSITORY -q '.permissions | "push=\(.push) admin=\(.admin)"' \
-            || echo "::error::gh api repo gagal — token mungkin tidak punya akses repo (read-only GITHUB_TOKEN?)"
-          gh release view "$TAG" --json tagName -q '"[diag] release target: \(.tagName)"' || echo "[diag] release belum ada"
-          if ! OUT=$(gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
-                --title "Pulau Toon — APK debug $TAG" --notes-file notes.md 2>&1); then
-            SC=${SC:-0}
-            echo "[diag] create gagal (mungkin sudah ada): $(echo "$OUT" | head -c 200)"
-            gh release edit "$TAG" --title "Pulau Toon — APK debug $TAG" --notes-file notes.md || true
-          fi
-          for f in "$GITHUB_WORKSPACE/exports/android/PulauToon-aio.apk" "$GITHUB_WORKSPACE/exports/android/PulauToon-debug.apk" "$GITHUB_WORKSPACE/SHA256SUMS.txt"; do
+          gh release edit "$TAG" --notes-file notes.md
+          for f in "$OUTDIR/PulauToon-aio.apk" "$OUTDIR/PulauToon-debug.apk" "$GITHUB_WORKSPACE/SHA256SUMS.txt"; do
             ok=0
             for i in 1 2 3 4; do
-              if OUT2=$(gh release upload "$TAG" "$f" --clobber 2>&1); then ok=1; echo "upload $f OK ($i)"; break; fi
-              echo "upload $f percobaan $i gagal: $(echo "$OUT2" | head -c 250)"; sleep 15
+              if OUT2=$(gh release upload "$TAG" "$f" --clobber 2>&1); then ok=1; echo "upload OK: $(basename "$f")"; break; fi
+              echo "upload $(basename "$f") percobaan $i gagal: $(echo "$OUT2" | head -c 200)"; sleep 15
             done
-            [ "$ok" = "1" ] || { echo "::error::gagal unggah $f setelah 4 percobaan — $(echo "$OUT2" | head -c 250)"; exit 1; }
+            [ "$ok" = "1" ] || { echo "::error::gagal unggah $f — $(echo "$OUT2" | head -c 200)"; exit 1; }
           done
-          echo "== release final =="
-          gh release view "$TAG" || true
