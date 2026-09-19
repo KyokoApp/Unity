@@ -76,6 +76,26 @@ kill $SRV_PID 2>/dev/null
 sleep 0.5
 timeout 90 "$GODOT" --headless --path "$PRJ" -- --server="$URL" > "$LOGS/run3.log" 2>&1 || true
 grep -q "pack lokal" "$LOGS/run3.log" && ok "mode offline berfungsi" || fail "mode offline gagal"
+ERRS=$(grep -acE "SCRIPT ERROR|Parse Error|ERROR: " "$LOGS/run3.log" || true)
+[ "$ERRS" = "0" ] && ok "run offline tanpa error runtime" || fail "$ERRS error runtime di run3"
+
+say "8. Uji karakter: skin, resolver animasi, AnimationTree"
+timeout 90 "$GODOT" --headless --path "$PRJ" --script dev_probe/character_anim_check.gd > "$LOGS/anim_check.log" 2>&1
+if [ $? -eq 0 ]; then
+    ok "karakter: 76 animasi, semua state terpenuhi, 240 transisi aktif"
+else
+    fail "anim-check keluar non-zero"
+fi
+tail -4 "$LOGS/anim_check.log" | grep -avE "fontconfig"
+
+say "9. Uji preset kualitas (Rendah/Sedang/Tinggi efektif)"
+timeout 90 "$GODOT" --headless --path "$PRJ" --script dev_probe/quality_presets_check.gd > "$LOGS/quality_check.log" 2>&1
+if [ $? -eq 0 ]; then
+    ok "preset efektif: skala monoton naik, Sedang=30 FPS"
+else
+    fail "quality-check keluar non-zero"
+fi
+tail -4 "$LOGS/quality_check.log" | grep -avE "fontconfig"
 
 say "Selesai — ringkasan:"
 cat "$LOGS/summary.txt"

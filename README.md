@@ -187,17 +187,21 @@ shader ringan tanpa post-process).
 
 ## 10. Uji yang sudah dijalankan (ringkasan hijau)
 
-Orkestrator `tools/run_all_tests.sh` dijalankan terakhir dengan hasil **8/8**:
+Orkestrator `tools/run_all_tests.sh` dijalankan terakhir dengan hasil **11/11**:
 
 ```
 [ OK ] manifest ada                [ OK ] Range dijawab 206 (resume)
 [ OK ] manifest tersaji            [ OK ] dunia selesai digenerate
 [ OK ] tanpa error runtime         [ OK ] delta: hanya 1 pack berubah
 [ OK ] launcher hanya unduh 1 pack [ OK ] mode offline berfungsi
+[ OK ] run offline tanpa error      [ OK ] karakter: 76 animasi, 240 transisi
+[ OK ] preset efektif (Rendah<Sedang<Tinggi, Sedang=30 FPS)
 ```
 
 3 skenario launcher (unduhan penuh 10 pack, delta 1 pack `ui` 35 KB, offline)
-semuanya berakhir dengan **0 SCRIPT ERROR**. Cuplikan log & detail:
+semuanya berakhir dengan **0 SCRIPT ERROR**; probe karakter (76 animasi KayKit,
+semua state terpetakan, AnimationTree 240 transisi aktif) dan preset kualitas
+(efektif terbaca dari objek mesin; Sedang=30 FPS) keduanya lulus. Cuplikan log & detail:
 `docs/BUKTI_UJI.md`. Bukti visual toon/langit/siang-malam (renderer CPU
 shader-accurate, sandbox tanpa GPU): `docs/screenshots/` — `biome_map.png`,
 `view_day.png`, `view_dusk.png`, `view_night.png`.

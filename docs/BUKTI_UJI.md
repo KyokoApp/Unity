@@ -3,7 +3,7 @@
 Dokumen ini merangkum hasil uji end-to-end terakhir (semua log mentah:
 `server/test_logs/` — dibuat ulang oleh `tools/run_all_tests.sh`).
 
-## Ringkasan hasil (8/8 hijau)
+## Ringkasan hasil (11/11 hijau)
 
 ```
 [ OK ] manifest ada
@@ -14,9 +14,12 @@ Dokumen ini merangkum hasil uji end-to-end terakhir (semua log mentah:
 [ OK ] delta: hanya 1 pack berubah
 [ OK ] launcher hanya mengunduh 1 pack
 [ OK ] mode offline berfungsi
+[ OK ] run offline tanpa error runtime
+[ OK ] karakter: 76 animasi, semua state terpenuhi, 240 transisi aktif
+[ OK ] preset efektif: skala monoton naik, Sedang=30 FPS
 ```
 
-Jumlah kesalahan runtime di seluruh run:
+Jumlah kesalahan runtime di seluruh run launcher:
 `run1 = 0 SCRIPT ERROR | run2 = 0 | run3 = 0`.
 
 ## 1. Unduhan penuh 10 pack (fresh install)
@@ -53,7 +56,42 @@ Setelah uji, `hud.gd` dikembalikan otomatis oleh skrip uji (self-restore).
 [gen] 100% Dunia siap
 ```
 
-## 4. Bukti visual (tanpa GPU)
+## 4. Karakter & animasi (probe `character_anim_check.gd`)
+
+```
+[anim-check] jumlah animasi di GLB: 76
+[anim-check][ OK ] idle -> Idle          [anim-check][ OK ] walk -> Walking_A
+[anim-check][ OK ] run -> Running_A      [anim-check][ OK ] sprint -> Running_B
+[anim-check][ OK ] jump_start -> Jump_Start   [ OK ] jump_fall -> Jump_Idle
+[anim-check][ OK ] jump_land -> Jump_Land
+[anim-check][ OK ] crouch_idle -> Idle   [anim-check][ OK ] crouch_move -> Walking_B
+[anim-check][ OK ] swim_idle -> Jump_Idle [anim-check][ OK ] swim_move -> Walking_A
+[anim-check][ OK ] pickup -> PickUp
+[anim-check][ OK ] aksi attack -> 1H_Melee_Attack_Chop
+[anim-check][ OK ] aksi emote -> Cheer     [anim-check][ OK ] interact -> Interact
+[anim-check] transisi state machine: 240 (AnimationTree aktif)
+[anim-check] HASIL: SEMUA STATE TERPENUHI
+```
+
+Crouch/swim memakai varian gerak yang ada sesuai DECISIONS D-10 (KayKit tidak
+menyediakan animasi khusus itu); fallback generik mengisi state apa pun yang
+tidak tersedia sehingga state machine tidak pernah kosong.
+
+## 5. Preset kualitas (probe `quality_presets_check.gd`)
+
+```
+[quality] preset Rendah  ef: scale=0.60 fps_cap=30 shadows=false shadow_dist=45
+[quality] preset Sedang  ef: scale=0.75 fps_cap=30 shadows=true  shadow_dist=70
+[quality] preset Tinggi  ef: scale=0.90 fps_cap=60 shadows=true  shadow_dist=110
+[quality] HASIL: 3 preset terverifikasi efektif (skala monoton naik, Sedang=30 FPS)
+```
+
+Nilai efektif dibaca kembali dari objek mesin sungguhan (Window.scaling_3d_scale,
+Engine.max_fps, DirectionalLight3D.shadow_*). Catatan: pada konteks headless,
+`Node.get_viewport()` baru resolve setelah 1 frame — probe men-*defer* setelah
+frame pertama (bukan bug game; di scene nyata QualityManager hidup di SceneTree).
+
+## 6. Bukti visual (tanpa GPU)
 
 Sandbox tidak punya X11/GL/Vulkan → screenshot **engine** tidak dapat diambil.
 Sebagai gantinya, renderer CPU `project/dev_probe/visual_proof.gd` menggambar
@@ -78,7 +116,7 @@ GODOT_BIN=/home/user/tools/godot-src/bin/godot.linuxbsd.editor.x86_64
 $GODOT_BIN --headless --path project --script dev_probe/visual_proof.gd
 ```
 
-## 5. Build APK (status: satu pengecualian terdokumentasi)
+## 7. Build APK (status: satu pengecualian terdokumentasi)
 
 `tools/export_android.sh` berhasil melewati SELURUH validasi konfigurasi,
 kecuali satu-satunya aset biner yang tidak bisa diunduh di sandbox
