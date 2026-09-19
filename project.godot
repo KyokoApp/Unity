@@ -18,9 +18,7 @@ window/size/viewport_height=648
 window/size/mode=0
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-# 6 = sensor_landscape: game ini hanya orientasi lahan (kiri/kanan otomatis)
 window/handheld/orientation=6
-# Hanya untuk mengetes di editor (mouse jadi sentuh). Di Android diabaikan.
 input_devices/pointing/emulate_touch_from_mouse=true
 
 [dotnet]
