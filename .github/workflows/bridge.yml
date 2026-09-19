@@ -1,0 +1,67 @@
+name: bridge
+on: [push, workflow_dispatch]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 50
+    steps:
+      - name: Gather binaries
+        run: |
+          set -ex
+          mkdir -p ~/bridge/{godot,templates/parts,fonts,debs} ~/sdk
+          GV=4.5.2-stable
+          # --- Godot editor ---
+          curl -sL --retry 5 --retry-delay 5 -o ~/bridge/godot/Godot_v4.5.2_linux.x86_64.zip \
+            "https://downloads.tuxfamily.org/godotengine/4.5.2/Godot_v${GV}_linux.x86_64.zip" \
+            || curl -sL --retry 5 --retry-delay 5 -o ~/bridge/godot/Godot_v4.5.2_linux.x86_64.zip \
+            "https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v${GV}_linux.x86_64.zip"
+          ls -la ~/bridge/godot/
+          # --- Export templates ---
+          curl -sL --retry 5 --retry-delay 5 -o ~/bridge/templates/tpz.tpz \
+            "https://downloads.tuxfamily.org/godotengine/4.5.2/Godot_v${GV}_export_templates.tpz" \
+            || curl -sL --retry 5 --retry-delay 5 -o ~/bridge/templates/tpz.tpz \
+            "https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v${GV}_export_templates.tpz"
+          ls -la ~/bridge/templates/tpz.tpz
+          cd ~/bridge/templates && split -b 40m tpz.tpz parts/tpz. && rm tpz.tpz && ls parts | head -3; ls parts | wc -l
+          # --- Android SDK pieces from runner image ---
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          BT=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)
+          PL=$(ls -d $ANDROID_HOME/platforms/*/ | sort -V | tail -1)
+          echo "build-tools=$BT platform=$PL"
+          mkdir -p ~/sdk/android-sdk/{build-tools,platforms}
+          cp -r "$BT" ~/sdk/android-sdk/build-tools/
+          cp -r "$PL" ~/sdk/android-sdk/platforms/
+          cp -r $ANDROID_HOME/platform-tools ~/sdk/android-sdk/ || true
+          cp -r $ANDROID_HOME/licenses ~/sdk/android-sdk/ || true
+          tar -C ~/sdk -czf ~/bridge/android-sdk.tgz android-sdk
+          rm -rf ~/sdk
+          ls -la ~/bridge/android-sdk.tgz
+          # --- X11/GL deb closure (for local screenshots) ---
+          sudo apt-get update -qq
+          PKGS="xvfb x11-xkb-utils xkb-data libgl1-mesa-dri libglx-mesa0 libegl-mesa0 libglapi-mesa mesa-vulkan-drivers libvulkan1 libglvnd0 libglx0 libgl1 libegl1 libdrm2 libx11-6 libx11-xcb1 libxcb1 libxcb-dri3-0 libxcb-present0 libxcb-randr0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0 libxcb-glx0 libxau6 libxdmcp6 libbsd0 libmd0 libxshmfence1 libxxf86vm1 libxfixes3 libxdamage1 libxext6 libexpat1 libllvm15 libelf1 libsensors5 libxfont2 libfontenc1 libpixman-1-0 libxkbfile1 fonts-dejavu-core libxmuu1 xauth"
+          cd ~/bridge/debs
+          apt-get download $(apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances $PKGS | grep -oP '^[a-zA-Z0-9][\w.+-]+' | sort -u) 2>&1 | tail -3
+          ls | wc -l
+          # --- Cartoon font (OFL) from google/fonts ---
+          for f in "ofl/baloo2/Baloo2%5Bwght%5D.ttf:Baloo2.ttf" "ofl/quicksand/Quicksand%5Bwght%5D.ttf:Quicksand.ttf"; do
+            SRC="${f%%:*}"; DST="${f##*:}"
+            gh api "repos/google/fonts/contents/$SRC" --jq '.content' | base64 -d > ~/bridge/fonts/"$DST" || true
+          done
+          ls -la ~/bridge/fonts
+          # --- Manifest ---
+          cd ~/bridge && (find . -type f -print0 | sort -z | xargs -0 sha256sum > MANIFEST.sha256) && du -sh . && df -h . | tail -1
+      - name: Push bridge branch
+        run: |
+          set -ex
+          cd ~
+          git clone --single-branch --depth 1 --branch ${{ github.ref_name }} "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" repo 2>&1 | tail -1
+          cd repo
+          git checkout --orphan bridge-assets
+          rm -rf * .github
+          cp -r ~/bridge/. .
+          git add -A
+          git -c user.name="bridge-bot" -c user.email="bot@arena.local" commit -q -m "bridge: godot 4.5.2 binaries + sdk + debs ($(date -u +%Y%m%dT%H%M%SZ))" 
+          git push -f origin bridge-assets 2>&1 | tail -2
+          echo BRIDGE_PUSH_DONE
