@@ -19,4 +19,10 @@ unduh gagal(0):
 unduh OK: 200 1353063159
 tpz: OK
 unzip tpz rc=0 
+
+=== FASE: android-sdk 15:59:26 ===
+ANDROID_HOME= /usr/local/lib/android/sdk
+build-tools: /usr/local/lib/android/sdk/build-tools/37.0.0
+platform: /usr/local/lib/android/sdk/platforms/android-37.2-beta3
+sdk tgz rc=0 size=136035793
 ```
