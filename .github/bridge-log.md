@@ -25,4 +25,7 @@ ANDROID_HOME= /usr/local/lib/android/sdk
 build-tools: /usr/local/lib/android/sdk/build-tools/37.0.0
 platform: /usr/local/lib/android/sdk/platforms/android-37.2-beta3
 sdk tgz rc=0 size=136035793
+
+=== FASE: x-debs 15:59:54 ===
+debs rc=0 count=136
 ```
