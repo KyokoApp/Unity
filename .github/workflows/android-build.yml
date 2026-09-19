@@ -148,15 +148,32 @@ jobs:
         run: |
           mkdir -p build/android
 
+          # Ekor log dilempar sebagai anotasi supaya penyebab kegagalan terlihat
+          # tanpa harus mengunduh arsip log run (kadang tidak bisa diakses).
+          run_export() {
+            local label="$1"; shift
+            set +e
+            timeout 300 "$@" > "build/android/${label}.log" 2>&1
+            local ec=$?
+            set -e
+            if [ "$ec" -ne 0 ]; then
+              MSG=$(tail -c 1200 "build/android/${label}.log" | tr '\n\r' '  ' | sed 's/%/%25/g; s/[[:space:]]\{2,\}/ /g')
+              echo "::error::[${label}] exit=${ec} :: ${MSG}"
+              return "$ec"
+            fi
+            tail -4 "build/android/${label}.log" || true
+            return 0
+          }
+
           echo "Exporting base data pack (assets_v1.pck)..."
-          timeout 300 godot --headless --export-pack "AssetPack" build/android/assets_v1.pck
+          run_export base godot --headless --export-pack "AssetPack" build/android/assets_v1.pck
 
           echo "Exporting patch pack ($PATCH_NAME) - hanya file berubah sejak baseline..."
           # NOTE: export_filter="selected_resources" di Godot 4.5 tidak memangkas
           # isi pack sesuai ekspektasi pipeline ini (patch selalu seikut paket
           # penuh). Solusinya: stage proyek minimal lalu export all_resources.
           python3 tools/update_pipeline/stage_patch_project.py
-          timeout 300 godot --headless --path build/patch_project --export-pack "PatchPack" "$(pwd)/build/android/$PATCH_NAME"
+          run_export patch godot --headless --path build/patch_project --export-pack "PatchPack" "$(pwd)/build/android/$PATCH_NAME"
 
           echo "Base PCK size: $(stat -c%s build/android/assets_v1.pck) bytes"
           echo "Patch PCK size: $(stat -c%s build/android/$PATCH_NAME) bytes"
