@@ -953,12 +953,21 @@ public partial class Bootstrapper : Control
 
     private void InstallDownloadedApk()
     {
+        // Android melarang aplikasi membagikan file privat lewat URI "file://":
+        // StrictMode melempar FileUriExposedException di UI thread -> game mati.
+        // Menyerahkan APK ke Package Installer butuh ContentProvider (plugin
+        // Android sendiri), jadi di sini tautan unduhannya yang dibuka lewat
+        // browser. Unduhan hasil download internal tetap dipakai untuk cek hash
+        // dan resume, hanya langkah "buka installer"-nya yang lewat browser.
         string apkGlobal = ProjectSettings.GlobalizePath(ApkUserPath);
-        GD.Print("[Bootstrapper] Membuka installer untuk: " + apkGlobal);
-        Error err = OS.ShellOpen("file://" + apkGlobal);
-        DetailLabel?.SetText(err == Error.Ok
-            ? "Installer Android terbuka. Setelah pasang, buka lagi gamenya."
-            : "Installer gagal terbuka (" + err + "). Unduh lewat tombol Browser sebagai cadangan.");
+        GD.Print("[Bootstrapper] APK terverifikasi di: " + apkGlobal);
+
+        if (string.IsNullOrEmpty(_manifest.ApkUrl) || OS.ShellOpen(_manifest.ApkUrl) != Error.Ok)
+        {
+            DetailLabel?.SetText("Installer tidak dapat dibuka otomatis. Ketuk BROWSER lalu pasang file APK dari halaman unduhan.");
+            return;
+        }
+        DetailLabel?.SetText("Browser dibuka untuk mengunduh APK. Setelah selesai, buka file itu dari notifikasi untuk memasang.");
     }
 
     private void OnDownloaderFailed(string message)

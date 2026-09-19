@@ -26,6 +26,57 @@ public partial class MainCharacter : CharacterBody3D
 	[Export]
 	public float Action = 100;
 
+	[ExportGroup("Vitality")]
+	[Export]
+	public float MaxHealth = 100;
+
+	[Export]
+	public float Health = 100;
+
+	/// <summary>Darah 0..1 untuk HUD (garis tipis di bawah layar).</summary>
+	public float HealthRatio
+	{
+		get { return MaxHealth > 0.001f ? Mathf.Clamp(Health / MaxHealth, 0f, 1f) : 0f; }
+	}
+
+	/// <summary>Sisa stamina 0..1 untuk HUD (setengah lingkaran di samping karakter).</summary>
+	public float ActionRatio
+	{
+		get { return Mathf.Clamp(Action / 100f, 0f, 1f); }
+	}
+
+	/// <summary>Aksi yang menyedot stamina — dipakai HUD untuk menampilkan busur stamina.</summary>
+	public bool IsConsumingStamina
+	{
+		get
+		{
+			return CurrentAction == CharacterActions.Running
+				|| CurrentAction == CharacterActions.Flying
+				|| CurrentAction == CharacterActions.Gliding;
+		}
+	}
+
+	/// <summary>
+	/// Titik masuk kerusakan. Saat ini belum ada yang memanggilnya (proyek
+	/// belum punya sistem damage — lihat docs/AUDIT_MENYELURUH.md temuan #2):
+	/// cukup sambungkan dari tabrakan mob/serangan, lalu OnLoseGame() saat 0.
+	/// </summary>
+	public void TakeDamage(float amount)
+	{
+		if (amount <= 0f) return;
+		Health = Mathf.Max(0f, Health - amount);
+		if (Health <= 0f)
+		{
+			GD.Print("[MainCharacter] health habis — di sini dipanggil GameManager.OnLoseGame()");
+		}
+	}
+
+	public void Heal(float amount)
+	{
+		if (amount <= 0f) return;
+		Health = Mathf.Min(MaxHealth, Health + amount);
+	}
+
 	[Export]
 	public float Mojo = 0;
 
@@ -59,7 +110,6 @@ public partial class MainCharacter : CharacterBody3D
 
 	[Export] public MeshInstance3D Faraway;
 
-	float mouse_speed = 0.05f;
 
 	[Export]
 	public float WalkingSpeed = 4;
@@ -205,12 +255,10 @@ public partial class MainCharacter : CharacterBody3D
 	{
 		//Faraway = GetNode("/root/Faraway") as MeshInstance3D;
 		GameSettings.EnsureLoaded();
-		// Mouse capture hanya relevan di desktop; di Android tidak didukung
-		// dan bisa mengganggu penyaluran event sentuh.
-		if (DisplayServer.GetName() != "Android")
-		{
-			Input.MouseMode = Input.MouseModeEnum.Captured;
-		}
+		// GAME KHUSUS ANDROID: tidak ada lagi mouse capture / mouse-look.
+		// (MouseMode = Captured dulu membekukan posisi event sentuh hasil
+		//  emulate_touch_from_mouse, sehingga analog & tombol tidak pernah
+		//  kena hit-test saat diuji di editor — lihat docs/AUDIT_MENYELURUH.md.)
 		FloorMaxAngle = Mathf.DegToRad(50);
 		GameManager.Instance.SetMainCamera(PlayerCamera);
 		GameManager.Instance.SetMainCharacter(this);
@@ -279,6 +327,8 @@ public partial class MainCharacter : CharacterBody3D
 		if (Initialized)
 		{
 			float deltaFloat = (float)delta;
+			// Baca tombol dulu, lalu gerak — satu tick, tanpa urutan event.
+			RefreshInputState();
 			UpdateMovement(deltaFloat);
 		}
 	}
@@ -506,51 +556,6 @@ public partial class MainCharacter : CharacterBody3D
 
 	}
 
-	/*public override void _Input(InputEvent keyEvent)
-		{
-			
-			if (keyEvent is InputEventMouseButton _mouseButton)
-			{
-				switch (_mouseButton.ButtonIndex)
-				{
-					case MouseButton.Right:
-					Input.MouseMode = _mouseButton.Pressed? Input.MouseModeEnum.Captured:Input.MouseModeEnum.Visible;
-					break;
-				}
-				if (_mouseButton.ButtonIndex == MouseButton.Left && _mouseButton.Pressed)
-				{
-					RigidBody3D newCube = Cube.Instantiate() as RigidBody3D;
-					GetTree().Root.AddChild(newCube);
-					Vector3 forwardDirection = GlobalTransform.Basis.Z;
-
-					newCube.Position = GlobalTransform.Origin + (forwardDirection*2)+Vector3.Up;
-
-					Vector3 velocityDirection = (forwardDirection*2 + Vector3.Up).Normalized();
-        			newCube.LinearVelocity = velocityDirection * 5;
-
-					//newCube.Position = this.Position + Vector3.Back +Vector3.Up;
-				//	newCube.Rotation = this.Rotation;
-					//newCube.LinearVelocity = (Vector3.Back+Vector3.Up)*10;
-				}
-			}
-			if (keyEvent is InputEventMouseMotion motion)
-			{
-				cam_rot_x = Mathf.Clamp((cam_rot_x +(-motion.Relative.Y * mouse_speed)), -25,60);
-				cam_rot_y += -motion.Relative.X * mouse_speed;
-			}
-			if (Input.IsActionPressed("action"))
-			{
-				float height = TerrainManager.Instance.GetTerrainHeightAtGlobalCoordinate(new Vector2(GlobalPosition.X, GlobalPosition.Z));
-
-				float degree = TerrainManager.Instance.GetTerrainInclinationAtGlobalCoordinate(new Vector2(GlobalPosition.X, GlobalPosition.Z));
-
-				Vector3 location = new Vector3(GlobalPosition.X, height, GlobalPosition.Z);
-				GD.Print("Degree inclination: " + degree);
-				
-				
-			}
-
-		}*/
 
 	protected void UpdateAnimations()
 	{
@@ -676,7 +681,7 @@ public partial class MainCharacter : CharacterBody3D
 			}
 			else
 			{
-				Action = Mathf.Clamp(Action + (int)deltaFloat, 0, 100);
+				Action = Mathf.Clamp(Action + deltaFloat * 2f, 0, 100);
 				velocity.Y -= gravity * deltaFloat;
 				//float ratio = (speed - WalkingSpeed) / (RunningSpeed - WalkingSpeed);
 				//float newRatio = Mathf.MoveToward(ratio, 0, deltaFloat * 1.5f); // adjust the 1.5f as needed
@@ -710,13 +715,13 @@ public partial class MainCharacter : CharacterBody3D
 
 	protected void UpdateCamera(float deltaFloat)
 	{
-#if GODOT_ANDROID
+		// Satu-satunya sumber rotasi kamera: drag sentuh (berlaku juga saat
+		// diuji di editor, karena emulator mouse->touch aktif).
 		if (touchInputManager != null)
 		{
 			CameraRotationAxis.X = touchInputManager.CameraRotationAxis.X;
 			CameraRotationAxis.Y = touchInputManager.CameraRotationAxis.Y;
 		}
-#endif
 		float targetFov = 75;
 		float fovLerpTime = 0.5f; // adjust this value to control the speed of the FOV change
 
@@ -786,9 +791,7 @@ public partial class MainCharacter : CharacterBody3D
 			PopupInfo = Debug.SetTextHelper(initText, CameraPivot.Position, CameraPivot);
 			PopupInfo.MaxViewDistance = 1000;
 			_lastHelperText = initText;
-#if GODOT_ANDROID
 				PopupInfo.SetSize(50); // cukup set sekali (sebelumnya tiap frame)
-#endif
 		}
 		if (PopupInfo != null)
 		{
@@ -824,118 +827,37 @@ public partial class MainCharacter : CharacterBody3D
 		}*/
 	}
 
-	public override void _Input(InputEvent keyEvent)
+	// === Tombol sentuh dibaca per tick fisika, bukan per event ===
+	//
+	// Kenapa diubah: Viewport memanggil _input() mulai dari node yang PALING
+	// AKHIR masuk tree. Karakter ada di world.tscn (ditambahkan setelah
+	// main.tscn), jadi ia membaca Input.IsActionPressed(...) SEBELUM
+	// AnimeActionTouchButton menekan action pada event yang sama -> aksi
+	// tombol tidak pernah terbaca (terasa "tombol ga reaksi").
+	// Polling di _PhysicsProcess menghapus ketergantungan urutan itu, dan
+	// sekaligus membuat jalur yang sama berlaku di editor maupun di HP.
+	private bool _torchWasDown;
+
+	private void RefreshInputState()
 	{
 		CurrentInput.Reset();
-		if (Input.IsActionPressed("run"))
-		{
-			CurrentInput.SetRun();
-		}
-		if (Input.IsActionPressed("jump"))
-		{
-			CurrentInput.SetJump();
-		}
-		if (Input.IsActionPressed("fly"))
-		{
-			CurrentInput.SetFly();
-		}
-		
-		if (Input.IsActionPressed("sit"))
-		{
-			CurrentInput.SetSit();
-		}
-#if GODOT_WINDOWS
-		if (Input.IsActionJustPressed("torch"))
+
+		if (Input.IsActionPressed("run")) CurrentInput.SetRun();
+		if (Input.IsActionPressed("jump")) CurrentInput.SetJump();
+		if (Input.IsActionPressed("fly")) CurrentInput.SetFly();
+		if (Input.IsActionPressed("sit")) CurrentInput.SetSit();
+
+		// Torches: sekali per ketukan (edge), bukan tiap tick.
+		bool torchDown = Input.IsActionPressed("torch");
+		if (torchDown && !_torchWasDown && SpotLight != null)
 		{
 			SpotLight.Visible = !SpotLight.Visible;
 		}
-		if (keyEvent is InputEventMouseButton _mouseButton)
-		{
-			switch (_mouseButton.ButtonIndex)
-			{
-				case MouseButton.Right:
-					Input.MouseMode = _mouseButton.Pressed ? Input.MouseModeEnum.Captured : Input.MouseModeEnum.Visible;
-					break;
-			}
-			if (_mouseButton.ButtonIndex == MouseButton.Left && _mouseButton.Pressed)
-			{
-				CurrentInput.SetAttack();
+		_torchWasDown = torchDown;
 
-				//Toss a crate
-				/*Animator.Set("parameters/conditions/tossing", true);
-				RigidBody3D newCube = Cube.Instantiate() as RigidBody3D;
-				GetTree().Root.AddChild(newCube);
-				Crates.Add(newCube);
-				Vector3 forwardDirection = GlobalTransform.Basis.Z;
-
-				newCube.Position = GlobalTransform.Origin + (forwardDirection*2)+Vector3.Up;
-
-				Vector3 velocityDirection = (forwardDirection*2 + Vector3.Up).Normalized();
-				newCube.LinearVelocity = velocityDirection * 10;*/
-
-			}
-		}
-#endif
-#if GODOT_ANDROID
-			if (Input.IsActionPressed("torch"))
-			{
-				SpotLight.Visible = !SpotLight.Visible;
-			}
-			if (Input.IsActionPressed("attack"))
-			{
-				CurrentInput.SetAttack();
-					
-					//Toss a crate
-					Animator.Set("parameters/conditions/tossing", true);
-					RigidBody3D newCube = Cube.Instantiate() as RigidBody3D;
-					GetTree().Root.AddChild(newCube);
-					Vector3 forwardDirection = GlobalTransform.Basis.Z;
-
-					newCube.Position = GlobalTransform.Origin + (forwardDirection*2)+Vector3.Up;
-
-					Vector3 velocityDirection = (forwardDirection*2 + Vector3.Up).Normalized();
-        			newCube.LinearVelocity = velocityDirection * 10;
-					
-    				LaunchAttack();
-			}
-#endif
-#if GODOT_WINDOWS
-		if (keyEvent is InputEventJoypadMotion joypadMotionEvent)
-		{
-			// Get the joystick axis values
-			JoyAxis axis = joypadMotionEvent.Axis; // X-axis of the joystick
-			if (axis == JoyAxis.RightX || axis == JoyAxis.RightY)//axis goes from -1 to 0
-			{
-				// Get the joystick axis values
-				if (axis == JoyAxis.RightY)
-				{
-					CameraRotationAxis.Y = joypadMotionEvent.AxisValue;
-				}
-				if (axis == JoyAxis.RightX)
-				{
-					CameraRotationAxis.X = joypadMotionEvent.AxisValue;
-				}
-			}
-			//GD.Print(axis + joypadMotionEvent.AxisValue.ToString());
-		}
-
-		if (keyEvent is InputEventMouseMotion motion)
-		{
-			cam_rot_x = Mathf.Clamp((cam_rot_x + (-motion.Relative.Y * mouse_speed)), -25, 60);
-			cam_rot_y += -motion.Relative.X * mouse_speed;
-		}
-#endif
-		if (Input.IsActionPressed("run"))
-		{
-			CurrentInput.SetRun();
-			float height = TerrainManager.Instance.GetTerrainHeightAtGlobalCoordinate(new Vector2(GlobalPosition.X, GlobalPosition.Z));
-
-			float degree = TerrainManager.Instance.GetTerrainInclinationAtGlobalCoordinate(new Vector2(GlobalPosition.X, GlobalPosition.Z));
-
-			Vector3 location = new Vector3(GlobalPosition.X, height, GlobalPosition.Z);
-			//GD.Print("Degree inclination: " + degree);
-
-		}
-
+		// Serangan: cukup set flag. LaunchAttack() (crate + cooldown) sudah
+		// dipanggil dari UpdateAction(); memanggilnya dari dua tempat membuat
+		// crate lahir dua kali.
+		if (Input.IsActionPressed("attack")) CurrentInput.SetAttack();
 	}
 }

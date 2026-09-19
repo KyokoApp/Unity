@@ -49,12 +49,20 @@ public partial class GraphicsSettingsManager : CanvasLayer
 
     private void CreateUI()
     {
-        // 1. Gear Icon Button at Top-Left (below compass)
+        // 1. Tombol gear di KANAN-ATAS.
+        // Kiri-atas khusus untuk HUD (jarak / kompas), supaya tidak ada teks
+        // atau tombol yang saling menutupi.
         toggleButton = new Button();
         toggleButton.Text = "⚙";
         toggleButton.Name = "SettingsGearButton";
-        toggleButton.Position = new Vector2(30, 200);
-        toggleButton.CustomMinimumSize = new Vector2(55, 55);
+        toggleButton.SetAnchorsPreset(Control.LayoutPreset.TopRight);
+        toggleButton.OffsetLeft = -82;
+        toggleButton.OffsetTop = 12;
+        toggleButton.OffsetRight = -16;
+        toggleButton.OffsetBottom = 68;
+        toggleButton.GrowHorizontal = Control.GrowDirection.Begin;
+        toggleButton.GrowVertical = Control.GrowDirection.End;
+        toggleButton.CustomMinimumSize = new Vector2(56, 56);
         toggleButton.FocusMode = Control.FocusModeEnum.None;
         
         // Clean anime/modern style for gear button

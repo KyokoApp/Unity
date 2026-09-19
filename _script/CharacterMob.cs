@@ -78,7 +78,6 @@ public partial class CharacterMob : CharacterBody3D
 		RandomNumberGenerator rng = new RandomNumberGenerator();
 		int multiplier = rng.RandiRange(-5, 5);
 		_cachedDirection = _cachedDirection*multiplier;
-		//Input.MouseMode = Input.MouseModeEnum.Captured;
 		FloorMaxAngle = Mathf.DegToRad(50);
 
 	}
@@ -142,51 +141,6 @@ public partial class CharacterMob : CharacterBody3D
 
 
 
-	/*public override void _Input(InputEvent keyEvent)
-		{
-			
-			if (keyEvent is InputEventMouseButton _mouseButton)
-			{
-				switch (_mouseButton.ButtonIndex)
-				{
-					case MouseButton.Right:
-					Input.MouseMode = _mouseButton.Pressed? Input.MouseModeEnum.Captured:Input.MouseModeEnum.Visible;
-					break;
-				}
-				if (_mouseButton.ButtonIndex == MouseButton.Left && _mouseButton.Pressed)
-				{
-					RigidBody3D newCube = Cube.Instantiate() as RigidBody3D;
-					GetTree().Root.AddChild(newCube);
-					Vector3 forwardDirection = GlobalTransform.Basis.Z;
-
-					newCube.Position = GlobalTransform.Origin + (forwardDirection*2)+Vector3.Up;
-
-					Vector3 velocityDirection = (forwardDirection*2 + Vector3.Up).Normalized();
-        			newCube.LinearVelocity = velocityDirection * 5;
-
-					//newCube.Position = this.Position + Vector3.Back +Vector3.Up;
-				//	newCube.Rotation = this.Rotation;
-					//newCube.LinearVelocity = (Vector3.Back+Vector3.Up)*10;
-				}
-			}
-			if (keyEvent is InputEventMouseMotion motion)
-			{
-				cam_rot_x = Mathf.Clamp((cam_rot_x +(-motion.Relative.Y * mouse_speed)), -25,60);
-				cam_rot_y += -motion.Relative.X * mouse_speed;
-			}
-			if (Input.IsActionPressed("action"))
-			{
-				float height = TerrainManager.Instance.GetTerrainHeightAtGlobalCoordinate(new Vector2(GlobalPosition.X, GlobalPosition.Z));
-
-				float degree = TerrainManager.Instance.GetTerrainInclinationAtGlobalCoordinate(new Vector2(GlobalPosition.X, GlobalPosition.Z));
-
-				Vector3 location = new Vector3(GlobalPosition.X, height, GlobalPosition.Z);
-				GD.Print("Degree inclination: " + degree);
-				
-				
-			}
-
-		}*/
 
 	// State animasi di-cache: sebelumnya 5x Animator.Set (string lookup) dipanggil
 	// TIAP FRAME PER MOB (~20 mob -> ~100 native string call/frame). Sekarang hanya

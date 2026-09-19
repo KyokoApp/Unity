@@ -94,26 +94,34 @@ public partial class GameManager : Node
 		BouncerockEventManager.TriggerEvent<EvtCharacterChanged>(evtCharacterChanged);
 	}
 
+	// Semua getter di bawah ini aman dipanggil sebelum karakter utama terdaftar:
+	// adegan (main.tscn) dan karakter (world.tscn) dimuat terpisah, jadi HUD yang
+	// jalan di 1-2 frame pertama dulu-duluan dengan mainCharacter == null.
 	public float GetMainCharacterAction()
 	{
-		return mainCharacter.Action;
+		return mainCharacter != null && GodotObject.IsInstanceValid(mainCharacter) ? mainCharacter.Action : 0f;
 	}
 	public float GetMainCharacterMojo()
 	{
-		return mainCharacter.Mojo;
+		return mainCharacter != null && GodotObject.IsInstanceValid(mainCharacter) ? mainCharacter.Mojo : 0f;
 	}
 	public float GetMainCharacterScore()
 	{
-		return mainCharacter.Points;
+		return mainCharacter != null && GodotObject.IsInstanceValid(mainCharacter) ? mainCharacter.Points : 0f;
+	}
+	/// <summary>Rasio darah 0..1 untuk HUD. 1f saat karakter belum ada (tidak berkedip).</summary>
+	public float GetMainCharacterHealthRatio()
+	{
+		return mainCharacter != null && GodotObject.IsInstanceValid(mainCharacter) ? mainCharacter.HealthRatio : 1f;
 	}
 	public MainCharacter GetMainCharacter()
 	{
-		return mainCharacter;
+		return mainCharacter != null && GodotObject.IsInstanceValid(mainCharacter) ? mainCharacter : null;
 	}
 
 	public Vector3 GetMainCharacterPosition()
 	{
-		return mainCharacter.Position;
+		return mainCharacter != null && GodotObject.IsInstanceValid(mainCharacter) ? mainCharacter.Position : Vector3.Zero;
 	}
 
 	public void LoadWorld()

@@ -18,7 +18,7 @@ public static class GameSettings
     public static float JoystickScale { get; set; } = 1.0f;       // pengali 0.7 - 1.6
 
     // Debug
-    public static bool DebugOverlay { get; set; } = true;         // sementara default ON untuk diagnosa
+    public static bool DebugOverlay { get; set; } = false;        // overlay debugging: nyalakan lewat file config (bagian [debug]) bila perlu
 
     private static bool _loaded;
 

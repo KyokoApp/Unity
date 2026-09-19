@@ -29,7 +29,10 @@ public partial class Compass : Control
 
     public void UpdateCompass(double delta)
     {
-        float targetAngle = GetCompassHeading(GameManager.Instance.GetMainCharacter());
+        // Karakter bisa belum terdaftar saat boot (world.tscn dimuat terpisah)
+        MainCharacter ch = GameManager.Instance != null ? GameManager.Instance.GetMainCharacter() : null;
+        if (ch == null) { return; }
+        float targetAngle = GetCompassHeading(ch);
 
         // Simulating flip-flop effect with a damped spring formula
         float angleDifference = Mathf.PosMod(targetAngle - currentSmoothedAngle + 180f, 360f) - 180f; // Shortest rotation direction
@@ -65,6 +68,7 @@ public partial class Compass : Control
 
     public static float GetCompassHeading(Node3D node)
     {
+        if (node == null) { return 0f; }
         Vector3 forward = node.GlobalTransform.Basis.Z;
 
         float angle = Mathf.RadToDeg(Mathf.Atan2(forward.X, forward.Z));

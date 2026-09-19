@@ -1,120 +1,100 @@
 using Godot;
-using System;
 
+/// <summary>
+/// ScreenSpaceMainUI — pengatur HUD in-game.
+///
+/// Versi Android-only: teks-teks penjelasan ("Distance from start:", "Record:",
+/// "Time:", "MOJO", skor &amp; multiplier) sudah dibuang dari layar. Yang tersisa:
+///   • satu angka jarak di tengah atas (itu memang skor di endless runner),
+///   • garis darah tipis di tepi bawah layar (HudHealthLine),
+///   • setengah lingkaran stamina di samping karakter (HudStaminaArc),
+///     yang baru muncul saat stamina dipakai — persis seperti game mobile.
+///
+/// HUD di-update 10x/detik dan SetText hanya saat nilainya berubah:
+/// tiap SetText memicu layout ulang + alokasi string (sampah GC per frame
+/// di HP). Node lama tidak dihapus dari adegan lewat kode ini — cukup jangan
+/// direferensikan lagi (bloknya sudah dibuang dari main.tscn).
+/// </summary>
 public partial class ScreenSpaceMainUI : Control
 {
-	// Called when the node enters the scene tree for the first time.
+    [Export] public Label Distance;
+    [Export] public HudHealthLine HealthLine;
+    [Export] public HudStaminaArc StaminaArc;
 
-	[Export]
-	public Label Distance;
-	[Export]
-	public ProgressBar ActionBar;
+    private const double UiUpdateInterval = 0.1;
+    private double _uiAccum;
 
-	[Export]
-	public ProgressBar MojoBar;
+    private string _lastDistanceText = "";
+    private float _record;
+    private double _recordFlash;
 
-	[Export]
-	public Label Score;
+    public override void _Ready()
+    {
+        // Seluruh HUD tidak boleh menyerap sentuhan.
+        MouseFilter = MouseFilterEnum.Ignore;
 
-	[Export]
-	public Label Multiplier;
+        _record = GameManager.Instance != null ? GameManager.Instance.Record : 0f;
+    }
 
-	[Export]
-	public Label Record;
-	[Export]
-	public Label TimeOfDay;
+    public override void _Process(double delta)
+    {
+        _uiAccum += delta;
+        if (_uiAccum < UiUpdateInterval) return;
+        _uiAccum = 0.0;
 
-	public override void _Ready()
-	{
+        GameManager gm = GameManager.Instance;
+        MainCharacter ch = gm != null ? gm.GetMainCharacter() : null;
+        // Boot window: world/main character belum tentu terdaftar. Jangan NRE.
+        if (gm == null || ch == null) return;
 
-	}
+        float dist = gm.StartingPoint.DistanceTo(ch.GlobalPosition);
+        UpdateDistance(dist);
+        UpdateVitality(ch);
+        UpdateRecord(dist);
 
-	void UpdateTime()
+        if (_recordFlash > 0.0)
+        {
+            _recordFlash -= UiUpdateInterval;
+            if (_recordFlash <= 0.0 && Distance != null)
+            {
+                Distance.Modulate = Colors.White;
+            }
+        }
+    }
 
-	{
-		updateTimeOfDay();
-	}
+    private void UpdateDistance(float distMeters)
+    {
+        if (Distance == null) return;
+        string txt = Mathf.FloorToInt(distMeters) + " m";
+        if (txt != _lastDistanceText)
+        {
+            Distance.Text = txt;
+            _lastDistanceText = txt;
+        }
+    }
 
+    private void UpdateVitality(MainCharacter ch)
+    {
+        HealthLine?.SetRatio(ch.HealthRatio);
+        StaminaArc?.UpdateStamina(ch.ActionRatio, ch.IsConsumingStamina);
+    }
 
+    private void UpdateRecord(float distMeters)
+    {
+        if (distMeters <= _record) return;
 
-
-	// HUD di-update 5x/detik (bukan tiap frame) dan SetText hanya saat nilai
-	// berubah — SetText tiap frame memicu layout ulang label + alokasi string
-	// terus-menerus (sampah GC setiap frame di mobile).
-	private double _uiAccum = 0.0;
-	private const double UiUpdateInterval = 0.2;
-
-	private string _lastDistanceText = "";
-	private string _lastScoreText = "";
-	private string _lastMultText = "";
-	private string _lastRecordText = "";
-	private string _lastTimeText = "";
-
-	public override void _Process(double delta)
-	{
-		_uiAccum += delta;
-		if (_uiAccum < UiUpdateInterval) return;
-		_uiAccum = 0.0;
-
-		UpdateTime();
-		UpdateDistance();
-		UpdateActionBar();
-		UpdateRecord();
-	}
-
-	void UpdateDistance()
-
-	{
-		updateDistance();
-	}
-
-	void UpdateActionBar()
-
-	{
-		updateActionBar();
-	}
-
-	void updateActionBar()
-	{
-		ActionBar.Value = GameManager.Instance.GetMainCharacterAction();
-		MojoBar.Value = GameManager.Instance.GetMainCharacterMojo();
-
-		string score = GameManager.Instance.GetMainCharacterScore().ToString();
-		if (score != _lastScoreText) { Score.Text = score; _lastScoreText = score; }
-
-		float multiplier = GameManager.Instance.StartingPoint.DistanceTo(GameManager.Instance.GetMainCharacterPosition());
-			multiplier = Mathf.Clamp(multiplier/100,1,100);
-			multiplier = Mathf.FloorToInt(multiplier);
-		string mult = "x" + multiplier;
-		if (mult != _lastMultText) { Multiplier.Text = mult; _lastMultText = mult; }
-	}
-
-	void UpdateRecord()
-
-	{
-		updateRecord();
-	}
-
-	void updateRecord()
-	{
-		float curdist = GameManager.Instance.StartingPoint.DistanceTo(GameManager.Instance.GetMainCharacterPosition());
-		if (GameManager.Instance.Record < curdist)
-		{
-			string rec = curdist.ToString();
-			if (rec != _lastRecordText) { Record.Text = rec; _lastRecordText = rec; }
-			GameManager.Instance.Record = curdist;
-		}
-	}
-
-	void updateDistance()
-	{
-		string dist = Mathf.FloorToInt(GameManager.Instance.StartingPoint.DistanceTo(GameManager.Instance.GetMainCharacterPosition())).ToString();
-		if (dist != _lastDistanceText) { Distance.Text = dist; _lastDistanceText = dist; }
-	}
-
-	void updateTimeOfDay()
-	{
-		string timeText = EnvironmentManager.Instance.GetTime();
-		if (timeText != _lastTimeText) { TimeOfDay.Text = timeText; _lastTimeText = timeText; }
-	}
+        _record = distMeters;
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.Record = distMeters;
+        }
+        // Beri sinyal singkat, bukan label permanen di layar.
+        _recordFlash = 2.0;
+        if (Distance != null)
+        {
+            Distance.Text = Mathf.FloorToInt(distMeters) + " m  ·  REKOR BARU";
+            _lastDistanceText = Distance.Text;
+            Distance.Modulate = new Color(1f, 0.92f, 0.62f, 1f);
+        }
+    }
 }

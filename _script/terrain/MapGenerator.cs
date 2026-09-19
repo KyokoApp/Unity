@@ -24,8 +24,10 @@ namespace Bouncerock.Terrain
 
 
 
-		static string documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-				+ "/Islands/";
+		// Android tidak punya "My Documents": GetFolderPath di sana kosong dan
+		// static field ini akan membuat semua tulis terrain salah alamat.
+		// Pakai folder data aplikasi (user://) yang dijamin bisa ditulis.
+		static string documentspath = ProjectSettings.GlobalizePath("user://Islands") + "/";
 		//This is where new chunks are generated and assembled.
 
 		// Seed deterministik per chunk: dunia konsisten antar-run DAN aman dipakai
@@ -593,8 +595,7 @@ namespace Bouncerock.Terrain
 
 		public void SaveUnibyte(string name)
 		{
-			string documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-				+ "/Islands/";
+			DirAccess.MakeDirPathRecursive("user://Islands");
 
 			int width = heightMap.GetLength(0);
 			int height = heightMap.GetLength(1);
@@ -621,8 +622,7 @@ namespace Bouncerock.Terrain
 
 		public void SaveMapDetails(string name)
 		{
-			string documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-				+ "/Islands/";
+			DirAccess.MakeDirPathRecursive("user://Islands");
 			byte[] buffer = FileWriter.SerializeToBinary(DecorElements);
 			GD.Print("Writing binaries " + buffer.Length);
 			FileWriter.BinaryToISL(buffer, documentspath + name + "_D");
