@@ -83,15 +83,16 @@ jobs:
       - name: Export APK Launcher + AIO
         run: |
           mkdir -p exports/android
-          timeout 900 ./godot --headless --path project --export-debug "Android Launcher" exports/android/PulauToon-debug.apk | tee exports/android/export.log
-          timeout 900 ./godot --headless --path project --export-debug "Android AIO" exports/android/PulauToon-aio.apk | tee -a exports/android/export.log
-          ls -la exports/android/
+          export OUTDIR="$GITHUB_WORKSPACE/exports/android"
+          timeout 900 ./godot --headless --path project --export-debug "Android Launcher" "$OUTDIR/PulauToon-debug.apk" | tee "$OUTDIR/export.log"
+          timeout 900 ./godot --headless --path project --export-debug "Android AIO" "$OUTDIR/PulauToon-aio.apk" | tee -a "$OUTDIR/export.log"
+          ls -la "$OUTDIR/"
 
       - name: Buat catatan rilis
         if: success()
         run: |
           set -e
-          cd exports/android && sha256sum PulauToon-debug.apk PulauToon-aio.apk > /tmp/SHA256SUMS && cd "$GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE/exports/android" && sha256sum PulauToon-debug.apk PulauToon-aio.apk > /tmp/SHA256SUMS && cd "$GITHUB_WORKSPACE"
           cp /tmp/SHA256SUMS SHA256SUMS.txt
           {
             echo "## Pulau Toon — APK debug (CI)"
@@ -132,7 +133,7 @@ jobs:
             echo "[diag] create gagal (mungkin sudah ada): $(echo "$OUT" | head -c 200)"
             gh release edit "$TAG" --title "Pulau Toon — APK debug $TAG" --notes-file notes.md || true
           fi
-          for f in exports/android/PulauToon-aio.apk exports/android/PulauToon-debug.apk SHA256SUMS.txt; do
+          for f in "$GITHUB_WORKSPACE/exports/android/PulauToon-aio.apk" "$GITHUB_WORKSPACE/exports/android/PulauToon-debug.apk" "$GITHUB_WORKSPACE/SHA256SUMS.txt"; do
             ok=0
             for i in 1 2 3 4; do
               if OUT2=$(gh release upload "$TAG" "$f" --clobber 2>&1); then ok=1; echo "upload $f OK ($i)"; break; fi
