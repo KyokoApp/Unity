@@ -58,10 +58,12 @@ jobs:
           cd ~
           git clone --single-branch --depth 1 --branch ${{ github.ref_name }} "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" repo 2>&1 | tail -1
           cd repo
-          git checkout --orphan bridge-assets
+          git config --global http.postBuffer 1073741824
+          git checkout --orphan arena/bridge-assets
           rm -rf * .github
           cp -r ~/bridge/. .
           git add -A
           git -c user.name="bridge-bot" -c user.email="bot@arena.local" commit -q -m "bridge: godot 4.5.2 binaries + sdk + debs ($(date -u +%Y%m%dT%H%M%SZ))" 
-          git push -f origin bridge-assets 2>&1 | tail -2
-          echo BRIDGE_PUSH_DONE
+          set -o pipefail
+          git push -f origin arena/bridge-assets 2>&1 | tail -3
+          git ls-remote origin 2>&1 | grep refs/heads/arena/bridge-assets && echo PUSH_VERIFIED || (echo PUSH_FAILED; exit 1)
