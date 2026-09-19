@@ -58,8 +58,8 @@ say "6. Uji delta update (ubah 1 file di 1 pack)"
 ## bangun (harusnya HANYA pack ui yang naik versi), lalu setelah uji dikembalikan.
 DELTA_FILE="$PRJ/packs/ui/hud.gd"
 cp "$DELTA_FILE" "$LOGS/hud.gd.before_delta"
-grep -v '^// uji delta$' "$DELTA_FILE" > "$LOGS/hud.gd.clean" && cp "$LOGS/hud.gd.clean" "$DELTA_FILE"
-printf '// uji delta\n' >> "$DELTA_FILE"
+grep -v '^# uji delta$' "$DELTA_FILE" > "$LOGS/hud.gd.clean" && cp "$LOGS/hud.gd.clean" "$DELTA_FILE"
+printf '# uji delta\n' >> "$DELTA_FILE"
 python3 "$ROOT/tools/build_packs.py" --godot "$GODOT" > "$LOGS/build2.log" 2>&1
 grep -E "^\[change\]" "$LOGS/build2.log" | tee "$LOGS/delta_changes.txt"
 NCHANGE=$(grep -c "^\[change\]" "$LOGS/build2.log" || true)
