@@ -177,4 +177,29 @@ sha256 87f6e6be292929e363d15ed9052f277b2ba4e95ed994e1e099048097be2dfd03 70517423
 sha256 c52dcb8460598a477fb533c427b6ea4ada343c36ad3b58a99059bb2927e754f3 124551270 templates/4.5.2.stable/android_debug.apk
 sha256 41c04d4ba5f3c421541179e8d3c46f11bc424b3fd3d2c05a229ab78d39f5b062 102186370 templates/4.5.2.stable/android_release.apk
 sha256 2ba06d33ddf37a2874a46c7f77ffd15b5502f9edb9dbcace6c0fa78b74f269a6 13 templates/4.5.2.stable/version.txt
+
+=== FASE: rest-push 16:00:08 ===
+branch baru
+EXCEPTION: <HTTPError 422: 'Unprocessable Entity'>
+Traceback (most recent call last):
+  File "/home/runner/work/Unity/Unity/.github/workflows/bridge.py", line 164, in <module>
+    sys.exit(main())
+  File "/home/runner/work/Unity/Unity/.github/workflows/bridge.py", line 142, in main
+    b = api("POST", gitapi + "/blobs", {"content": base64.b64encode(part).decode(), "encoding": "base64"})
+  File "/home/runner/work/Unity/Unity/.github/workflows/bridge.py", line 23, in api
+    with urllib.request.urlopen(req) as r:
+  File "/usr/lib/python3.10/urllib/request.py", line 216, in urlopen
+    return opener.open(url, data, timeout)
+  File "/usr/lib/python3.10/urllib/request.py", line 525, in open
+    response = meth(req, response)
+  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response
+    response = self.parent.error(
+  File "/usr/lib/python3.10/urllib/request.py", line 563, in error
+    return self._call_chain(*args)
+  File "/usr/lib/python3.10/urllib/request.py", line 496, in _call_chain
+    result = func(*args)
+  File "/usr/lib/python3.10/urllib/request.py", line 643, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 422: Unprocessable Entity
+
 ```
