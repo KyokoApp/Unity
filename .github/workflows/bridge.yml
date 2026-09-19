@@ -10,60 +10,59 @@ jobs:
       - name: Gather binaries
         run: |
           set -ex
-          mkdir -p ~/bridge/{godot,templates/parts,fonts,debs} ~/sdk
-          GV=4.5.2-stable
-          # --- Godot editor ---
-          curl -sL --retry 5 --retry-delay 5 -o ~/bridge/godot/Godot_v4.5.2_linux.x86_64.zip \
-            "https://downloads.tuxfamily.org/godotengine/4.5.2/Godot_v${GV}_linux.x86_64.zip" \
-            || curl -sL --retry 5 --retry-delay 5 -o ~/bridge/godot/Godot_v4.5.2_linux.x86_64.zip \
-            "https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v${GV}_linux.x86_64.zip"
-          ls -la ~/bridge/godot/
-          # --- Export templates ---
-          curl -sL --retry 5 --retry-delay 5 -o ~/bridge/templates/tpz.tpz \
-            "https://downloads.tuxfamily.org/godotengine/4.5.2/Godot_v${GV}_export_templates.tpz" \
-            || curl -sL --retry 5 --retry-delay 5 -o ~/bridge/templates/tpz.tpz \
-            "https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v${GV}_export_templates.tpz"
-          ls -la ~/bridge/templates/tpz.tpz
-          cd ~/bridge/templates && split -b 40m tpz.tpz parts/tpz. && rm tpz.tpz && ls parts | head -3; ls parts | wc -l
-          # --- Android SDK pieces from runner image ---
+          mkdir -p ~/bridge/{godot,templates,fonts,debs} ~/templates_extract
+          GV=4.5.2
+          # --- Godot editor (linux x86_64) ---
+          curl -sL --retry 5 --retry-delay 5 -o ~/bridge/godot/Godot_v${GV}_linux.x86_64.zip \
+            "https://downloads.tuxfamily.org/godotengine/${GV}/Godot_v${GV}-stable_linux.x86_64.zip" \
+            || curl -sL --retry 5 -o ~/bridge/godot/Godot_v${GV}_linux.x86_64.zip \
+            "https://github.com/godotengine/godot/releases/download/${GV}-stable/Godot_v${GV}-stable_linux.x86_64.zip"
+          # --- Export templates: ambil HANYA Android ---
+          curl -sL --retry 5 --retry-delay 5 -o /tmp/tpz.tpz \
+            "https://downloads.tuxfamily.org/godotengine/${GV}/Godot_v${GV}-stable_export_templates.tpz" \
+            || curl -sL --retry 5 -o /tmp/tpz.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GV}-stable/Godot_v${GV}-stable_export_templates.tpz"
+          cd ~/templates_extract
+          unzip -o -q /tmp/tpz.tpz "templates/android_debug.apk" "templates/android_release.apk" "templates/version.txt"
+          mkdir -p ~/bridge/templates/4.5.2.stable
+          cp templates/android_debug.apk templates/android_release.apk ~/bridge/templates/4.5.2.stable/
+          cp templates/version.txt ~/bridge/templates/4.5.2.stable/
+          rm -rf /tmp/tpz.tpz ~/templates_extract
+          # --- Android SDK dari runner image ---
           echo "ANDROID_HOME=$ANDROID_HOME"
           BT=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)
           PL=$(ls -d $ANDROID_HOME/platforms/*/ | sort -V | tail -1)
-          echo "build-tools=$BT platform=$PL"
-          mkdir -p ~/sdk/android-sdk/{build-tools,platforms}
-          cp -r "$BT" ~/sdk/android-sdk/build-tools/
-          cp -r "$PL" ~/sdk/android-sdk/platforms/
-          cp -r $ANDROID_HOME/platform-tools ~/sdk/android-sdk/ || true
-          cp -r $ANDROID_HOME/licenses ~/sdk/android-sdk/ || true
-          tar -C ~/sdk -czf ~/bridge/android-sdk.tgz android-sdk
-          rm -rf ~/sdk
-          ls -la ~/bridge/android-sdk.tgz
-          # --- X11/GL deb closure (for local screenshots) ---
+          echo "build-tools=$BT platform=$PL" | tee ~/bridge/DIAGNOSTIC.txt
+          mkdir -p ~/sdkpack/android-sdk/{build-tools,platforms}
+          cp -r "$BT" ~/sdkpack/android-sdk/build-tools/
+          cp -r "$PL" ~/sdkpack/android-sdk/platforms/
+          cp -r $ANDROID_HOME/platform-tools ~/sdkpack/android-sdk/ || true
+          tar -C ~/sdkpack -czf ~/bridge/android-sdk.tgz android-sdk
+          rm -rf ~/sdkpack
+          # --- X11/GL deb closure untuk screenshot lokal ---
           sudo apt-get update -qq
           PKGS="xvfb x11-xkb-utils xkb-data libgl1-mesa-dri libglx-mesa0 libegl-mesa0 libglapi-mesa mesa-vulkan-drivers libvulkan1 libglvnd0 libglx0 libgl1 libegl1 libdrm2 libx11-6 libx11-xcb1 libxcb1 libxcb-dri3-0 libxcb-present0 libxcb-randr0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0 libxcb-glx0 libxau6 libxdmcp6 libbsd0 libmd0 libxshmfence1 libxxf86vm1 libxfixes3 libxdamage1 libxext6 libexpat1 libllvm15 libelf1 libsensors5 libxfont2 libfontenc1 libpixman-1-0 libxkbfile1 fonts-dejavu-core libxmuu1 xauth"
           cd ~/bridge/debs
-          apt-get download $(apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances $PKGS | grep -oP '^[a-zA-Z0-9][\w.+-]+' | sort -u) 2>&1 | tail -3
-          ls | wc -l
-          # --- Cartoon font (OFL) from google/fonts ---
+          apt-get download $(apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances $PKGS | grep -oP '^[a-zA-Z0-9][\w.+-]+' | sort -u) >> ~/bridge/DIAGNOSTIC.txt 2>&1 || true
+          ls | wc -l >> ~/bridge/DIAGNOSTIC.txt
+          # --- Font kartun (OFL) ---
           for f in "ofl/baloo2/Baloo2%5Bwght%5D.ttf:Baloo2.ttf" "ofl/quicksand/Quicksand%5Bwght%5D.ttf:Quicksand.ttf"; do
             SRC="${f%%:*}"; DST="${f##*:}"
-            gh api "repos/google/fonts/contents/$SRC" --jq '.content' | base64 -d > ~/bridge/fonts/"$DST" || true
+            gh api "repos/google/fonts/contents/$SRC" --jq '.content' | base64 -d > ~/bridge/fonts/"$DST" || echo "font $DST gagal" >> ~/bridge/DIAGNOSTIC.txt
           done
-          ls -la ~/bridge/fonts
-          # --- Manifest ---
-          cd ~/bridge && (find . -type f -print0 | sort -z | xargs -0 sha256sum > MANIFEST.sha256) && du -sh . && df -h . | tail -1
+          du -sh ~/bridge >> ~/bridge/DIAGNOSTIC.txt
+          cd ~/bridge && find . -type f -print0 | sort -z | xargs -0 sha256sum > MANIFEST.sha256
+          find . -type f | sort >> DIAGNOSTIC.txt
       - name: Push bridge branch
         run: |
           set -ex
+          git config --global http.postBuffer 2147483648
+          git config --global http.version HTTP/1.1
           cd ~
           git clone --single-branch --depth 1 --branch ${{ github.ref_name }} "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" repo 2>&1 | tail -1
-          cd repo
-          git config --global http.postBuffer 1073741824
-          git checkout --orphan arena/bridge-assets
-          rm -rf * .github
+          cd repo && git checkout --orphan arena/bridge-assets && rm -rf * .github
           cp -r ~/bridge/. .
           git add -A
-          git -c user.name="bridge-bot" -c user.email="bot@arena.local" commit -q -m "bridge: godot 4.5.2 binaries + sdk + debs ($(date -u +%Y%m%dT%H%M%SZ))" 
-          set -o pipefail
-          git push -f origin arena/bridge-assets 2>&1 | tail -3
-          git ls-remote origin 2>&1 | grep refs/heads/arena/bridge-assets && echo PUSH_VERIFIED || (echo PUSH_FAILED; exit 1)
+          git -c user.name="bridge-bot" -c user.email="bot@arena.local" commit -q -m "bridge: godot binaries + android sdk/templates + x debs ($(du -sh . | cut -f1))"
+          git push -f origin arena/bridge-assets
+          git ls-remote origin | grep refs/heads/arena/bridge-assets && echo PUSH_VERIFIED || (echo PUSH_FAILED; exit 1)
