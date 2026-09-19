@@ -122,18 +122,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          # release sudah dibuat lokal; create fallback jika belum ada (mis. rerun)
-          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
-            --title "Pulau Toon — APK debug $TAG" --notes-file notes.md \
-            || gh release edit "$TAG" \
-                 --title "Pulau Toon — APK debug $TAG" --notes-file notes.md
+          echo "[diag] permissions repo (via token aktif):"
+          gh api repos/$GITHUB_REPOSITORY -q '.permissions | "push=\(.push) admin=\(.admin)"' \
+            || echo "::error::gh api repo gagal — token mungkin tidak punya akses repo (read-only GITHUB_TOKEN?)"
+          gh release view "$TAG" --json tagName -q '"[diag] release target: \(.tagName)"' || echo "[diag] release belum ada"
+          if ! OUT=$(gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
+                --title "Pulau Toon — APK debug $TAG" --notes-file notes.md 2>&1); then
+            SC=${SC:-0}
+            echo "[diag] create gagal (mungkin sudah ada): $(echo "$OUT" | head -c 200)"
+            gh release edit "$TAG" --title "Pulau Toon — APK debug $TAG" --notes-file notes.md || true
+          fi
           for f in exports/android/PulauToon-aio.apk exports/android/PulauToon-debug.apk SHA256SUMS.txt; do
             ok=0
             for i in 1 2 3 4; do
-              if gh release upload "$TAG" "$f" --clobber; then ok=1; break; fi
-              echo "upload $f percobaan $i gagal; ulangi..."; sleep 15
+              if OUT2=$(gh release upload "$TAG" "$f" --clobber 2>&1); then ok=1; echo "upload $f OK ($i)"; break; fi
+              echo "upload $f percobaan $i gagal: $(echo "$OUT2" | head -c 250)"; sleep 15
             done
-            [ "$ok" = "1" ] || { echo "::error::gagal unggah $f setelah 4 percobaan"; exit 1; }
+            [ "$ok" = "1" ] || { echo "::error::gagal unggah $f setelah 4 percobaan — $(echo "$OUT2" | head -c 250)"; exit 1; }
           done
           echo "== release final =="
           gh release view "$TAG" || true
