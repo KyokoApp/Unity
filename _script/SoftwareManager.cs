@@ -77,10 +77,10 @@ namespace Bouncerock
 			// MyDocuments) — di Android fungsi itu mengembalikan string kosong,
 			// sehingga persistentpath jadi "" dan semua file update/manifest tulis ke
 			// path yang tidak valid. Semua data sekarang di folder milik aplikasi.
-			DirAccess.MakeDirPathRecursive("user://Bouncerock");
+			DirAccess.MakeDirPathAbsolute("user://Bouncerock");
 			persistentpath = ProjectSettings.GlobalizePath("user://Bouncerock") + "/";
 			documentspath = persistentpath + "Docs/";
-			DirAccess.MakeDirPathRecursive("user://Bouncerock/Docs");
+			DirAccess.MakeDirPathAbsolute("user://Bouncerock/Docs");
 		}
 
 		public static string GetManifestPath()

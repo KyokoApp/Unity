@@ -28,6 +28,9 @@ namespace Bouncerock.Terrain
 		// static field ini akan membuat semua tulis terrain salah alamat.
 		// Pakai folder data aplikasi (user://) yang dijamin bisa ditulis.
 		static string documentspath = ProjectSettings.GlobalizePath("user://Islands") + "/";
+
+		/// <summary>Folder cache terrain, dipakai juga oleh struct Map (di bawah).</summary>
+		public static string IslandsPath => documentspath;
 		//This is where new chunks are generated and assembled.
 
 		// Seed deterministik per chunk: dunia konsisten antar-run DAN aman dipakai
@@ -595,7 +598,8 @@ namespace Bouncerock.Terrain
 
 		public void SaveUnibyte(string name)
 		{
-			DirAccess.MakeDirPathRecursive("user://Islands");
+			DirAccess.MakeDirPathAbsolute("user://Islands");
+			string documentspath = MapGenerator.IslandsPath;
 
 			int width = heightMap.GetLength(0);
 			int height = heightMap.GetLength(1);
@@ -622,7 +626,8 @@ namespace Bouncerock.Terrain
 
 		public void SaveMapDetails(string name)
 		{
-			DirAccess.MakeDirPathRecursive("user://Islands");
+			DirAccess.MakeDirPathAbsolute("user://Islands");
+			string documentspath = MapGenerator.IslandsPath;
 			byte[] buffer = FileWriter.SerializeToBinary(DecorElements);
 			GD.Print("Writing binaries " + buffer.Length);
 			FileWriter.BinaryToISL(buffer, documentspath + name + "_D");
