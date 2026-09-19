@@ -86,6 +86,7 @@ public partial class ScreenSpaceMainUI : Control
     /// <summary>null = semuanya siap; selain itu: nama bagian yang masih macet.</summary>
     private string DescribeBootState(MainCharacter ch)
     {
+        if (GameManager.BootError != null) return GameManager.BootError;
         if (GameManager.Instance == null) return "GameManager";
         TerrainManager tm = TerrainManager.Instance;
         if (tm == null) return "generator dunia";

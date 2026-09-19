@@ -36,6 +36,13 @@ namespace Bouncerock.Terrain
         {
             Instance = this;
             PackedScene waterScene = ResourceLoader.Load<PackedScene>(SeaWaterScene);
+            if (waterScene == null)
+            {
+                // Jangan biarkan satu scene pendukung menjatuhkan seluruh dunia
+                // (dulu Instantiate() di atas null -> exception -> world.tscn gagal).
+                GD.PrintErr("[TerrainDetailsManager] " + SeaWaterScene + " tidak ditemukan, air dilewati");
+                return;
+            }
             /*if (UseDebug)
             {
                 string path = UseDebug ? DebugShaderAddress : ShaderAddress;

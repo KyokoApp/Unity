@@ -179,7 +179,9 @@ public partial class MobManager : Node
 		{
 			Vector3 spawnPos = GetSpawnLocation();
 			if (spawnPos == Vector3.Zero) { continue; }
+			if (Mob == null) { return; }   // mob.tscn ikut paket aset, bukan APK
 			CharacterMob node = Mob.Instantiate() as CharacterMob;
+			if (node == null) { continue; }
 			AddChild(node);
 			//AddChild(node);
 			node.Position = spawnPos;

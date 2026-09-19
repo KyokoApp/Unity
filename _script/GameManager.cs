@@ -124,12 +124,40 @@ public partial class GameManager : Node
 		return mainCharacter != null && GodotObject.IsInstanceValid(mainCharacter) ? mainCharacter.Position : Vector3.Zero;
 	}
 
+	/// <summary>Diisi kalau boot dunia gagal; dibaca HUD supaya pemain (dan Anda)
+	/// bisa MEMBACA penyebabnya di layar, bukan menebak dari warna latar.</summary>
+	public static string BootError = null;
+
 	public void LoadWorld()
 	{
 	GD.Print("Loading world");
-		World = ResourceLoader.Load<PackedScene>("res://_scenes/world.tscn");
-		Node node = World.Instantiate();
-		CallDeferred("add_sibling",node);
-		//AddSibling(node);
+		try
+		{
+			World = ResourceLoader.Load<PackedScene>("res://_scenes/world.tscn");
+			if (World == null)
+			{
+				// world.tscn TIDAK ada di APK Lite - ia datang dari assets_v1.pck
+				// yang diunduh saat boot. Jadi null di sini = paket aset belum
+				// lengkap/rusak, bukan bug scene.
+				BootError = "world.tscn gagal dimuat (paket aset belum lengkap?)";
+				GD.PrintErr("[GameManager] " + BootError);
+				return;
+			}
+			Node node = World.Instantiate();
+			if (node == null)
+			{
+				BootError = "world.tscn tidak bisa di-instance";
+				GD.PrintErr("[GameManager] " + BootError);
+				return;
+			}
+			CallDeferred("add_sibling",node);
+			//AddSibling(node);
+		}
+		catch (System.Exception e)
+		{
+			// Dulu: exception di sini membuat dunia hilang tanpa pesan (layar kosong).
+			BootError = "world.tscn error: " + e.Message;
+			GD.PrintErr("[GameManager] " + BootError + "\n" + (e.StackTrace ?? ""));
+		}
 	}
 }

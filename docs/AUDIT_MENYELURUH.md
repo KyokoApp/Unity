@@ -377,3 +377,19 @@ menolaknya → proyek gagal dimuat, lihat riwayat commit 9760aec→cf6655d).
 4. **ScreenSpaceMainUI**: kalau `GameManager`/`TerrainManager`/karakter belum siap, label atas
    menampilkan `Menunggu <bagian yang macet> (Ns)` dan **hilang sendiri** saat sehat — jadi
    gejala "layar biru kosong" bisa dibaca dari foto layar, bukan ditebak.
+
+### K.8 Temuan baru saat mendiagnosis "layar biru" (v1.0.177 ke sini)
+1. `materials/textures/tower/tower_material.tres` menunjuk tekstur ke
+   `res://_models/obstacles/tower/*.png` padahal file aslinya ada di
+   `res://materials/textures/tower/*.png` — di editor terselamatkan oleh fallback UID,
+   di build hasil export tidak. Diperbaiki ke path yang benar.
+2. `GameManager.LoadWorld()` memanggil `World.Instantiate()` tanpa cek null dan tanpa
+   try/catch: satu scene pendukung yang gagal = dunia tidak pernah masuk tree dan
+   tidak ada pesan sama sekali. Sekarang: guard + `GameManager.BootError` yang
+   ditampilkan HUD di bagian atas layar.
+3. `TerrainDetailsManager._Ready()` (`sea_water.tscn`) dan `MobManager` spawn
+   (`mob.tscn`) punya pola sama (Load -> Instantiate tanpa guard) -> diberi guard;
+   scene pendukung yang hilang tidak boleh menjatuhkan dunia.
+4. Catatan API yang diverifikasi dari source 4.5.1: `Node.add_sibling` **terdaftar di
+   ClassDB** (`scene/main/node.cpp:3712`) sehingga `CallDeferred("add_sibling", node)`
+   valid — jangan "dibersihkan". Yang TIDAK ada di binding C#: `DirAccess.MakeDirPath*`.
