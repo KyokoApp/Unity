@@ -116,8 +116,9 @@ public partial class HudHealthLine : Control
             origin + new Vector2(0f, LineHeight),
         };
         Color[] cols = new Color[] { baseCol, tipCol, tipCol, baseCol };
-        int[] idx = new int[] { 0, 1, 2, 0, 2, 3 };
-        DrawPolygon(pts, cols, idx);
+        // Godot 4 tidak lagi menerima daftar indeks di draw_polygon (itu API 3.x);
+        // urutannya saja yang harus searah jarum jam, quad ini cembung jadi aman.
+        DrawPolygon(pts, cols);
 
         // Ujung kanan terang (indikator "sekarang")
         DrawRect(new Rect2(origin + new Vector2(Mathf.Max(0f, fillW - 2f), 0f),
