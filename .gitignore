@@ -1,0 +1,17 @@
+# Godot
+.godot/
+*.import
+*.translation
+# Build output
+*.pck
+*.apk
+*.aab
+*.keystore
+server/
+artifacts/
+# Tools / scratch
+__pycache__/
+assets_src/
+*.log
+.DS_Store
+dev_probe/
