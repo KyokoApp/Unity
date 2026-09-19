@@ -84,7 +84,11 @@ jobs:
         run: |
           mkdir -p exports/android
           export OUTDIR="$GITHUB_WORKSPACE/exports/android"
-          set -o pipefail
+          set -x
+          which unzip java; echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ldd ./godot 2>&1 | tail -4
+          RC0=0; timeout 120 ./godot --headless --path project --quit > "$OUTDIR/quit.log" 2>&1 || RC0=$?
+          echo "quit.rc=$RC0"; head -5 "$OUTDIR/quit.log"
           RC=0
           timeout 900 ./godot --headless --verbose --path project --export-debug "Android Launcher" "$OUTDIR/PulauToon-debug.apk" > "$OUTDIR/export.log" 2>&1 || RC=$?
           echo "export.rc=$RC"; wc -c "$OUTDIR/export.log" || true; ls -la "$OUTDIR"
