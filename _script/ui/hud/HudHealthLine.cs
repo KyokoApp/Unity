@@ -106,8 +106,8 @@ public partial class HudHealthLine : Control
         Color tipCol = baseCol.Lightened(0.22f);
 
         // Fill dengan gradien kiri->kanan lewat vertex color (tanpa alokasi shader/material).
-        // Catatan API: di C# DrawPolygon menerima array biasa (Vector2[]/Color[]/int[]),
-        // bukan PackedVector2Array seperti di GDScript.
+        // Catatan API: di C# draw_polygon() memakai array biasa (Vector2[]/Color[]),
+        // bukan PackedVector2Array/PackedColorArray seperti di GDScript.
         Vector2[] pts = new Vector2[]
         {
             origin,
