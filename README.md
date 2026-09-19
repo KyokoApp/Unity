@@ -106,14 +106,31 @@ Pipeline lengkap tersedia sebagai satu perintah:
 sh tools/fetch_export_templates.sh   # android_debug/release.apk → ~/.local/share/godot/export_templates/4.5.2.stable/
 
 # setiap build:
-sh tools/export_android.sh           # → exports/android/PulauToon-debug.apk (+ export.log)
+sh tools/export_android.sh           # → PulauToon-debug.apk + PulauToon-aio.apk (+ export.log)
 ```
 
-`export_android.sh` akan menulis editor settings (`export/android/*` —
+Dua varian aplikasi dihasilkan dari satu project (preset sudah siap dalam
+`export_presets.cfg`):
+
+| Varian | Isi | Cocok untuk |
+| --- | --- | --- |
+| **PulauToon-debug.apk** ("Android Launcher") | hanya launcher+updater | Model rilis delta (butuh server konten di run pertama) |
+| **PulauToon-aio.apk** ("Android AIO") | launcher + semua pack ter-bundle | Main langsung tanpa server; update delta selanjutnya tetap jalan normal |
+
+`export_android.sh` menulis editor settings (`export/android/*` —
 android_sdk_path, java path, keystore debug RSA-2048 yang digenerate dengan
-`keytool`), lalu memanggil `--export-debug "Android Launcher"`. Preset
-menargetkan **arm64-v8a**, **INTERNET**, **landscape**, immersive, pck
-tetap eksternal.
+`keytool`), lalu menjalankan `--export-debug` untuk kedua preset (lewati AIO
+dengan `EXPORT_AIO=0`). Preset menargetkan **arm64-v8a**, **INTERNET**,
+**landscape**, immersive.
+
+**Install ke HP:**
+
+```bash
+adb install -r exports/android/PulauToon-aio.apk   # langsung main
+# atau launcher online:
+adb install -r exports/android/PulauToon-debug.apk
+# lalu isi URL server masuk di launcher (http://<IP-LAN>:8787; lihat bagian §3)
+```
 
 > **Catatan sandbox ini**: jaringan egress membatasi host biner resmi Godot
 > (objects.githubusercontent.com & tuxfamily diblok), sehingga dua berkas

@@ -186,6 +186,25 @@ def gen_export_presets(pack_infos):
             'randomize_export_signature=false',
         ]
         idx += 1
+    # preset APK menyeluruh (all-in-one): embed SEMUA packs/* ke dalam APK.
+    # Dijalankan launcher via fallback res://packs/<id> (tanpa server konten);
+    # update delta berikutnya masih menimpa konten via pck berversi terunduh.
+    aio = [l for l in launcher]
+    for i, l in enumerate(aio):
+        if l.startswith('name="'):
+            aio[i] = 'name="Android AIO"'
+        elif l.startswith('include_filter='):
+            aio[i] = 'include_filter="launcher/*,project.godot,packs/*"'
+        elif l.startswith('export_path='):
+            aio[i] = 'export_path="exports/android/PulauToon-aio.apk"'
+        elif l.startswith('version/code='):
+            aio[i] = 'version/code=2'
+    for i, l in enumerate(aio):
+        if l == '[preset.0]':
+            aio[i] = f'[preset.{idx}]'
+        elif l == '[preset.0.options]':
+            aio[i] = f'[preset.{idx}.options]'
+    out += aio
     with open(os.path.join(PROJECT, "export_presets.cfg"), "w") as f:
         f.write("\n".join(out) + "\n")
 

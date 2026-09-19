@@ -39,4 +39,10 @@ fi
 echo "[export] preset 'Android Launcher' -> exports/android/PulauToon-debug.apk"
 "$GODOT_BIN" --headless --path "$ROOT/project" --export-debug "Android Launcher" \
     "$ROOT/exports/android/PulauToon-debug.apk" 2>&1 | tee "$ROOT/exports/android/export.log"
+
+if [ "${EXPORT_AIO:-1}" = "1" ]; then
+    echo "[export] preset 'Android AIO' (konten ter-bundle) -> exports/android/PulauToon-aio.apk"
+    "$GODOT_BIN" --headless --path "$ROOT/project" --export-debug "Android AIO" \
+        "$ROOT/exports/android/PulauToon-aio.apk" 2>&1 | tee -a "$ROOT/exports/android/export.log"
+fi
 echo "[export] selesai (lihat exports/android/export.log)"

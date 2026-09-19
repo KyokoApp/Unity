@@ -15,7 +15,18 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PRJ="$ROOT/project"
 SRV="$ROOT/server"
 LOGS="$SRV/test_logs"
-GODOT="${GODOT_BIN:-$ROOT/tools/godot-src/bin/godot.linuxbsd.editor.x86_64}"
+GODOT="${GODOT_BIN:-}"
+if [ -z "$GODOT" ]; then
+    for cand in "$ROOT/tools/godot-src/bin/godot.linuxbsd.editor.x86_64" \
+                /home/user/tools/godot-src/bin/godot.linuxbsd.editor.x86_64; do
+        [ -x "$cand" ] && GODOT="$cand" && break
+    done
+fi
+if [ -z "$GODOT" ] || [ ! -x "$GODOT" ]; then
+    echo "ERROR: binari Godot tidak ditemukan; set GODOT_BIN=/path/to/godot" >&2
+    exit 2
+fi
+echo "[env] godot = $GODOT"
 PORT=8787
 URL="http://127.0.0.1:$PORT"
 mkdir -p "$LOGS"
