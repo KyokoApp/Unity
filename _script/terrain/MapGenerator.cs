@@ -29,6 +29,16 @@ namespace Bouncerock.Terrain
 		// Pakai folder data aplikasi (user://) yang dijamin bisa ditulis.
 		static string documentspath = ProjectSettings.GlobalizePath("user://Islands") + "/";
 
+		// Folder cache dibuat sekali saat kelas dipakai. System.IO dipakai karena
+		// API statis DirAccess untuk "buat folder bertingkat" tidak tersedia di
+		// binding C# Godot versi proyek ini (CreateDirectory idempoten + membuat
+		// induknya sekaligus).
+		static MapGenerator()
+		{
+			try { Directory.CreateDirectory(documentspath); }
+			catch (System.Exception e) { GD.PrintErr("Gagal membuat user://Islands: " + e.Message); }
+		}
+
 		/// <summary>Folder cache terrain, dipakai juga oleh struct Map (di bawah).</summary>
 		public static string IslandsPath => documentspath;
 		//This is where new chunks are generated and assembled.
@@ -598,7 +608,6 @@ namespace Bouncerock.Terrain
 
 		public void SaveUnibyte(string name)
 		{
-			DirAccess.MakeDirPathAbsolute("user://Islands");
 			string documentspath = MapGenerator.IslandsPath;
 
 			int width = heightMap.GetLength(0);
@@ -626,7 +635,6 @@ namespace Bouncerock.Terrain
 
 		public void SaveMapDetails(string name)
 		{
-			DirAccess.MakeDirPathAbsolute("user://Islands");
 			string documentspath = MapGenerator.IslandsPath;
 			byte[] buffer = FileWriter.SerializeToBinary(DecorElements);
 			GD.Print("Writing binaries " + buffer.Length);
