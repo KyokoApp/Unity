@@ -393,3 +393,22 @@ menolaknya → proyek gagal dimuat, lihat riwayat commit 9760aec→cf6655d).
 4. Catatan API yang diverifikasi dari source 4.5.1: `Node.add_sibling` **terdaftar di
    ClassDB** (`scene/main/node.cpp:3712`) sehingga `CallDeferred("add_sibling", node)`
    valid — jangan "dibersihkan". Yang TIDAK ada di binding C#: `DirAccess.MakeDirPath*`.
+
+### K.9 Build penyelidikan (setelah laporan "layar biru, tanpa pesan")
+"0 m" adalah teks default label di `main.tscn`. Ada DUA keadaan yang menghasilkan layar
+persis sama, dan itu tidak bisa dibedakan tanpa data dari perangkat:
+1. APK lama (pra-diagnostik) → `_Process` hanya `return` diam-diam, jadi label tidak pernah
+   disentuh → tetap "0 m".
+2. APK baru tapi semua subsistem MELAPORKAN SEHAT (TerrainManager ter-Inicialized, chunk > 0,
+   karakter terdaftar) → jarak memang 0 m, jadi tidak ada teks "Menunggu" — masalahnya bukan
+   loading, melainkan **yang digambar kamera**.
+Maka build ini menambahkan baris diagnostik permanen di label atas (konstanta `Diag` di
+`ScreenSpaceMainUI`, set `false` untuk rilis bersih): versi build, jumlah chunk, status
+loader, jumlah error generator, posisi & status karakter, dan status kamera
+(`aktip` / `ada-bukan-current` / `TIDAK ADA`). Baris ini juga membuktikan APK mana yang
+benar-benar terpasang.
+Sekalian: `GraphicsSettingsManager.VfxEnabled` kini default **false** — overlay sharpen
+adalah ColorRect fullscreen (`res://_scenes/main_character.tscn` → `Node/SharpenShader`) yang
+dinyalakan otomatis oleh `ApplyPreset(Medium)` di `_Ready()`, dan shader-nya membaca
+`SCREEN_TEXTURE`; dengan `scaling_3d/mode=1` (FSR) + `screen_space_aa` hasilnya tidak
+dijamin, sementara UI (layer 10) tetap terlihat di atasnya — gejala persis "biru rata + 0 m".

@@ -25,7 +25,10 @@ public partial class GraphicsSettingsManager : CanvasLayer
     public bool ShadowEnabled { get; set; } = true;
     public int ShadowFilterQuality { get; set; } = 1; // 0: low/off, 1: mid, 2: high
     public int ViewDistanceChunks { get; set; } = 3; // 2=low (~250m), 3=mid (~400m), 4=high (~500m), 5=ultra (~700m)
-    public bool VfxEnabled { get; set; } = true;
+    // overlay sharpen/blur membaca SCREEN_TEXTURE; di perangkat mobile+FSR/scaling_3d
+    // hasil samplingnya tidak guaranteed, dan ini rect FULLSCREEN di bawah UI.
+    // Default OFF: bisa dinyalakan pemain dari panel ⚙ kalau terbukti aman.
+    public bool VfxEnabled { get; set; } = false;
 
     // UI elements references
     private OptionButton presetOption;

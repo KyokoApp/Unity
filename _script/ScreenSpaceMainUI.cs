@@ -23,6 +23,9 @@ public partial class ScreenSpaceMainUI : Control
     [Export] public HudStaminaArc StaminaArc;
 
     private const double UiUpdateInterval = 0.1;
+
+    /// <summary>Build penyelidikan: tampilkan status mesin di layar. Set false untuk rilis bersih.</summary>
+    private const bool Diag = true;
     private double _uiAccum;
     private double _bootWait;
 
@@ -36,6 +39,12 @@ public partial class ScreenSpaceMainUI : Control
         MouseFilter = MouseFilterEnum.Ignore;
 
         _record = GameManager.Instance != null ? GameManager.Instance.Record : 0f;
+
+        if (Diag && Distance != null)
+        {
+            // dua baris -> font sedikit kecil supaya tetap muat di HP
+            Distance.AddThemeFontSizeOverride("font_size", 20);
+        }
     }
 
     public override void _Process(double delta)
@@ -56,7 +65,7 @@ public partial class ScreenSpaceMainUI : Control
             _bootWait += UiUpdateInterval;
             if (Distance != null)
             {
-                string txt = "Menunggu " + waiting + " (" + (int)_bootWait + "s)";
+                string txt = "Menunggu " + waiting + " (" + (int)_bootWait + "s)" + DiagLine(ch);
                 if (txt != _lastDistanceText)
                 {
                     Distance.Text = txt;
@@ -100,10 +109,35 @@ public partial class ScreenSpaceMainUI : Control
         return null;
     }
 
+    private string DiagLine(MainCharacter ch)
+    {
+        if (!Diag) return "";
+        TerrainManager tm = TerrainManager.Instance;
+        var sb = new System.Text.StringBuilder();
+        sb.Append("\n").Append(BuildInfo.Version).Append("/").Append(BuildInfo.VersionCode);
+        sb.Append(" · chunk ").Append(tm != null ? tm.ChunkCount : -1);
+        sb.Append(" · st ").Append(tm != null ? tm.CurrentLoadStatus.ToString() : "null");
+        sb.Append(" · err ").Append(tm != null ? tm.GenerationErrors : -1);
+        if (ch != null)
+        {
+            Vector3 p = ch.GlobalPosition;
+            sb.Append(" · pos ").Append(p.X.ToString("0")).Append(",")
+              .Append(p.Y.ToString("0")).Append(",").Append(p.Z.ToString("0"));
+            sb.Append(" · init ").Append(ch.Initialized ? "ya" : "belum");
+            Viewport vp = ch.GetViewport();
+            bool camNow = ch.PlayerCamera != null && ch.PlayerCamera.IsCurrent();
+            bool camAny = vp != null && vp.GetCamera3D() != null;
+            sb.Append(" · cam ").Append(camNow ? "aktip" : (camAny ? "ada-bukan-current" : "TIDAK ADA"));
+        }
+        else sb.Append(" · karakter: TIDAK ADA");
+        if (GameManager.BootError != null) sb.Append(" · ").Append(GameManager.BootError);
+        return sb.ToString();
+    }
+
     private void UpdateDistance(float distMeters)
     {
         if (Distance == null) return;
-        string txt = Mathf.FloorToInt(distMeters) + " m";
+        string txt = Mathf.FloorToInt(distMeters) + " m" + DiagLine(GameManager.Instance != null ? GameManager.Instance.GetMainCharacter() : null);
         if (txt != _lastDistanceText)
         {
             Distance.Text = txt;
