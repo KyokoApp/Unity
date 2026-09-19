@@ -1,0 +1,131 @@
+name: apk-release
+## Bangun APK launcher + AIO di runner GitHub (akses internet penuh):
+## unduh Godot 4.5.2 editor + export templates resmi, siapkan SDK/JDK/keystore,
+## export kedua preset, lalu terbitkan sebagai GitHub Release (prerelease).
+on:
+  push:
+    paths:
+      - ".github/workflows/apk_release.yml"
+  workflow_dispatch:
+
+concurrency: apk-release
+
+permissions:
+  contents: write
+
+env:
+  GVER: 4.5.2
+  GDIR: export_templates/4.5.2.stable
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependensi sistem untuk editor Godot
+        run: |
+          sudo apt-get update -qq || true
+          sudo apt-get install -y -qq --no-install-recommends \
+            libx11-6 libxkbcommon0 libxinerama1 libxcursor1 libxi6 \
+            libxrandr2 libxext6 libxrender1 libgl1 libegl1 libasound2 \
+            fontconfig libfontconfig1 unzip zip
+
+      - name: Unduh Godot editor + export templates resmi
+        run: |
+          set -e
+          curl -sL --fail -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GVER}-stable/Godot_v${GVER}-stable_linux.x86_64.zip"
+          curl -sL --fail -o templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GVER}-stable/Godot_v${GVER}-stable_export_templates.tpz"
+          unzip -qo godot.zip
+          mv Godot_v${GVER}-stable_linux.x86_64 godot && chmod +x godot
+          mkdir -p "$HOME/.local/share/godot/${GDIR}"
+          mkdir -p tpz
+          (cd tpz && unzip -q ../templates.tpz "templates/android_debug.apk" "templates/android_release.apk" "templates/version.txt")
+          cp tpz/templates/* "$HOME/.local/share/godot/${GDIR}/"
+          echo "== templates terpasang =="; ls -la "$HOME/.local/share/godot/${GDIR}/"
+
+      - name: Keystore debug + editor settings (SDK/JDK runner)
+        run: |
+          mkdir -p "$HOME/.config/godot" exports/android
+          keytool -genkey -v -keystore "$GITHUB_WORKSPACE/exports/android/debug.keystore" \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" | tail -2
+          JAVA_DIR="$(dirname "$(dirname "$(readlink -f "$(which java)")")")"
+          echo "android-sdk = $ANDROID_SDK_ROOT"
+          echo "java = $JAVA_DIR"
+          ls "$ANDROID_SDK_ROOT/build-tools" | tail -3
+          cat > "$HOME/.config/godot/editor_settings-4.5.tres" <<EOF
+          [gd_resource type="EditorSettings" format=1]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_SDK_ROOT"
+          export/android/java_sdk_path = "$JAVA_DIR"
+          export/android/debug_keystore = "$GITHUB_WORKSPACE/exports/android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+
+      - name: Import proyek (sekali)
+        run: timeout 900 ./godot --headless --path project --import | tail -5
+
+      - name: Bangun pack + manifest (delta sanity)
+        run: python3 tools/build_packs.py --godot ./godot | tail -6
+
+      - name: Export APK Launcher + AIO
+        run: |
+          mkdir -p exports/android
+          timeout 900 ./godot --headless --path project --export-debug "Android Launcher" exports/android/PulauToon-debug.apk | tee exports/android/export.log
+          timeout 900 ./godot --headless --path project --export-debug "Android AIO" exports/android/PulauToon-aio.apk | tee -a exports/android/export.log
+          ls -la exports/android/
+
+      - name: Buat catatan rilis
+        if: success()
+        run: |
+          set -e
+          cd exports/android && sha256sum PulauToon-debug.apk PulauToon-aio.apk > /tmp/SHA256SUMS && cd "$GITHUB_WORKSPACE"
+          cp /tmp/SHA256SUMS SHA256SUMS.txt
+          {
+            echo "## Pulau Toon — APK debug (CI)"
+            echo ""
+            echo "Commit: \`$GITHUB_SHA\` — dibangun oleh GitHub Actions (runner full-internet)."
+            echo ""
+            echo "| APK | Isi | Isi konten | Install langsung? |"
+            echo "| --- | --- | --- | --- |"
+            echo "| PulauToon-aio.apk | launcher + semua pack ter-bundle | Ya (siap dimainkan offline awal; update delta masih bisa) | **Ya — rekomendasi** |"
+            echo "| PulauToon-debug.apk | hanya launcher | Memerlukan server konten (README §3) | Ya, lalu unduh pak saat pertama jalan |"
+            echo ""
+            echo "### Cara install (HP Android ARM64, landscape)"
+            echo "1. Unduh APK (rekomendasi AIO) dari aset rilis ini."
+            echo "2. Izinkan instal dari sumber tak dikenal saat diminta ponsel."
+            echo "3. Buka; tombol ▶ untuk mulai. Layar berputar otomatis lanskap."
+            echo ""
+            echo "Detail arsitektur 2 APK + updater delta/hash/resume: README.md §5-§8;"
+            echo "bukti uji lengkap: docs/BUKTI_UJI.md."
+            echo ""
+            echo '### SHA-256'
+            echo '```'; cat SHA256SUMS.txt; echo '```'
+          } > notes.md
+          cat notes.md
+          echo "TAG=apk-$(date +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
+
+      - name: Terbitkan GitHub Release
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Pulau Toon — APK debug $TAG" \
+            --notes-file notes.md \
+            exports/android/PulauToon-aio.apk \
+            exports/android/PulauToon-debug.apk \
+            SHA256SUMS.txt
