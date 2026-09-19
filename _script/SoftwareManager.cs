@@ -57,34 +57,29 @@ namespace Bouncerock
 		public override void _Ready() 
 		{
 			GD.Print("Starting Software Manager");
+			// Harus dipanggil: tanpa ini persistentpath/documentspath tetap "" dan
+			// semua file (manifest, terrain cache, log) ditulis ke path tidak valid.
+			SetPersistentPaths();
 			Initialized = true;
 			//Debug.DebugStartSession();
 			GameManager gameManager = GetParent().GetNode<GameManager>("GameManager");
-			if (gameManager == null) {GD.Print("Couldn't find GameManager");}
+			if (gameManager == null)
+			{
+				GD.PrintErr("SoftwareManager: GameManager tidak ditemukan - inisialisasi game dilewati.");
+				return;
+			}
 			gameManager.Initialize();
 		}
 
 		protected void SetPersistentPaths()
-        {
-			#if GODOT_WINDOWS 
-				persistentpath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData)
-				+ "/Bouncerock";
-				documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-					+ "/Bouncerock";
-				if(!Directory.Exists(persistentpath))
-					{
-						Directory.CreateDirectory(persistentpath);
-					}
-				if(!Directory.Exists(documentspath))
-					{
-						Directory.CreateDirectory(documentspath);
-					}
-			#endif
-			#if GODOT_ANDROID
-						/*persistentpath = Application.persistentDataPath;
-						documentspath = persistentpath
-							+ "/Docs";*/
-			#endif
+		{
+			// GAME KHUSUS ANDROID: tidak ada lagi SpecialFolder (ApplicationData /
+			// MyDocuments) — di Android fungsi itu mengembalikan string kosong,
+			// sehingga persistentpath jadi "" dan semua file update/manifest tulis ke
+			// path yang tidak valid. Semua data sekarang di folder milik aplikasi.
+			persistentpath = ProjectSettings.GlobalizePath("user://Bouncerock") + "/";
+			documentspath = persistentpath + "Docs/";
+			Directory.CreateDirectory(persistentpath);   // System.IO: folder ini juga dibaca FileWriter
 		}
 
 		public static string GetManifestPath()

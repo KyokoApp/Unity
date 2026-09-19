@@ -24,8 +24,23 @@ namespace Bouncerock.Terrain
 
 
 
-		static string documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-				+ "/Islands/";
+		// Android tidak punya "My Documents": GetFolderPath di sana kosong dan
+		// static field ini akan membuat semua tulis terrain salah alamat.
+		// Pakai folder data aplikasi (user://) yang dijamin bisa ditulis.
+		static string documentspath = ProjectSettings.GlobalizePath("user://Islands") + "/";
+
+		// Folder cache dibuat sekali saat kelas dipakai. System.IO dipakai karena
+		// API statis DirAccess untuk "buat folder bertingkat" tidak tersedia di
+		// binding C# Godot versi proyek ini (CreateDirectory idempoten + membuat
+		// induknya sekaligus).
+		static MapGenerator()
+		{
+			try { Directory.CreateDirectory(documentspath); }
+			catch (System.Exception e) { GD.PrintErr("Gagal membuat user://Islands: " + e.Message); }
+		}
+
+		/// <summary>Folder cache terrain, dipakai juga oleh struct Map (di bawah).</summary>
+		public static string IslandsPath => documentspath;
 		//This is where new chunks are generated and assembled.
 
 		// Seed deterministik per chunk: dunia konsisten antar-run DAN aman dipakai
@@ -593,8 +608,12 @@ namespace Bouncerock.Terrain
 
 		public void SaveUnibyte(string name)
 		{
-			string documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-				+ "/Islands/";
+			// Tulis cache boleh gagal (izin tulis, disk penuh, path belum ada).
+			// Kalau dibiarkan, exception ini membuat Task pemrosesan chunk gagal
+			// di tengah jalan -> chunk tidak pernah jadi -> dunia kosong.
+			try
+			{
+			string documentspath = MapGenerator.IslandsPath;
 
 			int width = heightMap.GetLength(0);
 			int height = heightMap.GetLength(1);
@@ -616,16 +635,27 @@ namespace Bouncerock.Terrain
 				}
 			}
 			FileWriter.BinaryToISL(buffer, documentspath + name);
+			}
+			catch (System.Exception e)
+			{
+				GD.PrintErr("[MapGenerator] cache .isl dilewati (" + e.GetType().Name + "): " + e.Message);
+			}
 
 		}
 
 		public void SaveMapDetails(string name)
 		{
-			string documentspath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments)
-				+ "/Islands/";
+			try
+			{
+			string documentspath = MapGenerator.IslandsPath;
 			byte[] buffer = FileWriter.SerializeToBinary(DecorElements);
 			GD.Print("Writing binaries " + buffer.Length);
 			FileWriter.BinaryToISL(buffer, documentspath + name + "_D");
+			}
+			catch (System.Exception e)
+			{
+				GD.PrintErr("[MapGenerator] cache detail dilewati (" + e.GetType().Name + "): " + e.Message);
+			}
 		}
 	}
 

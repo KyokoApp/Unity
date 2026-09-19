@@ -54,6 +54,11 @@ namespace Bouncerock.Terrain
 
 		public static TerrainManager Instance;
 
+		// Diagnostic yang bisa DIBACA DI LAYAR (dulu exception generator cuma
+		// masuk logcat sehingga "layar biru" tidak bisa dijelaskan).
+		public int ChunkCount => chunksDictionary.Count + hiddenchunksDictionary.Count;
+		public int GenerationErrors = 0;
+
 		public TerrainDetailsManager DetailsManager;
 		//public int colliderLODIndex;
 		public LODInfo[] detailLevels;
@@ -334,151 +339,177 @@ namespace Bouncerock.Terrain
 
 		async Task UpdateChunks()
 		{
-			// (set) {return;}
-			//GD.Print("Updating chunks");
-			if (CurrentLoadStatus == LoadStatuses.Armed)
-			{
-				GlobalUIManager.Instance?.LoadingUI?.SetLoadingText("Loading world chunks...");
-			}
-			Vector2 newChunkPosition = CameraInChunk();
-			if (currentChunk == null)
-			{
-				//GD.Print("First time loading.");
-				//First time loading. 
-				TerrainChunk newChunk = new TerrainChunk(newChunkPosition, heightMapSettings, detailLevels, 0, this);
-				chunksDictionary.Add(newChunkPosition, newChunk);
-				//newChunk.onVisibilityChanged += OnTerrainChunkVisibilityChanged;
-				await newChunk.Load();
-				currentChunk = newChunk;
-				updatingChunks = false;
-				return;
-			}
-
-			if (currentChunk.GridPosition != newChunkPosition)
-			{
-				//GD.Print("Entering new chunk : " + newChunkPosition.X + "/" + newChunkPosition.Y );
-				if (!chunksDictionary.ContainsKey(newChunkPosition)) { GD.Print("Wierd: Chunk" + newChunkPosition.X + "/" + newChunkPosition.Y + "is not in dictionnary"); }
-				currentChunk = chunksDictionary[newChunkPosition];
-				currentHalfChunkPosition = MathExt.GetCurrentHalfBoundPosition(viewerPosition, currentChunk.Bounds);
-			}
-
-			Vector2 newHalfChunk = MathExt.GetCurrentHalfBoundPosition(viewerPosition, currentChunk.Bounds);
-			//GD.Print("Calculated the bound " + currentChunk.Bounds.Position + " The result was " + newHalfChunk + "Current chunks: " + chunksDictionary.Count);
-			string textt = "Half-chunk : " + string.Format("{0:0. #}", newHalfChunk.X) + "/" + string.Format("{0:0. #}", newHalfChunk.Y);
-			Debug.SetStaticBug("Chunk: " + currentChunk.GridPosition + ". Position: " + string.Format("{0:0. #}", viewerPosition.X) + "/" + string.Format("{0:0. #}", viewerPosition.Y) + " - " + textt);
-			if (newHalfChunk != currentHalfChunkPosition)
-			{
-				//GD.Print("Entering new half chunk, not doing anything else yet.");
-				//We have changed the position in the chunk enough to get close to other chunks. We need to recompute all the chunks that need to be
-				//updated
-				Vector2[] FirstLodChunks = new Vector2[4];
-
-				float lowestX = newHalfChunk.X == -1 ? currentChunk.GridPosition.X - 1 : currentChunk.GridPosition.X;
-				float lowestY = newHalfChunk.Y == -1 ? currentChunk.GridPosition.Y - 1 : currentChunk.GridPosition.Y;
-
-
-				FirstLodChunks[0] = new Vector2(lowestX, lowestY); //Lowest
-				FirstLodChunks[1] = new Vector2(lowestX, lowestY + 1);
-				FirstLodChunks[2] = new Vector2(lowestX + 1, lowestY + 1);//Highest
-				FirstLodChunks[3] = new Vector2(lowestX + 1, lowestY);
-
-				List<Vector2>[] chunksLayered = ComputeNewChunksAddresses(FirstLodChunks);
-
-
-				HashSet<Vector2> reviewedChunks = new HashSet<Vector2>();
-				Dictionary<Vector2, TerrainChunk>  chunksToHide = new Dictionary<Vector2, TerrainChunk>();
-				for (int i = 0; i < chunksLayered.Length; i++)
+			try {
+				// (set) {return;}
+				//GD.Print("Updating chunks");
+				if (CurrentLoadStatus == LoadStatuses.Armed)
 				{
-					if (CurrentLoadStatus == LoadStatuses.Armed)
+					GlobalUIManager.Instance?.LoadingUI?.SetLoadingText("Loading world chunks...");
+				}
+				Vector2 newChunkPosition = CameraInChunk();
+				if (currentChunk == null)
+				{
+					//GD.Print("First time loading.");
+					//First time loading. 
+					TerrainChunk newChunk = new TerrainChunk(newChunkPosition, heightMapSettings, detailLevels, 0, this);
+					chunksDictionary.Add(newChunkPosition, newChunk);
+					//newChunk.onVisibilityChanged += OnTerrainChunkVisibilityChanged;
+					await newChunk.Load();
+					currentChunk = newChunk;
+					updatingChunks = false;
+					return;
+				}
+
+				if (currentChunk.GridPosition != newChunkPosition)
+				{
+					//GD.Print("Entering new chunk : " + newChunkPosition.X + "/" + newChunkPosition.Y );
+					if (!chunksDictionary.ContainsKey(newChunkPosition)) { GD.Print("Wierd: Chunk" + newChunkPosition.X + "/" + newChunkPosition.Y + "is not in dictionnary"); }
+					currentChunk = chunksDictionary[newChunkPosition];
+					currentHalfChunkPosition = MathExt.GetCurrentHalfBoundPosition(viewerPosition, currentChunk.Bounds);
+				}
+
+				Vector2 newHalfChunk = MathExt.GetCurrentHalfBoundPosition(viewerPosition, currentChunk.Bounds);
+				//GD.Print("Calculated the bound " + currentChunk.Bounds.Position + " The result was " + newHalfChunk + "Current chunks: " + chunksDictionary.Count);
+				string textt = "Half-chunk : " + string.Format("{0:0. #}", newHalfChunk.X) + "/" + string.Format("{0:0. #}", newHalfChunk.Y);
+				Debug.SetStaticBug("Chunk: " + currentChunk.GridPosition + ". Position: " + string.Format("{0:0. #}", viewerPosition.X) + "/" + string.Format("{0:0. #}", viewerPosition.Y) + " - " + textt);
+				if (newHalfChunk != currentHalfChunkPosition)
+				{
+					//GD.Print("Entering new half chunk, not doing anything else yet.");
+					//We have changed the position in the chunk enough to get close to other chunks. We need to recompute all the chunks that need to be
+					//updated
+					Vector2[] FirstLodChunks = new Vector2[4];
+
+					float lowestX = newHalfChunk.X == -1 ? currentChunk.GridPosition.X - 1 : currentChunk.GridPosition.X;
+					float lowestY = newHalfChunk.Y == -1 ? currentChunk.GridPosition.Y - 1 : currentChunk.GridPosition.Y;
+
+
+					FirstLodChunks[0] = new Vector2(lowestX, lowestY); //Lowest
+					FirstLodChunks[1] = new Vector2(lowestX, lowestY + 1);
+					FirstLodChunks[2] = new Vector2(lowestX + 1, lowestY + 1);//Highest
+					FirstLodChunks[3] = new Vector2(lowestX + 1, lowestY);
+
+					List<Vector2>[] chunksLayered = ComputeNewChunksAddresses(FirstLodChunks);
+
+
+					HashSet<Vector2> reviewedChunks = new HashSet<Vector2>();
+					Dictionary<Vector2, TerrainChunk>  chunksToHide = new Dictionary<Vector2, TerrainChunk>();
+					for (int i = 0; i < chunksLayered.Length; i++)
 					{
-						GlobalUIManager.Instance?.LoadingUI?.SetLoadingText($"Loading {i}/{chunksLayered.Length}");
-					}
-					//Loop through each lod coordinate in the fresh list to see if we need to change the chunk
+						if (CurrentLoadStatus == LoadStatuses.Armed)
+						{
+							GlobalUIManager.Instance?.LoadingUI?.SetLoadingText($"Loading {i}/{chunksLayered.Length}");
+						}
+						//Loop through each lod coordinate in the fresh list to see if we need to change the chunk
 					
-					foreach (Vector2 coord in chunksLayered[i])
-					{
-						try
+						foreach (Vector2 coord in chunksLayered[i])
 						{
-							//GlobalUIManager.Instance.LoadingUI.SetLoadingText($"Loading {i}/{chunksLayered.Length} - {((chunks/chunksLayered.Count()))}%");
-							if (chunksDictionary.ContainsKey(coord) && chunksDictionary[coord].currentLODIndex != i)
+							try
 							{
-								//LOD has changed, initiate LOD change
-								chunksDictionary[coord].currentLODIndex = i;
-								chunksDictionary[coord].OnLODChanged();
-								chunksDictionary[coord].UpdateHelpers();
-							}
-							else if (hiddenchunksDictionary.ContainsKey(coord))
-							{
-								hiddenchunksDictionary[coord].currentLODIndex = i;
-								hiddenchunksDictionary[coord].ReinstateChunk();
-								ShowChunk(coord);
-							}
+								//GlobalUIManager.Instance.LoadingUI.SetLoadingText($"Loading {i}/{chunksLayered.Length} - {((chunks/chunksLayered.Count()))}%");
+								if (chunksDictionary.ContainsKey(coord) && chunksDictionary[coord].currentLODIndex != i)
+								{
+									//LOD has changed, initiate LOD change
+									chunksDictionary[coord].currentLODIndex = i;
+									chunksDictionary[coord].OnLODChanged();
+									chunksDictionary[coord].UpdateHelpers();
+								}
+								else if (hiddenchunksDictionary.ContainsKey(coord))
+								{
+									hiddenchunksDictionary[coord].currentLODIndex = i;
+									hiddenchunksDictionary[coord].ReinstateChunk();
+									ShowChunk(coord);
+								}
 							
-							if (!chunksDictionary.ContainsKey(coord) && !hiddenchunksDictionary.ContainsKey(coord) && !chunksToHide.ContainsKey(coord)) 
-							{
-								//New chunk
-								TerrainChunk newChunk = new TerrainChunk(coord, heightMapSettings, detailLevels, i, this);
-								chunksDictionary.Add(coord, newChunk);
-								//newChunk.onVisibilityChanged += OnTerrainChunkVisibilityChanged;
-								await newChunk.Load();
+								if (!chunksDictionary.ContainsKey(coord) && !hiddenchunksDictionary.ContainsKey(coord) && !chunksToHide.ContainsKey(coord)) 
+								{
+									//New chunk
+									TerrainChunk newChunk = new TerrainChunk(coord, heightMapSettings, detailLevels, i, this);
+									chunksDictionary.Add(coord, newChunk);
+									//newChunk.onVisibilityChanged += OnTerrainChunkVisibilityChanged;
+									await newChunk.Load();
+								}
+
+								reviewedChunks.Add(coord);
 							}
-
-							reviewedChunks.Add(coord);
-						}
-						catch (Exception ex)
-						{
-							GD.Print(ex.StackTrace);
-						}
+							catch (Exception ex)
+							{
+								GenerationErrors++;
+								GD.PrintErr("[TerrainManager] chunk gagal (total " + GenerationErrors + "): " + ex.Message);
+								GD.Print(ex.StackTrace);
+							}
 						
-					}
-
-				}
-				//GD.Print("We reviewedreviewed "+ reviewedChunks.Count);
-				//Last, clean up unused chunks
-				foreach (Vector2 coord in chunksDictionary.Keys)
-				{
-					if (!reviewedChunks.Contains(coord))
-					{
-						//Chunk isn't visible anymore, dispose
-						//Now this means every time we leave and reload, the chunk will be regenerated as is, so if there's any change, it'll be erased
-
-						//chunksDictionary[coord].Destroy();
-						//chunksDictionary.Remove(coord);
-						if (!chunksToHide.ContainsKey(coord))
-						{
-							chunksToHide.Add(coord, chunksDictionary[coord]);
 						}
-						
-						HideChunk(coord);
+
 					}
-				}
-				foreach (Vector2 coord in hiddenchunksDictionary.Keys)
-				{
-					DestroyChunk(coord);
-				}
-				foreach (KeyValuePair<Vector2, TerrainChunk> chunkToHide in chunksToHide)
-				{
-					if (!hiddenchunksDictionary.ContainsKey(chunkToHide.Key))
+					//GD.Print("We reviewedreviewed "+ reviewedChunks.Count);
+					//Last, clean up unused chunks
+					// Snapshot dulu kuncinya: HideChunk()/DestroyChunk() MENGHAPUS entri
+					// dari dictionary yang sama. Iterasi .Keys langsung + Remove =
+					// InvalidOperationException, dan karena UpdateChunks() dipanggil
+					// tanpa await, errornya hilang tanpa jejak -> streaming chunk mati
+					// permanen (dunia tidak pernah muncul / karakter terkunci).
+					Vector2[] liveCoords = new Vector2[chunksDictionary.Count];
+					chunksDictionary.Keys.CopyTo(liveCoords, 0);
+					foreach (Vector2 coord in liveCoords)
 					{
-						hiddenchunksDictionary.Add(chunkToHide.Key, chunkToHide.Value);
+						if (!reviewedChunks.Contains(coord))
+						{
+							//Chunk isn't visible anymore, dispose
+							//Now this means every time we leave and reload, the chunk will be regenerated as is, so if there's any change, it'll be erased
+
+							//chunksDictionary[coord].Destroy();
+							//chunksDictionary.Remove(coord);
+							if (!chunksToHide.ContainsKey(coord))
+							{
+								chunksToHide.Add(coord, chunksDictionary[coord]);
+							}
+						
+							HideChunk(coord);
+						}
 					}
+					Vector2[] hiddenCoords = new Vector2[hiddenchunksDictionary.Count];
+					hiddenchunksDictionary.Keys.CopyTo(hiddenCoords, 0);
+					foreach (Vector2 coord in hiddenCoords)
+					{
+						if (hiddenchunksDictionary.ContainsKey(coord))
+						{
+							DestroyChunk(coord);
+						}
+					}
+					foreach (KeyValuePair<Vector2, TerrainChunk> chunkToHide in chunksToHide)
+					{
+						if (!hiddenchunksDictionary.ContainsKey(chunkToHide.Key))
+						{
+							hiddenchunksDictionary.Add(chunkToHide.Key, chunkToHide.Value);
+						}
+					}
+
+
+
+				}
+				else
+				{
+					//GD.Print("No mode detected for half chunk position");
+				}
+				currentHalfChunkPosition = newHalfChunk;
+				if (CurrentLoadStatus == LoadStatuses.Armed)
+				{
+					CurrentLoadStatus = LoadStatuses.Initialized;
+					if (GlobalUIManager.Instance != null && GlobalUIManager.Instance.LoadingUI != null)
+						GlobalUIManager.Instance.LoadingUI.Visible = false;
 				}
 
-
-
 			}
-			else
+			catch (System.Exception e)
 			{
-				//GD.Print("No mode detected for half chunk position");
+				// Jangan biarkan exception di task yang tidak di-await menelan
+				// seluruh pipeline streaming tanpa pesan apa pun.
+				GD.PrintErr("[TerrainManager] UpdateChunks gagal: " + e.Message + "\n" + (e.StackTrace ?? ""));
 			}
-			currentHalfChunkPosition = newHalfChunk;
-			if (CurrentLoadStatus == LoadStatuses.Armed)
+			finally
 			{
-				CurrentLoadStatus = LoadStatuses.Initialized;
-				if (GlobalUIManager.Instance != null && GlobalUIManager.Instance.LoadingUI != null)
-					GlobalUIManager.Instance.LoadingUI.Visible = false;
+				updatingChunks = false;
 			}
-			updatingChunks = false;
 		}
 
 
