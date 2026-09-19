@@ -608,6 +608,11 @@ namespace Bouncerock.Terrain
 
 		public void SaveUnibyte(string name)
 		{
+			// Tulis cache boleh gagal (izin tulis, disk penuh, path belum ada).
+			// Kalau dibiarkan, exception ini membuat Task pemrosesan chunk gagal
+			// di tengah jalan -> chunk tidak pernah jadi -> dunia kosong.
+			try
+			{
 			string documentspath = MapGenerator.IslandsPath;
 
 			int width = heightMap.GetLength(0);
@@ -630,15 +635,27 @@ namespace Bouncerock.Terrain
 				}
 			}
 			FileWriter.BinaryToISL(buffer, documentspath + name);
+			}
+			catch (System.Exception e)
+			{
+				GD.PrintErr("[MapGenerator] cache .isl dilewati (" + e.GetType().Name + "): " + e.Message);
+			}
 
 		}
 
 		public void SaveMapDetails(string name)
 		{
+			try
+			{
 			string documentspath = MapGenerator.IslandsPath;
 			byte[] buffer = FileWriter.SerializeToBinary(DecorElements);
 			GD.Print("Writing binaries " + buffer.Length);
 			FileWriter.BinaryToISL(buffer, documentspath + name + "_D");
+			}
+			catch (System.Exception e)
+			{
+				GD.PrintErr("[MapGenerator] cache detail dilewati (" + e.GetType().Name + "): " + e.Message);
+			}
 		}
 	}
 

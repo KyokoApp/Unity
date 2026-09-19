@@ -18,7 +18,7 @@ window/size/viewport_height=648
 window/size/mode=0
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-window/handheld/orientation=6
+window/handheld/orientation=4
 input_devices/pointing/emulate_touch_from_mouse=true
 
 [dotnet]

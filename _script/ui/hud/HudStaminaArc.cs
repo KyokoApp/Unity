@@ -50,6 +50,9 @@ public partial class HudStaminaArc : Control
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Ignore;
+        // Ukuran Control belum tentu benar saat _Ready (anchor baru diterapkan
+        // setelah layout) -> tanpa ini garis/busur tidak pernah digambar.
+        Resized += QueueRedraw;
         float w = (Radius + Thickness) * 2f;
         float h = Radius + Thickness * 2f + 8f;
         CustomMinimumSize = new Vector2(w, h);

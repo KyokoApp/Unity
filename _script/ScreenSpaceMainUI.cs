@@ -1,4 +1,5 @@
 using Godot;
+using Bouncerock.Terrain;
 
 /// <summary>
 /// ScreenSpaceMainUI — pengatur HUD in-game.
@@ -23,6 +24,7 @@ public partial class ScreenSpaceMainUI : Control
 
     private const double UiUpdateInterval = 0.1;
     private double _uiAccum;
+    private double _bootWait;
 
     private string _lastDistanceText = "";
     private float _record;
@@ -44,7 +46,26 @@ public partial class ScreenSpaceMainUI : Control
 
         GameManager gm = GameManager.Instance;
         MainCharacter ch = gm != null ? gm.GetMainCharacter() : null;
-        // Boot window: world/main character belum tentu terdaftar. Jangan NRE.
+
+        // Kalau dunia/karakter belum siap, TULISKAN di layar apa yang menahan.
+        // Tanpa ini gejalanya cuma layar biru kosong dan tidak bisa ditebak
+        // bagian mana yang macet (dan pesan ini hilang sendiri saat sehat).
+        string waiting = DescribeBootState(ch);
+        if (waiting != null)
+        {
+            _bootWait += UiUpdateInterval;
+            if (Distance != null)
+            {
+                string txt = "Menunggu " + waiting + " (" + (int)_bootWait + "s)";
+                if (txt != _lastDistanceText)
+                {
+                    Distance.Text = txt;
+                    _lastDistanceText = txt;
+                }
+            }
+            return;
+        }
+        _bootWait = 0.0;
         if (gm == null || ch == null) return;
 
         float dist = gm.StartingPoint.DistanceTo(ch.GlobalPosition);
@@ -60,6 +81,22 @@ public partial class ScreenSpaceMainUI : Control
                 Distance.Modulate = Colors.White;
             }
         }
+    }
+
+    /// <summary>null = semuanya siap; selain itu: nama bagian yang masih macet.</summary>
+    private string DescribeBootState(MainCharacter ch)
+    {
+        if (GameManager.Instance == null) return "GameManager";
+        TerrainManager tm = TerrainManager.Instance;
+        if (tm == null) return "generator dunia";
+        if (tm.CurrentLoadStatus != TerrainManager.LoadStatuses.Initialized)
+            return "chunk dunia: " + tm.CurrentLoadStatus;
+        if (tm.ChunkCount == 0)
+            return tm.GenerationErrors > 0
+                ? "chunk dunia: 0 aktif, " + tm.GenerationErrors + " error generator"
+                : "chunk dunia: belum ada di sekitar kamera";
+        if (ch == null) return "karakter";
+        return null;
     }
 
     private void UpdateDistance(float distMeters)

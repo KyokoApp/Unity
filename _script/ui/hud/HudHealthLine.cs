@@ -40,6 +40,9 @@ public partial class HudHealthLine : Control
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Ignore;
+        // Ukuran Control belum tentu benar saat _Ready (anchor baru diterapkan
+        // setelah layout) -> tanpa ini garis/busur tidak pernah digambar.
+        Resized += QueueRedraw;
         SetAnchorsPreset(LayoutPreset.FullRect);
         _display = _target;
         QueueRedraw();

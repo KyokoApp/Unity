@@ -341,3 +341,39 @@ Tidak ada toolchain Godot maupun `dotnet` di lingkungan ini, jadi **tidak ada `d
 ### K.5 Yang MASIH menghambat terlihatnya HUD ini
 1. **Temuan #B (fatal, belum saya sentuh karena butuh izin Anda):** `TerrainManager.UpdateChunks()` melempar `InvalidOperationException` (hapus item sambil iterasi `Keys`) di `async void` tanpa `await` → streaming mati dan `CurrentLoadStatus` tidak pernah `Initialized` → gerbang `Initialized` di `MainCharacter._PhysicsProcess` menahan karakter **dan sekarang juga `RefreshInputState()`**. Tanpa perbaikan ini, game tetap beku di "loading" dan HUD baru tidak akan terlihat bergerak.
 2. Belum ada yang memanggil `TakeDamage()` → garis darah akan penuh terus sampai tabrakan mob/air/jatuh disambungkan (butuh keputusan desain: berapa damage, ada respawn atau tidak).
+
+### K.6 CATATAN ORIENTASI (penting, jangan diulang salah)
+`display/window/handheld/orientation` di Godot **4.5 dibaca sebagai INT**, bukan string
+(`main/main.cpp:2750` dan `platform/android/export/export_plugin.cpp:1197`), dan urutan
+enum-nya (`servers/display_server.h` 4.5) adalah:
+
+| nilai | arti |
+|---|---|
+| 0 | LANDSCAPE (kunci satu arah) |
+| 1 | PORTRAIT |
+| 2 | REVERSE_LANDSCAPE |
+| 3 | REVERSE_PORTRAIT |
+| **4** | **SENSOR_LANDSCAPE (landscape kiri/kanan bebas) ← dipakai proyek ini** |
+| 5 | SENSOR_PORTRAIT |
+| 6 | SENSOR (bebas — **inilah nilai keliru yang sempat tertulis dan membuat game ikut portrait**) |
+
+Nilai lama repo `0` sudah landscape. Menulis `"sensor_landscape"` (string) atau `6`
+(salah index) membuat orientasi lepas sehingga HP bebas memotret portrait.
+Format `project.godot` juga **tidak mendukung baris komentar `#`** (parser ConfigFile
+menolaknya → proyek gagal dimuat, lihat riwayat commit 9760aec→cf6655d).
+
+### K.7 Perbaikan lanjutan setelah uji APK v1.0.176 (layar biru)
+1. **TerrainManager.UpdateChunks()**: `foreach (… in chunksDictionary.Keys)` lalu
+   `HideChunk()` yang menghapus entri di dictionary yang sama → `InvalidOperationException`
+   di Task tanpa `await` → `updatingChunks` tersangkut `true` selamanya → streaming mati.
+   Sekarang: snapshot kunci (`Keys.CopyTo`), guard `ContainsKey` sebelum `DestroyChunk`,
+   dan seluruh isi dibungkus `try/catch/finally` (`updatingChunks=false` di `finally`,
+   error dicetak `GD.PrintErr`).
+2. **MapGenerator.SaveUnibyte/SaveMapDetails**: tulis cache `.isl` sekarang dibungkus
+   try/catch — kegagalan izin tulis/disk tidak boleh membatalkan `OnHeightMapReceived`,
+   yang kalau dibiarkan membuat chunk tidak pernah jadi (dunia kosong).
+3. **HudHealthLine & HudStaminaArc**: `Resized += QueueRedraw` — ukuran Control hasil anchor
+   belum pasti benar saat `_Ready`, tanpa ini `_Draw()` pertama bekerja dengan `Size` kosong.
+4. **ScreenSpaceMainUI**: kalau `GameManager`/`TerrainManager`/karakter belum siap, label atas
+   menampilkan `Menunggu <bagian yang macet> (Ns)` dan **hilang sendiri** saat sehat — jadi
+   gejala "layar biru kosong" bisa dibaca dari foto layar, bukan ditebak.
