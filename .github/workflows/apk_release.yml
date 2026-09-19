@@ -85,8 +85,8 @@ jobs:
           mkdir -p exports/android
           export OUTDIR="$GITHUB_WORKSPACE/exports/android"
           set -o pipefail
-          timeout 900 ./godot --headless --verbose --path project --export-debug "Android Launcher" "$OUTDIR/PulauToon-debug.apk" > "$OUTDIR/export.log" 2>&1
-          RC=$?
+          RC=0
+          timeout 900 ./godot --headless --verbose --path project --export-debug "Android Launcher" "$OUTDIR/PulauToon-debug.apk" > "$OUTDIR/export.log" 2>&1 || RC=$?
           echo "export.rc=$RC"; wc -c "$OUTDIR/export.log" || true; ls -la "$OUTDIR"
           if [ ! -s "$OUTDIR/PulauToon-debug.apk" ]; then
             echo "::error::rc=$RC log: $(cat '$OUTDIR/export.log' | grep -aiE 'error|fail|cant|missing|not found' | head -4 | tr '\n' ' ' | head -c 700)"
@@ -94,7 +94,9 @@ jobs:
             echo "::error::search: $(find "$GITHUB_WORKSPACE" "$HOME" -maxdepth 4 -name '*.apk' 2>/dev/null | tr '\n' ' ' | head -c 300)"
             exit 1
           fi
-          timeout 900 ./godot --headless --path project --export-debug "Android AIO" "$OUTDIR/PulauToon-aio.apk" >> "$OUTDIR/export.log" 2>&1 || true
+          RC=0
+          timeout 900 ./godot --headless --verbose --path project --export-debug "Android AIO" "$OUTDIR/PulauToon-aio.apk" >> "$OUTDIR/export.log" 2>&1 || RC=$?
+          echo "export-aio.rc=$RC"
           if [ ! -s "$OUTDIR/PulauToon-aio.apk" ]; then
             echo "::error::export AIO gagal: $(tail -6 '$OUTDIR/export.log' | tr '\n' ' ' | head -c 200)"
             exit 1
