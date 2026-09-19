@@ -95,8 +95,14 @@ jobs:
             echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
             ls "$ANDROID_SDK_ROOT/build-tools" 2>/dev/null | tail -2
             echo '### import.log (akhir)'; tail -6 "$GITHUB_WORKSPACE/import.log"
-            echo '### export.log (launcher, akhir)'; tail -25 "$OUTDIR/export.log"
-            echo '### export_aio.log (akhir)'; tail -25 "$OUTDIR/export_aio.log"
+            echo '### export.log (grep kunci)'
+            grep -aiE 'error|missing|invalid|version|template|keystore|apksigner|sdk|preset|gradl|abi|arch|cannot|unable' "$OUTDIR/export.log" | sed 's/\x1b\[[0-9;]*m//g' | head -40
+            echo '### export.log (akhir)'
+            tail -30 "$OUTDIR/export.log" | sed 's/\x1b\[[0-9;]*m//g'
+            echo '### template dir'
+            ls -la "$HOME/.local/share/godot/$GDIR/" | head -6
+            echo '### preset head'
+            head -14 project/export_presets.cfg
           } > "$OUTDIR/diag.txt" 2>&1
           echo "[diag] bytes: $(wc -c < "$OUTDIR/diag.txt")"
           ls -la "$OUTDIR/"
