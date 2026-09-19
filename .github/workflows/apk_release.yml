@@ -145,3 +145,5 @@ jobs:
             done
             [ "$ok" = "1" ] || { echo "::error::gagal unggah $f — $(echo "$OUT2" | head -c 200)"; exit 1; }
           done
+
+# rerun-kick 1
