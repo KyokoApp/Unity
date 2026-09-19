@@ -16,6 +16,7 @@ permissions:
 env:
   GVER: 4.5.2
   GDIR: export_templates/4.5.2.stable
+  TAG: apk-20260920-2302
 
 jobs:
   build-apk:
@@ -114,18 +115,25 @@ jobs:
             echo '```'; cat SHA256SUMS.txt; echo '```'
           } > notes.md
           cat notes.md
-          echo "TAG=apk-$(date +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
 
-      - name: Terbitkan GitHub Release
+      - name: Terbitkan/perbarui Release + unggah aset (retry)
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$TAG" \
-            --target "$GITHUB_SHA" \
-            --prerelease \
-            --title "Pulau Toon — APK debug $TAG" \
-            --notes-file notes.md \
-            exports/android/PulauToon-aio.apk \
-            exports/android/PulauToon-debug.apk \
-            SHA256SUMS.txt
+          set -e
+          # release sudah dibuat lokal; create fallback jika belum ada (mis. rerun)
+          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
+            --title "Pulau Toon — APK debug $TAG" --notes-file notes.md \
+            || gh release edit "$TAG" \
+                 --title "Pulau Toon — APK debug $TAG" --notes-file notes.md
+          for f in exports/android/PulauToon-aio.apk exports/android/PulauToon-debug.apk SHA256SUMS.txt; do
+            ok=0
+            for i in 1 2 3 4; do
+              if gh release upload "$TAG" "$f" --clobber; then ok=1; break; fi
+              echo "upload $f percobaan $i gagal; ulangi..."; sleep 15
+            done
+            [ "$ok" = "1" ] || { echo "::error::gagal unggah $f setelah 4 percobaan"; exit 1; }
+          done
+          echo "== release final =="
+          gh release view "$TAG" || true
