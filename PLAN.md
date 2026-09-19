@@ -3,40 +3,47 @@
 Game third-person eksplorasi pulau untuk Android mid-range. Aplikasi APK hanya
 *launcher*; seluruh konten game dikirim via resource pack (.pck) ber-versi.
 
-## Tahapan kerja (checklist)
+## Tahapan kerja (checklist final)
 
-- [x] **0. Recon lingkungan** — repo kosong; sandbox tanpa Godot/JDK/SDK; jaringan
-      terbatas (allowlist: GitHub API/codeload, PyPI, npm). **Solusi: GitHub Actions
-      “bridge”** untuk mengambil biner (editor, export templates Android, SDK,
-      paket X/GL) lalu push ke branch `arena/bridge-assets` → tarik via codeload.
-- [~] **1. Setup tooling lokal** (editor Godot 4.5.2 dibangun dari source — build berjalan; JDK(keytool) ✓, aapt2 ✓; export templates & SDK belum tersedia) — install Godot 4.5.2, export templates (Android),
-      Android SDK (build-tools 35, platform android-35, platform-tools), JDK
-      (jdk4py), kaykit asset, Xvfb+mesa/lavapipe (screenshot GPU-less).
-- [x] **2. Project setup + sistem pack + launcher** — struktur `project/` dengan
-      pemisahan ketat `launcher/` vs `packs/*`; updater (manifest, versi, hash
-      SHA-256, resume Range, retry backoff, offline mode, cek storage); tooling
-      `tools/build_packs.py` (export_presets generator, versi hanya naik bila isi
-      berubah, manifest.json); `tools/dev_server.py` (dukung Range).
-- [x] **3. Terrain pulau prosedural** — chunk grid + LOD + streaming
-      (WorkerThreadPool), falloff pulau, bioma (pantai/hutan/rumput/bukit,
-      sungai/danau), air toon + foam pantai, langit + siklus siang-malam.
-- [x] **4. Visual toon** — shader cel 3-band + rim, outline inverted-hull,
-      lighting seimbang (uji screenshot, iterasi exposure), fog tipis.
-- [x] **5. Karakter + animasi** — KayKit Adventurers (CC0), AnimationTree
-      (locomotion blendspace + air/crouch/swim/action), anim tambahan prosedural
-      untuk crouch/swim, material toon + outline.
-- [x] **6. Third-person controller + touch** — CharacterBody3D halus,
-      SpringArm anti-tembus, joystick virtual, tombol aksi (layout bisa diatur),
-      multi-touch, safe area, pause otomatis saat background.
-- [x] **7. Isi dunia + optimasi** — MultiMeshInstance3D pohon/batu/rumput/bunga,
-      bangunan landmark + collider, pickup, preset kualitas Rendah/Sedang/Tinggi
-      (skala render, jarak pandang, kepadatan, shadow, batas FPS), audio.
-- [~] **8. Build APK** (preset+skrip ada; butuh templates+SDK+JDK lengkap) — export preset Android (arm64, landscape, permission
-      INTERNET), debug keystore, build, log export; AAB via preset rilis.
-- [ ] **9. Uji bukti** (menunggu biner editor: import→smoke test→pack export→uji delta/resume) — screenshot visual (Xvfb+lavapipe), uji update parsial
-      (log hanya 1 pack yang diunduh), uji offline, headless error-scan.
-- [x] **10. Docs final** (README/CREDITS/DECISIONS rampung; PLAN diperbarui) — README (build APK, rilis update, hosting), CREDITS,
-      DECISIONS final, ringkasan + bukti.
+- [x] **0. Recon lingkungan** — sandbox tanpa Godot/JDK/SDK; jaringan allowlist:
+      github.com core + codeload + PyPI + npm; host biner (tuxfamily, release
+      assets, LFS media, debian, dl.google) diblok.
+- [x] **1. Setup tooling lokal** — Godot 4.5.2-stable dibangun dari source
+      (62 menit, `tools/godot-src/` sebelah repo); JDK dari PyPI jdk4py
+      (Temurin 25.0.2 + keytool); aapt2 2.20 dari npm aaptjs3; apksigner.jar
+      dari npm @postar/apktool-node; KayKit Adventurers (CC0) terverifikasi.
+      Export templates resmi → satu-satunya aset yang tidak terjangkau (D-18).
+- [x] **2. Project setup + sistem pack + launcher** — `project/launcher/` vs
+      `project/packs/*`; updater: manifest ber-versi, SHA-256, resume via HTTP
+      Range, retry backoff, mode offline, cek storage; `tools/build_packs.py`
+      (generate export_presets, versi naik hanya untuk pack berubah, manifest);
+      `tools/dev_server.py` (Range 206).
+- [x] **3. Terrain pulau prosedural** — chunk grid + LOD + streaming worker,
+      falloff pulau, bioma, sungai+danau (river-field cache 200×200), air toon
+      + foam, sky + siklus siang-malam.
+- [x] **4. Visual toon** — cel shader 3-band + rim, outline inverted-hull,
+      lighting seimbang, fog ringan; bukti: `docs/screenshots/` (peta + 3 momen
+      siang/senja/malam, renderer CPU shader-accurate — sandbox tanpa GPU).
+- [x] **5. Karakter + animasi** — Knight.glb KayKit diririg + 76 animasi;
+      AnimationTree 240 transisi (fix indentasi `_sm_setup_transitions`);
+      resolver nama animasi; crouch/swim dipetakan ke varian (D-10).
+- [x] **6. Third-person controller + touch** — SpringArm anti-tembus, joystick
+      kiri + geser kanan multi-touch, tombol aksi (skala/posisi bisa diatur),
+      safe area, pause otomatis saat background.
+- [x] **7. Isi dunia + optimasi** — MultiMesh pohon/batu/rumput; visibility
+      range; preset kualitas Rendah/Sedang/Tinggi (skala render, jarak pandang,
+      kepadatan, shadow, batas FPS); audio prosedural.
+- [~] **8. Build APK** — preset runnable arm64-v8a + INTERNET + landscape
+      lengkap; keystore debug ter-generate; SDK/JDK/apksigner/aapt2
+      tervalidasi satu per satu. **Bloker tunggal:** dua berkas export template
+      (egress sandbox; lihat `docs/BUKTI_UJI.md` §5). Container jaringan normal:
+      `sh tools/fetch_export_templates.sh && sh tools/export_android.sh`.
+- [x] **9. Uji bukti** — `tools/run_all_tests.sh` → **8/8 hijau** (fresh 10
+      pack, delta 1 pack ui 35 KB, resume 206, offline, 0 SCRIPT ERROR di
+      ketiga run); detail: `docs/BUKTI_UJI.md`.
+- [x] **10. Docs final** — README, CREDITS, DECISIONS (D-1..D-18), PLAN,
+      BUKTI_UJI, skrip: build_packs/dev_server/run_all_tests/fetch_templates/
+      export_android/visual_proof.
 
 ## Struktur repo
 
@@ -45,16 +52,17 @@ Unity/
 ├─ project/            # Godot project root
 │  ├─ project.godot
 │  ├─ launcher/        # isi APK (minimal)
-│  └─ packs/<id>/      # konten game, 1 folder = 1 pack
-├─ tools/              # build_packs.py, dev_server.py, scripts util
+│  ├─ packs/<id>/      # konten game, 1 folder = 1 pack
+│  └─ dev_probe/       # tools dev (visual_proof.gd — ter-version)
+├─ tools/              # build_packs.py, dev_server.py, run_all_tests.sh,
+│                      # fetch_export_templates.sh, export_android.sh, pck_list.py
 ├─ server/             # output: manifest.json + packs/*.pck (gitignored)
-└─ .github/workflows/  # bridge.yml (ambil biner), CI smoke
+└─ docs/               # screenshots/, BUKTI_UJI.md
 ```
 
-## Cara uji cepat (setelah tooling siap)
+## Cara uji cepat
 
-```
-python3 tools/build_packs.py           # bangun pack + manifest
-python3 tools/dev_server.py 8787 server&
-tools/bin/godot --headless --path project -- --server http://127.0.0.1:8787
+```bash
+export GODOT_BIN=/path/to/godot.linuxbsd.editor.x86_64
+bash tools/run_all_tests.sh     # orkestrasi penuh (8/8)
 ```
