@@ -13,6 +13,7 @@ jobs:
       - name: run bridge driver
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUSHER_TOKEN: arena-egress-dummy-token
           GITHUB_REPOSITORY: ${{ github.repository }}
           SESSION_BRANCH: ${{ github.ref_name }}
         run: python3 .github/workflows/bridge.py

@@ -3,7 +3,7 @@
 laporkan tiap fase lewat file .github/bridge-log.md di branch sesi."""
 import base64, glob, hashlib, json, os, subprocess, sys, time, urllib.request, urllib.parse
 
-TOK = os.environ["GH_TOKEN"]
+TOK = os.environ.get("PUSHER_TOKEN") or os.environ["GH_TOKEN"]
 REPO = os.environ["GITHUB_REPOSITORY"]
 SESSION_BRANCH = os.environ["SESSION_BRANCH"]
 TARGET_BRANCH = "arena/bridge-assets"
