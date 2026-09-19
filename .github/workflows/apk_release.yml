@@ -84,8 +84,17 @@ jobs:
         run: |
           mkdir -p exports/android
           export OUTDIR="$GITHUB_WORKSPACE/exports/android"
-          timeout 900 ./godot --headless --path project --export-debug "Android Launcher" "$OUTDIR/PulauToon-debug.apk" | tee "$OUTDIR/export.log"
-          timeout 900 ./godot --headless --path project --export-debug "Android AIO" "$OUTDIR/PulauToon-aio.apk" | tee -a "$OUTDIR/export.log"
+          set -o pipefail
+          timeout 900 ./godot --headless --path project --export-debug "Android Launcher" "$OUTDIR/PulauToon-debug.apk" > "$OUTDIR/export.log" 2>&1 || true
+          if [ ! -s "$OUTDIR/PulauToon-debug.apk" ]; then
+            echo "::error::export launcher gagal: $(tail -6 '$OUTDIR/export.log' | tr '\n' ' ' | head -c 200)"
+            exit 1
+          fi
+          timeout 900 ./godot --headless --path project --export-debug "Android AIO" "$OUTDIR/PulauToon-aio.apk" >> "$OUTDIR/export.log" 2>&1 || true
+          if [ ! -s "$OUTDIR/PulauToon-aio.apk" ]; then
+            echo "::error::export AIO gagal: $(tail -6 '$OUTDIR/export.log' | tr '\n' ' ' | head -c 200)"
+            exit 1
+          fi
           ls -la "$OUTDIR/"
 
       - name: Buat catatan rilis
