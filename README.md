@@ -99,33 +99,34 @@ ganti ke IP LAN/server produksi Anda).
 
 ## 5. Build APK launcher
 
-Satu keystore debug sudah cukup untuk pengujian.
+Pipeline lengkap tersedia sebagai satu perintah:
 
 ```bash
-# (a) import proyek sekali
-godot --headless --path project --import
+# sekali saja (host dengan akses internet normal):
+sh tools/fetch_export_templates.sh   # android_debug/release.apk → ~/.local/share/godot/export_templates/4.5.2.stable/
 
-# (b) isi editor settings (sekali):
-#   Editor > Editor Settings > Export > Android:
-#     android_sdk_path = /path/to/android-sdk
-#     release_keystore & debug_keystore (buat: keytool -genkeypair …)
-# (c) build APK debug:
-godot --headless --path project --export-debug "Android Launcher" exports/android/PulauToon-debug.apk
-# relis (butuh keystore rilis):
-godot --headless --path project --export-release "Android Launcher" exports/android/PulauToon.apk
+# setiap build:
+sh tools/export_android.sh           # → exports/android/PulauToon-debug.apk (+ export.log)
 ```
 
-Preset menargetkan **arm64-v8a**, **INTERNET**, **landscape**, immersive.
-`export_presets.cfg` dibuat ulang oleh `tools/build_packs.py` tiap build.
+`export_android.sh` akan menulis editor settings (`export/android/*` —
+android_sdk_path, java path, keystore debug RSA-2048 yang digenerate dengan
+`keytool`), lalu memanggil `--export-debug "Android Launcher"`. Preset
+menargetkan **arm64-v8a**, **INTERNET**, **landscape**, immersive, pck
+tetap eksternal.
 
-> Di sandbox ini SDK/templates belum tersedia → export APK gagal dengan pesan
-> tentang sdk/templates; ini keterbatasan lingkungan, bukan konfigurasi.
-> Prosedur di atas persis yang dipakai di mesin dev normal.
+> **Catatan sandbox ini**: jaringan egress membatasi host biner resmi Godot
+> (objects.githubusercontent.com & tuxfamily diblok), sehingga dua berkas
+> template — satu-satunya aset yang tidak dapat dijangkau — tidak terpasang.
+> Validasi export berjalan sampai titik itu saja (SDK ✓ apksigner ✓ aapt2 ✓
+> keystore ✓ preset ✓ keystore/Java ✓); lihat `docs/BUKTI_UJI.md` §5 untuk
+> log persisnya. Dua perintah di atas adalah prosedur yang sama persis dengan
+> mesin dev normal → akan menghasilkan APK begitu template terpasang.
 
 Install & uji di perangkat (bila `adb` ada):
 
 ```bash
-adb install -r exports/android/PulauToon.apk
+adb install -r exports/android/PulauToon-debug.apk
 ```
 
 ## 6. Rilis update konten (delta)
@@ -184,17 +185,22 @@ Target: **30 FPS stabil di preset Sedang** pada HP menengah (renderer
 *Mobile*, ~<120 draw calls, instancing MultiMesh, chunked LOD + streaming,
 shader ringan tanpa post-process).
 
-## 10. Uji yang sudah dijalankan
+## 10. Uji yang sudah dijalankan (ringkasan hijau)
 
-- `python3 tools/build_packs.py` → semua pack ter-export & hash stabil
-  (menjalankan ulang tanpa perubahan = *tidak ada* pack baru).
-- Uji delta: mengubah satu file di satu pack hanya menaikkan versi pack itu
-  (lihat `server/build_log.json` / output `[change]`).
-- Uji resume: `dev_server.py` melayani 206 Partial Content untuk header
-  `Range`; updater melanjutkan `.tmp` dengan `Range: bytes=N-`.
-- Headless smoke: scene game berjalan tanpa error fatal (log GDScript bersih).
-- Cek visual otomatis dibatasi lingkungan (sandbox tanpa X/Vulkan); prosedur
-  screenshot Xvfb+lavapipe dibahas di PLAN/DECISIONS.
+Orkestrator `tools/run_all_tests.sh` dijalankan terakhir dengan hasil **8/8**:
+
+```
+[ OK ] manifest ada                [ OK ] Range dijawab 206 (resume)
+[ OK ] manifest tersaji            [ OK ] dunia selesai digenerate
+[ OK ] tanpa error runtime         [ OK ] delta: hanya 1 pack berubah
+[ OK ] launcher hanya unduh 1 pack [ OK ] mode offline berfungsi
+```
+
+3 skenario launcher (unduhan penuh 10 pack, delta 1 pack `ui` 35 KB, offline)
+semuanya berakhir dengan **0 SCRIPT ERROR**. Cuplikan log & detail:
+`docs/BUKTI_UJI.md`. Bukti visual toon/langit/siang-malam (renderer CPU
+shader-accurate, sandbox tanpa GPU): `docs/screenshots/` — `biome_map.png`,
+`view_day.png`, `view_dusk.png`, `view_night.png`.
 
 ## 11. Troubleshooting
 

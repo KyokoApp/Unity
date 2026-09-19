@@ -20,6 +20,8 @@ mkdir -p "$ROOT/exports/android"
 for D in "$HOME/.local/share/godot" "$HOME/.config/godot"; do
     mkdir -p "$D"
     cat > "$D/editor_settings-4.5.tres" <<EOF
+[gd_resource type="EditorSettings" format=1]
+
 [resource]
 export/android/android_sdk_path = "$SDK"
 export/android/java_sdk_path = "$JRE"
