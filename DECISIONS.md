@@ -226,3 +226,11 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
    outline dilewatkan utk skybox/shadow/logo (plane transparan).
 5. Mode Edit sculpt/jalur dinonaktifkan di mode statis (no-op); slider cahaya
    tetap berfungsi karena dioper ke Environment yang sama.
+
+## 2026-09-20 — Ronde-11: hardening loader world statis + docs/BUGFIXES.md
+1. Blue screen (langit saja) = generate_async mati setelah langit jalan.
+   Loader world statis kini defensif: guard tiap tahap, verify hasil akhir
+   (permukaan pijakan > 0 & grid bucket terisi) — gagal → queue_free + fallback
+   pulau procedural. User tak pernah lagi terjebak di layar biru.
+2. Dokumentasi perbaikan bug dipusatkan di docs/BUGFIXES.md (gejala→akar→
+   investigasi→fix→prosedur rilis) supaya AI/developer lain bisa langsung kerja.

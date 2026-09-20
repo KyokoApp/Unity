@@ -1,6 +1,6 @@
 {
- "game_version": "1.0.14",
- "generated_at": "2026-09-20T10:13:46Z",
+ "game_version": "1.0.15",
+ "generated_at": "2026-09-20T10:32:55Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -29,10 +29,10 @@
    "deps": []
   },
   "world_terrain": {
-   "version": "1.0.14",
+   "version": "1.0.15",
    "size": 0,
    "sha256": "",
-   "url": "packs/world_terrain-1.0.14.pck",
+   "url": "packs/world_terrain-1.0.15.pck",
    "deps": [
     "shaders_materials"
    ]

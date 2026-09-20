@@ -150,12 +150,19 @@ func _build_static_world() -> bool:
 		-(aabb.position.z + aabb.size.z * 0.5) * k)
 	# collision + outline tipis + grid akselerasi tinggi permukaan
 	var out_mat = Materials.make_outline(0.008)
+	if out_mat == null:
+		_wtrace("PERINGATAN: material outline gagal — lanjut tanpa outline")
 	var base_xf := cont.transform
 	var stats := [0, 0]  # tris_kolisi, tris_walkable
 	_static_walk(scene_root, base_xf, out_mat, stats)
+	# verifikasi hasil: tanpa permukaan pijakan, world tak bisa dimainkan → fallback
+	if int(stats[1]) <= 0 or _gbuckets.is_empty():
+		_wtrace("PERINGATAN: tak ada permukaan pijakan di gravity_falls.glb — fallback")
+		cont.queue_free()
+		return false
 	_static_ready = true
-	_wtrace("gravity falls: span %.0fm×%.0fm skala %.2f | kolisi %dm segi | permukaan jalan %dm segi" % [
-		span, aabb.size.y, k, stats[0] / 1000000, stats[1] / 1000000])
+	_wtrace("gravity falls: span %dx%dm skala %.2f | kolisi %d segi | jalan %d segi | sel %d" % [
+		int(span), int(aabb.size.y), k, int(stats[0]), int(stats[1]), _gbuckets.size()])
 	return true
 
 func _static_walk(node: Node, xf: Transform3D, out_mat: Material, stats: Array) -> void:
@@ -170,21 +177,17 @@ func _static_walk(node: Node, xf: Transform3D, out_mat: Material, stats: Array) 
 			break
 	if node is MeshInstance3D and node.mesh != null:
 		var mi: MeshInstance3D = node
-		var tri_count := 0
-		for s in range(mi.mesh.get_surface_count()):
-			tri_count += int(mi.mesh.surface_get_primitive_type(s) == Mesh.PRIMITIVE_TRIANGLES) * \
-				int(mi.mesh.surface_get_arrays(s)[Mesh.ARRAY_INDEX].size() if mi.mesh.surface_get_arrays(s)[Mesh.ARRAY_INDEX] != null else mi.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX].size())
 		if not skip:
-			stats[0] += tri_count
 			# trimesh collision (digabung dari semua permukaan mesh)
-			var body := StaticBody3D.new()
-			body.name = mi.name + "_col"
-			var col := CollisionShape3D.new()
 			var sh := mi.mesh.create_trimesh_shape()
 			if sh != null:
+				var body := StaticBody3D.new()
+				body.name = mi.name + "_col"
+				var col := CollisionShape3D.new()
 				col.shape = sh
 				body.add_child(col)
 				mi.add_child(body)
+				stats[0] += 1
 			# outline tipis (hanya mesh bervolume, bukan skybox/shadow transparan)
 			var o := MeshInstance3D.new()
 			o.mesh = mi.mesh
