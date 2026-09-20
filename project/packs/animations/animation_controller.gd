@@ -38,14 +38,15 @@ var _move_state := "idle"
 var _air := false
 var _swimming := false
 
-func setup(node: Node3D, skin_root: Node) -> bool:
+func setup(node: Node3D, skin_root: Node, custom_states: Dictionary = {}) -> bool:
 	anim_player = _find_anim_player(skin_root)
 	if anim_player == null:
 		push_error("[anim] AnimationPlayer tidak ditemukan di skin")
 		return false
 	var names := anim_player.get_animation_list()
 	for st in STATES:
-		for cand in STATES[st]:
+		var cands: Array = custom_states.get(st, STATES[st])
+		for cand in cands:
 			if names.has(cand):
 				resolved[st] = cand
 				break

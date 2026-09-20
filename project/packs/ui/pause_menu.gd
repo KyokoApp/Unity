@@ -168,6 +168,21 @@ func _build_settings() -> void:
 		if not _syncing and _settings:
 			_settings.set_value("invert_y", on))
 	s.add_child(inv)
+	# karakter (skin)
+	s.add_child(_field_header("Karakter"))
+	var opt_skin := OptionButton.new()
+	for n in ["PolyGirl (bawaan)", "Knight (KayKit)"]:
+		opt_skin.add_item(n)
+	opt_skin.custom_minimum_size = Vector2(0, 56)
+	opt_skin.add_theme_font_size_override("font_size", 24)
+	opt_skin.selected = 0 if (_settings and str(_settings.char_skin) == "polygirl") else 1
+	opt_skin.item_selected.connect(func(ix):
+		if not _syncing and _settings:
+			var id := "polygirl" if ix == 0 else "knight"
+			_settings.set_value("char_skin", id)
+			if _root and _root.get("player") and _root.player.has_method("set_skin"):
+				_root.player.set_skin(id))
+	s.add_child(opt_skin)
 	# skala tombol
 	s.add_child(_field_header("Ukuran tombol aksi"))
 	var bs := HSlider.new()

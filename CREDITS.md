@@ -32,4 +32,9 @@
 - **Terrain detail textures** (`packs/shaders_materials/textures/detail_grass.jpg`, `detail_sand.jpg`)
   — dibuat AI (text-to-image) untuk proyek ini mengikuti referensi palet pengguna; bukan aset pihak ketiga.
 
+
+- **Low Poly Girl** (karakter + 36 animasi) oleh Manoel "Manneko" da Rocha de Oliveira
+  — lisensi bebas pakai (komersial diizinkan, redistribusi/penjualan aset dilarang);
+  dipakai sebagai skin bawaan pemain (`packs/character_player/polygirl.glb`).
+
 *Terakhir diperbarui: 2026-09-20*

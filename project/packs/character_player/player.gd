@@ -8,7 +8,38 @@ signal nearest_interactable_changed(meta)
 
 const AnimControllerScript := preload("res://packs/animations/animation_controller.gd")
 const Materials := preload("res://packs/shaders_materials/materials.gd")
-const SKIN_PATH := "res://packs/character_player/knight.glb"
+
+# Skin ganti-ganti: PolyGirl (bawaan) / Knight — tiap skin punya peta nama animasi.
+const SKINS := {
+	"polygirl": {
+		"path": "res://packs/character_player/polygirl.glb",
+		"height": 1.45,
+		"states": {
+			"idle": ["idle", "Idle 2", "Idle 3"],
+			"walk": ["walk"],
+			"run": ["walk_fast", "run"],
+			"sprint": ["run", "walk_fast"],
+			"crouch_idle": ["sit_idle", "idle"],
+			"crouch_move": ["walk"],
+			"jump_start": ["jump_start"],
+			"jump_fall": ["jump_falling", "jump_loop"],
+			"jump_land": ["jump_end"],
+			"swim_idle": ["idle"],
+			"swim_move": ["walk"],
+			"pickup": ["inspect_ground_loop", "action_button_click"],
+			"interact": ["action_button_click", "action_button_open_door"],
+			"emote": ["cycle_talking"],
+			"attack": ["action_button_open_door", "action_button_click"],
+			"sit": ["sit_idle", "idle"],
+		},
+	},
+	"knight": {
+		"path": "res://packs/character_player/knight.glb",
+		"height": 1.35,
+		"states": {},
+	},
+}
+var char_skin := "polygirl"   # diisi dari settings oleh game_root sebelum _ready
 
 # ------- gerak -------
 const SPEED_WALK := 2.4
@@ -82,15 +113,34 @@ func _ready() -> void:
 	is_ready = true
 
 func _load_skin() -> void:
-	var pa := load(SKIN_PATH)
+	var def: Dictionary = SKINS.get(char_skin, SKINS["polygirl"])
+	var pa := load(def["path"])
 	if pa == null:
-		push_error("[player] skin hilang: " + SKIN_PATH)
-		return
+		push_error("[player] skin hilang: " + str(def["path"]) + " — fallback knight")
+		char_skin = "knight"
+		def = SKINS["knight"]
+		pa = load(def["path"])
+		if pa == null:
+			return
+	if model_root and is_instance_valid(model_root):
+		model_root.queue_free()
 	model_root = pa.instantiate()
 	model_pivot.add_child(model_root)
-	# material toon + outline untuk karakter
+	# normalisasi skala: cocokkan tinggi karakter ke target antar-skin
 	var mesh_parents := []
 	_find_mesh_instances(model_root, mesh_parents)
+	var bbox := AABB()
+	var first_box := true
+	for mi in mesh_parents:
+		var b: AABB = mi.get_aabb()
+		if b.size == Vector3.ZERO:
+			continue
+		bbox = b if first_box else bbox.merge(b)
+		first_box = false
+	if not first_box and bbox.size.y > 0.05:
+		var target: float = float(def.get("height", 1.4))
+		model_root.scale = Vector3.ONE * clampf(target / bbox.size.y, 0.3, 3.0)
+	# material toon + outline untuk karakter
 	var first := true
 	for mi in mesh_parents:
 		var smi: MeshInstance3D = mi
@@ -102,18 +152,18 @@ func _load_skin() -> void:
 				# jadikan sedikit toon dengan shading cel via overlay outline saja
 				pass
 			if base_mat and not base_mat.next_pass:
-				base_mat.next_pass = Materials.make_outline(0.030)
+				base_mat.next_pass = Materials.make_outline(0.020)
 		else:
 			smi.material_override = mat
 		first = false
 	anim = AnimControllerScript.new()
-	if not anim.setup(self, model_root):
+	if not anim.setup(self, model_root, def.get("states", {})):
 		anim = null
 	# jejak boot terlihat: status animasi (diagnose "gliding" di perangkat)
 	var rootc = get_tree().current_scene
 	if rootc and rootc.has_method("_trace"):
 		if anim:
-			rootc.call("_trace", "boot: anim = OK (%d state teresolusi)" % anim.resolved.size())
+			rootc.call("_trace", "boot: anim = OK (%d state teresolusi) skin=%s" % [anim.resolved.size(), char_skin])
 		else:
 			rootc.call("_trace", "boot: ⚠ anim = NULL — AnimationPlayer tidak ketemu di skin")
 
@@ -122,6 +172,14 @@ func _find_mesh_instances(n: Node, out: Array) -> void:
 		out.append(n)
 	for c in n.get_children():
 		_find_mesh_instances(c, out)
+
+## Ganti skin karakter saat bermain (dari pengaturan / mode edit).
+func set_skin(id: String) -> void:
+	if not SKINS.has(id) or id == char_skin and model_root != null:
+		return
+	char_skin = id
+	if model_pivot:
+		_load_skin()
 
 func _make_blob_shadow() -> void:
 	var img := Image.create(64, 64, false, Image.FORMAT_L8)

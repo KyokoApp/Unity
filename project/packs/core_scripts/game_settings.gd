@@ -23,6 +23,7 @@ var gfx_faceted: bool = false  # gaya low-poly segi datar pada terrain
 var camera_sens: float = 1.0   # 0.3 .. 2.5
 var button_scale: float = 1.0  # 0.8 .. 1.5
 var invert_y: bool = false
+var char_skin: String = "polygirl"   # "polygirl" | "knight"
 var button_offsets := {}  # nama tombol -> Vector2 (offset dari posisi default)
 
 # --- Audio (dB) ---
@@ -39,6 +40,7 @@ func load_settings() -> void:
 		camera_sens = float(cfg.get_value("controls", "camera_sens", camera_sens))
 		button_scale = float(cfg.get_value("controls", "button_scale", button_scale))
 		invert_y = bool(cfg.get_value("controls", "invert_y", invert_y))
+		char_skin = str(cfg.get_value("controls", "char_skin", char_skin))
 		vol_master = float(cfg.get_value("audio", "master", vol_master))
 		vol_music = float(cfg.get_value("audio", "music", vol_music))
 		vol_sfx = float(cfg.get_value("audio", "sfx", vol_sfx))
@@ -57,6 +59,7 @@ func save_settings() -> void:
 	cfg.set_value("controls", "camera_sens", camera_sens)
 	cfg.set_value("controls", "button_scale", button_scale)
 	cfg.set_value("controls", "invert_y", invert_y)
+	cfg.set_value("controls", "char_skin", char_skin)
 	cfg.set_value("audio", "master", vol_master)
 	cfg.set_value("audio", "music", vol_music)
 	cfg.set_value("audio", "sfx", vol_sfx)
@@ -75,6 +78,7 @@ func set_value(key: String, v) -> void:
 		"camera_sens": camera_sens = clampf(float(v), 0.3, 2.5)
 		"button_scale": button_scale = clampf(float(v), 0.8, 1.5)
 		"invert_y": invert_y = bool(v)
+		"char_skin": char_skin = str(v)
 		"vol_master": vol_master = clampf(float(v), -40.0, 6.0)
 		"vol_music": vol_music = clampf(float(v), -40.0, 6.0)
 		"vol_sfx": vol_sfx = clampf(float(v), -40.0, 6.0)

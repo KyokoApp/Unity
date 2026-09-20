@@ -114,6 +114,7 @@ func _boot_world(progress_cb: Callable) -> void:
 		_fatal("Scene pemain hilang:\n" + PLAYER_SCENE)
 		return
 	player = pp.instantiate()
+	player.set("char_skin", settings.char_skin)  # skin dari pengaturan (dipakai _ready)
 	add_child(player)
 	var spawn = world.call("find_spawn_point")
 	player.global_position = spawn + Vector3(0, 0.12, 0)

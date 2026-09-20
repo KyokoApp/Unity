@@ -170,3 +170,17 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
    normal per-muka, warna diratakan) → tampilan low-poly faceted, toggle di Mode
    Edit (tersimpan gfx_faceted). ~3x vertex pada LOD0/1 — masih ringan di ponsel.
 2. Bug build_packs: game_version=max string ("1.0.10"<"1.0.7") → kunci semver.
+
+## 2026-09-20 — Ronde-7: hotfix jatuh-tembus + skin PolyGirl
+1. BUG KRITIS jatuh tembus: saat dunia diperkecil, `world._chunk_of` masih offset
+   +8 (GRID lama 16) padahal terrain_chunk pakai GRID_HALF=4 → chunk timur tak
+   terbangun/koordinat tabrakan bergeser. Offset kini GRID/2 konsisten.
+2. Skin ganti-ganti: PolyGirl (Manneko, lisensi bebas-pakai) jadi karakter bawaan;
+   Knight KayKit tetap sebagai alternatif; peta nama animasi per-skin di
+   AnimController.setup(custom_states); skala dinormalisasi via AABB; pemilih di
+   menu Pengaturan (char_skin, tersimpan, berlaku instan lewat player.set_skin).
+3. Aset pengguna di Godot4/: Village MegaKit Standard = potongan modular (bukan
+   rumah jadi) → perlu perakitan arketipe rumah; tanpa pohon (tetap prosedural
+   sampai ada paket pohon). EmacEArt Cool Water + Color Grading = belum
+   diintegrasi (cool water pakai screen-texture/depth → mahal di Adreno; color
+   grading compositor = desktop) — kontrol pencahayaan native tetap jalan.
