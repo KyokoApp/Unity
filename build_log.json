@@ -1,9 +1,9 @@
 [
  {
   "pack": "core_scripts",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "returncode": 0,
-  "duration_s": 3.6,
+  "duration_s": 2.5,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -12,21 +12,17 @@
   "pack": "shaders_materials",
   "version": "1.0.9",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 2.3,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
  },
  {
   "pack": "world_terrain",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "returncode": 0,
-  "duration_s": 3.5,
+  "duration_s": 2.3,
   "messages": [
-   "SCRIPT ERROR: Parse Error: Cannot infer the type of \"o\" variable because the value doesn't have a set type.",
-   "          at: GDScript::reload (res://packs/world_terrain/world.gd:279)",
-   "ERROR: Failed to load script \"res://packs/world_terrain/world.gd\" with error \"Parse error\".",
-   "   at: load (modules/gdscript/gdscript.cpp:3041)",
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
  },
@@ -34,7 +30,7 @@
   "pack": "animations",
   "version": "1.0.4",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 2.3,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -43,7 +39,7 @@
   "pack": "character_player",
   "version": "1.0.8",
   "returncode": 0,
-  "duration_s": 3.6,
+  "duration_s": 2.3,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -52,7 +48,7 @@
   "pack": "ui",
   "version": "1.0.7",
   "returncode": 0,
-  "duration_s": 3.6,
+  "duration_s": 2.5,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -61,7 +57,7 @@
   "pack": "audio_sfx",
   "version": "1.0.1",
   "returncode": 0,
-  "duration_s": 3.6,
+  "duration_s": 2.3,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -70,7 +66,7 @@
   "pack": "audio_music",
   "version": "1.0.1",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 2.5,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]

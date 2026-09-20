@@ -1,16 +1,16 @@
 {
  "packs": {
   "core_scripts": {
-   "content_hash": "d58634f73610cf2aaab98cd004f691b6761c87b56432f9967ec43e34814b9bd2",
-   "version": "1.0.7"
+   "content_hash": "100af893600c9f279e8a568e0b76d1e230c64f429b2640869a166ac04faccd3e",
+   "version": "1.0.8"
   },
   "shaders_materials": {
    "content_hash": "e93538aef9ae0513b9211cfab3456146c919a2d8183de726a31a8365ed5c7f6f",
    "version": "1.0.9"
   },
   "world_terrain": {
-   "content_hash": "17bdc49196ab4da644d338d54a452b360868970e31a0a50b7c64e18d1a8e1df3",
-   "version": "1.0.24"
+   "content_hash": "7ef4babe2fd784e03f735d41cd3c0a63c5d215620dfb8c91daf0a665c4eea8ce",
+   "version": "1.0.25"
   },
   "world_props_forest": {
    "content_hash": "8a1b9332ad6e8b6abf79009a280d17570bd50453004cea27b1c5bd3270b00dba",
