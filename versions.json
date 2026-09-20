@@ -9,8 +9,8 @@
    "version": "1.0.8"
   },
   "world_terrain": {
-   "content_hash": "8e55c8eab6c38de7f803926534199cfc2954e1b0d0fc7193a167ec74b34d43c2",
-   "version": "1.0.13"
+   "content_hash": "24a0e6d043449b1e9d6b034aecd9e7f07ec09ef59b0d8e19f723fea306610670",
+   "version": "1.0.15"
   },
   "world_props_forest": {
    "content_hash": "c314a401b4cfdcd32aeda4b48fdfc7a9ce5d079b272d058be2ce553a35308bb9",
@@ -25,8 +25,8 @@
    "version": "1.0.4"
   },
   "character_player": {
-   "content_hash": "3cf03bc52b27ff2d89bcac0553004d7b0407edd432789441076a716d2650cdd8",
-   "version": "1.0.6"
+   "content_hash": "74720c639336c597a6824235804940866e82a3b2e50f4a5db734249819a3b353",
+   "version": "1.0.7"
   },
   "ui": {
    "content_hash": "56ad629a0a54fcf3692212fb81a527db9a063b2d9e84d49a6eb10b5be56d97a4",
