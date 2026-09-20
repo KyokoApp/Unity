@@ -104,7 +104,9 @@ jobs:
             git clone --depth 1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY.git $DEST
             (cd $DEST && git checkout --orphan content && rm -rf ./*)
           fi
-          rsync -a --delete --exclude=.git "$GITHUB_WORKSPACE/server/" "$DEST/"
+          echo "::notice::ws manifest: $(grep -o '"game_version": *"[^"]*"' "$GITHUB_WORKSPACE/server/manifest.json" | head -1)"
+          rsync -a --delete --exclude=.git "$GITHUB_WORKSPACE/server/" "$DEST/"; echo "::notice::rsync rc=$?"
+          echo "::notice::dest manifest sesudah rsync: $(grep -o '"game_version": *"[^"]*"' "$DEST/manifest.json" | head -1)"
           cd "$DEST"
           git config user.name "arena-ci" && git config user.email "ci@example.invalid"
           git add -A
@@ -200,3 +202,4 @@ jobs:
 
 # rerun-kick 9 (versi konten persisten — delta update antar-bangun aktif)
 # rerun-kick 10 (debug manifest CI)
+# rerun-kick 11 (debug rsync publish)
