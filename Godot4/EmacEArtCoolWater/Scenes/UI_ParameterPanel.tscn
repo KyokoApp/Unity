@@ -1,0 +1,941 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI_ParameterPanel.gd" id="1_panelscript"]
+
+[sub_resource type="StyleBoxFlat" id="Panel_bg"]
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+bg_color = Color(0.05, 0.08, 0.11, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.45, 0.62, 0.74, 0.45)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="UI_ParameterPanel" type="Control"]
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 110.0
+offset_right = 360.0
+offset_bottom = -16.0
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_panelscript")
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+theme_override_styles/panel = SubResource("Panel_bg")
+
+[node name="Layout" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Panel/Layout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "Water Parameters"
+
+[node name="Hint" type="Label" parent="Panel/Layout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.78, 0.86, 1)
+theme_override_font_sizes/font_size = 11
+text = "H - hide / show this panel"
+
+[node name="SurfaceRow" type="HBoxContainer" parent="Panel/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SurfaceLabel" type="Label" parent="Panel/Layout/SurfaceRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Surface"
+
+[node name="SurfaceSelector" type="OptionButton" parent="Panel/Layout/SurfaceRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+selected = 0
+item_count = 3
+popup/item_0/text = "Lake - Tropical"
+popup/item_0/id = 0
+popup/item_1/text = "Round Pool - Lagoon"
+popup/item_1/id = 1
+popup/item_2/text = "Rect Pool - Deep Blue"
+popup/item_2/id = 2
+
+[node name="Separator" type="HSeparator" parent="Panel/Layout"]
+layout_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Panel/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Params" type="VBoxContainer" parent="Panel/Layout/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 5
+
+[node name="Group1" type="Label" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "COLORS AND DEPTH"
+
+[node name="water_depth" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/water_depth"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/water_depth/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Water Depth"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/water_depth/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "3.00"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/water_depth"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.1
+max_value = 20.0
+step = 0.05
+value = 3.0
+
+[node name="color_bands" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/color_bands"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/color_bands/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Color Bands"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/color_bands/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "3"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/color_bands"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 1.0
+max_value = 8.0
+step = 1.0
+value = 3.0
+
+[node name="shore_glow_width" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/shore_glow_width"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/shore_glow_width/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Shore Glow Width"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/shore_glow_width/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.150"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/shore_glow_width"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 0.75
+step = 0.005
+value = 0.15
+
+[node name="Group2" type="Label" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "LIGHTING AND TOON"
+
+[node name="specular_size" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/specular_size"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/specular_size/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Specular Size"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/specular_size/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "24.00"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/specular_size"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 5.0
+max_value = 60.0
+step = 0.5
+value = 24.0
+
+[node name="specular_softness" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/specular_softness"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/specular_softness/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Specular Softness"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/specular_softness/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.25"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/specular_softness"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.25
+
+[node name="specular_hardness" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/specular_hardness"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/specular_hardness/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Specular Hardness"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/specular_hardness/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.85"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/specular_hardness"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.85
+
+[node name="specular_intensity" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/specular_intensity"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/specular_intensity/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Specular Intensity"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/specular_intensity/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.50"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/specular_intensity"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="fresnel_power" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/fresnel_power"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/fresnel_power/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Fresnel Power"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/fresnel_power/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "1.00"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/fresnel_power"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 3.0
+step = 0.01
+value = 1.0
+
+[node name="refraction_strength" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/refraction_strength"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/refraction_strength/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Refraction Strength"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/refraction_strength/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.020"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/refraction_strength"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 0.1
+step = 0.001
+value = 0.02
+
+[node name="Group3" type="Label" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "FOAM AND SHORE"
+
+[node name="foam_style" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/foam_style"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Foam Style"
+
+[node name="Options" type="OptionButton" parent="Panel/Layout/Scroll/Params/foam_style"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+selected = 4
+item_count = 5
+popup/item_0/text = "Texture"
+popup/item_0/id = 0
+popup/item_1/text = "Cloudy"
+popup/item_1/id = 1
+popup/item_2/text = "Blobs"
+popup/item_2/id = 2
+popup/item_3/text = "Scatter"
+popup/item_3/id = 3
+popup/item_4/text = "Cellular"
+popup/item_4/id = 4
+
+[node name="foam_tiling" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/foam_tiling"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/foam_tiling/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Foam Tiling"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/foam_tiling/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.020"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/foam_tiling"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 0.1
+step = 0.001
+value = 0.02
+
+[node name="foam_cutoff" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/foam_cutoff"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/foam_cutoff/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Foam Cutoff"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/foam_cutoff/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.50"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/foam_cutoff"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="foam_depth" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/foam_depth"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/foam_depth/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Foam Depth"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/foam_depth/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.50"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/foam_depth"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 2.0
+step = 0.01
+value = 0.5
+
+[node name="foam_speed" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/foam_speed"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/foam_speed/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Foam Speed"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/foam_speed/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.400"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/foam_speed"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 0.6
+step = 0.005
+value = 0.4
+
+[node name="foam_edge_break" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/foam_edge_break"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/foam_edge_break/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Foam Edge Break"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/foam_edge_break/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.60"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/foam_edge_break"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.6
+
+[node name="shore_edge_break" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/shore_edge_break"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/shore_edge_break/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Shore Edge Break"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/shore_edge_break/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.250"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/shore_edge_break"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 0.6
+step = 0.005
+value = 0.25
+
+[node name="foam_hardness" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/foam_hardness"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/foam_hardness/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Foam Hardness"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/foam_hardness/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.80"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/foam_hardness"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.8
+
+[node name="foam_overlay" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/foam_overlay"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/foam_overlay/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Foam Overlay"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/foam_overlay/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.00"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/foam_overlay"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.0
+
+[node name="Group4" type="Label" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "CAUSTICS"
+
+[node name="caustics_strength" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/caustics_strength"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/caustics_strength/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Caustics Strength"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/caustics_strength/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.250"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/caustics_strength"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 0.5
+step = 0.005
+value = 0.25
+
+[node name="caustics_scale" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/caustics_scale"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/caustics_scale/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Caustics Scale"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/caustics_scale/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.050"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/caustics_scale"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 0.1
+step = 0.001
+value = 0.05
+
+[node name="caustics_speed" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/caustics_speed"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/caustics_speed/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Caustics Speed"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/caustics_speed/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.50"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/caustics_speed"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.2
+step = 0.01
+value = 0.5
+
+[node name="chromatic_aberration" type="CheckBox" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+button_pressed = true
+text = "Chromatic Aberration"
+
+[node name="Group5" type="Label" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "SPARKLE"
+
+[node name="sparkle_boost" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/sparkle_boost"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/sparkle_boost/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Sparkle Boost"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/sparkle_boost/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.00"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/sparkle_boost"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.0
+
+[node name="sparkle_density" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/sparkle_density"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/sparkle_density/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Sparkle Density"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/sparkle_density/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.50"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/sparkle_density"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="sparkle_size" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/sparkle_size"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/sparkle_size/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Sparkle Size"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/sparkle_size/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.35"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/sparkle_size"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.35
+
+[node name="Group6" type="Label" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "WAVES GEOMETRY"
+
+[node name="normal_tiling" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/normal_tiling"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/normal_tiling/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Normal Tiling"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/normal_tiling/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.080"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/normal_tiling"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 0.15
+step = 0.001
+value = 0.08
+
+[node name="normal_strength" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/normal_strength"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/normal_strength/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Normal Strength"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/normal_strength/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.50"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/normal_strength"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 2.0
+step = 0.01
+value = 0.5
+
+[node name="wave_speed" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/wave_speed"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/wave_speed/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Wave Speed"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/wave_speed/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.050"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/wave_speed"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 0.2
+step = 0.001
+value = 0.05
+
+[node name="wave_height" type="VBoxContainer" parent="Panel/Layout/Scroll/Params"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="Panel/Layout/Scroll/Params/wave_height"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Panel/Layout/Scroll/Params/wave_height/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Wave Height"
+
+[node name="Value" type="Label" parent="Panel/Layout/Scroll/Params/wave_height/Header"]
+custom_minimum_size = Vector2(54, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "0.040"
+horizontal_alignment = 2
+
+[node name="Slider" type="HSlider" parent="Panel/Layout/Scroll/Params/wave_height"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+min_value = 0.0
+max_value = 0.3
+step = 0.005
+value = 0.04
+

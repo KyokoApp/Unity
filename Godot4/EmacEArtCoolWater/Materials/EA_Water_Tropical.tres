@@ -1,0 +1,49 @@
+[gd_resource type="ShaderMaterial" load_steps=4 format=3]
+
+; Tropical - turquoise shore water. Values carried over 1:1 from the Unity
+; material Water_Experimental (Roadside Tales Backroad Bridges); colors
+; converted linear -> sRGB.
+
+[ext_resource type="Shader" path="res://Shaders/EA_CoolWater.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://Textures/EA_Water_Normal.tres" id="2_nmap"]
+[ext_resource type="Texture2D" path="res://Textures/EA_Foam_Voronoi.tres" id="3_foam"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/shallow_color = Color(0.366, 0.959, 0.86, 0.6)
+shader_parameter/deep_color = Color(0.248, 0.566, 0.815, 1.0)
+shader_parameter/water_depth = 5.42
+shader_parameter/color_bands = 3
+shader_parameter/shore_glow_color = Color(0.906, 0.982, 1.0, 1.0)
+shader_parameter/shore_glow_width = 0.477
+shader_parameter/specular_color = Color(1, 1, 1, 1)
+shader_parameter/specular_size = 20.28
+shader_parameter/specular_softness = 0.05
+shader_parameter/specular_hardness = 0.85
+shader_parameter/specular_intensity = 0.513
+shader_parameter/fresnel_power = 1.6
+shader_parameter/refraction_strength = 0.0277
+shader_parameter/foam_style = 1
+shader_parameter/foam_color = Color(1, 1, 1, 1)
+shader_parameter/foam_texture = ExtResource("3_foam")
+shader_parameter/foam_tiling = 0.012
+shader_parameter/foam_cutoff = 0.3
+shader_parameter/foam_depth = 2.0
+shader_parameter/foam_speed = 0.189
+shader_parameter/foam_edge_break = 0.7
+shader_parameter/foam_hardness = 0.85
+shader_parameter/foam_overlay = 0.0
+shader_parameter/caustics_tint = Color(0.798, 1.0, 0.931, 1.0)
+shader_parameter/caustics_strength = 0.3
+shader_parameter/caustics_scale = 0.0592
+shader_parameter/caustics_speed = 0.401
+shader_parameter/chromatic_aberration = false
+shader_parameter/sparkle_boost = 0.7
+shader_parameter/sparkle_density = 0.45
+shader_parameter/sparkle_size = 0.3
+shader_parameter/normal_map = ExtResource("2_nmap")
+shader_parameter/normal_tiling = 0.0419
+shader_parameter/normal_strength = 1.24
+shader_parameter/wave_speed = 0.001
+shader_parameter/wave_height = 0.04

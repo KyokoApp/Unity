@@ -1,0 +1,29 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="EmacEArt Cool Water"
+config/description="Demo scene for EA_CoolWater.gdshader - a Godot 4 port of the stylized toon water shader from Unity URP."
+run/main_scene="res://Scenes/WaterDemo.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+
+[editor]
+
+movie_writer/mjpeg_quality=0.95
+
+[rendering]
+
+anti_aliasing/quality/msaa_3d=2

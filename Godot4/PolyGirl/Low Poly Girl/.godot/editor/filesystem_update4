@@ -1,0 +1,41 @@
+res://assets/Skeleton Profiles/girl_skeleton_profile_humanoid.tres
+res://assets/Materials/transp.tres
+res://assets/Materials/girl.tres
+res://assets/Bone Maps/girls_bone_map.tres
+res://assets/Animations/girl/_T-Pose.res
+res://assets/Animations/girl/action_button_click.res
+res://assets/Animations/girl/action_button_open_door.res
+res://assets/Animations/girl/climb_high.res
+res://assets/Animations/girl/climb_low.res
+res://assets/Animations/girl/cycle_talking.res
+res://assets/Animations/girl/expressions_angry.res
+res://assets/Animations/girl/expressions_blinking.res
+res://assets/Animations/girl/idle.res
+res://assets/Animations/girl/Idle 2.res
+res://assets/Animations/girl/Idle 3.res
+res://assets/Animations/girl/idle_to_sit.res
+res://assets/Animations/girl/inspect_ground_end.res
+res://assets/Animations/girl/inspect_ground_start.res
+res://assets/Animations/girl/jump_end.res
+res://assets/Animations/girl/jump_falling.res
+res://assets/Animations/girl/jump_fwd.res
+res://assets/Animations/girl/jump_start.res
+res://assets/Animations/girl/phonemes  - A-I.res
+res://assets/Animations/girl/phonemes  - C-G-D-K-N-S-T.res
+res://assets/Animations/girl/phonemes  - E.res
+res://assets/Animations/girl/phonemes  - F-V-D-Th.res
+res://assets/Animations/girl/phonemes  - I-D-Th.res
+res://assets/Animations/girl/phonemes  - M-P-B.res
+res://assets/Animations/girl/phonemes  - O.res
+res://assets/Animations/girl/phonemes  - stand.res
+res://assets/Animations/girl/phonemes  - U.res
+res://assets/Animations/girl/run.res
+res://assets/Animations/girl/sit_idle.res
+res://assets/Animations/girl/sit_to idle.res
+res://assets/Animations/girl/walk.res
+res://assets/Animations/girl/walk_fast.res
+res://assets/Animations/girl/walk_stairway_down_root.res
+res://assets/Animations/girl/walk_stairway_root.res
+res://assets/Animations/girl/inspect_ground.res
+res://assets/Animations/girl/jump.res
+res://assets/girl.tscn
