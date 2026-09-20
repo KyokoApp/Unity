@@ -55,6 +55,41 @@ static func from_plane(size: Vector2, color: Color, double_sided_mesh := false) 
 		a[Mesh.ARRAY_INDEX] = ids
 	return a
 
+## Muat aset luar (.gltf/.glb) dan ambil ArrayMesh pertama (model KayKit = 1 mesh).
+## Mengembalikan {mesh, offset_y} — offset_y agar kaki model menyentuh y=0.
+static func load_external_mesh(path: String) -> Dictionary:
+	var res = load(path)
+	if res == null:
+		push_warning("MeshLib: aset gagal dimuat: " + path)
+		return {}
+	var root: Node = res.instantiate() if res is PackedScene else res
+	var mi := _find_mesh_instance(root)
+	if mi == null or mi.mesh == null:
+		if root is Node:
+			root.free()
+		push_warning("MeshLib: tidak ada MeshInstance3D di " + path)
+		return {}
+	var mesh: ArrayMesh = mi.mesh
+	var aabb: AABB = mesh.get_aabb()
+	if root is Node:
+		root.free()
+	return {"mesh": mesh, "offset_y": -aabb.position.y, "size": aabb.size}
+
+static func _find_mesh_instance(node: Node) -> MeshInstance3D:
+	if node is MeshInstance3D:
+		return node
+	for c in node.get_children():
+		var mi := _find_mesh_instance(c)
+		if mi != null:
+			return mi
+	return null
+
+## Skala agar tinggi AABB = target_h meter.
+static func fit_scale(info: Dictionary, target_h: float) -> float:
+	if info.is_empty() or float(info["size"].y) <= 0.001:
+		return 1.0
+	return target_h / float(info["size"].y)
+
 ## Deformasi bola/recak menjadi batu tak beraturan (deterministik dari seed).
 static func deform(a: Array, seed: int, strength: float) -> Array:
 	var rng := RandomNumberGenerator.new()

@@ -1,6 +1,6 @@
 {
- "game_version": "1.0.11",
- "generated_at": "2026-09-20T08:32:23Z",
+ "game_version": "1.0.12",
+ "generated_at": "2026-09-20T09:07:06Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -22,26 +22,26 @@
    "deps": []
   },
   "shaders_materials": {
-   "version": "1.0.7",
+   "version": "1.0.8",
    "size": 0,
    "sha256": "",
-   "url": "packs/shaders_materials-1.0.7.pck",
+   "url": "packs/shaders_materials-1.0.8.pck",
    "deps": []
   },
   "world_terrain": {
-   "version": "1.0.11",
+   "version": "1.0.12",
    "size": 0,
    "sha256": "",
-   "url": "packs/world_terrain-1.0.11.pck",
+   "url": "packs/world_terrain-1.0.12.pck",
    "deps": [
     "shaders_materials"
    ]
   },
   "world_props_forest": {
-   "version": "1.0.1",
+   "version": "1.0.2",
    "size": 0,
    "sha256": "",
-   "url": "packs/world_props_forest-1.0.1.pck",
+   "url": "packs/world_props_forest-1.0.2.pck",
    "deps": [
     "shaders_materials",
     "world_terrain"

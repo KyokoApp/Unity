@@ -45,24 +45,53 @@ func apply_density(t: float, g: float) -> void:
 	for k in supercells:
 		_apply_density_cell(supercells[k])
 
+const KIT_DIR := "res://packs/world_props_forest/kaykit/"
+var grass_mat: ShaderMaterial
+
+## varian KayKit (CC0): tiap entri { mesh, fit, offset_y } — ternormalisasi ke tinggi target
+func _kit_variants(names: Array, target_h: float) -> Array:
+	var out := []
+	for n in names:
+		var info: Dictionary = MeshLib.load_external_mesh(KIT_DIR + n + ".gltf")
+		if info.is_empty():
+			continue
+		info["fit"] = MeshLib.fit_scale(info, target_h)
+		out.append(info)
+	return out
+
+static func _proc(info_mesh: ArrayMesh) -> Dictionary:
+	return {"mesh": info_mesh, "fit": 1.0, "offset_y": 0.0}
+
 func _build_shared_meshes() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 911
-	var variants := []
-	for i in range(3):
-		variants.append(MeshLib.to_mesh(MeshLib.make_broadleaf_tree(rng)))
-	meshes["broadleaf"] = variants
-	variants = []
-	for i in range(3):
-		variants.append(MeshLib.to_mesh(MeshLib.make_pine_tree(rng)))
-	meshes["pine"] = variants
-	variants = []
-	for i in range(3):
-		variants.append(MeshLib.to_mesh(MeshLib.make_rock(rng)))
-	meshes["rock"] = variants
-	meshes["bush"] = [MeshLib.to_mesh(MeshLib.make_bush(rng))]
-	meshes["grass"] = [MeshLib.to_mesh(MeshLib.make_grass_tuft())]
-	meshes["flower"] = [MeshLib.to_mesh(MeshLib.make_flower())]
+	# pohon: aset KayKit tree_single_A/B (broadleaf) + rumpun kecil (pine-slots)
+	meshes["broadleaf"] = _kit_variants(["tree_single_A", "tree_single_B"], 6.8)
+	if meshes["broadleaf"].is_empty():
+		for i in range(3):
+			meshes["broadleaf"].append(_proc(MeshLib.to_mesh(MeshLib.make_broadleaf_tree(rng))))
+	meshes["pine"] = _kit_variants(["tree_single_B"], 9.0)
+	if meshes["pine"].is_empty():
+		for i in range(3):
+			meshes["pine"].append(_proc(MeshLib.to_mesh(MeshLib.make_pine_tree(rng))))
+	# batu: 5 varian KayKit
+	meshes["rock"] = _kit_variants(["rock_single_A", "rock_single_B", "rock_single_C", "rock_single_D", "rock_single_E"], 1.7)
+	if meshes["rock"].is_empty():
+		for i in range(3):
+			meshes["rock"].append(_proc(MeshLib.to_mesh(MeshLib.make_rock(rng))))
+	meshes["bush"] = [_proc(MeshLib.to_mesh(MeshLib.make_bush(rng)))]
+	meshes["grass"] = [_proc(MeshLib.to_mesh(MeshLib.make_grass_tuft()))]
+	meshes["flower"] = [_proc(MeshLib.to_mesh(MeshLib.make_flower()))]
+	# material rumput dipakai bersama agar uniform player_pos cukup diset 1x/frame
+	grass_mat = ShaderMaterial.new()
+	grass_mat.shader = GRASS_SHADER
+	# desa KayKit
+	var vl = load("res://packs/world_props_forest/village.gd")
+	if vl:
+		var vn = Node3D.new()
+		vn.set_script(vl)
+		add_child(vn)
+		vn.call("configure", island, world)
 
 func _supercell_at(x: float, z: float) -> Vector2i:
 	return Vector2i(floori(x / CELL) + 2, floori(z / CELL) + 2)
@@ -125,6 +154,8 @@ func _process(_delta: float) -> void:
 			if is_instance_valid(supercells[k][t]):
 				supercells[k][t].queue_free()
 		supercells.erase(k)
+	if player != null and grass_mat != null:
+		grass_mat.set_shader_parameter("player_pos", player.global_position)
 	if player != null and not flowers_spawned:
 		_spawn_pickup_flowers()
 
@@ -203,22 +234,27 @@ func _build_cell_nodes(data: Dictionary) -> void:
 		var pts: Array = data[t]
 		if pts.is_empty():
 			continue
-		var mesh: ArrayMesh = data["mesh_ix"][t] if data["mesh_ix"].has(t) else meshes[t][0]
+		var info: Dictionary = data["mesh_ix"][t] if data["mesh_ix"].has(t) else meshes[t][0]
+		var mesh: ArrayMesh = info["mesh"]
+		var fit: float = float(info.get("fit", 1.0))
+		var off_y: float = float(info.get("offset_y", 0.0))
 		var mmi := MultiMeshInstance3D.new()
 		var mm := MultiMesh.new()
 		mm.mesh = mesh
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.instance_count = pts.size()
 		for i in range(pts.size()):
-			var sc: float = pts[i]["s"]
+			var sc: float = pts[i]["s"] * fit
 			var basis := Basis(Vector3.UP, pts[i]["rot"]) * Basis.from_scale(Vector3.ONE * sc)
-			mm.set_instance_transform(i, Transform3D(basis, pts[i]["p"]))
+			var pos: Vector3 = pts[i]["p"] + Vector3(0.0, off_y * sc, 0.0)
+			mm.set_instance_transform(i, Transform3D(basis, pos))
 		mmi.multimesh = mm
 		if t == "grass":
-			var gm := ShaderMaterial.new()
-			gm.shader = GRASS_SHADER
-			mmi.material_override = gm
+			mmi.material_override = grass_mat
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		elif fit != 1.0:
+			# aset KayKit bertekstur: pakai material aslinya
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		else:
 			mmi.material_override = Materials.toon_vertex_color(false)
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON

@@ -38,3 +38,10 @@
   dipakai sebagai skin bawaan pemain (`packs/character_player/polygirl.glb`).
 
 *Terakhir diperbarui: 2026-09-20*
+
+## Ronde-8: Aset Desa & Alam — KayKit Medieval Hexagon Pack (CC0)
+
+- **KayKit Medieval Hexagon Pack** oleh Kay Lousberg — CC0 1.0
+  (https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0)
+  Dipakai: rumah (home A/B, tavern, blacksmith, windmill, church, well), pagar,
+  barrel/crate/wheelbarrow, pohon tree_single_A/B, batu rock_single_A–E.

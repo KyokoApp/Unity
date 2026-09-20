@@ -184,3 +184,18 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
    sampai ada paket pohon). EmacEArt Cool Water + Color Grading = belum
    diintegrasi (cool water pakai screen-texture/depth → mahal di Adreno; color
    grading compositor = desktop) — kontrol pencahayaan native tetap jalan.
+
+## 2026-09-20 — Ronde-8: aset jadi + mood sore (ZZZ-ish)
+1. Prinsip baru (permintaan user): semua objek dunia = aset jadi CC0, bukan rakitan
+   prosedural. Sumber utama GitHub (satu-satunya host yang lolos sandbox):
+   KayKit Medieval Hexagon Pack (CC0). MegaKit Quaternius modular TIDAK dipakai
+   (bukan rumah jadi) — ditinggalkan.
+2. Rumah: footprint/dbagikan normalisasi AABB → skala konsisten; desa = 3 situs
+   landai dekat pantai, cincin menghadap sumur, props hangat, collision kotak.
+3. Pohon KayKit menggantikan pohon prosedural; batu 5 varian; rumput tetap mesh
+   prosedural (tak terhindarkan untuk interaksi) tapi kini REAKTIF: hanyut saat
+   diinjak (shader mendapat player_pos per frame, radius 1.6m, tekan & dorong).
+4. Mood visual: default waktu 16.4 (sore), palet siang dibuat teduh + senja
+   peach-teal sinematik, ambient/fog disesuaikan, exposure 0.95; tanah direram
+   ke hijau zamrud; sea & sky tetap shader internal (addon Color Grading &
+   Cool Water tetap ditahan demi performa ponsel).

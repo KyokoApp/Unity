@@ -33,7 +33,7 @@ var sun: DirectionalLight3D
 var world_env: WorldEnvironment
 var sky_mat: ShaderMaterial
 var water: MeshInstance3D
-var time_of_day := 9.6    # jam (mulai pagi yang cerah)
+var time_of_day := 16.4   # jam (mulai sore yang adem — sesuai permintaan)
 const DAY_LENGTH := 420.0 # detik untuk 24 jam penuh
 var chunk_rings := 6
 var forest_pack: Node
@@ -110,13 +110,13 @@ func _setup_environment() -> void:
 	sk.sky_material = sky_mat
 	env.sky = sk
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.58, 0.66, 0.66)
-	env.ambient_light_energy = 0.70
+	env.ambient_light_color = Color(0.52, 0.58, 0.58)
+	env.ambient_light_energy = 0.60
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 1.0
+	env.tonemap_exposure = 0.95
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.62, 0.84, 0.78)
-	env.fog_density = 0.0015
+	env.fog_light_color = Color(0.56, 0.76, 0.68)
+	env.fog_density = 0.0016
 	env.fog_sky_affect = 0.3
 	world_env.environment = env
 	add_child(world_env)
@@ -508,29 +508,30 @@ func _apply_daylight() -> void:
 	sun.rotation_degrees = Vector3(-elev, azim - 90.0, 0)
 	var env := world_env.environment
 	if dayf > 0.15:
-		# siang
+		# siang: lembut teduh (bukan terang benderang) — rasa sore yang adem
 		var k := smoothstep(0.15, 0.85, dayf)
-		sun.light_color = Color(1.0, 0.90, 0.72).lerp(Color(1.0, 0.96, 0.86), k)
-		sun.light_energy = 0.60 + 0.06 * k
+		sun.light_color = Color(1.0, 0.82, 0.62).lerp(Color(1.0, 0.90, 0.76), k)
+		sun.light_energy = 0.46 + 0.07 * k
 		sun.shadow_enabled = quality_ref.get_preset().shadows if quality_ref else true
-		env.ambient_light_color = Color(0.58, 0.66, 0.66)
-		env.ambient_light_energy = 0.58
-		env.fog_light_color = Color(0.62, 0.84, 0.78)
-		sky_mat.set_shader_parameter("zenith_color", Color(0.30, 0.74, 0.69))
-		sky_mat.set_shader_parameter("horizon_color", Color(0.62, 0.88, 0.80))
-		sky_mat.set_shader_parameter("ground_color", Color(0.36, 0.44, 0.44))
-		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.94, 0.74))
+		sun.shadow_opacity = 0.40
+		env.ambient_light_color = Color(0.50, 0.57, 0.60)
+		env.ambient_light_energy = 0.50
+		env.fog_light_color = Color(0.54, 0.74, 0.68)
+		sky_mat.set_shader_parameter("zenith_color", Color(0.19, 0.42, 0.46))
+		sky_mat.set_shader_parameter("horizon_color", Color(0.62, 0.80, 0.66))
+		sky_mat.set_shader_parameter("ground_color", Color(0.30, 0.38, 0.37))
+		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.90, 0.66))
 	elif dayf > -0.12:
-		# senja/fajar
+		# senja/fajar: peach-teal sinematik (nuansa ZZZ)
 		var k := smoothstep(-0.12, 0.15, dayf)
-		sun.light_color = Color(1.0, 0.55, 0.34).lerp(Color(1.0, 0.93, 0.80), k)
-		sun.light_energy = 0.55 + 0.5 * k
-		env.ambient_light_color = Color(0.56, 0.50, 0.52).lerp(Color(0.58, 0.66, 0.66), k)
-		env.ambient_light_energy = 0.62 + 0.33 * k
-		env.fog_light_color = Color(0.82, 0.64, 0.50).lerp(Color(0.62, 0.84, 0.78), k)
-		sky_mat.set_shader_parameter("zenith_color", Color(0.16, 0.34, 0.44).lerp(Color(0.30, 0.74, 0.69), k))
-		sky_mat.set_shader_parameter("horizon_color", Color(0.98, 0.68, 0.42).lerp(Color(0.62, 0.88, 0.80), k))
-		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.66, 0.34))
+		sun.light_color = Color(1.0, 0.52, 0.32).lerp(Color(1.0, 0.90, 0.74), k)
+		sun.light_energy = 0.42 + 0.42 * k
+		env.ambient_light_color = Color(0.50, 0.46, 0.52).lerp(Color(0.50, 0.57, 0.60), k)
+		env.ambient_light_energy = 0.52 + 0.30 * k
+		env.fog_light_color = Color(0.72, 0.55, 0.48).lerp(Color(0.54, 0.74, 0.68), k)
+		sky_mat.set_shader_parameter("zenith_color", Color(0.11, 0.24, 0.38).lerp(Color(0.19, 0.42, 0.46), k))
+		sky_mat.set_shader_parameter("horizon_color", Color(0.95, 0.55, 0.34).lerp(Color(0.62, 0.80, 0.66), k))
+		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.60, 0.30))
 	else:
 		# malam: tetap terbaca, tidak gelap pekat
 		sun.light_color = Color(0.55, 0.65, 0.90)
@@ -541,7 +542,7 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("zenith_color", Color(0.05, 0.09, 0.16))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.10, 0.15, 0.22))
 		sky_mat.set_shader_parameter("sun_color", Color(0.62, 0.70, 0.85))
-	env.fog_density = 0.0015 * (quality_ref.get_preset().fog if quality_ref else 1.0) * float(_lo.fog)
+	env.fog_density = 0.0016 * (quality_ref.get_preset().fog if quality_ref else 1.0) * float(_lo.fog)
 	# override dari Mode Edit: pengali & preset gradien langit
 	sun.light_energy *= float(_lo.sun)
 	env.ambient_light_energy *= float(_lo.ambient)
