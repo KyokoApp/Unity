@@ -199,3 +199,16 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
    peach-teal sinematik, ambient/fog disesuaikan, exposure 0.95; tanah direram
    ke hijau zamrud; sea & sky tetap shader internal (addon Color Grading &
    Cool Water tetap ditahan demi performa ponsel).
+
+## 2026-09-20 — Ronde-9: dunia 268m + datar bergelombang + bersih repo
+1. Dunia 800 -> 268m (GRID 4x4, chunk 67m, forest supercell 67m, kabut 0.0026).
+2. Kontur "datar tapi bergelombang": bukit 38m->4.5m, relief dasar 5.2->2.1m,
+   detail 0.55->0.30; ambang batuan ikut turun (16-26m -> 7-13m).
+3. Godot4/ DIHAPUS (permintaan): yg dipakai sudah diekstrak (PolyGirl->pack
+   character_player; MegaKit modular ditinggal; VRM 19MB tak terpakai ikut hilang
+   — kalau nanti mau skin VRM, upload ulang saja).
+4. Lakshman-YT/Forest-Godot4 TIDAK dijadikan world baru: lisensi campuran
+   per-asset Sketchfab (beberapa bukan CC0/BY jelas), tergantung stack
+   Terrain3D+Sky3D+PhantomCamera (plugin PC, 158MB) — konflik dg prinsip
+   mobile-ringan kita. Nilai ambil parsial: model env (maple/pine/bush/grass/
+   bridge/butterfly) — ditawarkan sebagai opsi ronde berikut dgn kredit CC-BY.

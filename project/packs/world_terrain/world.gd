@@ -12,10 +12,10 @@ const WATER_SHADER := preload("res://packs/shaders_materials/water.gdshader")
 const SKY_SHADER := preload("res://packs/shaders_materials/sky.gdshader")
 const FOREST_SCENE := "res://packs/world_props_forest/forest.tscn"
 const BEACH_SCENE := "res://packs/world_props_beach/beach.tscn"
-const CHUNK_SIZE := 100.0
-const GRID := 8
+const CHUNK_SIZE := 67.0
+const GRID := 4
 const WORLD_SEED := 20260919
-const WORLD_SIZE := 800.0  # diperkecil dari 1600 (keluhan: dunia kebesaran)
+const WORLD_SIZE := 268.0  # diperkecil 3x laggi (keluhan: masih kebesaran)
 const EDITS_PATH := "user://terrain_edits.dat"
 
 var island
@@ -116,7 +116,7 @@ func _setup_environment() -> void:
 	env.tonemap_exposure = 0.95
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.56, 0.76, 0.68)
-	env.fog_density = 0.0016
+	env.fog_density = 0.0026
 	env.fog_sky_affect = 0.3
 	world_env.environment = env
 	add_child(world_env)
@@ -542,7 +542,7 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("zenith_color", Color(0.05, 0.09, 0.16))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.10, 0.15, 0.22))
 		sky_mat.set_shader_parameter("sun_color", Color(0.62, 0.70, 0.85))
-	env.fog_density = 0.0016 * (quality_ref.get_preset().fog if quality_ref else 1.0) * float(_lo.fog)
+	env.fog_density = 0.0026 * (quality_ref.get_preset().fog if quality_ref else 1.0) * float(_lo.fog)
 	# override dari Mode Edit: pengali & preset gradien langit
 	sun.light_energy *= float(_lo.sun)
 	env.ambient_light_energy *= float(_lo.ambient)

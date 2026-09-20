@@ -219,13 +219,13 @@ func _land_height(x: float, z: float) -> float:
 	var core := smoothstep(0.10, 0.42, edge)
 	var e1: float = n_base.get_noise_2d(x, z) * 0.5 + 0.5
 	var h := -9.0 * (1.0 - shelf) + shelf * 0.35
-	h += core * (1.4 + e1 * 5.2)
+	h += core * (0.9 + e1 * 2.1)   # datar: hanya gelombang lembut
 	var hillv: float = clampf(n_hill.get_noise_2d(x, z) * 0.5 + 0.5, 0.0, 1.0)
 	# clamp wajib: ridged noise bisa keluar [0,1] sedikit -> pow(neg,1.4)=NaN
 	# (NaN membunuh segitiga GPU -> mesh pulau tak terlihat di perangkat)
 	var hill_mask := smoothstep(0.52, 0.8, hillv) * core * smoothstep(0.15, 0.4, e1)
-	h += hill_mask * pow(hillv, 1.4) * 38.0
-	h += n_detail.get_noise_2d(x, z) * 0.55 * core
+	h += hill_mask * pow(hillv, 1.4) * 4.5   # bergelombang kecil, tanpa gunung
+	h += n_detail.get_noise_2d(x, z) * 0.30 * core
 	return h
 
 ## Tinggi final (dengan ukir sungai + danau + lapisan edit pemain). API utama.
@@ -304,8 +304,8 @@ func color_at(x: float, z: float, h: float) -> Color:
 		# campuran pasir di garis pantai
 		c = sand.lerp(c, smoothstep(0.9, 1.8, h))
 	# batuan pada lereng curam / tinggi
-	var rk := smoothstep(0.32, 0.55, s)
-	rk = maxf(rk, smoothstep(16.0, 26.0, h))
+	var rk := smoothstep(0.34, 0.58, s)
+	rk = maxf(rk, smoothstep(7.0, 13.0, h))
 	c = c.lerp(rock, rk)
 	# variasi lembut
 	var v := n_detail.get_noise_2d(x * 1.7, z * 1.7) * 0.035

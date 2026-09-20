@@ -162,7 +162,7 @@ func _build() -> void:
 		# 2-4 pohon hias tepi desa
 		for ti in range(rng.randi_range(2, 4)):
 			var ta := rng.randf() * TAU
-			var tx := c.x + cos(ta) * rng.randf_range(ring_r + 8.0, ring_r + 20.0)
-			var tz := c.y + sin(ta) * rng.randf_range(ring_r + 8.0, ring_r + 20.0)
+			var tx := c.x + cos(ta) * rng.randf_range(ring_r + 5.0, ring_r + 12.0)
+			var tz := c.y + sin(ta) * rng.randf_range(ring_r + 5.0, ring_r + 12.0)
 			_place("tree_single_A", Vector3(tx, island.height_at(tx, tz), tz), rng.randf() * TAU, 6.8, "tall", false)
 	print("village: %d desa dibangun" % sites.size())

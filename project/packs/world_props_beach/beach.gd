@@ -47,8 +47,8 @@ func _task_layout() -> void:
 	var tries := 0
 	while palms.size() < 170 and tries < 4000:
 		tries += 1
-		var x := rng.randf_range(-780, 780)
-		var z := rng.randf_range(-780, 780)
+		var x := rng.randf_range(-128, 128)
+		var z := rng.randf_range(-128, 128)
 		var h: float = island.height_at(x, z)
 		if h < 0.35 or h > 2.6:
 			continue
@@ -72,8 +72,8 @@ func _task_layout() -> void:
 	tries = 0
 	while shells.size() < 140 and tries < 2800:
 		tries += 1
-		var x := rng.randf_range(-780, 780)
-		var z := rng.randf_range(-780, 780)
+		var x := rng.randf_range(-128, 128)
+		var z := rng.randf_range(-128, 128)
 		var h: float = island.height_at(x, z)
 		if h < 0.15 or h > 0.8 or island.slope_at(x, z) > 0.2:
 			continue
@@ -83,10 +83,10 @@ func _task_layout() -> void:
 	var best := [Vector3(0, -10, 0)]
 	for j in range(21):
 		for i in range(21):
-			var x := -800.0 + i * 80.0
-			var z := -800.0 + j * 80.0
+			var x := -124.0 + i * 12.4
+			var z := -124.0 + j * 12.4
 			var r := Vector2(x, z).length()
-			if r < 150.0 or r > 500.0:
+			if r < 38.0 or r > 124.0:
 				continue
 			var h: float = island.height_at(x, z)
 			if h > best[0].y:
@@ -96,9 +96,9 @@ func _task_layout() -> void:
 	best = [Vector3(0, -10, 0)]
 	for j in range(13):
 		for i in range(13):
-			var x := -600.0 + i * 100.0
-			var z := -600.0 + j * 100.0
-			if Vector2(x, z).length() > 320.0:
+			var x := -84.0 + i * 14.0
+			var z := -84.0 + j * 14.0
+			if Vector2(x, z).length() > 110.0:
 				continue
 			var h: float = island.height_at(x, z)
 			if h > best[0].y:
