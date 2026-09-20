@@ -28,4 +28,8 @@
 - **Godot Engine** (4.5.x), MIT — https://godotengine.org
 - **OpenJDK (jdk4py)** untuk keystore/signing Android — GPL w/ classpath exception.
 
-*Terakhir diperbarui: 2026-09-19*
+
+- **Terrain detail texture** (`packs/shaders_materials/textures/terrain_detail.jpg`)
+  — dibuat AI (text-to-image) untuk proyek ini, gaya painterly; bukan aset pihak ketiga.
+
+*Terakhir diperbarui: 2026-09-20*

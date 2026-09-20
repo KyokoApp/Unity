@@ -231,8 +231,9 @@ func _physics_process(delta: float) -> void:
 		floor_h = world.height_at(global_position.x, global_position.z)
 	var depth := water_y - floor_h
 	_swimming = depth > 1.05 and global_position.y < water_y + 0.3
-	# input arah relatif kamera
-	var wish := Vector2(joy.x, -joy.y)
+	# input arah relatif kamera (y layar positif=kebawah karena dorongan atas = maju
+	# dipetakan ke -Z kamera lewat cam_basis; jangan dinegasikan dua kali)
+	var wish := Vector2(joy.x, joy.y)
 	if wish.length() > 1.0:
 		wish = wish.normalized()
 	var cam_basis := Basis(Vector3.UP, yaw)
@@ -243,7 +244,7 @@ func _physics_process(delta: float) -> void:
 		var kb := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 		if kb != Vector2.ZERO:
 			wish = kb
-			move_dir = (cam_basis * Vector3(wish.x, 0, -wish.y))
+			move_dir = (cam_basis * Vector3(wish.x, 0, wish.y))
 		if Input.is_action_just_pressed("ui_accept"):
 			press_jump()
 		sprint = Input.is_key_pressed(KEY_SHIFT) or sprint

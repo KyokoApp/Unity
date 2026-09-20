@@ -61,14 +61,26 @@ static func build_mesh_data(island, pcx: int, pcz: int, plod: int) -> Dictionary
 	normals.resize(n * n)
 	colors.resize(n * n)
 	var idx: int = 0
+	var nan_n: int = 0
+	var hmin: float = 1e9
+	var hmax: float = -1e9
 	for j in range(n):
 		for i in range(n):
 			var x: float = x0 + i * step
 			var z: float = z0 + j * step
 			var h: float = island.height_at(x, z)
+			if is_nan(h) or is_inf(h):
+				h = 0.0
+				nan_n += 1
+			var nrm: Vector3 = island.normal_at(x, z, maxf(step * 0.5, 0.8))
+			if is_nan(nrm.x) or is_nan(nrm.y) or is_nan(nrm.z):
+				nrm = Vector3.UP
+				nan_n += 1
 			verts[idx] = Vector3(x, h, z)
-			normals[idx] = island.normal_at(x, z, maxf(step * 0.5, 0.8))
+			normals[idx] = nrm
 			colors[idx] = island.color_at(x, z, h)
+			hmin = minf(hmin, h)
+			hmax = maxf(hmax, h)
 			idx += 1
 	var indices := PackedInt32Array()
 	indices.resize(res * res * 6)
@@ -121,7 +133,9 @@ static func build_mesh_data(island, pcx: int, pcz: int, plod: int) -> Dictionary
 			heights[hi] = island.height_at(x0 + i * pstep, z0 + j * pstep)
 			hi += 1
 	return {"verts": verts, "normals": normals, "colors": colors,
-			"indices": indices, "heights": heights}
+			"indices": indices, "heights": heights,
+			"stats_nan": nan_n, "stats_hmin": hmin, "stats_hmax": hmax,
+			"stats_v": verts.size()}
 
 ## Merangkai ArrayMesh dari data (dipanggil di main thread; murah).
 static func make_mesh(data: Dictionary) -> ArrayMesh:

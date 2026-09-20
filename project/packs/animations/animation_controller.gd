@@ -6,6 +6,9 @@ extends RefCounted
 
 class_name AnimController
 
+const LOOP_STATES := ["idle", "walk", "run", "sprint",
+	"crouch_idle", "crouch_move", "swim_idle", "swim_move", "jump_fall"]
+
 const STATES := {
 	"idle": ["Idle", "Unarmed_Idle", "Idle_Neutral"],
 	"walk": ["Walking_A", "Walking_D", "Walk_A", "Walking"],
@@ -49,6 +52,13 @@ func setup(node: Node3D, skin_root: Node) -> bool:
 		if not resolved.has(st) and not st in ["attack", "emote", "sit", "crouch_idle"]:
 			# fallback generik supaya tidak ada state kosong
 			resolved[st] = names[0] if names.size() > 0 else ""
+	# WAJIB: animasi GLB impor tidak loop secara bawaan — tanpa ini, walk
+	# berhenti di frame terakhir setelah ~1 siklus ("beberapa langkah lalu kaku").
+	for st in resolved:
+		var a := anim_player.get_animation(resolved[st])
+		if a == null:
+			continue
+		a.loop_mode = Animation.LOOP_LINEAR if LOOP_STATES.has(st) else Animation.LOOP_NONE
 	# bangun AnimationTree bermesin state machine
 	tree = AnimationTree.new()
 	tree.name = "AnimTree"

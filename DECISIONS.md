@@ -118,3 +118,19 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
 - **Permintaan**: tampilan amat-mirip game-kasual favorit pengguna (langit turquoise, kota krim/terracotta, garis cokelat sketchy) — ditempuh sebagai *replikasi bahasa visual*, BUKAN penyalinan aset: nilai warna dirumuskan ulang sendiri dari analisis tangkapan layar publik (referensi tidak disimpan di repo).
 - **Implementasi** (satu pass komit): sky.gdshader → turquoise/mint krim; toon 3-band tetap namun kontras direndahkan (shadow 0.52→0.60, softness 0.12→0.16, rim jadi hangat 1.0/0.90/0.70); outline → umber hangat (0.24/0.15/0.14); air → teal dua-nada (shallow 0.30/0.80/0.73, deep 0.09/0.42/0.52); biome island.gd → sand krim, rumput sage/jade, hutan jade-tua, batuan abu-lilac; properti pantai → cream/terracotta/sage/pale-cyan; siklus siang-malam disetel ulang (sun krim hangat, senja coral, malam teal-tinta tetap terbaca).
 - **Verifikasi**: tools/style_preview.py (CPU, mereplika math shader) merender pratinjau siang/senja/malam + metrik eksposur — day mean 0.61, dusk 0.42, night 0.18, over/under-klip < 0.5% → lolos standar "tidak over-exposed/crushed".
+
+## 2026-09-20 — Ronde-3: animasi kaku, analog terbalik, terrain tak terlihat
+1. **Animasi jalan beku setelah ~1 siklus**: GLB impor tidak loop bawaan. Semua
+   state lokomosi kini dipaksa `LOOP_LINEAR` saat AnimationController.setup().
+2. **Analog terbalik (maju/mundur)**: double-negation di mapping joy->kamera
+   (`-joy.y` di dalam basis yang sudah kamera-relatif). Dibalik tepat sekali,
+   jalur keyboard disamakan supaya konsisten.
+3. **Terrain tak terlihat di perangkat**: mitigasi multi: `cull_disabled` pada
+   toon_color (kebal winding/driver), clamp `hillv` anti-NaN (`pow(neg,1.4)`),
+   guard NaN per-vertex di terrain_chunk (fallback h=0/normal=UP), DAN jejak
+   diagnostik statistik mesh pada layar boot (chunk count, NaN, rentang h) agar
+   penyebab pasti terbaca dari HP.
+4. **Tekstur detail painted** pada terrain (luminance multiply, band sempit)
+   meniru tekstur reference pengguna — dibuat AI agar bebas lisensi.
+5. Foam/water: band pantai sempit dipertahankan; pola polka laut dipercaya
+   konsekuensi tinggi≈0/NaN global — jejak baru akan membuktikannya.

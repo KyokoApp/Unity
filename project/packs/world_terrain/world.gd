@@ -46,17 +46,32 @@ func _ready() -> void:
 
 # ---------------- boot ----------------
 
+var _root_ref: Node
+var _stat_chunks := 0
+var _stat_verts := 0
+var _stat_nan := 0
+var _stat_hmin := 1e9
+var _stat_hmax := -1e9
+
+func _wtrace(msg: String) -> void:
+	if _root_ref and _root_ref.has_method("_trace"):
+		_root_ref._trace(msg)
+
 func generate_async(_root: Node) -> void:
+	_root_ref = _root
 	_report(0.0, "Membangun pulau…")
 	island = IslandScript.new(WORLD_SEED, WORLD_SIZE)
+	_wtrace("pulau: h(0,0)=%.1f h(120,60)=%.1f" % [island.height_at(0, 0), island.height_at(120, 60)])
 	_progress_done = 0
 	_progress_total = 1 + 1 + 25 + 2  # shore map + laut + chunk awal + 2 pack props
-	terr_mat = Materials.toon_vertex_color(false)
+	terr_mat = Materials.toon_vertex_color(false, 0.012, true)
 	_setup_environment()
 	await _gen_shore_map_async()
 	_report_step("Menyiapkan lautan…")
 	_setup_water()
 	await _initial_chunks()
+	_wtrace("terrain: %d chunk, %dv, NaN=%d, h=[%.1f..%.1f]" % [
+		_stat_chunks, _stat_verts, _stat_nan, _stat_hmin, _stat_hmax])
 	await _load_prop_packs()
 	_report(1.0, "Dunia siap")
 
@@ -250,6 +265,12 @@ func _integrate_chunk(cx: int, cy: int, lod: int, data: Dictionary) -> void:
 	chunk.lod = lod
 	var mesh := ChunkScript.make_mesh(data)
 	chunk.apply_mesh(mesh, terr_mat, data["heights"])
+	# statistik diagnostik (terlihat di jejak boot layar HP)
+	_stat_chunks += 1
+	_stat_verts += int(data.get("stats_v", 0))
+	_stat_nan += int(data.get("stats_nan", 0))
+	_stat_hmin = minf(_stat_hmin, float(data.get("stats_hmin", 1e9)))
+	_stat_hmax = maxf(_stat_hmax, float(data.get("stats_hmax", -1e9)))
 	if _initial_pending:
 		_report_step("Bangun chunk %d,%d" % [cx, cy])
 
