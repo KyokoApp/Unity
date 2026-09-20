@@ -24,8 +24,24 @@ var pause_menu: CanvasLayer
 var _boot := {}
 var _trail: Label
 var _fatal_layer: CanvasLayer
+var _boot_ok := false
+var _last_trace := "(belum ada tahap)"
+const BOOT_LOG_PATH := "user://boot_log.txt"
+var _blog_lines: Array = []
+
+func _blog(msg: String) -> void:
+	var line := "[%s] %s" % [Time.get_time_string_from_system(false), msg]
+	_blog_lines.append(line)
+	if _blog_lines.size() > 400:
+		_blog_lines = _blog_lines.slice(-360)
+	var f := FileAccess.open(BOOT_LOG_PATH, FileAccess.WRITE)
+	if f:
+		f.store_string("\n".join(_blog_lines))
+		f.close()
 
 func _trace(msg: String) -> void:
+	_last_trace = msg
+	_blog(msg)
 	print("[boot] ", msg)
 	if _trail == null:
 		_trail = Label.new()
@@ -64,6 +80,18 @@ func _ready() -> void:
 	if cfg.load("user://boot.cfg") == OK:
 		_boot = {"offline": cfg.get_value("boot", "offline", false),
 				"game_version": cfg.get_value("boot", "game_version", "?")}
+	# header diagnostik — membaca meringkas keadaan perangkat untuk identifikasi bug
+	_blog("=== BOOT BARU ===")
+	_blog("device: %s | OS: %s" % [OS.get_model_name(), OS.get_name()])
+	_blog("renderer: %s | jagat: %s" % [
+		str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "?")),
+		RenderingServer.get_video_adapter_name()])
+	_blog("godot %s | game v%s | %dx%d" % [
+		Engine.get_version_info().get("string", "?"), _boot.get("game_version", "?"),
+		DisplayServer.window_get_size().x, DisplayServer.window_get_size().y])
+	# watchdog: bila boot macet, tampilkan penyebabnya — JANGAN PERNAH blue screen diam-diam
+	var wd := get_tree().create_timer(40.0)
+	wd.timeout.connect(_on_boot_watchdog)
 	_trace("boot: pengaturan…")
 	settings = SettingsScript.new()
 	settings.name = "GameSettings"
@@ -138,12 +166,23 @@ func _boot_world(progress_cb: Callable) -> void:
 		add_child(ad)
 		ad.setup(world, player)
 	progress_cb.call(1.0, "Selesai")
+	_boot_ok = true
 	_trace("boot: HUD ✔ — selamat bermain")
 	get_tree().create_timer(3.0).timeout.connect(func():
 		if is_instance_valid(_trail):
 			_trail.get_parent().queue_free()
 			_trail = null
 	)
+
+func _on_boot_watchdog() -> void:
+	if _boot_ok:
+		return
+	var tail := ""
+	var n := _blog_lines.size()
+	for i in range(maxi(0, n - 9), n):
+		tail += str(_blog_lines[i]) + "\n"
+	_fatal("Boot macet lebih dari 40 detik.\nTahap terakhir:\n%s\n\nLog ekor (%s):\n%s\n\nFoto layar ini." % [
+		_last_trace, OS.get_model_name(), tail])
 
 func on_loading_done() -> void:
 	if loading:

@@ -314,3 +314,24 @@ blue screen langsung. Dua hal dipisahkan:
 Aksi pencegahan permanen (agar tak lolos lagi tanpa terlihat):
 - `tools/analyze_checks.py` — lint tingkat analyzer (dup-var per scope;
   preload/load/const path; rujukan scene .tscn) → gerbang CI sebelum export.
+
+## Ronde-17 — APK kembali Launcher-murni + anti-blue-screen permanen (2026-09-20)
+
+1. **APK = peluncur murni, DILARANG berubah** (aturan user: update selalu lewat
+   server pack, tak pernah menyentuh aplikasi). Preset "Android AIO" dihapus dari
+   export_presets.cfg; workflow kini hanya export "Android Launcher"
+   (include: launcher/*,project.godot). APK kecil; boot pertama mengunduh
+   ~8 pack dari branch `content`; selanjutnya delta saja.
+2. **Watchdog 40 detik**: bila boot macet pada tahap mana pun, layar merah
+   menampilkan tahap terakhir + ekor log boot + info perangkat (OS/renderer/
+   resolusi) — TIDAK ADA LAGI blue screen diam-diam tanpa bisa didiagnosis.
+3. **Log boot permanen** `user://boot_log.txt` — setiap tahap `_trace` (launcher,
+   dunia 0..100%, spawn, HUD) dicatat waktu & perangkat.
+4. **Anti-freeze pembangunan world**: `_static_walk` kini async — yield
+   `process_frame` tiap 12 mesh; bar loading tetap hidup di ponsel lemah,
+   watchdog tak tembak palsu-positif.
+
+Hipotesis terbuka bila setelah ini masih biru: eksekusi tak pernah sampai
+`game_root._ready` (scene change BBC / hijack)—verifikasi lewat log launcher
+yang kini ikut menulis `=== BOOT BARU ===`… atau GPU/Adreno gagal kompilasi
+sky shader → panel merah watchdog akan menunjuk tahapnya.

@@ -144,19 +144,19 @@ jobs:
             echo "konten terbit: manifest $(grep -o '"game_version": *"[^"]*"' manifest.json | head -1)"
           fi
 
-      - name: Export APK Launcher + AIO (dengan diagnostik)
+      - name: Export APK Launcher-MURNI (tanpa konten — update hanya lewat server pack)
         run: |
           export OUTDIR="$GITHUB_WORKSPACE/exports/android"
           RC0=0; timeout 120 ./godot --headless --path project --quit > "$OUTDIR/quit.log" 2>&1 || RC0=$?
-          RC=0; timeout 900 ./godot --headless --verbose --path project --export-debug "Android AIO" "$OUTDIR/ASekai.apk" > "$OUTDIR/export_aio.log" 2>&1 || RC=$?
+          RC=0; timeout 900 ./godot --headless --verbose --path project --export-debug "Android Launcher" "$OUTDIR/ASekai.apk" > "$OUTDIR/export_launcher.log" 2>&1 || RC=$?
           {
             echo "## Diagnostik build $GITHUB_SHA"
-            echo "quit.rc=$RC0 export-aio.rc=$RC"
+            echo "quit.rc=$RC0 export-launcher.rc=$RC"
             echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
             ls "$ANDROID_SDK_ROOT/build-tools" 2>/dev/null | tail -2
             echo '### import.log (akhir)'; tail -6 "$GITHUB_WORKSPACE/import.log"
-            echo '### export_aio.log (penuh)'
-            sed 's/\x1b\[[0-9;]*m//g' "$OUTDIR/export_aio.log"
+            echo '### export_launcher.log (penuh)'
+            sed 's/\x1b\[[0-9;]*m//g' "$OUTDIR/export_launcher.log"
             echo '### preset head'
             head -14 project/export_presets.cfg
           } > "$OUTDIR/diag.txt" 2>&1
@@ -188,9 +188,10 @@ jobs:
             echo ""
             echo "Commit: \`$GITHUB_SHA\` — dibangun oleh GitHub Actions (runner full-internet)."
             echo ""
-            echo "**A-Sekai.apk** — launcher + seluruh konten ter-bundle di SATU aplikasi."
-            echo "Instal → langsung main offline; pembaruan konten berikutnya otomatis"
-            echo "delta (hanya pack yang berubah) saat kamu menjalankan server konten (README §3)."
+            echo "**A-Sekai.apk** — PELUNCUR murni (kecil). Sekali instal, selamanya:"
+            echo "konten game tidak pernah ikut APK — selalu diunduh dari server pack saat"
+            echo "aplikasi dibuka, dan hanya pack yang BERUBAH yang diunduh ulang (delta)."
+            echo "Saat pertama kali dibuka, dia akan mengunduh konten (tampil progress)."
             echo ""
             echo "Install: unduh APK → izinkan sumber tak dikenal → buka (landscape)."
             echo "Detail: README.md §5–§8; bukti uji: docs/BUKTI_UJI.md."
@@ -263,3 +264,4 @@ jobs:
 # rerun-kick 29 (Gravity Falls satu-satunya world; world procedural dihapus total + fallback bidang darurat)
 
 # rerun-kick 30 (4 fix blue screen: barycentric dot-product + kubah geometris + dasar lantai + swim guard + fallback collision)
+# rerun-kick 31 (APK kembali Launcher-murni tanpa konten; watchdog boot + log; world yield anti-freeze)

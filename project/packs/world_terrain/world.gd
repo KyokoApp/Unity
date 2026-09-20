@@ -25,6 +25,7 @@ var _static_ready := false
 var _gcell := 4.0             # meter per sel grid akselerasi ketinggian
 var _gbuckets := {}           # "cx,cz" -> PackedInt32Array indeks segitiga
 var _gtris := PackedFloat32Array()
+var _walk_tick := 0           # counter mesh di _static_walk (untuk yield anti-freeze)
 var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 
 func _ready() -> void:
@@ -57,7 +58,7 @@ func generate_async(p_root: Node) -> void:
 		_report(1.0, "Dunia darurat (polos) siap")
 		return
 	_report(0.6, "Membangun world…")
-	if _build_static(res):
+	if await _build_static(res):
 		_report(1.0, "Dunia siap (Gravity Falls)")
 	else:
 		_fallback_ground("build gagal")
@@ -147,6 +148,7 @@ static func _pick_ground_walk(node: Node, xf: Transform3D, total: AABB, best: Di
 		_pick_ground_walk(c, nxf, total, best)
 
 func _build_static(res: PackedScene) -> bool:
+	await get_tree().process_frame  # beri napas satu frame (loading screen hidup)
 	var scene_root: Node3D = res.instantiate()
 	if scene_root == null:
 		_wtrace("GAGAL: instantiate() null")
@@ -178,7 +180,7 @@ func _build_static(res: PackedScene) -> bool:
 	cont.position = Vector3(-cinfo.x * k, -base_y * k, -cinfo.z * k)
 	var out_mat = Materials.make_outline(0.008)
 	var stats := [0, 0]  # [mesh_kolisi, segi_jalan]
-	_static_walk(scene_root, cont.transform, out_mat, stats)
+	await _static_walk(scene_root, cont.transform, out_mat, stats)
 	if int(stats[1]) <= 0 or _gbuckets.is_empty():
 		_wtrace("GAGAL: tak ada segitiga pijakan (kolisi %d)" % int(stats[0]))
 		cont.queue_free()
@@ -201,6 +203,12 @@ func _static_walk(node: Node, xf: Transform3D, out_mat: Material, stats: Array) 
 	if node is MeshInstance3D and (node as MeshInstance3D).get_meta("gf_dome", false):
 		skip = true
 	if node is MeshInstance3D and node.mesh != null:
+		# beri napas tiap 12 mesh: di ponsel lemah, puluhan create_trimesh_shape
+		# berurutan bisa membekukan layar — dengan yield bar loading tetap hidup
+		_walk_tick += 1
+		if _walk_tick % 12 == 0:
+			_report(0.6 + 0.3 * minf(_walk_tick / 300.0, 1.0), "Membangun world… (mesh ke-%d)" % _walk_tick)
+			await get_tree().process_frame
 		var mi: MeshInstance3D = node
 		if not skip:
 			var sh := mi.mesh.create_trimesh_shape()
@@ -238,7 +246,7 @@ func _static_walk(node: Node, xf: Transform3D, out_mat: Material, stats: Array) 
 					stats[1] += 1
 	for c2 in node.get_children():
 		var nxf2: Transform3D = xf * (c2.transform if c2 is Node3D else Transform3D.IDENTITY)
-		_static_walk(c2, nxf2, out_mat, stats)
+		await _static_walk(c2, nxf2, out_mat, stats)
 
 func _grid_add_tri(a: Vector3, b: Vector3, c: Vector3) -> void:
 	var ti := _gtris.size() / 9
