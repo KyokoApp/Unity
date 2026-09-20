@@ -2,9 +2,15 @@ shader_type spatial;
 render_mode blend_mix, depth_prepass_alpha, cull_back;
 // Air toon ringan: gelombang sinus + foam di tepi pantai (via peta tinggi pulau).
 
+<<<<<<< HEAD
 uniform vec4 shallow_color : source_color = vec4(0.24, 0.72, 0.70, 0.72);
 uniform vec4 deep_color : source_color = vec4(0.03, 0.23, 0.44, 0.93);
 uniform vec4 foam_color : source_color = vec4(0.94, 0.98, 1.0, 1.0);
+=======
+uniform vec4 shallow_color : source_color = vec4(0.30, 0.80, 0.73, 0.70);
+uniform vec4 deep_color : source_color = vec4(0.09, 0.42, 0.52, 0.94);
+uniform vec4 foam_color : source_color = vec4(0.95, 0.99, 0.95, 1.0);
+>>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 uniform sampler2D shore_map : filter_linear, repeat_disable;
 uniform float world_half = 800.0;
 uniform float wave_speed = 0.9;

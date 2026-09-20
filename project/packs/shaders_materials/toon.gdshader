@@ -6,11 +6,19 @@ uniform bool use_texture = false;
 uniform sampler2D albedo_texture : source_color, filter_nearest;
 uniform float band1 : hint_range(0.0, 1.0) = 0.36;
 uniform float band2 : hint_range(0.0, 1.0) = 0.68;
+<<<<<<< HEAD
 uniform float softness : hint_range(0.01, 0.4) = 0.12;
 uniform float shadow_tint : hint_range(0.1, 1.0) = 0.52;
 uniform float mid_tint : hint_range(0.1, 1.0) = 0.78;
 uniform float rim_amount : hint_range(0.0, 2.0) = 0.5;
 uniform vec3 rim_color : source_color = vec3(0.95, 0.98, 1.0);
+=======
+uniform float softness : hint_range(0.01, 0.4) = 0.16;
+uniform float shadow_tint : hint_range(0.1, 1.0) = 0.60;
+uniform float mid_tint : hint_range(0.1, 1.0) = 0.78;
+uniform float rim_amount : hint_range(0.0, 2.0) = 0.5;
+uniform vec3 rim_color : source_color = vec3(1.0, 0.90, 0.70);
+>>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 
 void fragment() {
 	vec4 c = albedo;

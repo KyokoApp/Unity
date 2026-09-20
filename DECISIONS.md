@@ -112,3 +112,9 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
 - **Diagnostik buta-run**: log runner tidak bisa diunduh dari sandbox — solusi: diagnostik build (rc, EXPORT log) ditulis ke *release notes* lewat `gh release edit --notes-file` agar bisa dibaca via API; ini sekaligus menjadi pembuktian token tulis.
 - **Tiga gotcha export headless yang dipecahkan**: (1) path output export di-resolve relatif `project/` → pakai absolute; (2) nama proyek harus identifier paket yang sah (tanpa spasi) → `pulautoon`; (3) `import_etc2_astc=true` wajib — tanpanya validasi Android gagal diam-diam (valid=false tanpa pesan di kode sumber Godot).
 - **Cleanup kecil**: komentar `# rerun-kick` sengaja dibiarkan sebagai pendorong run ulang murah; tidak memengaruhi build.
+
+## Gaya visual "turquoise pastel" (permintaan pengguna)
+
+- **Permintaan**: tampilan amat-mirip game-kasual favorit pengguna (langit turquoise, kota krim/terracotta, garis cokelat sketchy) — ditempuh sebagai *replikasi bahasa visual*, BUKAN penyalinan aset: nilai warna dirumuskan ulang sendiri dari analisis tangkapan layar publik (referensi tidak disimpan di repo).
+- **Implementasi** (satu pass komit): sky.gdshader → turquoise/mint krim; toon 3-band tetap namun kontras direndahkan (shadow 0.52→0.60, softness 0.12→0.16, rim jadi hangat 1.0/0.90/0.70); outline → umber hangat (0.24/0.15/0.14); air → teal dua-nada (shallow 0.30/0.80/0.73, deep 0.09/0.42/0.52); biome island.gd → sand krim, rumput sage/jade, hutan jade-tua, batuan abu-lilac; properti pantai → cream/terracotta/sage/pale-cyan; siklus siang-malam disetel ulang (sun krim hangat, senja coral, malam teal-tinta tetap terbaca).
+- **Verifikasi**: tools/style_preview.py (CPU, mereplika math shader) merender pratinjau siang/senja/malam + metrik eksposur — day mean 0.61, dusk 0.42, night 0.18, over/under-klip < 0.5% → lolos standar "tidak over-exposed/crushed".

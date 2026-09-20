@@ -2,14 +2,23 @@ shader_type spatial;
 render_mode cull_disabled;
 // Rumput kartun: quad silang berayun angin (tanpa tekstur).
 
+<<<<<<< HEAD
 uniform vec4 albedo_bottom : source_color = vec4(0.18, 0.45, 0.16, 1.0);
 uniform vec4 albedo_tip : source_color = vec4(0.38, 0.72, 0.28, 1.0);
+=======
+uniform vec4 albedo_bottom : source_color = vec4(0.25, 0.54, 0.42, 1.0);
+uniform vec4 albedo_tip : source_color = vec4(0.60, 0.86, 0.58, 1.0);
+>>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 uniform float sway = 0.16;
 uniform float sway_speed = 1.8;
 uniform float band1 : hint_range(0.0, 1.0) = 0.35;
 uniform float band2 : hint_range(0.0, 1.0) = 0.7;
 uniform float softness : hint_range(0.01, 0.4) = 0.15;
+<<<<<<< HEAD
 uniform float shadow_tint : hint_range(0.1, 1.0) = 0.55;
+=======
+uniform float shadow_tint : hint_range(0.1, 1.0) = 0.60;
+>>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 uniform float mid_tint : hint_range(0.1, 1.0) = 0.8;
 
 void vertex() {
