@@ -234,3 +234,14 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
    pulau procedural. User tak pernah lagi terjebak di layar biru.
 2. Dokumentasi perbaikan bug dipusatkan di docs/BUGFIXES.md (gejala→akar→
    investigasi→fix→prosedur rilis) supaya AI/developer lain bisa langsung kerja.
+
+## 2026-09-20 — Ronde-12: Gravity Falls dimuat ASINKRON (anti blue screen total)
+1. Blue screen masih terjadi di 1.0.16 → kesimpulan: risiko memuat GLB 10MB secara
+   sinkron di boot tetap terlalu besar di perangkat. Strategi BARU: game SELALU
+   boot ke pulau procedural (jalur kode yang sudah terbukti stabil 1.0.12-1.0.14),
+   lalu Gravity Falls dimuat via ResourceLoader.load_threaded_request; saat
+   sukses → build container + matikan visual&collision pulau + sembunyikan water/
+   forest/beach + teleport pemain ke pijakan baru; saat GAGAL (load failed /
+   build gagal) → diam di pulau, hanya _wtrace. Mustahil blue screen dari sini.
+2. Setelah swap: height_at/find_spawn_point otomatis pakai grid segitiga GLB;
+   mode edit sculpt tetap no-op di mode statis.

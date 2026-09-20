@@ -92,4 +92,6 @@ fungsi itu diam-diam, loading screen tertutup, sisanya langit.
 5. Tunggu run Actions → pastikan anotasi `content push: "game_version": "x.y.z"`.
 6. Verifikasi: `gh api 'repos/KyokoApp/Unity/contents/manifest.json?ref=content'`.
 
-*Terakhir diperbarui: 2026-09-20 (fix blue screen world statis 1.0.16)*
+| 1.0.17 | Sinkron-load GLB di boot tetap mematikan di perangkat walau sudah defensif (path boot panjang + alokasi besar) | GLB dimuat ASINKRON setelah game playable (threaded request), swap baru setelah verifikasi; boot tak pernah menunggu world kustom |
+
+*Terakhir diperbarui: 2026-09-20 (fix blue screen total 1.0.17 — muat async+swap)*

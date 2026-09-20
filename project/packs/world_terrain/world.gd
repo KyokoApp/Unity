@@ -88,14 +88,6 @@ func generate_async(_root: Node) -> void:
 	_progress_total = 1 + 1 + 25 + 2  # shore map + laut + chunk awal + 2 pack props
 	terr_mat = Materials.toon_vertex_color(false, 0.012, true)
 	_setup_environment()
-	if ResourceLoader.exists(STATIC_WORLD_PATH):
-		if _build_static_world():
-			static_mode = true
-			_initial_pending = false
-			_seeded = true
-			_report(1.0, "Dunia siap (Gravity Falls)")
-			return
-		_wtrace("world statis gagal — kembali ke pulau procedural")
 	await _gen_shore_map_async()
 	_report_step("Menyiapkan lautan…")
 	_setup_water()
@@ -104,6 +96,17 @@ func generate_async(_root: Node) -> void:
 		_stat_chunks, _stat_verts, _stat_nan, _stat_hmin, _stat_hmax])
 	await _load_prop_packs()
 	_report(1.0, "Dunia siap")
+	# Gravity Falls dimuat ASINKRON di latar — never non-blocking boot →
+	# kalau apa pun gagal di tahap ini, pemain tetap di pulau (anti blue screen)
+	if ResourceLoader.exists(STATIC_WORLD_PATH):
+		var err := ResourceLoader.load_threaded_request(STATIC_WORLD_PATH, "", false)
+		if err == OK:
+			_static_queue = true
+			_wtrace("gravity falls dimuat di latar belakang…")
+		else:
+			_wtrace("gravity falls: request gagal (%d) — pakai pulau" % int(err))
+
+var _static_queue := false
 
 # sektor poligon yang dianggap non-kolisi/outline (langit, bayangan tempel, logo)
 const STATIC_SKIP := ["skybox", "shadow", "logo"]
@@ -123,12 +126,11 @@ static func _scene_aabb_walk(node: Node, xf: Transform3D, boxes: Array) -> void:
 		var nxf: Transform3D = xf * (c.transform if c is Node3D else Transform3D.IDENTITY)
 		_scene_aabb_walk(c, nxf, boxes)
 
-func _build_static_world() -> bool:
+func _build_static_world(res: Resource) -> bool:
 	_report_step("Memuat Gravity Falls…")
-	var res = load(STATIC_WORLD_PATH)
 	if not (res is PackedScene):
 		return false
-	var scene_root: Node3D = res.instantiate()
+	var scene_root: Node3D = (res as PackedScene).instantiate()
 	if scene_root == null:
 		return false
 	var aabb := _scene_aabb(scene_root)
@@ -571,7 +573,45 @@ func height_at(x: float, z: float) -> float:
 func get_island():
 	return island
 
-# ---------------- mode edit: sculpt & jalur ----------------
+# memuat GLB selesai (thread) → aktivasi; gagal → tetap di pulau (tidak fatal)
+func _poll_static_world() -> void:
+	if not _static_queue:
+		return
+	var st := ResourceLoader.load_threaded_get_status(STATIC_WORLD_PATH)
+	if st == ResourceLoader.THREAD_LOAD_LOADED:
+		_static_queue = false
+		_activate_static_world(ResourceLoader.load_threaded_get(STATIC_WORLD_PATH))
+	elif st == ResourceLoader.THREAD_LOAD_FAILED or st == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+		_static_queue = false
+		_wtrace("gravity falls: GAGAL dimuat (status %d) — tetap di pulau" % int(st))
+
+func _activate_static_world(res: Resource) -> void:
+	if not (res is PackedScene):
+		_wtrace("gravity falls: bukan PackedScene — tetap di pulau")
+		return
+	_wtrace("gravity falls: membangun world…")
+	if _build_static_world(res):
+		static_mode = true
+		# matikan visual & collision pulau procedural
+		for k in chunks:
+			chunks[k].visible = false
+			for cs in chunks[k].find_children("*", "CollisionShape3D", true, false):
+				cs.disabled = true
+		if is_instance_valid(water):
+			water.visible = false
+		if forest_pack:
+			forest_pack.visible = false
+			forest_pack.set_process(false)
+		if beach_pack:
+			beach_pack.visible = false
+			beach_pack.set_process(false)
+		# teleport pemain ke titik pijakan world baru
+		if player != null:
+			var sp := find_spawn_point()
+			player.global_position = sp + Vector3(0, 0.15, 0)
+		_wtrace("gravity falls: AKTIF ✓")
+	else:
+		_wtrace("gravity falls: pembangunan gagal — tetap di pulau")
 
 var _save_edits_t := 0.0
 
@@ -654,6 +694,7 @@ func apply_quality(p: Dictionary) -> void:
 		beach_pack.call("apply_density", float(p.tree_density), float(p.grass_density))
 
 func _process(delta: float) -> void:
+	_poll_static_world()
 	_integrate_results(2)
 	_stream_timer -= delta
 	if _stream_timer <= 0.0:
