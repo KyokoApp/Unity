@@ -89,7 +89,10 @@ jobs:
           echo "import.rc=$RC"; tail -8 "$GITHUB_WORKSPACE/import.log"
 
       - name: Bangun pack + manifest (delta sanity)
-        run: python3 tools/build_packs.py --godot ./godot | tail -6
+        run: |
+          echo "::notice::checkout versions.json: $(head -c 90 server/versions.json | tr '\n' ' ')"
+          python3 tools/build_packs.py --godot ./godot | tail -8
+          echo "::notice::manifest hasil: $(python3 -c 'import json; m=json.load(open("server/manifest.json")); print(m["game_version"]); print({k: v["version"] for k, v in list(m["packs"].items())[:3]})')"
 
       - name: Publikasikan server konten -> branch "content" (raw)
         env:
@@ -105,6 +108,7 @@ jobs:
           cd "$DEST"
           git config user.name "arena-ci" && git config user.email "ci@example.invalid"
           git add -A
+          echo "::notice::content push: $(grep -o '"game_version": *"[^"]*"' manifest.json | head -1) — staged $(git diff --cached --name-only | wc -l) file"
           if git diff --cached --quiet; then
             echo "konten tidak berubah — tidak ada push"
           else
@@ -195,3 +199,4 @@ jobs:
 # rerun-kick 8 (server konten publik + URL default launcher)
 
 # rerun-kick 9 (versi konten persisten — delta update antar-bangun aktif)
+# rerun-kick 10 (debug manifest CI)
