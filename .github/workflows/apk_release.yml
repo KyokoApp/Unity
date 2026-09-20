@@ -265,3 +265,4 @@ jobs:
 
 # rerun-kick 30 (4 fix blue screen: barycentric dot-product + kubah geometris + dasar lantai + swim guard + fallback collision)
 # rerun-kick 31 (APK kembali Launcher-murni tanpa konten; watchdog boot + log; world yield anti-freeze)
+# rerun-kick 32 (penyebab macet SEGITIGA GDScript dihapus; intersect_ray native; collision khusus mesh solid)
