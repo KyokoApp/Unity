@@ -12,10 +12,10 @@ const WATER_SHADER := preload("res://packs/shaders_materials/water.gdshader")
 const SKY_SHADER := preload("res://packs/shaders_materials/sky.gdshader")
 const FOREST_SCENE := "res://packs/world_props_forest/forest.tscn"
 const BEACH_SCENE := "res://packs/world_props_beach/beach.tscn"
-const CHUNK_SIZE := 67.0
-const GRID := 4
+const CHUNK_SIZE := 100.0
+const GRID := 8
 const WORLD_SEED := 20260919
-const WORLD_SIZE := 268.0  # diperkecil 3x laggi (keluhan: masih kebesaran)
+const WORLD_SIZE := 800.0  # konfigurasi stabil yang sebelumnya dikonfirmasi jalan
 const EDITS_PATH := "user://terrain_edits.dat"
 
 var island
@@ -70,14 +70,6 @@ func _wtrace(msg: String) -> void:
 	if _root_ref and _root_ref.has_method("_trace"):
 		_root_ref._trace(msg)
 
-# ---------------- mode WORLD STATIS (Gravity Falls) ----------------
-const STATIC_WORLD_PATH := "res://packs/world_terrain/gravity_falls.glb"
-var static_mode := false
-var _static_ready := false
-var _gcell := 4.0                      # meter per sel grid akselerasi
-var _gbuckets := {}                    # "cx,cz" -> PackedInt32Array indeks segitiga
-var _gtris := PackedFloat32Array()     # 9 float per segitiga (x,y,z)*3
-
 func generate_async(_root: Node) -> void:
 	_root_ref = _root
 	_report(0.0, "Membangun pulau…")
@@ -96,173 +88,6 @@ func generate_async(_root: Node) -> void:
 		_stat_chunks, _stat_verts, _stat_nan, _stat_hmin, _stat_hmax])
 	await _load_prop_packs()
 	_report(1.0, "Dunia siap")
-	# Gravity Falls dimuat ASINKRON di latar — never non-blocking boot →
-	# kalau apa pun gagal di tahap ini, pemain tetap di pulau (anti blue screen)
-	if ResourceLoader.exists(STATIC_WORLD_PATH):
-		var err := ResourceLoader.load_threaded_request(STATIC_WORLD_PATH, "", false)
-		if err == OK:
-			_static_queue = true
-			_wtrace("gravity falls dimuat di latar belakang…")
-		else:
-			_wtrace("gravity falls: request gagal (%d) — pakai pulau" % int(err))
-
-var _static_queue := false
-
-# sektor poligon yang dianggap non-kolisi/outline (langit, bayangan tempel, logo)
-const STATIC_SKIP := ["skybox", "shadow", "logo"]
-
-func _scene_aabb(node: Node) -> AABB:
-	var boxes := []
-	_scene_aabb_walk(node, Transform3D.IDENTITY, boxes)
-	var out := AABB()
-	for i in range(boxes.size()):
-		out = boxes[i] if i == 0 else out.merge(boxes[i])
-	return out
-
-static func _scene_aabb_walk(node: Node, xf: Transform3D, boxes: Array) -> void:
-	if node is MeshInstance3D and node.mesh != null:
-		boxes.append(xf * node.mesh.get_aabb())
-	for c in node.get_children():
-		var nxf: Transform3D = xf * (c.transform if c is Node3D else Transform3D.IDENTITY)
-		_scene_aabb_walk(c, nxf, boxes)
-
-func _build_static_world(res: Resource) -> bool:
-	_report_step("Memuat Gravity Falls…")
-	if not (res is PackedScene):
-		return false
-	var scene_root: Node3D = (res as PackedScene).instantiate()
-	if scene_root == null:
-		return false
-	var aabb := _scene_aabb(scene_root)
-	if aabb.size.x <= 0.001:
-		scene_root.free()
-		return false
-	# normalisasi: pertahankan skala asli bila sudah wajar (60..480 m), selain itu paksa ~160 m
-	var span := maxf(aabb.size.x, aabb.size.z)
-	var k := 1.0
-	if span < 60.0 or span > 480.0:
-		k = 160.0 / span
-	var cont := Node3D.new()
-	cont.name = "GravityFallsWorld"
-	add_child(cont)
-	cont.add_child(scene_root)
-	cont.scale = Vector3.ONE * k
-	cont.position = Vector3(-(aabb.position.x + aabb.size.x * 0.5) * k,
-		-aabb.position.y * k,
-		-(aabb.position.z + aabb.size.z * 0.5) * k)
-	# collision + outline tipis + grid akselerasi tinggi permukaan
-	var out_mat = Materials.make_outline(0.008)
-	if out_mat == null:
-		_wtrace("PERINGATAN: material outline gagal — lanjut tanpa outline")
-	var base_xf := cont.transform
-	var stats := [0, 0]  # tris_kolisi, tris_walkable
-	_static_walk(scene_root, base_xf, out_mat, stats)
-	# verifikasi hasil: tanpa permukaan pijakan, world tak bisa dimainkan → fallback
-	if int(stats[1]) <= 0 or _gbuckets.is_empty():
-		_wtrace("PERINGATAN: tak ada permukaan pijakan di gravity_falls.glb — fallback")
-		cont.queue_free()
-		return false
-	_static_ready = true
-	_wtrace("gravity falls: span %dx%dm skala %.2f | kolisi %d segi | jalan %d segi | sel %d" % [
-		int(span), int(aabb.size.y), k, int(stats[0]), int(stats[1]), _gbuckets.size()])
-	return true
-
-func _static_walk(node: Node, xf: Transform3D, out_mat: Material, stats: Array) -> void:
-	var lname := String(node.name).to_lower()
-	# 0/300 mencegah rekursi tak berujung: node yang KITA tambahkan (outline/collision) tidak diproses lagi
-	if lname.ends_with("_outline") or lname.ends_with("_col"):
-		return
-	var skip := false
-	for s in STATIC_SKIP:
-		if lname.contains(s):
-			skip = true
-			break
-	if node is MeshInstance3D and node.mesh != null:
-		var mi: MeshInstance3D = node
-		if not skip:
-			# trimesh collision (digabung dari semua permukaan mesh)
-			var sh := mi.mesh.create_trimesh_shape()
-			if sh != null:
-				var body := StaticBody3D.new()
-				body.name = mi.name + "_col"
-				var col := CollisionShape3D.new()
-				col.shape = sh
-				body.add_child(col)
-				mi.add_child(body)
-				stats[0] += 1
-			# outline tipis (hanya mesh bervolume, bukan skybox/shadow transparan)
-			var o := MeshInstance3D.new()
-			o.mesh = mi.mesh
-			o.material_override = out_mat
-			o.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			o.name = mi.name + "_outline"
-			mi.add_child(o)
-			# grid akselerasi: segitiga menghadap atas (bisa dipijak)
-			for s in range(mi.mesh.get_surface_count()):
-				var arrs := mi.mesh.surface_get_arrays(s)
-				var verts: PackedVector3Array = arrs[Mesh.ARRAY_VERTEX]
-				var idx: PackedInt32Array = arrs[Mesh.ARRAY_INDEX]
-				if verts.is_empty():
-					continue
-				if idx.is_empty():
-					idx = PackedInt32Array(range(verts.size()))
-				for t in range(0, idx.size() - 2, 3):
-					var a: Vector3 = xf * verts[idx[t]]
-					var b: Vector3 = xf * verts[idx[t + 1]]
-					var c: Vector3 = xf * verts[idx[t + 2]]
-					var n := (b - a).cross(c - a)
-					if n.length() < 0.0001 or n.normalized().y < 0.35:
-						continue  # bukan permukaan pijakan
-					_grid_add_tri(a, b, c)
-					stats[1] += 1
-	for c2 in node.get_children():
-		var nxf: Transform3D = xf * (c2.transform if c2 is Node3D else Transform3D.IDENTITY)
-		_static_walk(c2, nxf, out_mat, stats)
-
-func _grid_add_tri(a: Vector3, b: Vector3, c: Vector3) -> void:
-	var ti := _gtris.size() / 9
-	_gtris.append_array([a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z])
-	var minx := int(floor(minf(a.x, minf(b.x, c.x)) / _gcell))
-	var maxx := int(floor(maxf(a.x, maxf(b.x, c.x)) / _gcell))
-	var minz := int(floor(minf(a.z, minf(b.z, c.z)) / _gcell))
-	var maxz := int(floor(maxf(a.z, maxf(b.z, c.z)) / _gcell))
-	for cz in range(minz, maxz + 1):
-		for cx in range(minx, maxx + 1):
-			var key := "%d,%d" % [cx, cz]
-			if not _gbuckets.has(key):
-				_gbuckets[key] = PackedInt32Array()
-			var arr: PackedInt32Array = _gbuckets[key]
-			arr.append(ti)
-			_gbuckets[key] = arr
-
-## Tinggi permukaan pijakan di (x,z): barycentric atas segitiga di sel sekitar (-1000 jika tak ada).
-func _static_floor_at(x: float, z: float) -> float:
-	var best := -1000.0
-	var cx := int(floor(x / _gcell))
-	var cz := int(floor(z / _gcell))
-	for dz in range(-1, 2):
-		for dx in range(-1, 2):
-			var key := "%d,%d" % [cx + dx, cz + dz]
-			if not _gbuckets.has(key):
-				continue
-			for ti in _gbuckets[key]:
-				var o := ti * 9
-				var ax: float = _gtris[o]; var ay: float = _gtris[o + 1]; var az: float = _gtris[o + 2]
-				var bx: float = _gtris[o + 3]; var by: float = _gtris[o + 4]; var bz: float = _gtris[o + 5]
-				var cx2: float = _gtris[o + 6]; var cy: float = _gtris[o + 7]; var cz2: float = _gtris[o + 8]
-				# barycentric 2D pada proyeksi xz
-				var d := (bz - cz2) * (ax - cx2) + (cx2 - az) * (az - cz2)
-				if absf(d) < 0.00001:
-					continue
-				var w1 := ((bz - cz2) * (x - cx2) + (cx2 - az) * (z - cz2)) / d
-				var w2 := ((cz2 - az) * (x - cx2) + (ax - cx2) * (z - cz2)) / d
-				var w3 := 1.0 - w1 - w2
-				if w1 < -0.0001 or w2 < -0.0001 or w3 < -0.0001:
-					continue
-				var y := w1 * ay + w2 * by + w3 * cy
-				if y > best:
-					best = y
-	return best
 
 func _report(p: float, t: String) -> void:
 	print("[gen] %d%% %s" % [int(p * 100), t])
@@ -555,70 +380,17 @@ func set_player(p: Node3D) -> void:
 		beach_pack.call("set_player", p)
 
 func find_spawn_point() -> Vector3:
-	if static_mode:
-		# pusat dunia; jika bukan pijakan, sapu cincin kecil mencari lantai
-		for cand in [Vector2(0, 0), Vector2(4, 0), Vector2(-4, 0), Vector2(0, 4), Vector2(0, -4),
-				Vector2(8, 8), Vector2(-8, -8), Vector2(8, -8), Vector2(-8, 8)]:
-			var fy := _static_floor_at(cand.x, cand.y)
-			if fy > -999.0:
-				return Vector3(cand.x, fy + 0.25, cand.y)
-		return Vector3(0, 1.0, 0)
 	return island.find_spawn_point()
 
 func height_at(x: float, z: float) -> float:
-	if static_mode:
-		return _static_floor_at(x, z)
 	return island.height_at(x, z)
 
 func get_island():
 	return island
 
-# memuat GLB selesai (thread) → aktivasi; gagal → tetap di pulau (tidak fatal)
-func _poll_static_world() -> void:
-	if not _static_queue:
-		return
-	var st := ResourceLoader.load_threaded_get_status(STATIC_WORLD_PATH)
-	if st == ResourceLoader.THREAD_LOAD_LOADED:
-		_static_queue = false
-		_activate_static_world(ResourceLoader.load_threaded_get(STATIC_WORLD_PATH))
-	elif st == ResourceLoader.THREAD_LOAD_FAILED or st == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-		_static_queue = false
-		_wtrace("gravity falls: GAGAL dimuat (status %d) — tetap di pulau" % int(st))
-
-func _activate_static_world(res: Resource) -> void:
-	if not (res is PackedScene):
-		_wtrace("gravity falls: bukan PackedScene — tetap di pulau")
-		return
-	_wtrace("gravity falls: membangun world…")
-	if _build_static_world(res):
-		static_mode = true
-		# matikan visual & collision pulau procedural
-		for k in chunks:
-			chunks[k].visible = false
-			for cs in chunks[k].find_children("*", "CollisionShape3D", true, false):
-				cs.disabled = true
-		if is_instance_valid(water):
-			water.visible = false
-		if forest_pack:
-			forest_pack.visible = false
-			forest_pack.set_process(false)
-		if beach_pack:
-			beach_pack.visible = false
-			beach_pack.set_process(false)
-		# teleport pemain ke titik pijakan world baru
-		if player != null:
-			var sp := find_spawn_point()
-			player.global_position = sp + Vector3(0, 0.15, 0)
-		_wtrace("gravity falls: AKTIF ✓")
-	else:
-		_wtrace("gravity falls: pembangunan gagal — tetap di pulau")
-
-var _save_edits_t := 0.0
-
-## Terapkan edit dari HUD: mode "raise"/"lower" (sculpt) atau "road" (jalur).
 func apply_terrain_edit(p: Vector3, radius: float, amount: float, mode: String) -> void:
-	if static_mode or island == null:
-		return  # world statis tidak bisa di-sculpt
+	if island == null:
+		return
 	var m := "sculpt" if mode in ["raise", "lower"] else "road"
 	var amt := amount if mode != "lower" else -amount
 	island.edit_apply(p.x, p.z, radius, amt, m)
@@ -694,7 +466,6 @@ func apply_quality(p: Dictionary) -> void:
 		beach_pack.call("apply_density", float(p.tree_density), float(p.grass_density))
 
 func _process(delta: float) -> void:
-	_poll_static_world()
 	_integrate_results(2)
 	_stream_timer -= delta
 	if _stream_timer <= 0.0:

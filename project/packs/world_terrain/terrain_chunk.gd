@@ -2,9 +2,9 @@ extends Node3D
 ## TerrainChunk: satu kotak terrain (mesh visual + collision opsional).
 ## Data mesh dibangun di worker thread (build_mesh_data), node dirakit di main.
 
-const CHUNK_SIZE := 67.0
+const CHUNK_SIZE := 100.0
 const PHYS_RES := 16  # 16x16 sel fisika (17x17 titik)
-const GRID_HALF := 2  # = GRID/2 world (dunia 4x4 chunk 67m); setengah pusat indeks
+const GRID_HALF := 4  # = GRID/2 world (dunia 8x8 chunk 100m); setengah pusat indeks
 
 var cx: int
 var cz: int

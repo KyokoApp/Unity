@@ -245,3 +245,17 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
    build gagal) → diam di pulau, hanya _wtrace. Mustahil blue screen dari sini.
 2. Setelah swap: height_at/find_spawn_point otomatis pakai grid segitiga GLB;
    mode edit sculpt tetap no-op di mode statis.
+
+## 2026-09-20 — Ronde-13: BISEKSI blue screen (kembali ke konfigurasi 1.0.12)
+1. Setelah 3 fix buta gagal → biseksi tegas: world.gd di-strip TOTAL dari kode
+   world statis (loader/async/grid segitiga/outline GLB) + semua konstanta
+   dikembalikan ke nilai 1.0.12 (GRID 8x8 chunk 100m, WORLD 800m, forest 400m,
+   beach/village rentang asli) — konfigurasi terakhir yang dikonfirmasi user
+   berjalan (screenshot rumah+palem).
+2. gravity_falls.glb dikeluarkan dari pack (eliminasi variabel import/pack;
+   file masih di riwayat git → bisa diaktifkan lagi terpisah).
+3. Pertahankan: desa KayKit + pohon/batu + rumput reaktif, mood sore, outline
+   tipis karakter, kontur datar bergelombang (island flatten tetap — math aman).
+4. Jika 1.0.18 boot normal → kesalahannya di kode statis/handling GLB; jika
+   MASIH biru → tersangka berikutnya: resize konstanta (1.0.13) atau lapis
+   delivery pack; jejak boot di layar loading = titik mati persisnya.

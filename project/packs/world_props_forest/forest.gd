@@ -7,7 +7,7 @@ const Materials := preload("res://packs/shaders_materials/materials.gd")
 const MeshLib := preload("res://packs/world_terrain/meshlib.gd")
 const GRASS_SHADER := preload("res://packs/shaders_materials/grass.gdshader")
 const SUPER := 4             # 4x4 supercell menutupi seluruh pulau
-const CELL := 67.0           # meter per supercell (dunia 268m)
+const CELL := 400.0          # meter per supercell
 const BUILD_RING := 2        # ring supercell sekitar pemain yang dibangun
 const KEEP_RING := 3
 const MAX_CONCURRENT := 2
@@ -186,7 +186,7 @@ func _task_cell(c: Vector2i) -> void:
 	for i in range(TRIES):
 		var x := origin.x + rng.randf() * CELL
 		var z := origin.y + rng.randf() * CELL
-		if x < -134.0 or x > 134.0 or z < -134.0 or z > 134.0:
+		if x < -800.0 or x > 800.0 or z < -800.0 or z > 800.0:
 			continue
 		# sampel biom sekali untuk semua tipe (hemat query noise)
 		var h: float = island.height_at(x, z)
