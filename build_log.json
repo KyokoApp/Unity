@@ -3,7 +3,7 @@
   "pack": "core_scripts",
   "version": "1.0.6",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -12,19 +12,25 @@
   "pack": "shaders_materials",
   "version": "1.0.8",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
  },
  {
   "pack": "world_terrain",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 3.8,
   "messages": [
-   "SCRIPT ERROR: Parse Error: Cannot infer the type of \"o\" variable because the value doesn't have a set type.",
-   "          at: GDScript::reload (res://packs/world_terrain/world.gd:249)",
+   "SCRIPT ERROR: Parse Error: Identifier \"_save_edits_t\" not declared in the current scope.",
+   "          at: GDScript::reload (res://packs/world_terrain/world.gd:402)",
+   "SCRIPT ERROR: Parse Error: Identifier \"_save_edits_t\" not declared in the current scope.",
+   "          at: GDScript::reload (res://packs/world_terrain/world.gd:477)",
+   "SCRIPT ERROR: Parse Error: Identifier \"_save_edits_t\" not declared in the current scope.",
+   "          at: GDScript::reload (res://packs/world_terrain/world.gd:478)",
+   "SCRIPT ERROR: Parse Error: Identifier \"_save_edits_t\" not declared in the current scope.",
+   "          at: GDScript::reload (res://packs/world_terrain/world.gd:479)",
    "ERROR: Failed to load script \"res://packs/world_terrain/world.gd\" with error \"Parse error\".",
    "   at: load (modules/gdscript/gdscript.cpp:3041)",
    "cannot connect to daemon at tcp:5037: Connection refused"
@@ -32,18 +38,16 @@
  },
  {
   "pack": "world_props_forest",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "returncode": 0,
-  "duration_s": 3.3,
-  "messages": [
-   "cannot connect to daemon at tcp:5037: Connection refused"
-  ]
+  "duration_s": 3.8,
+  "messages": []
  },
  {
   "pack": "world_props_beach",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -52,7 +56,7 @@
   "pack": "animations",
   "version": "1.0.4",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 3.6,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -61,7 +65,7 @@
   "pack": "character_player",
   "version": "1.0.7",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -70,7 +74,7 @@
   "pack": "ui",
   "version": "1.0.7",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -79,7 +83,7 @@
   "pack": "audio_sfx",
   "version": "1.0.1",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -88,7 +92,7 @@
   "pack": "audio_music",
   "version": "1.0.1",
   "returncode": 0,
-  "duration_s": 3.3,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
