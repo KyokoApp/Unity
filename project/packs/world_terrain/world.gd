@@ -170,7 +170,6 @@ func _build_static(res: PackedScene) -> bool:
 	add_child(cont)
 	cont.add_child(scene_root)
 	cont.scale = Vector3.ONE * k
-	var total := _scene_aabb(scene_root)  # sama dengan aabb (scene_root belum diubah) — bacaan mengikat
 	var base_y: float = aabb.position.y
 	var cinfo := Vector3(aabb.position.x + aabb.size.x * 0.5, 0.0, aabb.position.z + aabb.size.z * 0.5)
 	if not ground.is_empty():
@@ -180,7 +179,6 @@ func _build_static(res: PackedScene) -> bool:
 	var out_mat = Materials.make_outline(0.008)
 	var stats := [0, 0]  # [mesh_kolisi, segi_jalan]
 	_static_walk(scene_root, cont.transform, out_mat, stats)
-	var total := aabb
 	if int(stats[1]) <= 0 or _gbuckets.is_empty():
 		_wtrace("GAGAL: tak ada segitiga pijakan (kolisi %d)" % int(stats[0]))
 		cont.queue_free()

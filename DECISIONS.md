@@ -290,3 +290,27 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
 4. fallback_ground: posisi Shape dipindah ke CollisionShape3D (Shape3D tak
    punya .position — error diam-diam); player.gd berhenti menganggap lantai
    tak-ketemu laut (_swimming=false bila floor < -900).
+
+## Ronde-16 — penutup sebenarnya dari misteri blue screen (2026-09-20)
+
+User lapor: setelah instal ulang APK baru → TAK ADA unduhan sama sekali →
+blue screen langsung. Dua hal dipisahkan:
+
+1. "Tak ada unduhan" = KEWAJARAN — APK kini dari preset **Android AIO**
+   (seluruh `packs/*` ter-bundle; mulai workflow TAG apk-20260920-2302).
+   Verifikasi: `export_presets.cfg` preset 11 include `launcher/*,project.godot,packs/*`
+   + release notes "seluruh konten ter-bundle di SATU aplikasi". Launcher menyemai
+   state dari `res://packs/manifest.json`, versi cocok → skip unduhan (by design).
+
+2. Blue screen = **error kompilasi**: `var total` dideklarasikan GANDA di
+   `_build_static` (world.gd) — keduanya baris mati warisan edit ronde-15.
+   GDScript analyzer menolak kelas → `load(WORLD_SCENE)` mengembalikan scene
+   tanpa skrip → `await world.generate_async(self)` hentak runtime →
+   `_boot_world` berhenti sebelum HUD → loading screen (bg biru-gelap
+   `Color(0.06,0.10,0.16)`) menggantung = yang user sebut "blue screen".
+   Ini juga menjelaskan kenapa versi-versi biru sebelumnya: chain yang sama
+   (ponsel laporannya selalu "diam di layar biru setelah loading").
+
+Aksi pencegahan permanen (agar tak lolos lagi tanpa terlihat):
+- `tools/analyze_checks.py` — lint tingkat analyzer (dup-var per scope;
+  preload/load/const path; rujukan scene .tscn) → gerbang CI sebelum export.

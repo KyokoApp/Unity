@@ -98,4 +98,6 @@ fungsi itu diam-diam, loading screen tertutup, sisanya langit.
 
 | 1.0.21 | spawn di bawah tanah→kamera hanya langit: 4 akar — barycentric x-z campur (61% miss), kubah generik lolos skip-nama, BoxShape.position (properti hantu), swim-guard bila lantai tak ketemu | barycentric dot-product (terverifikasi 100%), deteksi kubah geometris 0.42<kh<0.90+kd>0.6, dasar lantai dari kandidat tanah, posisi Shape→CollisionShape3D, player swim-guard |
 
-*Terakhir diperbarui: 2026-09-20 (fix blue screen total 1.0.17 — muat async+swap)*
+| 1.0.22+fix | blue screen TETAP walau 4 fix terkirim — dikonfirmasi: `var total` didklarasikan dua kali di `_build_static` (world.gd baris 173/183) → ERROR KOMPILASI tingkat analyzer (lolos dari gdparse!) → kelas `world.gd` gagal dimuat → `await world.generate_async()` hentak → loading screen bg biru-gelap menggantung abadi. Gejala "tak ada unduhan": TERJANGI — APK = preset "Android AIO" (konten bundled, verifikasi dari export_presets.cfg + release notes), bukan bug | buang kedua deklarasi mati; python analyzer-check `tools/analyze_checks.py` (dup-var per scope, path preload/load/const hilang, rujukan .tscn) kini jadi gerbang CI |
+
+*Terakhir diperbarui: 2026-09-20 (fix penutup blue screen 1.0.22 — error kompilasi world.gd tertangkap analyzer-check baru)*

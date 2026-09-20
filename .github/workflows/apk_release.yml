@@ -49,6 +49,10 @@ jobs:
             fi
           done
           [ "$FAIL" = 0 ] && echo "semua gd lolos parse" || exit 1
+          # kedalaman analyzer: duplikat var per scope, path preload/load/const hilang,
+          # rujukan scene .tscn rusak (kelas bug yang TAK terlihat gdparse — kasus
+          # v1.0.22 "blue screen": 'var total' ganda di world.gd lolos ekspor)
+          python3 tools/analyze_checks.py "$GITHUB_WORKSPACE" || exit 1
 
       - name: Dependensi sistem untuk editor Godot
         run: |
