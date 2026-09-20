@@ -228,7 +228,9 @@ func _load_prop_packs() -> void:
 	_seeded = true
 
 func _chunk_of(x: float, z: float) -> Vector2i:
-	return Vector2i(floori(x / CHUNK_SIZE) + 8, floori(z / CHUNK_SIZE) + 8)
+	# offset = GRID/2 (dunia 800m → +4; saat +8 terrain timur tak pernah terbangun
+	# → pemain jatuh tembus tanah). WAJIB sinkron dengan GRID_HALF di terrain_chunk.
+	return Vector2i(floori(x / CHUNK_SIZE) + GRID / 2, floori(z / CHUNK_SIZE) + GRID / 2)
 
 func _inside(c: Vector2i) -> bool:
 	return c.x >= 0 and c.x < GRID and c.y >= 0 and c.y < GRID
