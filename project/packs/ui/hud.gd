@@ -57,14 +57,14 @@ class RpgButton:
 
 	func _draw() -> void:
 		var c := Vector2(radius, radius)
-		draw_circle(c, radius - 1.0, Color(1, 1, 1, 0.34 if _down else 0.16))
-		draw_arc(c, radius - 3.0, 0.0, TAU, 48,
-			Color(1, 1, 1, 0.85 if active else 0.45), 3.0, true)
+		# gaya referensi (Genshin-like): lingkaran gelap translusen + glyph putih
+		draw_circle(c, radius - 1.0, Color(0.10, 0.12, 0.15, 0.62 if _down else 0.42))
+		draw_arc(c, radius - 2.5, 0.0, TAU, 48, Color(1, 1, 1, 0.30), 2.0, true)
 		if active:
-			draw_arc(c, radius - 8.0, 0.0, TAU, 48, Color(1, 1, 1, 0.3), 2.0, true)
+			draw_arc(c, radius - 7.0, 0.0, TAU, 48, Color(1, 1, 1, 0.55), 2.5, true)
 		if emoji != "":
 			return
-		var w := Color(1, 1, 1, 0.92)
+		var w := Color(1, 1, 1, 0.94)
 		var r := radius * 0.62
 		match icon:
 			"sword":
@@ -232,7 +232,7 @@ func _build_layout() -> void:
 	joy_base = Panel.new()
 	joy_base.name = "JoyBase"
 	joy_base.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	joy_base.add_theme_stylebox_override("panel", _make_panel_col(Color(1.0, 1.0, 1.0, 0.16), 100))
+	joy_base.add_theme_stylebox_override("panel", _make_panel_col(Color(0.0, 0.0, 0.0, 0.25), 100))
 	joy_base.custom_minimum_size = Vector2(JOY_RADIUS * 2, JOY_RADIUS * 2)
 	joy_base.size = Vector2(JOY_RADIUS * 2, JOY_RADIUS * 2)
 	joy_base.position = Vector2(ml + 10, vsz.y - mb - JOY_RADIUS * 2 - 16)
@@ -240,21 +240,22 @@ func _build_layout() -> void:
 	root.add_child(joy_base)
 	joy_knob = Panel.new()
 	joy_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	joy_knob.add_theme_stylebox_override("panel", _make_panel_col(Color(1.0, 1.0, 1.0, 0.55), 50))
+	joy_knob.add_theme_stylebox_override("panel", _make_panel_col(Color(1.0, 1.0, 1.0, 0.50), 50))
 	joy_knob.custom_minimum_size = Vector2(96, 96)
 	joy_knob.size = Vector2(96, 96)
 	joy_knob.position = Vector2(JOY_RADIUS - 48, JOY_RADIUS - 48)
 	joy_base.add_child(joy_knob)
 
-	# --- tombol aksi bulat gaya RPG (kanan bawah) ---
-	var att_c := Vector2(vsz.x - mr - 178, vsz.y - mb - 170)
-	_add_rpg(root, "BtnAtk", "sword", 56.0, att_c - Vector2(56, 56))
-	_add_rpg(root, "BtnJump", "jump", 44.0, att_c + Vector2(70.0, -122.0) - Vector2(44, 44))
-	_add_rpg(root, "BtnDash", "dash", 44.0, att_c + Vector2(70.0, 118.0) - Vector2(44, 44))
-	_add_rpg(root, "BtnAction", "", 34.0, att_c + Vector2(-104.0, -26.0) - Vector2(34, 34), "✋")
-	_add_rpg(root, "BtnSprint", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.40), "»")
-	_add_rpg(root, "BtnCrouch", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.40 + 72.0), "▼")
-	_add_rpg(root, "BtnEmote", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.40 + 144.0), "🙂")
+	# --- tombol aksi bulat gaya RPG (klaster kanan ala referensi) ---
+	# attack besar kanan-tengah-bawah; dash di bawah-kanannya; lompat pojok kanan bawah
+	var att_c := Vector2(vsz.x - mr - 148, vsz.y - mb - 230)
+	_add_rpg(root, "BtnAtk", "sword", 60.0, att_c - Vector2(60.0, 60.0))
+	_add_rpg(root, "BtnDash", "dash", 40.0, att_c + Vector2(86.0, 100.0) - Vector2(40.0, 40.0))
+	_add_rpg(root, "BtnJump", "jump", 46.0, Vector2(vsz.x - mr - 96.0, vsz.y - mb - 96.0) - Vector2(46.0, 46.0))
+	_add_rpg(root, "BtnAction", "", 36.0, att_c + Vector2(-112.0, -8.0) - Vector2(36.0, 36.0), "✋")
+	_add_rpg(root, "BtnSprint", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.34), "»")
+	_add_rpg(root, "BtnCrouch", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.34 + 72.0), "▼")
+	_add_rpg(root, "BtnEmote", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.34 + 144.0), "🙂")
 	_connect_rpg("BtnJump", Callable(self, "_on_jump"), false)
 	_connect_rpg("BtnSprint", Callable(self, "_on_sprint"), true)
 	_connect_rpg("BtnCrouch", Callable(self, "_on_crouch"), true)

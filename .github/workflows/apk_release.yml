@@ -235,3 +235,5 @@ jobs:
 # rerun-kick 17 (HUD RPG: joystick melayang + tombol bulat ber-icon; menu geser kiri; Mode Edit sculpt/jalur/cahaya; dunia 800m)
 
 # rerun-kick 18 (perbaikan deterministik publish konten: manifest+versions disalin paksa bila dest beda)
+
+# rerun-kick 19 (tata letak klaster ala referensi: lingkaran gelap translusen + glyph putih; attack besar, dash kanan-bawahnya, lompat pojok kanan bawah)

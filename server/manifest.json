@@ -1,6 +1,6 @@
 {
  "game_version": "1.0.9",
- "generated_at": "2026-09-20T07:25:04Z",
+ "generated_at": "2026-09-20T07:36:57Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -75,10 +75,10 @@
    ]
   },
   "ui": {
-   "version": "1.0.4",
+   "version": "1.0.5",
    "size": 0,
    "sha256": "",
-   "url": "packs/ui-1.0.4.pck",
+   "url": "packs/ui-1.0.5.pck",
    "deps": []
   },
   "audio_sfx": {
