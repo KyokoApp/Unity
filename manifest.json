@@ -1,12 +1,10 @@
 {
- "game_version": "1.0.18",
- "generated_at": "2026-09-20T11:06:22Z",
+ "game_version": "1.0.20",
+ "generated_at": "2026-09-20T11:19:50Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
   "world_terrain",
-  "world_props_forest",
-  "world_props_beach",
   "animations",
   "character_player",
   "ui",
@@ -16,58 +14,38 @@
  "packs": {
   "core_scripts": {
    "version": "1.0.6",
-   "size": 325460,
-   "sha256": "70fb53e5d4441f40f534447a62d5be3517a6dc56891919457a9c4c5ddc85e62b",
+   "size": 324388,
+   "sha256": "e82c2597b55fe408f703a5b39d74a5f4cbc0f1e546dac94545dfb4239f9cfd4b",
    "url": "packs/core_scripts-1.0.6.pck",
    "deps": []
   },
   "shaders_materials": {
-   "version": "1.0.8",
-   "size": 758716,
-   "sha256": "351ef46c5bce0dadfffaee6179e999957b8fd7e31c424011f71885f01a9b5f6c",
-   "url": "packs/shaders_materials-1.0.8.pck",
+   "version": "1.0.9",
+   "size": 752856,
+   "sha256": "960dd1c6107fc99ba695dae61361b35f25883009a49a0805c2ee5560027f0f35",
+   "url": "packs/shaders_materials-1.0.9.pck",
    "deps": []
   },
   "world_terrain": {
-   "version": "1.0.18",
-   "size": 357040,
-   "sha256": "dc552a079c0eeaed6dca8be7ac4071c3bb38aa62bd748df3b3914b7080cdd7b3",
-   "url": "packs/world_terrain-1.0.18.pck",
+   "version": "1.0.20",
+   "size": 13371428,
+   "sha256": "6ba06069304841d889e45963f41632f8276039926c1c27801d5435397a7a17be",
+   "url": "packs/world_terrain-1.0.20.pck",
    "deps": [
     "shaders_materials"
    ]
   },
-  "world_props_forest": {
-   "version": "1.0.5",
-   "size": 1588068,
-   "sha256": "6b52ecde8c606f512129066c78ada73c4b484f44c39d6a3af6609178fc33e12a",
-   "url": "packs/world_props_forest-1.0.5.pck",
-   "deps": [
-    "shaders_materials",
-    "world_terrain"
-   ]
-  },
-  "world_props_beach": {
-   "version": "1.0.6",
-   "size": 327244,
-   "sha256": "5684b4f48e8a11b77da09cefc4b46e9c3fa7fb2f94a1f7a83acbc5a43564b536",
-   "url": "packs/world_props_beach-1.0.6.pck",
-   "deps": [
-    "shaders_materials",
-    "world_terrain"
-   ]
-  },
   "animations": {
    "version": "1.0.4",
-   "size": 317888,
-   "sha256": "483c8bcf4c6d813f548a0d2cc2c688dddb1287d2f62ffa8a762ae7134beaf9ff",
+   "size": 316816,
+   "sha256": "8e1e2506fa3e2d8b3d64a54ffd0dd2ff61a5d941b1f0aeee00a208e62091e69a",
    "url": "packs/animations-1.0.4.pck",
    "deps": []
   },
   "character_player": {
    "version": "1.0.7",
-   "size": 8818764,
-   "sha256": "76716428c499ecc9808e80dd41a6bd2ab27538bd4bf8e573a3ce03643922066e",
+   "size": 8817692,
+   "sha256": "658590887bd83c05ce968a0db7cbf6d038e9736dc6953fdd80044a86d9e88eca",
    "url": "packs/character_player-1.0.7.pck",
    "deps": [
     "animations",
@@ -76,22 +54,22 @@
   },
   "ui": {
    "version": "1.0.7",
-   "size": 351228,
-   "sha256": "eda562cf791739f107172f7680e24414380538283206d03e5390d8123269b66b",
+   "size": 350156,
+   "sha256": "4697b14d77efd35ad90465c9edc6bfb816a61bf52c6db6f2a06e44a0ab376e48",
    "url": "packs/ui-1.0.7.pck",
    "deps": []
   },
   "audio_sfx": {
    "version": "1.0.1",
-   "size": 487060,
-   "sha256": "a49aef56e399c19cc6f48f6aecf34c27a4867f91c859ae6206c6532882ff302e",
+   "size": 485988,
+   "sha256": "304e025b54f408b982de2ba7cf7f9b154b4a9b080890017ec883bfcc0b421145",
    "url": "packs/audio_sfx-1.0.1.pck",
    "deps": []
   },
   "audio_music": {
    "version": "1.0.1",
-   "size": 1644576,
-   "sha256": "07cf036867d2af214405e68ce06efdd6e46ae3339e9f792904dc75d4d79c0a11",
+   "size": 1643504,
+   "sha256": "48110272c842def7d51fe1a5bf17f545abb46f8cc15253f9887fb21960459b23",
    "url": "packs/audio_music-1.0.1.pck",
    "deps": []
   }
