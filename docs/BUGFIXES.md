@@ -92,6 +92,7 @@ fungsi itu diam-diam, loading screen tertutup, sisanya langit.
 5. Tunggu run Actions → pastikan anotasi `content push: "game_version": "x.y.z"`.
 6. Verifikasi: `gh api 'repos/KyokoApp/Unity/contents/manifest.json?ref=content'`.
 
+| 1.0.19 | temuan kunci: konfigurasi 1.0.12 pun kini blue screen → akar kemungkinan BUKAN kode world (delivery/state perangkat). World procedural dihapus total; dunia = Gravity Falls statis + fallback bidang datar; debug diserahkan ke user | instruksi user: pasang GF + hapus world lama tanpa sisa; jaring darurat agar game SELALU boot |
 | 1.0.18 | blue screen bertahan → akar diverifikasi lewat biseksi: strip total kode statis + revert konstanta ke 1.0.12-terbukti; GLB dikeluarkan dari pack | eliminasi variabel satu per satu; hasil uji menyempitkan tersangka |
 | 1.0.17 | Sinkron-load GLB di boot tetap mematikan di perangkat walau sudah defensif (path boot panjang + alokasi besar) | GLB dimuat ASINKRON setelah game playable (threaded request), swap baru setelah verifikasi; boot tak pernah menunggu world kustom |
 

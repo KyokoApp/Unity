@@ -255,3 +255,5 @@ jobs:
 # rerun-kick 27 (blue screen fix total: Gravity Falls async + swap pasca-playable)
 
 # rerun-kick 28 (BISEKSI: back to konfigurasi 1.0.12, tanpa kode statis & tanpa GLB di pack)
+
+# rerun-kick 29 (Gravity Falls satu-satunya world; world procedural dihapus total + fallback bidang darurat)

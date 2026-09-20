@@ -259,3 +259,19 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
 4. Jika 1.0.18 boot normal → kesalahannya di kode statis/handling GLB; jika
    MASIH biru → tersangka berikutnya: resize konstanta (1.0.13) atau lapis
    delivery pack; jejak boot di layar loading = titik mati persisnya.
+
+## 2026-09-20 — Ronde-14: Gravity Falls = SATU-SATUNYA world (tanpa fallback)
+1. Sesuai instruksi tegas user: world procedural lama DIHAPUS TANPA SISA
+   (island.gd, terrain_chunk.gd, meshlib.gd, pack forest+beach+semua aset KayKit,
+   water.gdshader, grass.gdshader). Yang tersisa: world statis Gravity Falls.
+2. world.gd ditulis ulang ramping (~330 baris): load GLB sinkron saat boot
+   (atas permintaan), collision trimesh, grid segitiga barycentric utk height_at
+   & spawn, outline tipis 0.008, sky/sun/fog/siang-malam tetap (slider Mode Edit
+   masih berfungsi). API kompatibel penuh (sculpt/edit = no-op).
+3. JT JARING PENGAMAN TERAKHIR: bila GLB gagal total → "dunia darurat polos"
+   (bidang 400m + collision + grid y=0) — game tetap boot & pemain bisa
+   berjalan membaca jejak boot (tujuan: user mau otak-atik error sendiri).
+4. Catatan riset lapangan: karena 1.0.18 (= konfigurasi 1.0.12 yang dulu jalan)
+   TETAP blue screen, blue screen kemungkinan BUKAN dari kode world — kandidat
+   utama berikutnya: jalur update content (pack korup di perangkat) / build ci /
+   state user:// basi. Langkah debug diserahkan ke user bersama docs/BUGFIXES.md.

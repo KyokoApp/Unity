@@ -5,12 +5,12 @@
    "version": "1.0.6"
   },
   "shaders_materials": {
-   "content_hash": "d5d8d53c165e6efbcc735b33657d876978871fc505e8397d561f55387e97baa8",
-   "version": "1.0.8"
+   "content_hash": "e93538aef9ae0513b9211cfab3456146c919a2d8183de726a31a8365ed5c7f6f",
+   "version": "1.0.9"
   },
   "world_terrain": {
-   "content_hash": "a5f8932f1708250d9d31f2cbb1888f0a3f92aa26db406224d86ebee94159afa5",
-   "version": "1.0.18"
+   "content_hash": "2ce45ab3f4913630371ab487dba408f2975b9683931a37e4b8d2331c5b89d913",
+   "version": "1.0.19"
   },
   "world_props_forest": {
    "content_hash": "8a1b9332ad6e8b6abf79009a280d17570bd50453004cea27b1c5bd3270b00dba",

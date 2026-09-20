@@ -1,12 +1,10 @@
 {
- "game_version": "1.0.18",
- "generated_at": "2026-09-20T11:04:20Z",
+ "game_version": "1.0.19",
+ "generated_at": "2026-09-20T11:17:47Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
   "world_terrain",
-  "world_props_forest",
-  "world_props_beach",
   "animations",
   "character_player",
   "ui",
@@ -22,39 +20,19 @@
    "deps": []
   },
   "shaders_materials": {
-   "version": "1.0.8",
+   "version": "1.0.9",
    "size": 0,
    "sha256": "",
-   "url": "packs/shaders_materials-1.0.8.pck",
+   "url": "packs/shaders_materials-1.0.9.pck",
    "deps": []
   },
   "world_terrain": {
-   "version": "1.0.18",
+   "version": "1.0.19",
    "size": 0,
    "sha256": "",
-   "url": "packs/world_terrain-1.0.18.pck",
+   "url": "packs/world_terrain-1.0.19.pck",
    "deps": [
     "shaders_materials"
-   ]
-  },
-  "world_props_forest": {
-   "version": "1.0.4",
-   "size": 0,
-   "sha256": "",
-   "url": "packs/world_props_forest-1.0.4.pck",
-   "deps": [
-    "shaders_materials",
-    "world_terrain"
-   ]
-  },
-  "world_props_beach": {
-   "version": "1.0.6",
-   "size": 0,
-   "sha256": "",
-   "url": "packs/world_props_beach-1.0.6.pck",
-   "deps": [
-    "shaders_materials",
-    "world_terrain"
    ]
   },
   "animations": {
