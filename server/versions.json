@@ -9,8 +9,8 @@
    "version": "1.0.7"
   },
   "world_terrain": {
-   "content_hash": "8f870f58454fd2411d62d7e09ef1755694fccad79bf7e83b457ea2e3b934bacd",
-   "version": "1.0.7"
+   "content_hash": "5fb87a3b5500c8a2c9aebc654aa15a79a7974a1ed0e506c3475a1c4911ad6df8",
+   "version": "1.0.8"
   },
   "world_props_forest": {
    "content_hash": "8d13c88668a2743a3116177c72a0029cd996905c018b7b145118a4bc848fbf35",
@@ -29,8 +29,8 @@
    "version": "1.0.3"
   },
   "ui": {
-   "content_hash": "857cfb784d13495228d3a6a2df3644bc76eec27abac15b1e194550a7bfa739ba",
-   "version": "1.0.2"
+   "content_hash": "f8b888f671f521d76a802ed34d67c9ff7bcf5790e68fd6e2f7c8bf5cdcbfe136",
+   "version": "1.0.3"
   },
   "audio_sfx": {
    "content_hash": "d43e8a08337984778388db77c8084ac7dadda641018bcfde5a2e3ec10ed29c91",

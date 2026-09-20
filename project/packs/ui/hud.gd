@@ -180,7 +180,9 @@ func _build_layout() -> void:
 	bpause.text = "Ⅱ"
 	bpause.add_theme_font_size_override("font_size", 26)
 	root.add_child(bpause)
-	bpause.pressed.connect(func(): if root_node and root_node.has_method("toggle_pause"): root_node.toggle_pause())
+	bpause.pressed.connect(func():
+		if root_node and root_node.has_method("toggle_pause"):
+			root_node.toggle_pause())
 
 	# --- indikator atas: jam + fps ---
 	label_clock = Label.new()

@@ -38,6 +38,18 @@ jobs:
           fi
           echo "bersih dari marker konflik"
 
+      - name: Lint GDScript (gdparse) — tolak parse error sebelum export
+        run: |
+          pip install -q gdtoolkit
+          FAIL=0
+          for f in $(find project -name "*.gd"); do
+            if ! out=$(gdparse "$f" 2>&1); then
+              echo "::error::GDScript parse error di $f :: $(echo "$out" | head -5 | tr '\n' ' ')"
+              FAIL=1
+            fi
+          done
+          [ "$FAIL" = 0 ] && echo "semua gd lolos parse" || exit 1
+
       - name: Dependensi sistem untuk editor Godot
         run: |
           sudo apt-get update -qq || true
@@ -208,3 +220,5 @@ jobs:
 # rerun-kick 13 (fix anim loop + analog terbalik + terrain cull-disabled anti-NaN + jejak statistik mesh + tekstur detail painted)
 
 # rerun-kick 14 (palet tanah = referensi pengguna: olive painted + pasir hangat, detail dual-warna)
+
+# rerun-kick 15 (hotfix: komentar bergaya // di island.gd = parse error -> layar biru; CI kini wajib lolos gdparse)

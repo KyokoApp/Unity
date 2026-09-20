@@ -144,8 +144,8 @@ func _land_height(x: float, z: float) -> float:
 	var h := -9.0 * (1.0 - shelf) + shelf * 0.35
 	h += core * (1.4 + e1 * 5.2)
 	var hillv: float = clampf(n_hill.get_noise_2d(x, z) * 0.5 + 0.5, 0.0, 1.0)
-	// clamp wajib: ridged noise bisa keluar [0,1] sedikit -> pow(neg,1.4)=NaN
-	// (NaN membunuh segitiga GPU -> mesh pulau tak terlihat di perangkat)
+	# clamp wajib: ridged noise bisa keluar [0,1] sedikit -> pow(neg,1.4)=NaN
+	# (NaN membunuh segitiga GPU -> mesh pulau tak terlihat di perangkat)
 	var hill_mask := smoothstep(0.52, 0.8, hillv) * core * smoothstep(0.15, 0.4, e1)
 	h += hill_mask * pow(hillv, 1.4) * 38.0
 	h += n_detail.get_noise_2d(x, z) * 0.55 * core
