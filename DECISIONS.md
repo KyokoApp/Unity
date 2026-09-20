@@ -134,3 +134,12 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
    meniru tekstur reference pengguna — dibuat AI agar bebas lisensi.
 5. Foam/water: band pantai sempit dipertahankan; pola polka laut dipercaya
    konsekuensi tinggi≈0/NaN global — jejak baru akan membuktikannya.
+
+## 2026-09-20 — Ronde-4: palet tanah = referensi pengguna
+1. Referensi hijau (olive painted) & tanah (pasir hangat) pengguna diadopsi: warna
+   vertex biome di island.gd digeser ke olive pekat/pasir hangat, plus detail
+   tekstur dual-warna (detail_grass/detail_sand, AI) di-blend mengikuti hue
+   vertex (rumput g>r, pasir r>g) — menggantikan tekstur luminance tunggal ronde-3.
+2. Catatan: laporan "anim kaku/analog terbalik/tanah hilang" pada screenshot
+   12:47 berada pada build 1.0.5; perbaikan akarnya (loop animasi, sumbu analog,
+   cull-disabled/anti-NaN + jejak statistik) sudah live di 1.0.6 — menunggu uji ulang.

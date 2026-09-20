@@ -204,13 +204,13 @@ func biome_at(x: float, z: float, h: float = 9999.0) -> int:
 func color_at(x: float, z: float, h: float) -> Color:
 	var s := slope_at(x, z)
 	var m := moisture_at(x, z)
-	# palet mid-tone jenuh sedang
-	var sand := Color(0.85, 0.72, 0.54)
-	var grass_dry := Color(0.48, 0.62, 0.36)
-	var grass_lush := Color(0.26, 0.56, 0.37)
-	var forest := Color(0.15, 0.40, 0.29)
+	# palet referensi pengguna (painted): rumput olive pekat, pasir hangat — lebih gelap dari pastel
+	var sand := Color(0.77, 0.65, 0.42)
+	var grass_dry := Color(0.47, 0.50, 0.26)
+	var grass_lush := Color(0.37, 0.43, 0.21)
+	var forest := Color(0.27, 0.34, 0.16)
 	var rock := Color(0.55, 0.56, 0.60)
-	var seabed := Color(0.66, 0.75, 0.62)
+	var seabed := Color(0.62, 0.68, 0.50)
 	var c: Color
 	if h < SEA_LEVEL + 0.05:
 		c = seabed.lerp(sand, smoothstep(-3.0, 0.0, h))

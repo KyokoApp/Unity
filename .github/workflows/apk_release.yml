@@ -206,3 +206,5 @@ jobs:
 # rerun-kick 12 (kalibrasi palet soft-tengah: air gelap, foam tepi, jade pekat, spawn membumi, trace anim)
 
 # rerun-kick 13 (fix anim loop + analog terbalik + terrain cull-disabled anti-NaN + jejak statistik mesh + tekstur detail painted)
+
+# rerun-kick 14 (palet tanah = referensi pengguna: olive painted + pasir hangat, detail dual-warna)

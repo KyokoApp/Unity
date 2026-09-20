@@ -5,7 +5,8 @@ extends RefCounted
 const TOON_SHADER := preload("res://packs/shaders_materials/toon.gdshader")
 const TOON_COLOR_SHADER := preload("res://packs/shaders_materials/toon_color.gdshader")
 const OUTLINE_SHADER := preload("res://packs/shaders_materials/outline.gdshader")
-const TERRAIN_DETAIL := preload("res://packs/shaders_materials/textures/terrain_detail.jpg")
+const TERRAIN_DETAIL_G := preload("res://packs/shaders_materials/textures/detail_grass.jpg")
+const TERRAIN_DETAIL_S := preload("res://packs/shaders_materials/textures/detail_sand.jpg")
 
 static var _cache := {}
 
@@ -30,7 +31,8 @@ static func toon_vertex_color(outline := false, outline_thickness := 0.012, deta
 	m.shader = TOON_COLOR_SHADER
 	if detail:
 		m.set_shader_parameter("detail_enabled", true)
-		m.set_shader_parameter("detail_tex", TERRAIN_DETAIL)
+		m.set_shader_parameter("detail_grass", TERRAIN_DETAIL_G)
+		m.set_shader_parameter("detail_sand", TERRAIN_DETAIL_S)
 	if outline:
 		m.next_pass = make_outline(outline_thickness)
 	_cache[key] = m

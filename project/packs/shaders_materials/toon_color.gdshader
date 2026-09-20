@@ -4,10 +4,11 @@ render_mode cull_disabled;
 // cull_disabled: kebal perbedaan winding/culling antar driver (Adreno dsb).
 
 uniform vec4 albedo : source_color = vec4(1.0, 1.0, 1.0, 1.0);
-// detail painted opsional (luminance multiply), dipakai terrain pulau
+// detail painted opsional (dual-warna: rumput olive / pasir hangat), dipakai terrain
 uniform bool detail_enabled = false;
-uniform sampler2D detail_tex : filter_linear_mipmap, repeat_enable;
-uniform float detail_strength : hint_range(0.0, 1.0) = 0.55;
+uniform sampler2D detail_grass : filter_linear_mipmap, repeat_enable;
+uniform sampler2D detail_sand : filter_linear_mipmap, repeat_enable;
+uniform float detail_strength : hint_range(0.0, 1.0) = 0.62;
 uniform float detail_scale = 0.16;
 uniform float band1 : hint_range(0.0, 1.0) = 0.36;
 uniform float band2 : hint_range(0.0, 1.0) = 0.68;
@@ -26,8 +27,11 @@ void vertex() {
 void fragment() {
 	ALBEDO = COLOR.rgb * albedo.rgb;
 	if (detail_enabled) {
-		float d = texture(detail_tex, detail_uv).r;
-		ALBEDO *= mix(1.0, d / 0.74, detail_strength);
+		// rumput: COLOR.g > COLOR.r ; pasir: COLOR.r > COLOR.g ; batuan ~campur
+		float wg = clamp((COLOR.g - COLOR.r) * 8.0 + 0.5, 0.0, 1.0);
+		vec3 dtl = mix(texture(detail_sand, detail_uv).rgb,
+			texture(detail_grass, detail_uv).rgb, wg);
+		ALBEDO *= mix(vec3(1.0), dtl * 2.0, detail_strength);
 	}
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;

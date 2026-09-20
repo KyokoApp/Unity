@@ -29,7 +29,7 @@
 - **OpenJDK (jdk4py)** untuk keystore/signing Android — GPL w/ classpath exception.
 
 
-- **Terrain detail texture** (`packs/shaders_materials/textures/terrain_detail.jpg`)
-  — dibuat AI (text-to-image) untuk proyek ini, gaya painterly; bukan aset pihak ketiga.
+- **Terrain detail textures** (`packs/shaders_materials/textures/detail_grass.jpg`, `detail_sand.jpg`)
+  — dibuat AI (text-to-image) untuk proyek ini mengikuti referensi palet pengguna; bukan aset pihak ketiga.
 
 *Terakhir diperbarui: 2026-09-20*
