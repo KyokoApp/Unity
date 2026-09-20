@@ -18,6 +18,15 @@ const RF_GRID := 200
 const RF_STEP := 8.0
 var _river_field := PackedFloat32Array()
 
+# --- lapisan EDIT in-game (orangtua: Mode Edit) ---
+# edit_sculpt: offset tinggi per-sel (bilinear). edit_road: masker jalur 0..1.
+# edit_road_target: tinggi datar jalur per-sel (diisi saat mengecat).
+const EDIT_N := 160  # sel = world/160 (800m -> 5m)
+var edit_sculpt := PackedFloat32Array()
+var edit_road := PackedFloat32Array()
+var edit_road_target := PackedFloat32Array()
+var road_color := Color(0.64, 0.52, 0.35)
+
 enum BIOME { SEA, BEACH, GRASS, FOREST, ROCK, HILL }
 
 func _init(seed: int = 20260919, size_m: float = 1600.0) -> void:
@@ -48,7 +57,75 @@ func _init(seed: int = 20260919, size_m: float = 1600.0) -> void:
 	n_detail.frequency = 0.016
 	n_detail.fractal_octaves = 2
 	lake_center = Vector2(-0.28 * half, 0.14 * half)
+	_edit_init()
 	_compute_river()
+
+func _edit_init() -> void:
+	edit_sculpt = PackedFloat32Array()
+	edit_sculpt.resize(EDIT_N * EDIT_N)
+	edit_road = PackedFloat32Array()
+	edit_road.resize(EDIT_N * EDIT_N)
+	edit_road_target = PackedFloat32Array()
+	edit_road_target.resize(EDIT_N * EDIT_N)
+
+func serialize_edits() -> Dictionary:
+	return {"sc": edit_sculpt, "rd": edit_road, "rt": edit_road_target}
+
+func load_edits(d: Dictionary) -> void:
+	if d.get("sc") is PackedFloat32Array and d["sc"].size() == EDIT_N * EDIT_N:
+		edit_sculpt = d["sc"]
+	if d.get("rd") is PackedFloat32Array and d["rd"].size() == EDIT_N * EDIT_N:
+		edit_road = d["rd"]
+	if d.get("rt") is PackedFloat32Array and d["rt"].size() == EDIT_N * EDIT_N:
+		edit_road_target = d["rt"]
+
+func _edit_sample(field: PackedFloat32Array, x: float, z: float) -> float:
+	var gx := (x + half) / (2.0 * half) * float(EDIT_N - 1)
+	var gz := (z + half) / (2.0 * half) * float(EDIT_N - 1)
+	if gx < 0.0 or gz < 0.0 or gx > EDIT_N - 1 or gz > EDIT_N - 1:
+		return 0.0
+	var ix := int(gx)
+	var iz := int(gz)
+	var fx := gx - ix
+	var fz := gz - iz
+	var ix1 := mini(ix + 1, EDIT_N - 1)
+	var iz1 := mini(iz + 1, EDIT_N - 1)
+	var a: float = field[iz * EDIT_N + ix]
+	var b: float = field[iz * EDIT_N + ix1]
+	var c: float = field[iz1 * EDIT_N + ix]
+	var dd: float = field[iz1 * EDIT_N + ix1]
+	return lerpf(lerpf(a, b, fx), lerpf(c, dd, fx), fz)
+
+## Mengecat edit di sekitar (x,z) radius r: mode "sculpt" (amount +/-),
+## "road" (amount = kuat cat, diratakan ke tinggi saat ini).
+func edit_apply(x: float, z: float, radius: float, amount: float, mode: String) -> void:
+	var cell := (2.0 * half) / float(EDIT_N - 1)
+	var cx := (x + half) / (2.0 * half) * float(EDIT_N - 1)
+	var cz := (z + half) / (2.0 * half) * float(EDIT_N - 1)
+	var rc := int(ceil(radius / cell)) + 1
+	var i0 := int(floor(cx)) - rc
+	var i1 := int(floor(cx)) + rc
+	var j0 := int(floor(cz)) - rc
+	var j1 := int(floor(cz)) + rc
+	for j in range(j0, j1 + 1):
+		for i in range(i0, i1 + 1):
+			if i < 0 or j < 0 or i >= EDIT_N or j >= EDIT_N:
+				continue
+			var d := Vector2(float(i) - cx, float(j) - cz).length() * cell
+			if d > radius:
+				continue
+			var fall := 0.5 + 0.5 * cos(PI * d / radius)
+			var idx := j * EDIT_N + i
+			if mode == "road":
+				if amount > 0.0 and edit_road[idx] < 0.999:
+					# sasaran datar = tinggi saat ini supaya kontinyu dengan sekitar
+					var wx := float(i) / float(EDIT_N - 1) * (2.0 * half) - half
+					var wz := float(j) / float(EDIT_N - 1) * (2.0 * half) - half
+					edit_road_target[idx] = lerpf(edit_road_target[idx],
+						height_at(wx, wz), clampf(amount * fall, 0.0, 1.0))
+				edit_road[idx] = clampf(edit_road[idx] + amount * fall, 0.0, 1.0)
+			else:
+				edit_sculpt[idx] = clampf(edit_sculpt[idx] + amount * fall, -60.0, 60.0)
 
 ## Sungai: gradient-descent dari titik tinggi sampai laut.
 func _compute_river() -> void:
@@ -151,8 +228,8 @@ func _land_height(x: float, z: float) -> float:
 	h += n_detail.get_noise_2d(x, z) * 0.55 * core
 	return h
 
-## Tinggi final (dengan ukir sungai + danau). Ini API utama.
-func height_at(x: float, z: float) -> float:
+## Tinggi final (dengan ukir sungai + danau + lapisan edit pemain). API utama.
+func height_at(x: float, z: float, skip_edit := false) -> float:
 	var h := _land_height(x, z)
 	# danau
 	var dl := Vector2(x, z).distance_to(lake_center)
@@ -165,6 +242,11 @@ func height_at(x: float, z: float) -> float:
 		var carve := 4.2 * exp(-pow(dr / 9.0, 2.0))
 		var k := smoothstep(0.15, 1.6, h)  # tidak mengukir di bawah permukaan
 		h -= carve * k
+	if not skip_edit and edit_sculpt.size() == EDIT_N * EDIT_N:
+		h += _edit_sample(edit_sculpt, x, z)
+		var rm := _edit_sample(edit_road, x, z)
+		if rm > 0.001:
+			h = lerpf(h, _edit_sample(edit_road_target, x, z), clampf(rm, 0.0, 1.0))
 	return h
 
 func normal_at(x: float, z: float, eps: float = 1.2) -> Vector3:
@@ -228,6 +310,11 @@ func color_at(x: float, z: float, h: float) -> Color:
 	# variasi lembut
 	var v := n_detail.get_noise_2d(x * 1.7, z * 1.7) * 0.035
 	c = c.lightened(v) if v > 0.0 else c.darkened(-v)
+	# jalur tanah buatan pemain (Mode Edit)
+	if edit_road.size() == EDIT_N * EDIT_N:
+		var rm := _edit_sample(edit_road, x, z)
+		if rm > 0.03:
+			c = c.lerp(road_color, clampf(rm * 1.35, 0.0, 0.92))
 	return c
 
 ## Titik spawn di pantai: menyapu radial dari tepi ke dalam hingga pasir landai.

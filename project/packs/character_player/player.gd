@@ -16,6 +16,8 @@ const SPEED_RUN := 4.8
 const SPEED_SPRINT := 7.2
 const SPEED_CROUCH := 1.5
 const SPEED_SWIM := 2.6
+const DASH_IMPULSE := 9.0
+const DASH_CD := 0.9
 const ACCEL := 16.0
 const AIR_ACCEL := 5.0
 const GRAVITY := 24.0
@@ -190,6 +192,22 @@ func press_sprint(down: bool) -> void:
 	if sprint:
 		crouch = false
 
+## Dash: hentakan cepat searah gerak terakhir / arah hadap. Cooldown singkat.
+var _dash_cd := 0.0
+var _last_move_dir := Vector3(0, 0, -1)
+
+func press_dash() -> void:
+	if _dash_cd > 0.0 or _swimming:
+		return
+	_dash_cd = DASH_CD
+	var dir := _last_move_dir
+	if dir.length() < 0.1:
+		dir = Basis(Vector3.UP, yaw) * Vector3(0, 0, -1)
+	velocity.x = dir.x * DASH_IMPULSE
+	velocity.z = dir.z * DASH_IMPULSE
+	if anim and anim.has("sprint"):
+		anim.action("sprint", 320)
+
 func press_crouch(down: bool) -> void:
 	crouch = down
 	_apply_crouch_shape()
@@ -238,6 +256,9 @@ func _physics_process(delta: float) -> void:
 		wish = wish.normalized()
 	var cam_basis := Basis(Vector3.UP, yaw)
 	var move_dir := (cam_basis * Vector3(wish.x, 0, wish.y))
+	if move_dir.length() > 0.05:
+		_last_move_dir = move_dir.normalized()
+	_dash_cd = maxf(_dash_cd - delta, 0.0)
 	var speed := _target_speed()
 	# FAIL-SAFE desktop keyboard (untuk uji headless/dev)
 	if joy == Vector2.ZERO:

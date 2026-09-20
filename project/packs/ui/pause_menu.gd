@@ -45,49 +45,55 @@ func _make_button(txt: String, c: Color, cb: Callable) -> Button:
 
 func _build() -> void:
 	var shade := ColorRect.new()
-	shade.color = Color(0.02, 0.04, 0.07, 0.62)
+	shade.color = Color(0.02, 0.04, 0.07, 0.45)
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(shade)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
-
+	# panel geser dari KIRI (full tinggi, berscroll)
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(680, 0)
 	var pstyle := StyleBoxFlat.new()
-	pstyle.bg_color = Color(0.08, 0.12, 0.18, 0.96)
-	pstyle.corner_radius_top_left = 24
-	pstyle.corner_radius_top_right = 24
-	pstyle.corner_radius_bottom_left = 24
-	pstyle.corner_radius_bottom_right = 24
-	pstyle.border_width_left = 2
+	pstyle.bg_color = Color(0.08, 0.12, 0.18, 0.97)
+	pstyle.corner_radius_top_right = 26
+	pstyle.corner_radius_bottom_right = 26
 	pstyle.border_width_right = 2
-	pstyle.border_width_top = 2
-	pstyle.border_width_bottom = 2
 	pstyle.border_color = Color(1, 1, 1, 0.12)
 	_panel.add_theme_stylebox_override("panel", pstyle)
-	center.add_child(_panel)
+	_panel.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	_panel.custom_minimum_size = Vector2(560, 0)
+	_panel.size = Vector2(560, get_viewport().get_visible_rect().size.y)
+	add_child(_panel)
+	# animasi geser masuk
+	_panel.position.x = -580
+	var tw := create_tween()
+	tw.set_ease(Tween.EASE_OUT)
+	tw.set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(_panel, "position:x", 0.0, 0.28)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 36)
-	margin.add_theme_constant_override("margin_right", 36)
-	margin.add_theme_constant_override("margin_top", 30)
-	margin.add_theme_constant_override("margin_bottom", 30)
+	margin.add_theme_constant_override("margin_left", 34)
+	margin.add_theme_constant_override("margin_right", 34)
+	margin.add_theme_constant_override("margin_top", 28)
+	margin.add_theme_constant_override("margin_bottom", 28)
 	_panel.add_child(margin)
+	var scroll := ScrollContainer.new()
+	margin.add_child(scroll)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 16)
-	margin.add_child(v)
+	v.add_theme_constant_override("separation", 14)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(v)
 
 	var title := Label.new()
-	title.text = "⏸  JEDA"
+	title.text = "⏸  MENU"
 	title.add_theme_font_size_override("font_size", 46)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_color_override("font_color", Color(0.95, 0.86, 0.55))
 	v.add_child(title)
 
 	v.add_child(_make_button("▶  Lanjutkan", Color(0.28, 0.66, 0.34), Callable(self, "_on_resume")))
-	v.add_child(_make_button("⚙  Pengaturan", Color(0.36, 0.42, 0.52), Callable(self, "_on_settings")))
+	v.add_child(_make_button("✎  Mode Edit (dunia & cahaya)", Color(0.24, 0.58, 0.62), Callable(self, "_on_edit_mode")))
 	v.add_child(_make_button("↩  Keluar ke Launcher", Color(0.55, 0.42, 0.30), Callable(self, "_on_exit_launcher")))
 	v.add_child(_make_button("✕  Keluar Game", Color(0.66, 0.30, 0.28), Callable(self, "_on_exit_game")))
 
@@ -95,7 +101,7 @@ func _build() -> void:
 	v.add_child(sep)
 	_settings_box = VBoxContainer.new()
 	_settings_box.add_theme_constant_override("separation", 12)
-	_settings_box.visible = false
+	_settings_box.visible = true  # pengaturan langsung terlihat (scrollable)
 	v.add_child(_settings_box)
 	_build_settings()
 
@@ -197,8 +203,19 @@ func _field_header(txt: String) -> Label:
 	return l
 
 func _on_resume() -> void:
+	# geser keluar dulu, baru benar-benar ditutup
+	if _panel:
+		var tw := create_tween()
+		tw.set_ease(Tween.EASE_IN)
+		tw.set_trans(Tween.TRANS_CUBIC)
+		tw.tween_property(_panel, "position:x", -580.0, 0.2)
+		await tw.finished
 	if _root and _root.has_method("_close_pause"):
 		_root._close_pause()
+
+func _on_edit_mode() -> void:
+	if _root and _root.has_method("enter_edit_mode"):
+		_root.enter_edit_mode()
 
 func _on_settings() -> void:
 	_settings_box.visible = not _settings_box.visible

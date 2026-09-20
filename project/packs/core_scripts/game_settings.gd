@@ -12,6 +12,12 @@ var quality_preset: int = 1  # 0=Rendah, 1=Sedang, 2=Tinggi
 var fps_cap: int = 30        # 30 atau 60
 var show_fps: bool = false
 
+# --- Pencahayaan (Mode Edit in-game) ---
+var light_sun: float = 1.0     # pengali energi matahari 0.3..2.0
+var light_ambient: float = 1.0 # pengali ambient 0.3..2.0
+var light_fog: float = 1.0     # pengali kabut 0..3
+var light_sky: int = -1        # preset gradien langit (-1 = otomatis siang/malam)
+
 # --- Kontrol ---
 var camera_sens: float = 1.0   # 0.3 .. 2.5
 var button_scale: float = 1.0  # 0.8 .. 1.5
@@ -35,6 +41,10 @@ func load_settings() -> void:
 		vol_master = float(cfg.get_value("audio", "master", vol_master))
 		vol_music = float(cfg.get_value("audio", "music", vol_music))
 		vol_sfx = float(cfg.get_value("audio", "sfx", vol_sfx))
+		light_sun = float(cfg.get_value("lighting", "sun", light_sun))
+		light_ambient = float(cfg.get_value("lighting", "ambient", light_ambient))
+		light_fog = float(cfg.get_value("lighting", "fog", light_fog))
+		light_sky = int(cfg.get_value("lighting", "sky", light_sky))
 		apply_audio()
 
 func save_settings() -> void:
@@ -48,6 +58,10 @@ func save_settings() -> void:
 	cfg.set_value("audio", "master", vol_master)
 	cfg.set_value("audio", "music", vol_music)
 	cfg.set_value("audio", "sfx", vol_sfx)
+	cfg.set_value("lighting", "sun", light_sun)
+	cfg.set_value("lighting", "ambient", light_ambient)
+	cfg.set_value("lighting", "fog", light_fog)
+	cfg.set_value("lighting", "sky", light_sky)
 	cfg.save(PATH)
 
 func set_value(key: String, v) -> void:
@@ -61,6 +75,10 @@ func set_value(key: String, v) -> void:
 		"vol_master": vol_master = clampf(float(v), -40.0, 6.0)
 		"vol_music": vol_music = clampf(float(v), -40.0, 6.0)
 		"vol_sfx": vol_sfx = clampf(float(v), -40.0, 6.0)
+		"light_sun": light_sun = clampf(float(v), 0.3, 2.0)
+		"light_ambient": light_ambient = clampf(float(v), 0.3, 2.0)
+		"light_fog": light_fog = clampf(float(v), 0.0, 3.0)
+		"light_sky": light_sky = int(v)
 	save_settings()
 	changed.emit(key)
 	if key.begins_with("vol_"):

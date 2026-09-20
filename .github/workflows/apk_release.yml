@@ -222,3 +222,5 @@ jobs:
 # rerun-kick 14 (palet tanah = referensi pengguna: olive painted + pasir hangat, detail dual-warna)
 
 # rerun-kick 15 (hotfix: komentar bergaya // di island.gd = parse error -> layar biru; CI kini wajib lolos gdparse)
+
+# rerun-kick 17 (HUD RPG: joystick melayang + tombol bulat ber-icon; menu geser kiri; Mode Edit sculpt/jalur/cahaya; dunia 800m)

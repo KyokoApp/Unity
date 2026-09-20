@@ -13,9 +13,10 @@ const SKY_SHADER := preload("res://packs/shaders_materials/sky.gdshader")
 const FOREST_SCENE := "res://packs/world_props_forest/forest.tscn"
 const BEACH_SCENE := "res://packs/world_props_beach/beach.tscn"
 const CHUNK_SIZE := 100.0
-const GRID := 16
+const GRID := 8
 const WORLD_SEED := 20260919
-const WORLD_SIZE := 1600.0
+const WORLD_SIZE := 800.0  # diperkecil dari 1600 (keluhan: dunia kebesaran)
+const EDITS_PATH := "user://terrain_edits.dat"
 
 var island
 var terr_mat: Material
@@ -61,6 +62,7 @@ func generate_async(_root: Node) -> void:
 	_root_ref = _root
 	_report(0.0, "Membangun pulau…")
 	island = IslandScript.new(WORLD_SEED, WORLD_SIZE)
+	_load_edits(island)
 	_wtrace("pulau: h(0,0)=%.1f h(120,60)=%.1f" % [island.height_at(0, 0), island.height_at(120, 60)])
 	_progress_done = 0
 	_progress_total = 1 + 1 + 25 + 2  # shore map + laut + chunk awal + 2 pack props
@@ -372,6 +374,79 @@ func height_at(x: float, z: float) -> float:
 func get_island():
 	return island
 
+# ---------------- mode edit: sculpt & jalur ----------------
+
+var _save_edits_t := 0.0
+
+## Terapkan edit dari HUD: mode "raise"/"lower" (sculpt) atau "road" (jalur).
+func apply_terrain_edit(p: Vector3, radius: float, amount: float, mode: String) -> void:
+	if island == null:
+		return
+	var m := "sculpt" if mode in ["raise", "lower"] else "road"
+	var amt := amount if mode != "lower" else -amount
+	island.edit_apply(p.x, p.z, radius, amt, m)
+	var c0 := _chunk_of(p.x - radius, p.z - radius)
+	var c1 := _chunk_of(p.x + radius, p.z + radius)
+	for cz in range(c0.y, c1.y + 1):
+		for cx in range(c0.x, c1.x + 1):
+			_rebuild_chunk_now(cx, cz)
+	_save_edits_t = 2.0  # simpan pascajeda (debounce) — lihat _process
+
+func _rebuild_chunk_now(cx: int, cz: int) -> void:
+	var k := _key(cx, cz)
+	if not _inside(Vector2i(cx, cz)) or not chunks.has(k):
+		return
+	var chunk: Node3D = chunks[k]
+	var data := ChunkScript.build_mesh_data(island, cx, cz, chunk.lod)
+	var mesh := ChunkScript.make_mesh(data)
+	chunk.apply_mesh(mesh, terr_mat, data["heights"])
+	chunk.refresh_collision(island)
+
+func _save_edits() -> void:
+	var f := FileAccess.open(EDITS_PATH, FileAccess.WRITE)
+	if f:
+		f.store_var(island.serialize_edits())
+		f.close()
+
+func _load_edits(isl) -> void:
+	if not FileAccess.file_exists(EDITS_PATH):
+		return
+	var f := FileAccess.open(EDITS_PATH, FileAccess.READ)
+	if f:
+		var d = f.get_var()
+		if d is Dictionary:
+			isl.load_edits(d)
+			_wtrace("edit dunia dimuat (user-edited terrain)")
+		f.close()
+
+## Menghapus semua edit dunia (dipanggil dari panel Mode Edit).
+func reset_edits() -> void:
+	if island == null:
+		return
+	island._edit_init()
+	_save_edits()
+	for k in chunks.keys():
+		var parts: PackedStringArray = k.split(",")
+		var c := Vector2i(int(parts[0]), int(parts[1]))
+		_rebuild_chunk_now(c.x, c.y)
+	_wtrace("edit dunia direset")
+
+# ---------------- pencahayaan (Mode Edit) ----------------
+
+const SKY_PRESETS := [
+	[Color(0.30, 0.74, 0.69), Color(0.62, 0.88, 0.80)],  # 0 siang mint (bawaan)
+	[Color(0.18, 0.38, 0.52), Color(0.56, 0.86, 0.78)],  # 1 sore teal
+	[Color(0.18, 0.26, 0.44), Color(0.98, 0.60, 0.38)],  # 2 senja peach
+	[Color(0.05, 0.09, 0.16), Color(0.16, 0.20, 0.30)],  # 3 malam biru
+]
+var _lo := {"sun": 1.0, "ambient": 1.0, "fog": 1.0, "sky": -1}
+
+func apply_lighting(d: Dictionary) -> void:
+	for kk in d:
+		_lo[kk] = d[kk]
+	_dl_last = -1.0
+	_apply_daylight()
+
 func apply_quality(p: Dictionary) -> void:
 	chunk_rings = int(p.chunk_rings)
 	if world_env:
@@ -390,6 +465,10 @@ func _process(delta: float) -> void:
 			_initial_pending = false
 			_initial_done = true
 		_update_streaming_player_chunk()
+	if _save_edits_t > 0.0:
+		_save_edits_t -= delta
+		if _save_edits_t <= 0.0:
+			_save_edits()
 	_tick_daynight(delta)
 
 # ---------------- siang-malam ----------------
@@ -448,4 +527,11 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("zenith_color", Color(0.05, 0.09, 0.16))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.10, 0.15, 0.22))
 		sky_mat.set_shader_parameter("sun_color", Color(0.62, 0.70, 0.85))
-	env.fog_density = 0.0015 * (quality_ref.get_preset().fog if quality_ref else 1.0)
+	env.fog_density = 0.0015 * (quality_ref.get_preset().fog if quality_ref else 1.0) * float(_lo.fog)
+	# override dari Mode Edit: pengali & preset gradien langit
+	sun.light_energy *= float(_lo.sun)
+	env.ambient_light_energy *= float(_lo.ambient)
+	if int(_lo.sky) >= 0 and int(_lo.sky) < SKY_PRESETS.size():
+		var pr: Array = SKY_PRESETS[int(_lo.sky)]
+		sky_mat.set_shader_parameter("zenith_color", pr[0])
+		sky_mat.set_shader_parameter("horizon_color", pr[1])

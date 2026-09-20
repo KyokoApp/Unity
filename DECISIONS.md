@@ -143,3 +143,22 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
 2. Catatan: laporan "anim kaku/analog terbalik/tanah hilang" pada screenshot
    12:47 berada pada build 1.0.5; perbaikan akarnya (loop animasi, sumbu analog,
    cull-disabled/anti-NaN + jejak statistik) sudah live di 1.0.6 — menunggu uji ulang.
+
+## 2026-09-20 — Ronde-5: HUD RPG + Mode Edit in-game + dunia lebih kecil
+1. Joystick dibuat melayang: tersembunyi, muncul di titik sentuh pada 58% layar kiri.
+2. Tombol aksi menjadi lingkaran transparan-putih ber-icon canvas (RpgButton):
+   serang=pedang besar, lompat=orang melompat (atas-kanan), dash=sepatu (bawah-kanan);
+   sprint/jongkok/emote mini di tepi kanan. Pause = lingkaran kecil pojok kiri atas.
+3. Menu pause dirancang ulang: panel geser dari kiri, tinggi penuh, berscroll,
+   pengaturan selalu terlihat, tombol "Mode Edit" baru.
+4. Mode Edit in-game: sculpt terrain (angkat/turun via grid offset bilinear 160x160),
+   jalur tanah (masker + target datar + warna jalan), slider matahari/ambient/kabut,
+   preset gradien langit — semua tersimpan (terrain di user://terrain_edits.dat,
+   cahaya di settings.cfg) dan ter-load ulang saat boot.
+5. Dunia diperkecil 1600→800 m (GRID 8x8 chunk, GRID_HALF=4) atas keluhan "kegedean".
+6. Addon pihak ketiga TIDAK dipakai: (a) itch.io & asset-store tak dapat diunduh dari
+   CI/sandbox; (b) color-grading = post-process berat untuk ponsel — diganti kontrol
+   pencahayaan native; (c) stylized-water umumnya butuh screen/depth texture (mahal di
+   Adreno) — air toon internal dipertahankan; (d) terrain3d memang khusus desktop;
+   sistem chunk kustom kita sudah setara & mobile-native. Aset Quaternius (CC0) akan
+   diintegrasi begitu arsip GLB diunggah pengguna (unduhan diblok jaringan).

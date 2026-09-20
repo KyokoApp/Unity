@@ -100,6 +100,11 @@ func _boot_world(progress_cb: Callable) -> void:
 	if world.has_signal("gen_progress"):
 		world.gen_progress.connect(progress_cb)
 	await world.generate_async(self)
+	# terapkan pencahayaan hasil Mode Edit (tersimpan di pengaturan)
+	if world.has_method("apply_lighting"):
+		world.apply_lighting({
+			"sun": settings.light_sun, "ambient": settings.light_ambient,
+			"fog": settings.light_fog, "sky": settings.light_sky})
 	progress_cb.call(1.0, "Menempatkan pemain…")
 	_trace("boot: dunia ✔, pemain…")
 	var pp = load(PLAYER_SCENE)
@@ -168,6 +173,12 @@ func _close_pause() -> void:
 		get_tree().paused = false
 		pause_menu.queue_free()
 		pause_menu = null
+
+## Dipanggil dari pause menu: tutup menu (unpause) lalu aktifkan Mode Edit HUD.
+func enter_edit_mode() -> void:
+	_close_pause()
+	if hud and hud.has_method("set_edit_mode"):
+		hud.set_edit_mode(true)
 
 func quit_to_launcher() -> void:
 	get_tree().paused = false

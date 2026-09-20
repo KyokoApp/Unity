@@ -1,7 +1,104 @@
 extends CanvasLayer
-## HUD: joystick virtual kiri, area geser kamera kanan, tombol aksi,
-## prompt interaksi, statistik pickup, jam dalam game, FPS opsional, toast.
-## Semua elemen dibangun via kode agar pack mandiri; multi-touch via index event.
+## HUD: joystick melayang (muncul saat disentuh), kamera geser kanan, tombol
+## aksi bulat gaya RPG (digambar via canvas), prompt, statistik, jam, FPS, toast,
+## dan Mode Edit in-game (sculpt terrain + jalur + pencahayaan).
+
+## Tombol bulat transparan putih ber-icon canvas (pedang/lompat/sepatu/dll).
+class RpgButton:
+	extends Control
+	signal pressed
+	signal released
+	var icon := "sword"
+	var emoji := ""
+	var radius := 44.0
+	var active := false
+	var _down := false
+	var _label: Label
+
+	func _init(ic: String, r: float, emj := "") -> void:
+		icon = ic
+		radius = r
+		emoji = emj
+		custom_minimum_size = Vector2(r * 2, r * 2)
+		size = custom_minimum_size
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		if emoji != "":
+			_label = Label.new()
+			_label.text = emoji
+			_label.add_theme_font_size_override("font_size", int(r * 0.92))
+			_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
+			_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+			_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(_label)
+
+	func set_active(a: bool) -> void:
+		active = a
+		queue_redraw()
+
+	func _gui_input(e: InputEvent) -> void:
+		if e is InputEventScreenTouch:
+			if e.pressed:
+				_down = true
+				pressed.emit()
+			elif _down:
+				_down = false
+				released.emit()
+			queue_redraw()
+		elif e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
+			if e.pressed:
+				_down = true
+				pressed.emit()
+			elif _down:
+				_down = false
+				released.emit()
+			queue_redraw()
+
+	func _draw() -> void:
+		var c := Vector2(radius, radius)
+		draw_circle(c, radius - 1.0, Color(1, 1, 1, 0.34 if _down else 0.16))
+		draw_arc(c, radius - 3.0, 0.0, TAU, 48,
+			Color(1, 1, 1, 0.85 if active else 0.45), 3.0, true)
+		if active:
+			draw_arc(c, radius - 8.0, 0.0, TAU, 48, Color(1, 1, 1, 0.3), 2.0, true)
+		if emoji != "":
+			return
+		var w := Color(1, 1, 1, 0.92)
+		var r := radius * 0.62
+		match icon:
+			"sword":
+				var a := c + Vector2(-0.42, 0.42) * r      # pangkal gagang
+				var b := c + Vector2(0.52, -0.52) * r      # ujung pedang
+				var dir := (b - a).normalized()
+				var perp := Vector2(-dir.y, dir.x)
+				draw_line(a, b, w, 6.0, true)
+				draw_line(a + perp * r * 0.16 - dir * r * 0.18,
+					a - perp * r * 0.16 - dir * r * 0.18, w, 5.0, true)  # guard
+				draw_line(a, a - dir * r * 0.3, w, 5.0, true)              # gagang
+			"jump":
+				draw_arc(c + Vector2(0, -0.5) * r, r * 0.15, 0.0, TAU, 16, w, 3.0, true)
+				draw_line(c + Vector2(0, -0.34) * r, c + Vector2(0, 0.06) * r, w, 3.5, true)
+				draw_line(c + Vector2(-0.26, -0.2) * r, c + Vector2(0.26, -0.2) * r, w, 3.0, true)
+				draw_line(c + Vector2(0, 0.06) * r, c + Vector2(-0.24, 0.34) * r, w, 3.0, true)
+				draw_line(c + Vector2(0, 0.06) * r, c + Vector2(0.24, 0.34) * r, w, 3.0, true)
+				draw_line(c + Vector2(-0.42, 0.62) * r, c + Vector2(0, 0.42) * r, w, 3.5, true)
+				draw_line(c + Vector2(0, 0.42) * r, c + Vector2(0.42, 0.62) * r, w, 3.5, true)
+			"dash":  # sepatu + garis kecepatan
+				var pts := PackedVector2Array([
+					c + Vector2(-0.5, 0.14) * r, c + Vector2(-0.1, 0.14) * r,
+					c + Vector2(0.12, 0.3) * r, c + Vector2(0.5, 0.3) * r,
+					c + Vector2(0.5, 0.46) * r, c + Vector2(-0.5, 0.46) * r,
+					c + Vector2(-0.5, 0.14) * r])
+				draw_polyline(pts, w, 3.5, true)
+				draw_polyline(PackedVector2Array([
+					c + Vector2(-0.5, 0.14) * r, c + Vector2(-0.5, -0.12) * r,
+					c + Vector2(-0.2, -0.12) * r, c + Vector2(0.0, 0.06) * r]), w, 3.0, true)
+				draw_line(c + Vector2(-0.78, 0.1) * r, c + Vector2(-0.6, 0.1) * r, w, 3.0, true)
+				draw_line(c + Vector2(-0.78, 0.34) * r, c + Vector2(-0.64, 0.34) * r, w, 3.0, true)
+			"pause":
+				draw_line(c + Vector2(-0.2, -0.42) * r, c + Vector2(-0.2, 0.42) * r, w, 7.0, true)
+				draw_line(c + Vector2(0.2, -0.42) * r, c + Vector2(0.2, 0.42) * r, w, 7.0, true)
 
 var player: Node
 var root_node: Node
@@ -131,55 +228,48 @@ func _build_layout() -> void:
 		mr += maxf(0, vsz.x - sa.end.x)
 		mb += maxf(0, vsz.y - sa.end.y)
 
-	# --- joystick ---
+	# --- joystick melayang: tersembunyi, muncul di titik sentuh kiri ---
 	joy_base = Panel.new()
 	joy_base.name = "JoyBase"
-	joy_base.mouse_filter = Control.MOUSE_FILTER_STOP
-	joy_base.add_theme_stylebox_override("panel", _make_panel_col(Color(0.05, 0.06, 0.08, 0.30), 100))
+	joy_base.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	joy_base.add_theme_stylebox_override("panel", _make_panel_col(Color(1.0, 1.0, 1.0, 0.16), 100))
 	joy_base.custom_minimum_size = Vector2(JOY_RADIUS * 2, JOY_RADIUS * 2)
 	joy_base.size = Vector2(JOY_RADIUS * 2, JOY_RADIUS * 2)
 	joy_base.position = Vector2(ml + 10, vsz.y - mb - JOY_RADIUS * 2 - 16)
+	joy_base.visible = false
 	root.add_child(joy_base)
 	joy_knob = Panel.new()
 	joy_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	joy_knob.add_theme_stylebox_override("panel", _make_panel_col(Color(0.95, 0.86, 0.55, 0.9), 50))
+	joy_knob.add_theme_stylebox_override("panel", _make_panel_col(Color(1.0, 1.0, 1.0, 0.55), 50))
 	joy_knob.custom_minimum_size = Vector2(96, 96)
 	joy_knob.size = Vector2(96, 96)
 	joy_knob.position = Vector2(JOY_RADIUS - 48, JOY_RADIUS - 48)
 	joy_base.add_child(joy_knob)
 
-	# --- tombol aksi kanan bawah ---
-	var pad := 16.0
-	var positions := {
-		"BtnJump": Vector2(vsz.x - mr - 128 - pad, vsz.y - mb - 148),
-		"BtnAtk": Vector2(vsz.x - mr - 128 * 2 - pad * 2, vsz.y - mb - 148),
-		"BtnSprint": Vector2(vsz.x - mr - 128 - pad, vsz.y - mb - 148 * 2 - pad),
-		"BtnCrouch": Vector2(vsz.x - mr - 128 * 2 - pad * 2, vsz.y - mb - 148 * 2 - pad),
-		"BtnAction": Vector2(vsz.x - mr - 128 * 3 - pad * 3, vsz.y - mb - 148),
-		"BtnEmote": Vector2(vsz.x - mr - 128 * 3 - pad * 3, vsz.y - mb - 148 * 2 - pad),
-	}
-	_add_button_to(root, "BtnJump", "▲", Color(0.28, 0.66, 0.34), Color(0.18, 0.45, 0.24), positions["BtnJump"])
-	_add_button_to(root, "BtnAtk", "⚔", Color(0.74, 0.30, 0.28), Color(0.48, 0.19, 0.18), positions["BtnAtk"])
-	_add_button_to(root, "BtnSprint", "»", Color(0.27, 0.54, 0.72), Color(0.18, 0.36, 0.50), positions["BtnSprint"])
-	_add_button_to(root, "BtnCrouch", "▼", Color(0.55, 0.46, 0.66), Color(0.36, 0.30, 0.44), positions["BtnCrouch"])
-	_add_button_to(root, "BtnAction", "✋", Color(0.86, 0.64, 0.24), Color(0.56, 0.42, 0.16), positions["BtnAction"])
-	_add_button_to(root, "BtnEmote", "😀", Color(0.90, 0.51, 0.29), Color(0.60, 0.34, 0.19), positions["BtnEmote"])
-	# koneksi tombol
-	_connect_button("BtnJump", Callable(self, "_on_jump"), true)
-	_connect_button("BtnSprint", Callable(self, "_on_sprint"), true)
-	_connect_button("BtnCrouch", Callable(self, "_on_crouch"), true)
-	_connect_button("BtnAction", Callable(self, "_on_action"), true)
-	_connect_button("BtnAtk", Callable(self, "_on_attack"), true)
-	_connect_button("BtnEmote", Callable(self, "_on_emote"), false)
+	# --- tombol aksi bulat gaya RPG (kanan bawah) ---
+	var att_c := Vector2(vsz.x - mr - 178, vsz.y - mb - 170)
+	_add_rpg(root, "BtnAtk", "sword", 56.0, att_c - Vector2(56, 56))
+	_add_rpg(root, "BtnJump", "jump", 44.0, att_c + Vector2(70.0, -122.0) - Vector2(44, 44))
+	_add_rpg(root, "BtnDash", "dash", 44.0, att_c + Vector2(70.0, 118.0) - Vector2(44, 44))
+	_add_rpg(root, "BtnAction", "", 34.0, att_c + Vector2(-104.0, -26.0) - Vector2(34, 34), "✋")
+	_add_rpg(root, "BtnSprint", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.40), "»")
+	_add_rpg(root, "BtnCrouch", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.40 + 72.0), "▼")
+	_add_rpg(root, "BtnEmote", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.40 + 144.0), "🙂")
+	_connect_rpg("BtnJump", Callable(self, "_on_jump"), false)
+	_connect_rpg("BtnSprint", Callable(self, "_on_sprint"), true)
+	_connect_rpg("BtnCrouch", Callable(self, "_on_crouch"), true)
+	_connect_rpg("BtnAction", Callable(self, "_on_action"), false)
+	_connect_rpg("BtnAtk", Callable(self, "_on_attack"), false)
+	_connect_rpg("BtnDash", Callable(self, "_on_dash"), false)
+	_connect_rpg("BtnEmote", Callable(self, "_on_emote"), false)
 	_buttons["BtnAction"].visible = false
 
-	# --- pause ---
-	var bpause := _make_action_button("BtnPause", "II", Color(0.30, 0.31, 0.36), Color(0.20, 0.20, 0.24))
+	# --- pause: bulat kecil pojok kiri atas ---
+	var bpause := RpgButton.new("pause", 32.0)
+	bpause.name = "BtnPause"
 	bpause.position = Vector2(ml, mt)
-	bpause.custom_minimum_size = Vector2(88, 88)
-	bpause.text = "Ⅱ"
-	bpause.add_theme_font_size_override("font_size", 26)
 	root.add_child(bpause)
+	_buttons["BtnPause"] = bpause
 	bpause.pressed.connect(func():
 		if root_node and root_node.has_method("toggle_pause"):
 			root_node.toggle_pause())
@@ -240,16 +330,18 @@ func _build_layout() -> void:
 	toast_label.modulate.a = 0.0
 	root.add_child(toast_label)
 
-func _add_button_to(root: Control, name: String, txt: String, c: Color, e: Color, pos: Vector2) -> void:
-	var b := _make_action_button(name, txt, c, e)
+func _add_rpg(root: Control, name: String, icon: String, r: float, pos: Vector2, emj := "") -> void:
+	var b := RpgButton.new(icon, r, emj)
+	b.name = name
 	b.position = pos
 	root.add_child(b)
+	_buttons[name] = b
 
-func _connect_button(name: String, cb: Callable, holdable: bool) -> void:
-	var b: Button = _buttons[name]
-	b.button_down.connect(func(): cb.call(true))
+func _connect_rpg(name: String, cb: Callable, holdable: bool) -> void:
+	var b: RpgButton = _buttons[name]
+	b.pressed.connect(func(): cb.call(true))
 	if holdable:
-		b.button_up.connect(func(): cb.call(false))
+		b.released.connect(func(): cb.call(false))
 
 # ---------- handlers tombol ----------
 
@@ -260,12 +352,12 @@ func _on_jump(down: bool) -> void:
 func _on_sprint(down: bool) -> void:
 	if player:
 		player.press_sprint(down)
-	_buttons["BtnSprint"].modulate = Color(1.25, 1.25, 1.25) if down else Color.WHITE
+	_buttons["BtnSprint"].set_active(down)
 
 func _on_crouch(down: bool) -> void:
 	if player:
 		player.press_crouch(down)
-	_buttons["BtnCrouch"].modulate = Color(1.25, 1.25, 1.25) if down else Color.WHITE
+	_buttons["BtnCrouch"].set_active(down)
 
 func _on_action(down: bool) -> void:
 	if down and player:
@@ -274,6 +366,10 @@ func _on_action(down: bool) -> void:
 func _on_attack(down: bool) -> void:
 	if down and player:
 		player.press_attack()
+
+func _on_dash(down: bool) -> void:
+	if down and player and player.has_method("press_dash"):
+		player.press_dash()
 
 func _on_emote(_down: bool) -> void:
 	if player:
@@ -288,10 +384,21 @@ func _input(event: InputEvent) -> void:
 		_handle_drag(event)
 
 func _handle_touch(e: InputEventScreenTouch) -> void:
+	if edit_mode:
+		if _over_edit_bar(e.position):
+			return  # biarkan kontrol bar yang menangani
+		if e.pressed:
+			_edit_paint = e.index
+			_apply_edit_at(e.position)
+		elif e.index == _edit_paint:
+			_edit_paint = -1
+		return
 	if e.pressed:
-		# daerah joystick?
-		var jrect := Rect2(joy_base.global_position - Vector2(30, 30), joy_base.size + Vector2(60, 60))
-		if _joy_touch == -1 and jrect.has_point(e.position):
+		var vsz := get_viewport().get_visible_rect().size
+		# joystick melayang: sentuh area kiri-tengah → joystick muncul di titik itu
+		if _joy_touch == -1 and e.position.x < vsz.x * 0.58 and e.position.y > vsz.y * 0.22:
+			joy_base.position = e.position - Vector2(JOY_RADIUS, JOY_RADIUS)
+			joy_base.visible = true
 			_joy_touch = e.index
 			_update_joy(e.position)
 			return
@@ -301,11 +408,16 @@ func _handle_touch(e: InputEventScreenTouch) -> void:
 	else:
 		if e.index == _joy_touch:
 			_joy_touch = -1
+			joy_base.visible = false
 			_set_joy(Vector2.ZERO)
 		elif e.index == _look_touch:
 			_look_touch = -1
 
 func _handle_drag(e: InputEventScreenDrag) -> void:
+	if edit_mode:
+		if e.index == _edit_paint and not _over_edit_bar(e.position):
+			_apply_edit_at(e.position)
+		return
 	if e.index == _joy_touch:
 		_update_joy(e.position)
 	elif e.index == _look_touch:
@@ -332,13 +444,13 @@ func _set_joy(v: Vector2) -> void:
 # ---------- sinyal dari player ----------
 
 func _on_near_changed(meta: Dictionary) -> void:
+	var show := meta and meta.size() > 0 and not edit_mode
 	if meta and meta.size() > 0:
 		var t := str(meta.get("type", ""))
 		label_prompt.text = "Ambil: " + ("🥥 Kelapa" if t == "coconut" else "🌼 Bunga")
-		_buttons["BtnAction"].visible = true
 	else:
 		label_prompt.text = ""
-		_buttons["BtnAction"].visible = false
+	_buttons["BtnAction"].visible = show
 
 func _on_stats(kind: String, count: int) -> void:
 	var flowers := 0
@@ -386,3 +498,215 @@ func _apply_scale() -> void:
 			continue
 		_buttons[name].scale = Vector2.ONE * sc
 	joy_base.scale = Vector2.ONE * sc
+
+# ==================== MODE EDIT (sculpt dunia + pencahayaan) ====================
+
+var edit_mode := false
+var edit_tool := "raise"   # "raise" | "lower" | "road"
+var edit_radius := 12.0
+var edit_strength := 1.4
+var _edit_paint := -1
+var _edit_bar: Control
+var _edit_tool_btns := {}
+const EDIT_ACTION_NAMES := ["BtnJump", "BtnAtk", "BtnDash", "BtnSprint", "BtnCrouch", "BtnAction", "BtnEmote"]
+
+func set_edit_mode(on: bool) -> void:
+	edit_mode = on
+	if player:
+		player.set_joy(Vector2.ZERO)
+	joy_base.visible = false
+	if _edit_bar == null:
+		_build_edit_bar()
+	_edit_bar.visible = on
+	for n in EDIT_ACTION_NAMES:
+		if on:
+			_buttons[n].visible = false
+		else:
+			_buttons[n].visible = true
+			_buttons["BtnAction"].visible = label_prompt.text != ""
+	toast("Mode Edit — sentuh & geser tanah untuk membentuknya" if on else "Kembali bermain")
+
+func _exit_edit() -> void:
+	set_edit_mode(false)
+	if root_node and root_node.has_method("toggle_pause"):
+		root_node.toggle_pause()
+
+func _over_edit_bar(sp: Vector2) -> bool:
+	return _edit_bar and _edit_bar.visible and _edit_bar.get_global_rect().has_point(sp)
+
+func _apply_edit_at(sp: Vector2) -> void:
+	if _world == null or not _world.has_method("apply_terrain_edit"):
+		return
+	var hit := _edit_ray_hit(sp)
+	if hit.x > 1e17:
+		return
+	if edit_tool == "road":
+		_world.apply_terrain_edit(hit, edit_radius, edit_strength * 0.14, "road")
+	else:
+		_world.apply_terrain_edit(hit, edit_radius, edit_strength * 0.09, edit_tool)
+
+func _edit_ray_hit(sp: Vector2) -> Vector3:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null or _world == null:
+		return Vector3(1e18, 0, 0)
+	var ro: Vector3 = cam.project_ray_origin(sp)
+	var rd: Vector3 = cam.project_ray_normal(sp)
+	var p := ro
+	var prev := p
+	for i in range(600):
+		if p.y <= _world.height_at(p.x, p.z) + 0.02:
+			for k in range(8):
+				var mid := (prev + p) * 0.5
+				if mid.y <= _world.height_at(mid.x, mid.z) + 0.02:
+					p = mid
+				else:
+					prev = mid
+			return p
+		prev = p
+		p += rd * 1.5
+		if p.distance_to(ro) > 900.0:
+			break
+	return Vector3(1e18, 0, 0)
+
+func _mk_slider(vbox: VBoxContainer, header: String, mn: float, mx: float, val: float, cb: Callable) -> HSlider:
+	var l := Label.new()
+	l.text = header
+	l.add_theme_font_size_override("font_size", 22)
+	l.modulate.a = 0.85
+	vbox.add_child(l)
+	var s := HSlider.new()
+	s.min_value = mn
+	s.max_value = mx
+	s.step = 0.05
+	s.value = clampf(val, mn, mx)
+	s.custom_minimum_size = Vector2(0, 38)
+	s.value_changed.connect(cb)
+	vbox.add_child(s)
+	return s
+
+func _build_edit_bar() -> void:
+	var vsz := get_viewport().get_visible_rect().size
+	var bar := PanelContainer.new()
+	bar.add_theme_stylebox_override("panel", _make_panel_col(Color(0.06, 0.10, 0.14, 0.90), 22))
+	bar.size = Vector2(300, vsz.y)
+	bar.position = Vector2(vsz.x - 300, 0)
+	add_child(bar)
+	_edit_bar = bar
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 18)
+	margin.add_theme_constant_override("margin_right", 18)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_bottom", 16)
+	bar.add_child(margin)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(scroll)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(v)
+	var title := Label.new()
+	title.text = "✎ Mode Edit"
+	title.add_theme_font_size_override("font_size", 32)
+	title.add_theme_color_override("font_color", Color(0.95, 0.86, 0.55))
+	v.add_child(title)
+	# alat bentuk
+	var tools := HBoxContainer.new()
+	tools.add_theme_constant_override("separation", 8)
+	v.add_child(tools)
+	for spec in [["raise", "⛰ Angkat"], ["lower", "⬇ Turun"], ["road", "🛤 Jalan"]]:
+		var tb := Button.new()
+		tb.text = spec[1]
+		tb.custom_minimum_size = Vector2(0, 56)
+		tb.add_theme_font_size_override("font_size", 20)
+		tb.toggle_mode = true
+		var m: String = spec[0]
+		tb.pressed.connect(func(): _select_tool(m))
+		tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tools.add_child(tb)
+		_edit_tool_btns[m] = tb
+	_update_tool_visual()
+	_mk_slider(v, "Ukuran kuas (m)", 3.0, 40.0, edit_radius, func(x): edit_radius = x)
+	_mk_slider(v, "Kekuatan", 0.2, 4.0, edit_strength, func(x): edit_strength = x)
+	var sep1 := HSeparator.new()
+	v.add_child(sep1)
+	var lh := Label.new()
+	lh.text = "Pencahayaan"
+	lh.add_theme_font_size_override("font_size", 26)
+	lh.add_theme_color_override("font_color", Color(0.9, 0.92, 0.96))
+	v.add_child(lh)
+	_mk_slider(v, "Energi matahari", 0.3, 2.0,
+		float(settings.light_sun) if settings else 1.0,
+		func(x):
+			if _world: _world.apply_lighting({"sun": x})
+			if settings: settings.set_value("light_sun", x))
+	_mk_slider(v, "Cahaya ambient", 0.3, 2.0,
+		float(settings.light_ambient) if settings else 1.0,
+		func(x):
+			if _world: _world.apply_lighting({"ambient": x})
+			if settings: settings.set_value("light_ambient", x))
+	_mk_slider(v, "Kabut", 0.0, 3.0,
+		float(settings.light_fog) if settings else 1.0,
+		func(x):
+			if _world: _world.apply_lighting({"fog": x})
+			if settings: settings.set_value("light_fog", x))
+	var lh2 := Label.new()
+	lh2.text = "Gradien langit"
+	lh2.add_theme_font_size_override("font_size", 22)
+	lh2.modulate.a = 0.85
+	v.add_child(lh2)
+	var sw := HBoxContainer.new()
+	sw.add_theme_constant_override("separation", 8)
+	v.add_child(sw)
+	var presets := [Color(0.62, 0.88, 0.80), Color(0.56, 0.86, 0.78), Color(0.98, 0.60, 0.38), Color(0.10, 0.15, 0.24)]
+	for i in range(4):
+		var cbtn := ColorRect.new()
+		cbtn.color = presets[i]
+		cbtn.custom_minimum_size = Vector2(52, 40)
+		var bee := Button.new()
+		bee.flat = true
+		bee.custom_minimum_size = Vector2(52, 40)
+		var ix := i
+		bee.pressed.connect(func(): _pick_sky(ix))
+		cbtn.add_child(bee)
+		sw.add_child(cbtn)
+	var auto := Button.new()
+	auto.text = "Otomatis"
+	auto.custom_minimum_size = Vector2(110, 40)
+	auto.add_theme_font_size_override("font_size", 18)
+	auto.pressed.connect(func(): _pick_sky(-1))
+	sw.add_child(auto)
+	var sep2 := HSeparator.new()
+	v.add_child(sep2)
+	var rst := Button.new()
+	rst.text = "↺ Reset bentuk dunia"
+	rst.custom_minimum_size = Vector2(0, 56)
+	rst.add_theme_font_size_override("font_size", 22)
+	rst.pressed.connect(func():
+		if _world and _world.has_method("reset_edits"):
+			_world.reset_edits()
+			toast("Bentuk dunia direset"))
+	v.add_child(rst)
+	var done := Button.new()
+	done.text = "✔ Selesai — simpan semua"
+	done.custom_minimum_size = Vector2(0, 64)
+	done.add_theme_font_size_override("font_size", 24)
+	done.add_theme_color_override("font_color", Color(0.8, 1.0, 0.85))
+	done.pressed.connect(func(): _exit_edit())
+	v.add_child(done)
+
+func _pick_sky(ix: int) -> void:
+	if _world:
+		_world.apply_lighting({"sky": ix})
+	if settings:
+		settings.set_value("light_sky", ix)
+	toast("Gradien langit " + (str(ix) if ix >= 0 else "otomatis"))
+
+func _select_tool(m: String) -> void:
+	edit_tool = m
+	_update_tool_visual()
+
+func _update_tool_visual() -> void:
+	for m in _edit_tool_btns:
+		_edit_tool_btns[m].button_pressed = m == edit_tool

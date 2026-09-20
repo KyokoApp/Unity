@@ -4,6 +4,7 @@ extends Node3D
 
 const CHUNK_SIZE := 100.0
 const PHYS_RES := 16  # 16x16 sel fisika (17x17 titik)
+const GRID_HALF := 4  # = GRID/2 world (dunia 8x8 chunk 100m); setengah pusat indeks
 
 var cx: int
 var cz: int
@@ -13,7 +14,7 @@ var body: StaticBody3D
 var height_data := PackedFloat32Array()
 
 func world_rect() -> Rect2:
-	return Rect2(Vector2(cx - 8, cz - 8) * CHUNK_SIZE, Vector2(CHUNK_SIZE, CHUNK_SIZE))
+	return Rect2(Vector2(cx - GRID_HALF, cz - GRID_HALF) * CHUNK_SIZE, Vector2(CHUNK_SIZE, CHUNK_SIZE))
 
 func apply_mesh(mesh: ArrayMesh, material: Material, heights: PackedFloat32Array) -> void:
 	height_data = heights
@@ -40,18 +41,28 @@ func set_collision(enabled: bool, island) -> void:
 		# skala XZ supaya 16 sel = 100 m; shape dipusatkan di tengah chunk
 		var step: float = CHUNK_SIZE / PHYS_RES
 		body.scale = Vector3(step, 1.0, step)
-		body.position = Vector3((cx - 8) * CHUNK_SIZE + CHUNK_SIZE * 0.5, 0.0,
-				(cz - 8) * CHUNK_SIZE + CHUNK_SIZE * 0.5)
+		body.position = Vector3((cx - GRID_HALF) * CHUNK_SIZE + CHUNK_SIZE * 0.5, 0.0,
+				(cz - GRID_HALF) * CHUNK_SIZE + CHUNK_SIZE * 0.5)
 		add_child(body)
 	elif not enabled and body != null:
 		body.queue_free()
 		body = null
 
+## Bangun ulang shape fisika setelah edit terrain (tanpa membuat node baru).
+func refresh_collision(island) -> void:
+	if body == null:
+		return
+	var shape := HeightMapShape3D.new()
+	shape.map_width = PHYS_RES + 1
+	shape.map_depth = PHYS_RES + 1
+	shape.map_data = height_data
+	(body.get_child(0) as CollisionShape3D).shape = shape
+
 ## Dibangun di worker thread. LOD: 0=48, 1=24, 2=12, 3=6 quads/sisi.
 static func build_mesh_data(island, pcx: int, pcz: int, plod: int) -> Dictionary:
 	var res: int = [48, 24, 12, 6][plod]
-	var x0: float = (pcx - 8) * CHUNK_SIZE
-	var z0: float = (pcz - 8) * CHUNK_SIZE
+	var x0: float = (pcx - GRID_HALF) * CHUNK_SIZE
+	var z0: float = (pcz - GRID_HALF) * CHUNK_SIZE
 	var step: float = CHUNK_SIZE / res
 	var n: int = res + 1
 	var verts := PackedVector3Array()
