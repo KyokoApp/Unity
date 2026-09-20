@@ -152,7 +152,7 @@ func _load_skin() -> void:
 				# jadikan sedikit toon dengan shading cel via overlay outline saja
 				pass
 			if base_mat and not base_mat.next_pass:
-				base_mat.next_pass = Materials.make_outline(0.020)
+				base_mat.next_pass = Materials.make_outline(0.008)  # garis tipis (permintaan)
 		else:
 			smi.material_override = mat
 		first = false

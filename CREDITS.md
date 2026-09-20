@@ -45,3 +45,12 @@
   (https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0)
   Dipakai: rumah (home A/B, tavern, blacksmith, windmill, church, well), pagar,
   barrel/crate/wheelbarrow, pohon tree_single_A/B, batu rock_single_A–E.
+
+## Ronde-10: World "Gravity Falls" (upload pengguna)
+
+- **gravity_falls.glb** — world kartun 225m (Mystery Shack area; mesh\+tekstur penuh,
+  ~62k segitiga). Sumber: file `.glb` yang diunggah pengguna langsung ke branch.
+  Atribusi: tema/brand Gravity Falls © Disney; model tampak berupa ekspor gaya
+  Sketchfab (fan-made). Nama pembuat model BELUM terverifikasi — diminta ke
+  pengguna; entri akan dilengkapi. Catat: ini kandidat yang perlu konfirmasi
+  lisensi sebelum rilis publik (di luar paket CC0/CC-BY wajib).

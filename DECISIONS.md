@@ -212,3 +212,17 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
    Terrain3D+Sky3D+PhantomCamera (plugin PC, 158MB) — konflik dg prinsip
    mobile-ringan kita. Nilai ambil parsial: model env (maple/pine/bush/grass/
    bridge/butterfly) — ditawarkan sebagai opsi ronde berikut dgn kredit CC-BY.
+
+## 2026-09-20 — Ronde-10: mode WORLD STATIS (Gravity Falls GLB)
+1. world.gd kini punya mode statis: bila gravity_falls.glb ada → terrain
+   procedural, laut, shore map, chunk streaming, hutan/pantai/desa Dinonaktifkan
+   (tetap fallback otomatis bila GLB gagal dimuat). Sun/sky/fog/siang-malam tetap.
+2. Normalisasi skala: span asli 225m dipertahankan (rentang wajar 60-480m);
+   origin dipindah agar pusat (0,?,0) & dasar di y=0.
+3. Collision: trimesh per mesh (kecuali skybox/shadow/logo); ketinggian permukaan
+   pijakan dijawab lewat grid akselerasi segitiga barycentric (tanpa query fisika
+   → aman dipanggil dari konteks apa pun) — player.height_at otomatis cocok.
+4. Outline tipis 0.008m menggantikan 0.020 (karakter + world), sesuai permintaan;
+   outline dilewatkan utk skybox/shadow/logo (plane transparan).
+5. Mode Edit sculpt/jalur dinonaktifkan di mode statis (no-op); slider cahaya
+   tetap berfungsi karena dioper ke Environment yang sama.
