@@ -1,6 +1,6 @@
 {
- "game_version": "1.0.23",
- "generated_at": "2026-09-20T13:51:17Z",
+ "game_version": "1.0.24",
+ "generated_at": "2026-09-20T14:14:20Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -13,10 +13,10 @@
  ],
  "packs": {
   "core_scripts": {
-   "version": "1.0.6",
-   "size": 324388,
-   "sha256": "e82c2597b55fe408f703a5b39d74a5f4cbc0f1e546dac94545dfb4239f9cfd4b",
-   "url": "packs/core_scripts-1.0.6.pck",
+   "version": "1.0.7",
+   "size": 325860,
+   "sha256": "8e2e61ed50923492c0c381cc3f4dc94b151a5e9ce286e6e2223de966489a0d7f",
+   "url": "packs/core_scripts-1.0.7.pck",
    "deps": []
   },
   "shaders_materials": {
@@ -27,10 +27,10 @@
    "deps": []
   },
   "world_terrain": {
-   "version": "1.0.23",
-   "size": 13373316,
-   "sha256": "0be5ad128976c5fd442411e13a16026d91ccc7728612a840c124fa668426f2b3",
-   "url": "packs/world_terrain-1.0.23.pck",
+   "version": "1.0.24",
+   "size": 13373652,
+   "sha256": "f6289be045b0b36dab55afab85ba4c4321aec1733de81f474193035390bd6d25",
+   "url": "packs/world_terrain-1.0.24.pck",
    "deps": [
     "shaders_materials"
    ]
