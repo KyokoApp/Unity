@@ -223,7 +223,36 @@ semua state terpetakan, AnimationTree 240 transisi aktif) dan preset kualitas
 shader-accurate, sandbox tanpa GPU): `docs/screenshots/` — `biome_map.png`,
 `view_day.png`, `view_dusk.png`, `view_night.png`.
 
-## 11. Troubleshooting
+## 11. Rilis APK via GitHub Actions (CI)
+
+Workflow `.github/workflows/apk_release.yml` membangun **kedua APK di runner
+GitHub** (unduh Godot 4.5.2 editor + export templates resmi, siapkan keystore
+debug + SDK/JDK runner, impor proyek, bangun pack, export) lalu menerbitkan
+aset + `SHA256SUMS.txt` ke **GitHub Release `apk-...`**. Pemicu: push yang
+menyentuh file workflow, atau tombol *Run workflow* (sementara ini dari branch
+`arena/...` sampai workflow tergabung ke `main`).
+
+Cara memakai rilis:
+
+```bash
+# buka halaman rilis, unduh PulauToon-aio.apk → instal di HP (rekomendasi)
+gh release view apk-20260920-2302
+# verifikasi integritas setelah unduh:
+sha256sum PulauToon-aio.apk   # bandingkan dengan SHA256SUMS.txt
+```
+
+Gotcha CI yang sudah dipecahkan (diagnostik build juga otomatis tertulis ke
+release notes bila export bermasalah):
+
+1. Path output `--export-debug` di-resolve **relatif ke `project/`** — wajib
+   absolute path di CI.
+2. Nama proyek harus identifier valid (tanpa spasi) — Godot menolak export
+   Android bila nama proyek bukan nama paket yang sah.
+3. **`rendering/textures/vram_compression/import_etc2_astc` wajib `true`** —
+   tanpanya Godot membatalkan export Android dengan pesan "configuration
+   errors:" **tanpa detail** (validasi bungkam di kode sumber engine).
+
+## 12. Troubleshooting
 
 - **“Server tidak terjangkau”** — pastikan `dev_server.py` jalan dan URL di
   launcher benar (pakai IP LAN untuk HP fisik, bukan 127.0.0.1).

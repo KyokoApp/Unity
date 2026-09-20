@@ -105,3 +105,10 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
   diblok — ditemukan repo dengan template 4.5.stable via LFS, objek-nya
   tidak bisa dijangkau). Skrip `fetch_export_templates.sh` memuat langkah
   satu-klik untuk lingkungan normal.
+
+## Rilis CI GitHub Actions (keputusan)
+
+- **Pola rilis**: workflow `apk_release.yml` membangun APK di runner (internet penuh) dan menempelkan aset ke Release tag deterministik (`apk-YYYYMMDD-HHMM`) via `gh release edit/upload --clobber` + retry 4× per file; release dibuat/ditarget dari commit CI tanpa perlu kredensial tambahan (GITHUB_TOKEN bawaan, permissions.contents=write).
+- **Diagnostik buta-run**: log runner tidak bisa diunduh dari sandbox — solusi: diagnostik build (rc, EXPORT log) ditulis ke *release notes* lewat `gh release edit --notes-file` agar bisa dibaca via API; ini sekaligus menjadi pembuktian token tulis.
+- **Tiga gotcha export headless yang dipecahkan**: (1) path output export di-resolve relatif `project/` → pakai absolute; (2) nama proyek harus identifier paket yang sah (tanpa spasi) → `pulautoon`; (3) `import_etc2_astc=true` wajib — tanpanya validasi Android gagal diam-diam (valid=false tanpa pesan di kode sumber Godot).
+- **Cleanup kecil**: komentar `# rerun-kick` sengaja dibiarkan sebagai pendorong run ulang murah; tidak memengaruhi build.
