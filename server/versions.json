@@ -1,16 +1,16 @@
 {
  "packs": {
   "core_scripts": {
-   "content_hash": "7a656a1154b388e39a7b1ec2a5d839fd91148fb2a903cd33e05dd97870896510",
-   "version": "1.0.4"
+   "content_hash": "97450918331fa565990c77c810220bb6bc23f53aa168d98af70bd5e303f698e2",
+   "version": "1.0.5"
   },
   "shaders_materials": {
    "content_hash": "2d160678f0a83caabe70399fd1e25d6ead7e7890dffa4459df34404ee50e32a6",
    "version": "1.0.7"
   },
   "world_terrain": {
-   "content_hash": "fc467f50a921b21a19db00c0d0d68a19cdb20089cfa0ffcc0f634668eb925c05",
-   "version": "1.0.9"
+   "content_hash": "3152eb6e2c0fea3dae698a5e24e3b12d8a493c895a66b137eb2d0ea317e2f7d7",
+   "version": "1.0.10"
   },
   "world_props_forest": {
    "content_hash": "8d13c88668a2743a3116177c72a0029cd996905c018b7b145118a4bc848fbf35",
@@ -29,8 +29,8 @@
    "version": "1.0.4"
   },
   "ui": {
-   "content_hash": "8d28ac4f95aa04b22bed82c0d7f3d4910e3c37032538a9d1021184f93ec13602",
-   "version": "1.0.5"
+   "content_hash": "5dca6079279a7d9901ff8cc8d4bdd8b0841b84ba4cadfcef948f7ac7129fd4ed",
+   "version": "1.0.6"
   },
   "audio_sfx": {
    "content_hash": "d43e8a08337984778388db77c8084ac7dadda641018bcfde5a2e3ec10ed29c91",

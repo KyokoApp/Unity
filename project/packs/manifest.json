@@ -1,6 +1,6 @@
 {
- "game_version": "1.0.9",
- "generated_at": "2026-09-20T07:36:57Z",
+ "game_version": "1.0.10",
+ "generated_at": "2026-09-20T07:49:09Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -15,10 +15,10 @@
  ],
  "packs": {
   "core_scripts": {
-   "version": "1.0.4",
+   "version": "1.0.5",
    "size": 0,
    "sha256": "",
-   "url": "packs/core_scripts-1.0.4.pck",
+   "url": "packs/core_scripts-1.0.5.pck",
    "deps": []
   },
   "shaders_materials": {
@@ -29,10 +29,10 @@
    "deps": []
   },
   "world_terrain": {
-   "version": "1.0.9",
+   "version": "1.0.10",
    "size": 0,
    "sha256": "",
-   "url": "packs/world_terrain-1.0.9.pck",
+   "url": "packs/world_terrain-1.0.10.pck",
    "deps": [
     "shaders_materials"
    ]
@@ -75,10 +75,10 @@
    ]
   },
   "ui": {
-   "version": "1.0.5",
+   "version": "1.0.6",
    "size": 0,
    "sha256": "",
-   "url": "packs/ui-1.0.5.pck",
+   "url": "packs/ui-1.0.6.pck",
    "deps": []
   },
   "audio_sfx": {

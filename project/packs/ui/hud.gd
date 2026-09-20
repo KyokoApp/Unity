@@ -678,6 +678,19 @@ func _build_edit_bar() -> void:
 	auto.add_theme_font_size_override("font_size", 18)
 	auto.pressed.connect(func(): _pick_sky(-1))
 	sw.add_child(auto)
+	# gaya low-poly (segi datar) — terinspirasi low-poly terrain builder
+	var chk_fac := CheckBox.new()
+	chk_fac.text = "Gaya low-poly (segi datar)"
+	chk_fac.button_pressed = bool(settings.gfx_faceted) if settings else false
+	chk_fac.add_theme_font_size_override("font_size", 20)
+	chk_fac.custom_minimum_size = Vector2(0, 52)
+	chk_fac.toggled.connect(func(on):
+		if _world and _world.has_method("set_faceted"):
+			_world.set_faceted(on)
+		if settings:
+			settings.set_value("gfx_faceted", on)
+		toast("Gaya " + ("low-poly segi datar" if on else "halus")))
+	v.add_child(chk_fac)
 	var sep2 := HSeparator.new()
 	v.add_child(sep2)
 	var rst := Button.new()

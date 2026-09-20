@@ -99,6 +99,8 @@ func _boot_world(progress_cb: Callable) -> void:
 	add_child(world)
 	if world.has_signal("gen_progress"):
 		world.gen_progress.connect(progress_cb)
+	if world.get("faceted") != null and settings.get("gfx_faceted") != null:
+		world.faceted = settings.gfx_faceted  # gaya low-poly dari pengaturan (sebelum chunk awal)
 	await world.generate_async(self)
 	# terapkan pencahayaan hasil Mode Edit (tersimpan di pengaturan)
 	if world.has_method("apply_lighting"):

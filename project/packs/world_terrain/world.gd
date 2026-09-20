@@ -41,6 +41,18 @@ var beach_pack: Node
 var interactables := []
 var quality_ref
 var _seeded := false
+var faceted := false   # gaya low-poly "segi datar" (Mode Edit / pengaturan)
+
+## Ganti gaya render terrain (halus ↔ segi datar) + bangun ulang semua chunk.
+func set_faceted(on: bool) -> void:
+	if on == faceted:
+		return
+	faceted = on
+	for k in chunks.keys():
+		var parts: PackedStringArray = k.split(",")
+		var c := Vector2i(int(parts[0]), int(parts[1]))
+		_rebuild_chunk_now(c.x, c.y)
+	_wtrace("gaya terrain: " + ("segi datar (low-poly)" if on else "halus"))
 
 func _ready() -> void:
 	name = "World"
@@ -240,7 +252,7 @@ func _queue_chunk(cx: int, cy: int, lod: int, hi_prio := false) -> void:
 	WorkerThreadPool.add_task(Callable(self, "_task_build").bind(cx, cy, lod), hi_prio)
 
 func _task_build(cx: int, cy: int, lod: int) -> void:
-	var data := ChunkScript.build_mesh_data(island, cx, cy, lod)
+	var data := ChunkScript.build_mesh_data(island, cx, cy, lod, faceted)
 	results_mtx.lock()
 	results.append([cx, cy, lod, data])
 	results_mtx.unlock()
@@ -397,7 +409,7 @@ func _rebuild_chunk_now(cx: int, cz: int) -> void:
 	if not _inside(Vector2i(cx, cz)) or not chunks.has(k):
 		return
 	var chunk: Node3D = chunks[k]
-	var data := ChunkScript.build_mesh_data(island, cx, cz, chunk.lod)
+	var data := ChunkScript.build_mesh_data(island, cx, cz, chunk.lod, faceted)
 	var mesh := ChunkScript.make_mesh(data)
 	chunk.apply_mesh(mesh, terr_mat, data["heights"])
 	chunk.refresh_collision(island)

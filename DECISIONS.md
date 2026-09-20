@@ -162,3 +162,11 @@ Format: **[D-nomor]** Keputusan → alasan + alternatif yang ditolak.
    Adreno) — air toon internal dipertahankan; (d) terrain3d memang khusus desktop;
    sistem chunk kustom kita sudah setara & mobile-native. Aset Quaternius (CC0) akan
    diintegrasi begitu arsip GLB diunggah pengguna (unduhan diblok jaringan).
+
+## 2026-09-20 — Ronde-6: gaya low-poly faceted + bug max semver
+1. "Low Poly Terrain Builder" (asset store) = plugin editor Godot — tidak berjalan di
+   APK, lisensi di luar filter CC0, dan server unduhan diblok. Digantikan MODE
+   "segi datar" native: terrain_chunk meledakkan segitiga (vertex unik per-tri,
+   normal per-muka, warna diratakan) → tampilan low-poly faceted, toggle di Mode
+   Edit (tersimpan gfx_faceted). ~3x vertex pada LOD0/1 — masih ringan di ponsel.
+2. Bug build_packs: game_version=max string ("1.0.10"<"1.0.7") → kunci semver.

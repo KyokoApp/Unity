@@ -17,6 +17,7 @@ var light_sun: float = 1.0     # pengali energi matahari 0.3..2.0
 var light_ambient: float = 1.0 # pengali ambient 0.3..2.0
 var light_fog: float = 1.0     # pengali kabut 0..3
 var light_sky: int = -1        # preset gradien langit (-1 = otomatis siang/malam)
+var gfx_faceted: bool = false  # gaya low-poly segi datar pada terrain
 
 # --- Kontrol ---
 var camera_sens: float = 1.0   # 0.3 .. 2.5
@@ -45,6 +46,7 @@ func load_settings() -> void:
 		light_ambient = float(cfg.get_value("lighting", "ambient", light_ambient))
 		light_fog = float(cfg.get_value("lighting", "fog", light_fog))
 		light_sky = int(cfg.get_value("lighting", "sky", light_sky))
+		gfx_faceted = bool(cfg.get_value("graphics", "faceted", gfx_faceted))
 		apply_audio()
 
 func save_settings() -> void:
@@ -62,6 +64,7 @@ func save_settings() -> void:
 	cfg.set_value("lighting", "ambient", light_ambient)
 	cfg.set_value("lighting", "fog", light_fog)
 	cfg.set_value("lighting", "sky", light_sky)
+	cfg.set_value("graphics", "faceted", gfx_faceted)
 	cfg.save(PATH)
 
 func set_value(key: String, v) -> void:
@@ -79,6 +82,7 @@ func set_value(key: String, v) -> void:
 		"light_ambient": light_ambient = clampf(float(v), 0.3, 2.0)
 		"light_fog": light_fog = clampf(float(v), 0.0, 3.0)
 		"light_sky": light_sky = int(v)
+		"gfx_faceted": gfx_faceted = bool(v)
 	save_settings()
 	changed.emit(key)
 	if key.begins_with("vol_"):

@@ -59,7 +59,8 @@ func refresh_collision(island) -> void:
 	(body.get_child(0) as CollisionShape3D).shape = shape
 
 ## Dibangun di worker thread. LOD: 0=48, 1=24, 2=12, 3=6 quads/sisi.
-static func build_mesh_data(island, pcx: int, pcz: int, plod: int) -> Dictionary:
+## faceted=true → normal per-segitiga + warna rata (gaya low-poly "segi datar").
+static func build_mesh_data(island, pcx: int, pcz: int, plod: int, faceted := false) -> Dictionary:
 	var res: int = [48, 24, 12, 6][plod]
 	var x0: float = (pcx - GRID_HALF) * CHUNK_SIZE
 	var z0: float = (pcz - GRID_HALF) * CHUNK_SIZE
@@ -134,6 +135,38 @@ static func build_mesh_data(island, pcx: int, pcz: int, plod: int) -> Dictionary
 		var bot_b: int = base_count + t2
 		sidx.append_array([top_a, bot_a, top_b, top_b, bot_a, bot_b])
 	indices.append_array(sidx)
+	# --- rakit arrays akhir ---
+	var out_verts := verts
+	var out_normals := normals
+	var out_colors := colors
+	var out_indices := indices
+	if faceted:
+		# ledakkan: tiap segitiga menyalin vertexnya → normal muka rata (flat shading)
+		out_verts = PackedVector3Array()
+		out_normals = PackedVector3Array()
+		out_colors = PackedColorArray()
+		out_indices = PackedInt32Array()
+		for t in range(0, indices.size(), 3):
+			var i0: int = indices[t]
+			var i1: int = indices[t + 1]
+			var i2: int = indices[t + 2]
+			var v0: Vector3 = verts[i0]
+			var v1: Vector3 = verts[i1]
+			var v2: Vector3 = verts[i2]
+			var fn := (v1 - v0).cross(v2 - v0)
+			if fn.length_squared() < 1e-10:
+				fn = Vector3(0, 1, 0)
+			fn = fn.normalized()
+			var fc: Color = Color(
+				(colors[i0].r + colors[i1].r + colors[i2].r) / 3.0,
+				(colors[i0].g + colors[i1].g + colors[i2].g) / 3.0,
+				(colors[i0].b + colors[i1].b + colors[i2].b) / 3.0)
+			out_verts.append(v0)
+			out_verts.append(v1)
+			out_verts.append(v2)
+			for _x in 3:
+				out_normals.append(fn)
+				out_colors.append(fc)
 	# data fisika (resolusi tetap)
 	var heights := PackedFloat32Array()
 	heights.resize((PHYS_RES + 1) * (PHYS_RES + 1))
@@ -143,10 +176,10 @@ static func build_mesh_data(island, pcx: int, pcz: int, plod: int) -> Dictionary
 		for i in range(PHYS_RES + 1):
 			heights[hi] = island.height_at(x0 + i * pstep, z0 + j * pstep)
 			hi += 1
-	return {"verts": verts, "normals": normals, "colors": colors,
-			"indices": indices, "heights": heights,
+	return {"verts": out_verts, "normals": out_normals, "colors": out_colors,
+			"indices": out_indices, "heights": heights, "faceted": faceted,
 			"stats_nan": nan_n, "stats_hmin": hmin, "stats_hmax": hmax,
-			"stats_v": verts.size()}
+			"stats_v": out_verts.size()}
 
 ## Merangkai ArrayMesh dari data (dipanggil di main thread; murah).
 static func make_mesh(data: Dictionary) -> ArrayMesh:
@@ -155,7 +188,8 @@ static func make_mesh(data: Dictionary) -> ArrayMesh:
 	arrays[Mesh.ARRAY_VERTEX] = data["verts"]
 	arrays[Mesh.ARRAY_NORMAL] = data["normals"]
 	arrays[Mesh.ARRAY_COLOR] = data["colors"]
-	arrays[Mesh.ARRAY_INDEX] = data["indices"]
+	if not data.get("faceted", false):
+		arrays[Mesh.ARRAY_INDEX] = data["indices"]
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh

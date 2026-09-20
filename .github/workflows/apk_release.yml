@@ -237,3 +237,5 @@ jobs:
 # rerun-kick 18 (perbaikan deterministik publish konten: manifest+versions disalin paksa bila dest beda)
 
 # rerun-kick 19 (tata letak klaster ala referensi: lingkaran gelap translusen + glyph putih; attack besar, dash kanan-bawahnya, lompat pojok kanan bawah)
+
+# rerun-kick 20 (gaya low-poly faceted toggleable + fix semver max game_version)

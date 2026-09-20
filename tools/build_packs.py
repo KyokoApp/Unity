@@ -305,8 +305,11 @@ def main():
         if fn.endswith(".pck") and fn not in keep:
             os.remove(os.path.join(SERVER_PACKS, fn))
             print(f"[clean] hapus {fn}")
-    # manifest
-    game_version = max((info["version"] for info in pack_infos.values() if info["exists"]), default="1.0.0")
+    # manifest — pembandingan semver (max() polos salah urut: "1.0.10" < "1.0.7")
+    def _vkey(v: str):
+        return tuple(int(x) for x in str(v).split(".") if str(x).isdigit())
+    game_version = max((info["version"] for info in pack_infos.values() if info["exists"]),
+                       key=_vkey, default="1.0.0")
     manifest = {
         "game_version": game_version,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
