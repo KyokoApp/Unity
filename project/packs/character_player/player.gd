@@ -11,6 +11,30 @@ const Materials := preload("res://packs/shaders_materials/materials.gd")
 
 # Skin ganti-ganti: PolyGirl (bawaan) / Knight — tiap skin punya peta nama animasi.
 const SKINS := {
+	"mannequin": {
+		# Universal Animation Library (Quaternius CC0) — BAWAAN per 1.0.26:
+		# 43 animasi lengkap (idle/walk/run/sprint/crouch/jump/swim/roll/speak/attack...)
+		"path": "res://packs/character_player/ual_mannequin.glb",
+		"height": 1.45,
+		"states": {
+			"idle": ["Idle_Loop"],
+			"walk": ["Walk_Loop"],
+			"run": ["Jog_Fwd_Loop"],
+			"sprint": ["Sprint_Loop"],
+			"crouch_idle": ["Crouch_Idle_Loop"],
+			"crouch_move": ["Crouch_Fwd_Loop"],
+			"jump_start": ["Jump_Start"],
+			"jump_fall": ["Jump_Loop"],
+			"jump_land": ["Jump_Land"],
+			"swim_idle": ["Swim_Idle_Loop"],
+			"swim_move": ["Swim_Fwd_Loop"],
+			"pickup": ["PickUp_Table", "Interact"],
+			"interact": ["Interact"],
+			"emote": ["Dance_Loop"],
+			"attack": ["Punch_Jab", "Punch_Cross"],
+			"sit": ["Sitting_Idle_Loop"],
+		},
+	},
 	"polygirl": {
 		"path": "res://packs/character_player/polygirl.glb",
 		"height": 1.45,
@@ -39,7 +63,7 @@ const SKINS := {
 		"states": {},
 	},
 }
-var char_skin := "polygirl"   # diisi dari settings oleh game_root sebelum _ready
+var char_skin := "mannequin"   # diisi dari settings oleh game_root sebelum _ready (bawaan: UAL mannequin)
 
 # ------- gerak -------
 const SPEED_WALK := 2.4

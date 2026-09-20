@@ -2,6 +2,15 @@
 
 ## Aset pihak ketiga (disertakan)
 
+### Karakter & Animasi: Mannequin — "Universal Animation Library [Standard]" (v1, Quaternius)
+- **Pembuat:** Quaternius — https://quaternius.com
+- **File:** `project/packs/character_player/ual_mannequin.glb` (mannequin + skin + **43 animasi**)
+- **Sumber:** diunggah pengguna ke branch (`Universal Animation Library[Standard]/`,
+  berisi License.txt + README.txt asli); varian yang dipakai: Standard (root motion off).
+- **Lisensi:** Creative Commons Zero (CC0 1.0) — domain publik
+  (teks lisensi: https://creativecommons.org/publicdomain/zero/1.0/).
+- **Ringkasan lisensi:** bebas dipakai/dimodifikasi untuk apa pun, termasuk komersial.
+
 ### Karakter: Knight — "KayKit Character Pack: Adventures" (v1.0)
 - **Pembuat:** Kay Lousberg — https://kaylousberg.itch.io
 - **File:** `project/packs/character_player/knight.glb` (+ rig & ~76 animasi)

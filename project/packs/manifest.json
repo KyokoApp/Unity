@@ -1,6 +1,6 @@
 {
  "game_version": "1.0.24",
- "generated_at": "2026-09-20T21:33:16Z",
+ "generated_at": "2026-09-20T23:54:33Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -13,10 +13,10 @@
  ],
  "packs": {
   "core_scripts": {
-   "version": "1.0.8",
+   "version": "1.0.9",
    "size": 0,
    "sha256": "",
-   "url": "packs/core_scripts-1.0.8.pck",
+   "url": "packs/core_scripts-1.0.9.pck",
    "deps": []
   },
   "shaders_materials": {
@@ -43,20 +43,20 @@
    "deps": []
   },
   "character_player": {
-   "version": "1.0.7",
+   "version": "1.0.8",
    "size": 0,
    "sha256": "",
-   "url": "packs/character_player-1.0.7.pck",
+   "url": "packs/character_player-1.0.8.pck",
    "deps": [
     "animations",
     "shaders_materials"
    ]
   },
   "ui": {
-   "version": "1.0.7",
+   "version": "1.0.8",
    "size": 0,
    "sha256": "",
-   "url": "packs/ui-1.0.7.pck",
+   "url": "packs/ui-1.0.8.pck",
    "deps": []
   },
   "audio_sfx": {

@@ -354,3 +354,14 @@ Prinsip yang ditetapkan (tak berubah lagi):
    find_spawn_point + height_at API tak berubah (pemain/UI tak perlu diubah).
 
 Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
+
+## Ronde-19 — skin bawaan = Mannequin UAL (upload user) 2026-09-21
+
+- Karakter bawaan diganti ke **Universal Animation Library Standard**
+  (Quaternius CC0, unggahan user). 43 animasi lengkap → resolve melalui tabel
+  `SKINS["mannequin"].states`. Varian dipakai: Standard (in-place; root motion
+  TIDAK dibutuhkan — gerak dikendalikan CharacterBody3D). Varian _RM dibiarkan
+  di folder sumber saja.
+- Default `char_skin` = "mannequin" di settings + player + pause menu
+  (pilihan kini triple: Mannequin/PolyGirl/Knight — dua skin lama tetap tersedia).
+- CREDITS: entri Quaternius CC0 + License.txt asli tetap di repo.
