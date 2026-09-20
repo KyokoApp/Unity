@@ -107,6 +107,13 @@ func _load_skin() -> void:
 	anim = AnimControllerScript.new()
 	if not anim.setup(self, model_root):
 		anim = null
+	# jejak boot terlihat: status animasi (diagnose "gliding" di perangkat)
+	var rootc = get_tree().current_scene
+	if rootc and rootc.has_method("_trace"):
+		if anim:
+			rootc.call("_trace", "boot: anim = OK (%d state teresolusi)" % anim.resolved.size())
+		else:
+			rootc.call("_trace", "boot: ⚠ anim = NULL — AnimationPlayer tidak ketemu di skin")
 
 func _find_mesh_instances(n: Node, out: Array) -> void:
 	if n is MeshInstance3D:

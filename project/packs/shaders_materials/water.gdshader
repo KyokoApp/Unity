@@ -2,8 +2,8 @@ shader_type spatial;
 render_mode blend_mix, depth_prepass_alpha, cull_back;
 // Air toon ringan: gelombang sinus + foam di tepi pantai (via peta tinggi pulau).
 
-uniform vec4 shallow_color : source_color = vec4(0.24, 0.77, 0.72, 0.78);
-uniform vec4 deep_color : source_color = vec4(0.07, 0.38, 0.49, 0.95);
+uniform vec4 shallow_color : source_color = vec4(0.20, 0.68, 0.68, 0.85);
+uniform vec4 deep_color : source_color = vec4(0.07, 0.34, 0.47, 0.97);
 uniform vec4 foam_color : source_color = vec4(0.95, 0.99, 0.95, 1.0);
 uniform sampler2D shore_map : filter_linear, repeat_disable;
 uniform float world_half = 800.0;
@@ -41,9 +41,9 @@ void fragment() {
 	float depth_f = smoothstep(0.0, -7.0, land); // 0 pantai -> 1 laut dalam
 	vec4 col = mix(shallow_color, deep_color, depth_f);
 	// pita foam mengikuti garis pantai, sedikit bergerak
-	float foam_band = smoothstep(0.55, 0.18, abs(land + 0.2));
+	float foam_band = smoothstep(0.35, 0.06, abs(land + 0.2));
 	float wob = sin(wpos.x * 1.9 + TIME * 2.1) * sin(wpos.z * 1.6 + TIME * 1.8);
-	foam_band *= smoothstep(-0.2, 0.35, wob + 0.30);
+	foam_band *= smoothstep(0.05, 0.42, wob);
 	float sparkle = pow(max(0.0, sin(wpos.x * 3.1 + TIME) * sin(wpos.z * 2.7 - TIME * 1.25)), 8.0) * 0.10;
 	ALBEDO = mix(col.rgb + sparkle, foam_color.rgb, foam_band);
 	ALPHA = clamp(col.a + foam_band * 0.28, 0.0, 1.0);

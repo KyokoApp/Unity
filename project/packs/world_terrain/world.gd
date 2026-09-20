@@ -94,7 +94,7 @@ func _setup_environment() -> void:
 
 	sun = DirectionalLight3D.new()
 	sun.light_color = Color(1.0, 0.90, 0.72)
-	sun.light_energy = 0.80
+	sun.light_energy = 0.68
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_max_distance = 70.0
@@ -397,10 +397,10 @@ func _apply_daylight() -> void:
 		# siang
 		var k := smoothstep(0.15, 0.85, dayf)
 		sun.light_color = Color(1.0, 0.90, 0.72).lerp(Color(1.0, 0.96, 0.86), k)
-		sun.light_energy = 0.72 + 0.10 * k
+		sun.light_energy = 0.60 + 0.06 * k
 		sun.shadow_enabled = quality_ref.get_preset().shadows if quality_ref else true
 		env.ambient_light_color = Color(0.58, 0.66, 0.66)
-		env.ambient_light_energy = 0.70
+		env.ambient_light_energy = 0.58
 		env.fog_light_color = Color(0.62, 0.84, 0.78)
 		sky_mat.set_shader_parameter("zenith_color", Color(0.30, 0.74, 0.69))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.62, 0.88, 0.80))

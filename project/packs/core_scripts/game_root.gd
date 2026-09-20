@@ -109,7 +109,7 @@ func _boot_world(progress_cb: Callable) -> void:
 	player = pp.instantiate()
 	add_child(player)
 	var spawn = world.call("find_spawn_point")
-	player.global_position = spawn + Vector3(0, 0.6, 0)
+	player.global_position = spawn + Vector3(0, 0.12, 0)
 	player.call("set_world", world)
 	player.call("set_settings", settings)
 	quality.apply_all()  # shadow sudah terdaftar

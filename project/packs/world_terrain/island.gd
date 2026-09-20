@@ -203,10 +203,10 @@ func color_at(x: float, z: float, h: float) -> Color:
 	var s := slope_at(x, z)
 	var m := moisture_at(x, z)
 	# palet mid-tone jenuh sedang
-	var sand := Color(0.91, 0.80, 0.62)
-	var grass_dry := Color(0.52, 0.66, 0.38)
-	var grass_lush := Color(0.30, 0.62, 0.42)
-	var forest := Color(0.18, 0.44, 0.32)
+	var sand := Color(0.85, 0.72, 0.54)
+	var grass_dry := Color(0.48, 0.62, 0.36)
+	var grass_lush := Color(0.26, 0.56, 0.37)
+	var forest := Color(0.15, 0.40, 0.29)
 	var rock := Color(0.55, 0.56, 0.60)
 	var seabed := Color(0.66, 0.75, 0.62)
 	var c: Color

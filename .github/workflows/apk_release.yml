@@ -203,3 +203,4 @@ jobs:
 # rerun-kick 9 (versi konten persisten — delta update antar-bangun aktif)
 # rerun-kick 10 (debug manifest CI)
 # rerun-kick 11 (debug rsync publish)
+# rerun-kick 12 (kalibrasi palet soft-tengah: air gelap, foam tepi, jade pekat, spawn membumi, trace anim)

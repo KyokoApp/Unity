@@ -112,9 +112,9 @@ static func to_mesh(arrays: Array) -> ArrayMesh:
 
 ## Rampingkan pohon beringin: batang + beberapa bola daun.
 static func make_broadleaf_tree(rng: RandomNumberGenerator) -> Array:
-	var trunk_c := Color(0.45, 0.33, 0.22)
-	var leaf_a := Color(0.24, 0.50, 0.22)
-	var leaf_b := Color(0.32, 0.58, 0.26)
+	var trunk_c := Color(0.50, 0.36, 0.26)
+	var leaf_a := Color(0.25, 0.58, 0.42)
+	var leaf_b := Color(0.34, 0.66, 0.48)
 	var parts := []
 	var trunk_h := rng.randf_range(2.2, 3.2)
 	var trunk := from_cyl(0.14, 0.24, trunk_h, 6, trunk_c)
@@ -131,8 +131,8 @@ static func make_broadleaf_tree(rng: RandomNumberGenerator) -> Array:
 
 static func make_pine_tree(rng: RandomNumberGenerator) -> Array:
 	var trunk_c := Color(0.40, 0.28, 0.18)
-	var pine_a := Color(0.16, 0.38, 0.20)
-	var pine_b := Color(0.20, 0.45, 0.24)
+	var pine_a := Color(0.16, 0.40, 0.33)
+	var pine_b := Color(0.19, 0.46, 0.36)
 	var parts := []
 	var th := rng.randf_range(0.8, 1.2)
 	parts.append(xform(from_cyl(0.12, 0.18, th, 6, trunk_c), Transform3D(Basis(), Vector3(0, th * 0.5, 0))))
@@ -187,8 +187,8 @@ static func make_flower() -> Array:
 
 ## Pohon kelapa: batang melengkung + daun palem + kelapa.
 static func make_palm(rng: RandomNumberGenerator) -> Array:
-	var trunk_c := Color(0.52, 0.40, 0.28)
-	var leaf_c := Color(0.20, 0.52, 0.24)
+	var trunk_c := Color(0.55, 0.41, 0.30)
+	var leaf_c := Color(0.22, 0.58, 0.45)
 	var parts := []
 	var h := rng.randf_range(3.0, 4.2)
 	var bend := Vector3(rng.randf_range(-0.05, 0.05), 0, 0)
