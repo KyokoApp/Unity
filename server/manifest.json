@@ -1,6 +1,6 @@
 {
- "game_version": "1.0.23",
- "generated_at": "2026-09-20T14:11:30Z",
+ "game_version": "1.0.24",
+ "generated_at": "2026-09-20T21:33:16Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -13,10 +13,10 @@
  ],
  "packs": {
   "core_scripts": {
-   "version": "1.0.7",
+   "version": "1.0.8",
    "size": 0,
    "sha256": "",
-   "url": "packs/core_scripts-1.0.7.pck",
+   "url": "packs/core_scripts-1.0.8.pck",
    "deps": []
   },
   "shaders_materials": {
@@ -27,10 +27,10 @@
    "deps": []
   },
   "world_terrain": {
-   "version": "1.0.23",
+   "version": "1.0.24",
    "size": 0,
    "sha256": "",
-   "url": "packs/world_terrain-1.0.23.pck",
+   "url": "packs/world_terrain-1.0.24.pck",
    "deps": [
     "shaders_materials"
    ]

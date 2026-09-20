@@ -65,12 +65,18 @@ func _fatal(msg: String) -> void:
 	bg.color = Color(0.35, 0.05, 0.08, 1)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fatal_layer.add_child(bg)
+	# gulung dari ATAS (tengah layar dibiarkan pendek): teks panjang tak pernah
+	# keluar tepi bawah — bug layar foto ronde-16: ekor log terpotong
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fatal_layer.add_child(scroll)
 	var l := Label.new()
 	l.text = "A-SEKAI — BOOT GAGAL\n\n" + msg + "\n\n(foto layar ini untuk laporan)"
-	l.set_anchors_preset(Control.PRESET_CENTER)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", 30)
-	_fatal_layer.add_child(l)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.add_theme_font_size_override("font_size", 24)
+	scroll.add_child(l)
 	_fatal_layer.visible = true
 	# jangan keluar — biarkan pengguna membaca pesan
 

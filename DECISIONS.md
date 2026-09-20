@@ -335,3 +335,22 @@ Hipotesis terbuka bila setelah ini masih biru: eksekusi tak pernah sampai
 `game_root._ready` (scene change BBC / hijack)—verifikasi lewat log launcher
 yang kini ikut menulis `=== BOOT BARU ===`… atau GPU/Adreno gagal kompilasi
 sky shader → panel merah watchdog akan menunjuk tahapnya.
+
+## Ronde-18 — pembunuh macet terfoto bukti (bukti visual user, 2026-09-21)
+
+Bukti lapangan (screenshot user): watchdog menyala, tahap terakhir
+"membangun dunia", timer jalan → eksekusi HIDUP tapi tak maju — bukan crash.
+Deduksi: script memproses semua segitiga diorama (grid bucket tinggi tinggi
+jutaan operasi GDScript vs backdrop AlphaCutouts ratusan ribu poligon) →
+boot butuh menit di Infinix X6853 (hp budget user).
+
+Prinsip yang ditetapkan (tak berubah lagi):
+1. Jangan sekali-kali loop segitiga/verteks kustom di GDScript untuk tugas
+   produksi di ponsel — pakai API engine (intersect_ray, trimesh shape).
+2. Collision hanya untuk mesh solid besar (≥6m); yang kecil/decoratif/cutout
+   visual saja — phyis register rendah, boot detik level, RAM hemat.
+3. `_static_floor_at` = `PhysicsRayQueryParameters3D.intersect_ray` dari
+   _hit_top→_hit_bottom (dihitung dari AABB scene setelah skala world).
+   find_spawn_point + height_at API tak berubah (pemain/UI tak perlu diubah).
+
+Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.

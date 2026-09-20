@@ -22,10 +22,10 @@ var time_of_day := 16.4       # sore adem
 
 var _root: Node
 var _static_ready := false
-var _gcell := 4.0             # meter per sel grid akselerasi ketinggian
-var _gbuckets := {}           # "cx,cz" -> PackedInt32Array indeks segitiga
-var _gtris := PackedFloat32Array()
-var _walk_tick := 0           # counter mesh di _static_walk (untuk yield anti-freeze)
+var _hit_top := 60.0          # batas atas ray cari-lantai (diset dari AABB world)
+var _hit_bottom := -60.0      # batas bawah ray (fallback bidang datar)
+var _fallback_flat := false   # mode darurat: semua titik y=0
+var _mesh_done := 0           # counter mesh di _static_walk (progres + yield)
 var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 
 func _ready() -> void:
@@ -83,18 +83,10 @@ func _fallback_ground(why: String) -> void:
 	col.shape = sh
 	body.add_child(col)
 	add_child(body)
-	# grid tinggi menganggap semua titik di y=0
-	_register_flat_grid()
+	_fallback_flat = true
+	_hit_top = 40.0
+	_hit_bottom = -40.0
 	_static_ready = true
-
-func _register_flat_grid() -> void:
-	# dua segitiga besar menutupi [-200,200]^2 di y=0
-	_gtris.append_array([-200.0, 0.0, -200.0, 200.0, 0.0, -200.0, 200.0, 0.0, 200.0])
-	_gtris.append_array([-200.0, 0.0, -200.0, 200.0, 0.0, 200.0, -200.0, 0.0, 200.0])
-	for cz in range(-50, 51):
-		for cx in range(-50, 51):
-			var key := "%d,%d" % [cx, cz]
-			_gbuckets[key] = PackedInt32Array([0, 1])
 
 # ---------------- pembangun world statis ----------------
 
@@ -178,15 +170,19 @@ func _build_static(res: PackedScene) -> bool:
 		base_y = float(ground["min_y"])
 		cinfo = ground["center"]
 	cont.position = Vector3(-cinfo.x * k, -base_y * k, -cinfo.z * k)
+	# rentang ray cari-lantai pada RUANG DUNIA (posisi cont terpasang);
+	# atas = puncak scene di ruang dunia, bawah = dasar scene (keduanya +keleluasaan)
+	_hit_top = (aabb.position.y + aabb.size.y) * k + 20.0 - base_y * k
+	_hit_bottom = aabb.position.y * k - base_y * k - 20.0
 	var out_mat = Materials.make_outline(0.008)
-	var stats := [0, 0]  # [mesh_kolisi, segi_jalan]
+	var stats := [0, 0]  # [mesh_kolisi, mesh_diberi_outline]
 	await _static_walk(scene_root, cont.transform, out_mat, stats)
-	if int(stats[1]) <= 0 or _gbuckets.is_empty():
-		_wtrace("GAGAL: tak ada segitiga pijakan (kolisi %d)" % int(stats[0]))
+	if int(stats[0]) <= 0:
+		_wtrace("GAGAL: tak ada satu pun mesh solid (kubah=%d)" % 0)
 		cont.queue_free()
 		return false
 	_static_ready = true
-	_wtrace("gravity falls ✓ span %dm tinggi %dm skala %.2f | mesh kolisi %d | segi jalan %d" % [
+	_wtrace("gravity falls ✓ span %dm tinggi %dm skala %.2f | mesh kolisi %d | outline %d" % [
 		int(span), int(aabb.size.y), k, int(stats[0]), int(stats[1])])
 	_wtrace("kubah dikeluarkan dari hitungan (ground dasar y=%.1f)" % base_y)
 	return true
@@ -203,23 +199,25 @@ func _static_walk(node: Node, xf: Transform3D, out_mat: Material, stats: Array) 
 	if node is MeshInstance3D and (node as MeshInstance3D).get_meta("gf_dome", false):
 		skip = true
 	if node is MeshInstance3D and node.mesh != null:
-		# beri napas tiap 12 mesh: di ponsel lemah, puluhan create_trimesh_shape
-		# berurutan bisa membekukan layar — dengan yield bar loading tetap hidup
-		_walk_tick += 1
-		if _walk_tick % 12 == 0:
-			_report(0.6 + 0.3 * minf(_walk_tick / 300.0, 1.0), "Membangun world… (mesh ke-%d)" % _walk_tick)
-			await get_tree().process_frame
 		var mi: MeshInstance3D = node
 		if not skip:
-			var sh := mi.mesh.create_trimesh_shape()
-			if sh != null:
-				var body := StaticBody3D.new()
-				body.name = mi.name + "_col"
-				var col := CollisionShape3D.new()
-				col.shape = sh
-				body.add_child(col)
-				mi.add_child(body)
-				stats[0] += 1
+			# COLLISION hanya untuk mesh SOLID BESAR — mesh kecil/dekoratik (pohon,
+			# rumah mini, dekor, dan TERUTAMA kanvas cutout raksasa milik backdrop
+			# yang ratusan ribu poligon) tak pernah dapat collision: dulu jutaan
+			# segitiga diproses di GDScript → ponsel macet '_' watchdog menyala.
+			var lb: AABB = xf * mi.mesh.get_aabb()
+			var widest: float = maxf(lb.size.x, lb.size.z)
+			if widest >= 6.0 or lb.size.y >= 6.0:
+				var sh := mi.mesh.create_trimesh_shape()
+				if sh != null:
+					var body := StaticBody3D.new()
+					body.name = mi.name + "_col"
+					var col := CollisionShape3D.new()
+					col.shape = sh
+					body.add_child(col)
+					mi.add_child(body)
+					stats[0] += 1
+			# outline khusus mesh non-kubah (input temen: outline = garis tipis)
 			if out_mat != null:
 				var o := MeshInstance3D.new()
 				o.mesh = mi.mesh
@@ -227,83 +225,38 @@ func _static_walk(node: Node, xf: Transform3D, out_mat: Material, stats: Array) 
 				o.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				o.name = mi.name + "_outline"
 				mi.add_child(o)
-			for si in range(mi.mesh.get_surface_count()):
-				var arrs := mi.mesh.surface_get_arrays(si)
-				var verts: PackedVector3Array = arrs[Mesh.ARRAY_VERTEX]
-				if verts.is_empty():
-					continue
-				var idx: PackedInt32Array = arrs[Mesh.ARRAY_INDEX]
-				if idx.is_empty():
-					idx = PackedInt32Array(range(verts.size()))
-				for t in range(0, idx.size() - 2, 3):
-					var a: Vector3 = xf * verts[idx[t]]
-					var b: Vector3 = xf * verts[idx[t + 1]]
-					var c: Vector3 = xf * verts[idx[t + 2]]
-					var n := (b - a).cross(c - a)
-					if n.length() < 0.0001 or n.normalized().y < 0.35:
-						continue
-					_grid_add_tri(a, b, c)
-					stats[1] += 1
+				stats[1] += 1
+			# yield per mesh agar layar tidak membeku + progres terlihat merayap
+			_mesh_done += 1
+			if _mesh_done % 8 == 0:
+				_report(0.6 + 0.35 * minf(_mesh_done / 250.0, 1.0), "Membangun world… (mesh ke-%d)" % _mesh_done)
+			await get_tree().process_frame
 	for c2 in node.get_children():
 		var nxf2: Transform3D = xf * (c2.transform if c2 is Node3D else Transform3D.IDENTITY)
 		await _static_walk(c2, nxf2, out_mat, stats)
 
-func _grid_add_tri(a: Vector3, b: Vector3, c: Vector3) -> void:
-	var ti := _gtris.size() / 9
-	_gtris.append_array([a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z])
-	var minx := int(floor(minf(a.x, minf(b.x, c.x)) / _gcell))
-	var maxx := int(floor(maxf(a.x, maxf(b.x, c.x)) / _gcell))
-	var minz := int(floor(minf(a.z, minf(b.z, c.z)) / _gcell))
-	var maxz := int(floor(maxf(a.z, maxf(b.z, c.z)) / _gcell))
-	for cz in range(minz, maxz + 1):
-		for cx in range(minx, maxx + 1):
-			var key := "%d,%d" % [cx, cz]
-			if not _gbuckets.has(key):
-				_gbuckets[key] = PackedInt32Array()
-			var arr: PackedInt32Array = _gbuckets[key]
-			arr.append(ti)
-			_gbuckets[key] = arr
+var _floor_q := PhysicsRayQueryParameters3D.new()
 
-# ---------------- query permukaan ----------------
-
+## LANTAI NATIVE: ray physics dari atas ke bawah di titik (x,z).
+## Menggantikan grid-bucket manual (jutaan segi diproses di GDScript = jamur lambat).
 func _static_floor_at(x: float, z: float) -> float:
-	var best := -999.0
-	var cx := int(floor(x / _gcell))
-	var cz := int(floor(z / _gcell))
-	for dz in range(-1, 2):
-		for dx in range(-1, 2):
-			var key := "%d,%d" % [cx + dx, cz + dz]
-			if not _gbuckets.has(key):
-				continue
-			for ti in _gbuckets[key]:
-				var o := ti * 9
-				var ax: float = _gtris[o]; var ay: float = _gtris[o + 1]; var az: float = _gtris[o + 2]
-				var bx: float = _gtris[o + 3]; var by: float = _gtris[o + 4]; var bz: float = _gtris[o + 5]
-				var cx2: float = _gtris[o + 6]; var cy: float = _gtris[o + 7]; var cz2: float = _gtris[o + 8]
-				# barycentric via dot-product (dua vektor sisi) — AKURAT, terverifikasi 20.000 titik acak
-				var v0x: float = bx - ax
-				var v0z: float = bz - az
-				var v1x: float = cx2 - ax
-				var v1z: float = cz2 - az
-				var v2x: float = x - ax
-				var v2z: float = z - az
-				var d00: float = v0x * v0x + v0z * v0z
-				var d01: float = v0x * v1x + v0z * v1z
-				var d11: float = v1x * v1x + v1z * v1z
-				var d20: float = v2x * v0x + v2z * v0z
-				var d21: float = v2x * v1x + v2z * v1z
-				var den: float = d00 * d11 - d01 * d01
-				if absf(den) < 0.0000001:
-					continue
-				var wb: float = (d11 * d20 - d01 * d21) / den
-				var wc: float = (d00 * d21 - d01 * d20) / den
-				var wa: float = 1.0 - wb - wc
-				if wa < -0.0001 or wb < -0.0001 or wc < -0.0001:
-					continue
-				var y := wa * ay + wb * by + wc * cy
-				if y > best:
-					best = y
-	return best
+	if _fallback_flat:
+		return 0.0
+	if not _static_ready:
+		return -999.0
+	if not is_inside_tree():
+		return -999.0
+	_floor_q.from = Vector3(x, _hit_top, z)
+	_floor_q.to = Vector3(x, _hit_bottom, z)
+	_floor_q.collide_with_areas = false
+	_floor_q.collide_with_bodies = true
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(_floor_q)
+	if hit.is_empty():
+		return -999.0
+	return float(hit["position"].y)
+
+func height_at(x: float, z: float) -> float:
+	return _static_floor_at(x, z)
 
 func find_spawn_point() -> Vector3:
 	for cand in [Vector2(0, 0), Vector2(4, 0), Vector2(-4, 0), Vector2(0, 4), Vector2(0, -4),
@@ -312,9 +265,6 @@ func find_spawn_point() -> Vector3:
 		if fy > -999.0:
 			return Vector3(cand.x, fy + 0.25, cand.y)
 	return Vector3(0, 0.3, 0)
-
-func height_at(x: float, z: float) -> float:
-	return _static_floor_at(x, z)
 
 # ---------------- API kompatibel (no-op / kosong) ----------------
 
