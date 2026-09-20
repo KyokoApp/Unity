@@ -161,6 +161,18 @@ func _start_update() -> void:
 	_updater.finished_ok.connect(_on_finished)
 	_updater.finished_offline.connect(_on_finished_offline)
 	_updater.failed.connect(_on_failed)
+	# Seed manifest bundel (APK AIO): konten sudah ada di res://packs/*,
+	# catat sebagai manifest lokal agar boot offline-total tetap jalan.
+	if FileAccess.file_exists("res://packs/manifest.json") \
+			and not FileAccess.file_exists("user://local_manifest.json"):
+		var f := FileAccess.open("res://packs/manifest.json", FileAccess.READ)
+		if f != null:
+			var w := FileAccess.open("user://local_manifest.json", FileAccess.WRITE)
+			if w != null:
+				w.store_string(f.get_as_text())
+				w.close()
+				_log_line("Konten bawaan terdeteksi — bisa langsung main offline.")
+			f.close()
 	_updater.run(_server_url)
 
 func _on_pack_progress(pid: String, done: int, total: int) -> void:

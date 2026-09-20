@@ -305,6 +305,10 @@ def main():
     }
     with open(os.path.join(SERVER_DIR, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=1, ensure_ascii=False)
+    # SNAPSHOT bundel: ikut di-export ke APK AIO lewat include_filter "packs/*"
+    # supaya launcher kenal konten bawaan saat offline-total (tanpa server).
+    with open(os.path.join(PROJECT, "packs", "manifest.json"), "w") as f:
+        json.dump(manifest, f, indent=1, ensure_ascii=False)
     with open(os.path.join(SERVER_DIR, "build_log.json"), "w") as f:
         json.dump(export_log, f, indent=1, ensure_ascii=False)
     save_db(db)
