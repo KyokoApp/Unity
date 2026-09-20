@@ -72,7 +72,7 @@ func _build_ui() -> void:
 	panel.add_child(v)
 
 	var title := Label.new()
-	title.text = "🌴 Pulau Toon"
+	title.text = "🌴 A-SEKAI"
 	title.add_theme_font_size_override("font_size", 44)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)

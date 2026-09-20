@@ -10,12 +10,12 @@ config_version=5
 
 [application]
 
-config/name="pulautoon"
+config/name="asekai"
 config/description="Game third-person eksplorasi pulau kartun untuk Android. APK hanya berisi launcher; konten dikirim lewat resource pack (.pck) ber-versi."
 run/main_scene="res://launcher/launcher.tscn"
 config/features=PackedStringArray("4.5", "Mobile")
 boot_splash/bg_color=Color(0.06, 0.1, 0.14, 1)
-boot_splash/image="res://launcher/splash.png"
+boot_splash/image="res://launcher/icon.png"
 boot_splash/fullsize=false
 
 [audio]

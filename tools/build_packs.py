@@ -104,7 +104,7 @@ def gen_export_presets(pack_infos):
         'include_filter="launcher/*,project.godot"',
         'export_files=PackedStringArray()',
         'exclude_filter=""',
-        'export_path="exports/android/PulauToon.apk"',
+        'export_path="exports/android/ASekai.apk"',
         'patch_list=PackedStringArray()',
         'seed=0',
         'encrypt_pck=false',
@@ -117,18 +117,18 @@ def gen_export_presets(pack_infos):
         'custom_template/debug=""',
         'custom_template/release=""',
         'custom_template/use_custom_build=false',
-        'icon="res://launcher/splash.png"',
+        'icon="res://launcher/icon.png"',
         'app_category=2',
         'package_name_config/unique_name="dev.pulautoon.launcher"',
-        'package_name_config/name="Pulau Toon"',
+        'package_name_config/name="A-Sekai"',
         'package_name_config/signed=true',
         'package_name_config/app_category=2',
         'package_name_config/retain_data_on_uninstall=false',
         'package_name_config/exclude_from_recents=false',
-        'launcher_icons/main_192x192="res://launcher/splash.png"',
-        'launcher_icons/adaptive_foreground_432x432="res://launcher/splash.png"',
-        'launcher_icons/adaptive_background_432x432="res://launcher/splash.png"',
-        'launcher_icons/adaptive_monochrome_432x432="res://launcher/splash.png"',
+        'launcher_icons/main_192x192="res://launcher/icon.png"',
+        'launcher_icons/adaptive_foreground_432x432="res://launcher/icon.png"',
+        'launcher_icons/adaptive_background_432x432="res://launcher/icon.png"',
+        'launcher_icons/adaptive_monochrome_432x432="res://launcher/icon.png"',
         'version/code=1',
         'version/name="0.1.0"',
         'architectures/armeabi-v7a=false',
@@ -196,7 +196,7 @@ def gen_export_presets(pack_infos):
         elif l.startswith('include_filter='):
             aio[i] = 'include_filter="launcher/*,project.godot,packs/*"'
         elif l.startswith('export_path='):
-            aio[i] = 'export_path="exports/android/PulauToon-aio.apk"'
+            aio[i] = 'export_path="exports/android/ASekai.apk"'
         elif l.startswith('version/code='):
             aio[i] = 'version/code=2'
     for i, l in enumerate(aio):
@@ -208,7 +208,26 @@ def gen_export_presets(pack_infos):
     with open(os.path.join(PROJECT, "export_presets.cfg"), "w") as f:
         f.write("\n".join(out) + "\n")
 
+def adopt_icon_if_present():
+    """Bila ada file.jpg di root repo (ditaruh pengguna), jadikan launcher/icon.png lalu hapus."""
+    src = os.path.join(ROOT, "file.jpg")
+    dst = os.path.join(PROJECT, "launcher", "icon.png")
+    if not os.path.exists(src):
+        return
+    try:
+        from PIL import Image
+        im = Image.open(src).convert("RGBA").resize((512, 512))
+        im.save(dst)
+        os.remove(src)
+        print(f"[ikon] {src} -> {dst} lalu dihapus")
+    except Exception as e:  # tanpa PIL: salin mentah saja (Godot bisa baca jpg)
+        import shutil
+        shutil.copyfile(src, os.path.join(PROJECT, "launcher", "icon.png"))
+        os.remove(src)
+        print("[ikon] disalin mentah (tanpa PIL)")
+
 def main():
+    adopt_icon_if_present()
     force = "--force" in sys.argv
     skip_export = "--skip-export" in sys.argv
     godot = None

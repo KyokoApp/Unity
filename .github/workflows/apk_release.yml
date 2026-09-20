@@ -87,7 +87,7 @@ jobs:
         run: |
           export OUTDIR="$GITHUB_WORKSPACE/exports/android"
           RC0=0; timeout 120 ./godot --headless --path project --quit > "$OUTDIR/quit.log" 2>&1 || RC0=$?
-          RC=0; timeout 900 ./godot --headless --verbose --path project --export-debug "Android AIO" "$OUTDIR/PulauToon.apk" > "$OUTDIR/export_aio.log" 2>&1 || RC=$?
+          RC=0; timeout 900 ./godot --headless --verbose --path project --export-debug "Android AIO" "$OUTDIR/ASekai.apk" > "$OUTDIR/export_aio.log" 2>&1 || RC=$?
           {
             echo "## Diagnostik build $GITHUB_SHA"
             echo "quit.rc=$RC0 export-aio.rc=$RC"
@@ -116,18 +116,18 @@ jobs:
             exit 1
           fi
           OUTDIR="$GITHUB_WORKSPACE/exports/android"
-          if [ ! -s "$OUTDIR/PulauToon.apk" ]; then
+          if [ ! -s "$OUTDIR/ASekai.apk" ]; then
             echo "::notice::APK belum tersedia — lihat diagnostik di release notes"
             exit 0
           fi
           # 2) notes final + sha + upload aset dengan retry
-          cd "$OUTDIR" && sha256sum PulauToon.apk > "$GITHUB_WORKSPACE/SHA256SUMS.txt" && cd "$GITHUB_WORKSPACE"
+          cd "$OUTDIR" && sha256sum ASekai.apk > "$GITHUB_WORKSPACE/SHA256SUMS.txt" && cd "$GITHUB_WORKSPACE"
           {
             echo "## Pulau Toon — APK debug (CI)"
             echo ""
             echo "Commit: \`$GITHUB_SHA\` — dibangun oleh GitHub Actions (runner full-internet)."
             echo ""
-            echo "**PulauToon.apk** — launcher + seluruh konten ter-bundle di SATU aplikasi."
+            echo "**A-Sekai.apk** — launcher + seluruh konten ter-bundle di SATU aplikasi."
             echo "Instal → langsung main offline; pembaruan konten berikutnya otomatis"
             echo "delta (hanya pack yang berubah) saat kamu menjalankan server konten (README §3)."
             echo ""
@@ -137,7 +137,7 @@ jobs:
             echo '```'; cat SHA256SUMS.txt; echo '```'
           } > notes.md
           gh release edit "$TAG" --notes-file notes.md
-          for f in "$OUTDIR/PulauToon.apk" "$GITHUB_WORKSPACE/SHA256SUMS.txt"; do
+          for f in "$OUTDIR/ASekai.apk" "$GITHUB_WORKSPACE/SHA256SUMS.txt"; do
             ok=0
             for i in 1 2 3 4; do
               if OUT2=$(gh release upload "$TAG" "$f" --clobber 2>&1); then ok=1; echo "upload OK: $(basename "$f")"; break; fi
@@ -146,7 +146,7 @@ jobs:
             [ "$ok" = "1" ] || { echo "::error::gagal unggah $f — $(echo "$OUT2" | head -c 200)"; exit 1; }
           done
           # hapus aset legasi varian lama (bila masih menempel)
-          for a in PulauToon-aio.apk PulauToon-debug.apk; do
+          for a in PulauToon-aio.apk PulauToon-debug.apk PulauToon.apk; do
             gh release delete-asset "$TAG" "$a" --yes 2>/dev/null && echo "aset legasi $a dihapus" || true
           done
 

@@ -3,6 +3,8 @@ extends Node3D
 ## Alur boot: pengaturan -> loading screen -> generate dunia async -> spawn
 ## pemain di pantai -> HUD -> mulai. Juga mengurus pause, auto-pause saat
 ## aplikasi ke background, dan tombol back Android.
+## Diagnostik: setiap tahap mencetak label kecil di layar; kegagalan
+## memicu panel merah penuh teks (supaya pengguna bisa memfoto penyebabnya).
 
 const SettingsScript := preload("res://packs/core_scripts/game_settings.gd")
 const QualityScript := preload("res://packs/core_scripts/quality_manager.gd")
@@ -20,6 +22,41 @@ var hud: CanvasLayer
 var loading: CanvasLayer
 var pause_menu: CanvasLayer
 var _boot := {}
+var _trail: Label
+var _fatal_layer: CanvasLayer
+
+func _trace(msg: String) -> void:
+	print("[boot] ", msg)
+	if _trail == null:
+		_trail = Label.new()
+		_trail.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		_trail.add_theme_font_size_override("font_size", 16)
+		_trail.add_theme_color_override("font_color", Color(1, 0.95, 0.55, 0.9))
+		_trail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var cl := CanvasLayer.new()
+		cl.layer = 99
+		cl.name = "BootTrail"
+		cl.add_child(_trail)
+		add_child(cl)
+	_trail.text = msg
+
+func _fatal(msg: String) -> void:
+	push_error("[game] FATAL: " + msg)
+	_fatal_layer = CanvasLayer.new()
+	_fatal_layer.layer = 100
+	add_child(_fatal_layer)
+	var bg := ColorRect.new()
+	bg.color = Color(0.35, 0.05, 0.08, 1)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fatal_layer.add_child(bg)
+	var l := Label.new()
+	l.text = "A-SEKAI — BOOT GAGAL\n\n" + msg + "\n\n(foto layar ini untuk laporan)"
+	l.set_anchors_preset(Control.PRESET_CENTER)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", 30)
+	_fatal_layer.add_child(l)
+	_fatal_layer.visible = true
+	# jangan keluar — biarkan pengguna membaca pesan
 
 func _ready() -> void:
 	# info dari launcher (offline/server/versi)
@@ -27,6 +64,7 @@ func _ready() -> void:
 	if cfg.load("user://boot.cfg") == OK:
 		_boot = {"offline": cfg.get_value("boot", "offline", false),
 				"game_version": cfg.get_value("boot", "game_version", "?")}
+	_trace("boot: pengaturan…")
 	settings = SettingsScript.new()
 	settings.name = "GameSettings"
 	add_child(settings)
@@ -37,29 +75,38 @@ func _ready() -> void:
 	add_child(quality)
 	settings.changed.connect(quality.on_settings_changed)
 	quality.apply_all()
+	_trace("boot: kualitas ✔, memuat UI…")
 	_start_loading()
 
 func _start_loading() -> void:
 	var lp = load(LOADING_SCENE)
 	if lp == null:
-		push_error("[game] loading screen tidak ditemukan")
-		_finish_boot_fail()
+		_fatal("Scene loading hilang:\n" + LOADING_SCENE)
 		return
 	loading = lp.instantiate()
 	add_child(loading)
+	_trace("boot: loading screen ✔, membangun dunia…")
 	var snapped: Callable = Callable(self, "_boot_world")
 	loading.call("begin", snapped)
 
 func _boot_world(progress_cb: Callable) -> void:
 	# dipanggil dari loading screen; generate dunia bertahap
 	var wp = load(WORLD_SCENE)
+	if wp == null:
+		_fatal("Scene dunia hilang:\n" + WORLD_SCENE)
+		return
 	world = wp.instantiate()
 	add_child(world)
 	if world.has_signal("gen_progress"):
 		world.gen_progress.connect(progress_cb)
 	await world.generate_async(self)
 	progress_cb.call(1.0, "Menempatkan pemain…")
-	player = load(PLAYER_SCENE).instantiate()
+	_trace("boot: dunia ✔, pemain…")
+	var pp = load(PLAYER_SCENE)
+	if pp == null:
+		_fatal("Scene pemain hilang:\n" + PLAYER_SCENE)
+		return
+	player = pp.instantiate()
 	add_child(player)
 	var spawn = world.call("find_spawn_point")
 	player.global_position = spawn + Vector3(0, 0.6, 0)
@@ -68,6 +115,9 @@ func _boot_world(progress_cb: Callable) -> void:
 	quality.apply_all()  # shadow sudah terdaftar
 	await get_tree().process_frame
 	var hp = load(HUD_SCENE)
+	if hp == null:
+		_fatal("Scene HUD hilang:\n" + HUD_SCENE)
+		return
 	hud = hp.instantiate()
 	add_child(hud)
 	hud.call("bind_player", player)
@@ -80,6 +130,12 @@ func _boot_world(progress_cb: Callable) -> void:
 		add_child(ad)
 		ad.setup(world, player)
 	progress_cb.call(1.0, "Selesai")
+	_trace("boot: HUD ✔ — selamat bermain")
+	get_tree().create_timer(3.0).timeout.connect(func():
+		if is_instance_valid(_trail):
+			_trail.get_parent().queue_free()
+			_trail = null
+	)
 
 func on_loading_done() -> void:
 	if loading:

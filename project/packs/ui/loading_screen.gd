@@ -41,7 +41,7 @@ func _build() -> void:
 	center.add_child(v)
 
 	var title := Label.new()
-	title.text = "🌴 PULAU TOON"
+	title.text = "🌴 A-SEKAI"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 64)
 	title.add_theme_color_override("font_color", Color(0.95, 0.86, 0.55))
