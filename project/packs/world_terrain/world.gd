@@ -81,31 +81,19 @@ func _setup_environment() -> void:
 	sk.sky_material = sky_mat
 	env.sky = sk
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-<<<<<<< HEAD
-	env.ambient_light_color = Color(0.55, 0.62, 0.72)
-=======
 	env.ambient_light_color = Color(0.58, 0.66, 0.66)
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	env.ambient_light_energy = 0.95
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 1.0
 	env.fog_enabled = true
-<<<<<<< HEAD
-	env.fog_light_color = Color(0.60, 0.70, 0.82)
-=======
 	env.fog_light_color = Color(0.66, 0.82, 0.76)
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	env.fog_density = 0.0009
 	env.fog_sky_affect = 0.3
 	world_env.environment = env
 	add_child(world_env)
 
 	sun = DirectionalLight3D.new()
-<<<<<<< HEAD
-	sun.light_color = Color(1.0, 0.93, 0.80)
-=======
 	sun.light_color = Color(1.0, 0.90, 0.72)
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	sun.light_energy = 1.05
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
@@ -408,18 +396,6 @@ func _apply_daylight() -> void:
 	if dayf > 0.15:
 		# siang
 		var k := smoothstep(0.15, 0.85, dayf)
-<<<<<<< HEAD
-		sun.light_color = Color(1.0, 0.93, 0.80).lerp(Color(1.0, 0.98, 0.92), k)
-		sun.light_energy = 0.95 + 0.15 * k
-		sun.shadow_enabled = quality_ref.get_preset().shadows if quality_ref else true
-		env.ambient_light_color = Color(0.55, 0.62, 0.72)
-		env.ambient_light_energy = 0.95
-		env.fog_light_color = Color(0.60, 0.70, 0.82)
-		sky_mat.set_shader_parameter("zenith_color", Color(0.22, 0.50, 0.85))
-		sky_mat.set_shader_parameter("horizon_color", Color(0.75, 0.85, 0.95))
-		sky_mat.set_shader_parameter("ground_color", Color(0.28, 0.32, 0.38))
-		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.92, 0.72))
-=======
 		sun.light_color = Color(1.0, 0.90, 0.72).lerp(Color(1.0, 0.96, 0.86), k)
 		sun.light_energy = 0.95 + 0.15 * k
 		sun.shadow_enabled = quality_ref.get_preset().shadows if quality_ref else true
@@ -430,44 +406,25 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("horizon_color", Color(0.86, 0.95, 0.86))
 		sky_mat.set_shader_parameter("ground_color", Color(0.36, 0.44, 0.44))
 		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.94, 0.74))
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	elif dayf > -0.12:
 		# senja/fajar
 		var k := smoothstep(-0.12, 0.15, dayf)
 		sun.light_color = Color(1.0, 0.55, 0.34).lerp(Color(1.0, 0.93, 0.80), k)
 		sun.light_energy = 0.55 + 0.5 * k
-<<<<<<< HEAD
-		env.ambient_light_color = Color(0.55, 0.45, 0.50).lerp(Color(0.55, 0.62, 0.72), k)
-		env.ambient_light_energy = 0.62 + 0.33 * k
-		env.fog_light_color = Color(0.72, 0.52, 0.42).lerp(Color(0.60, 0.70, 0.82), k)
-		sky_mat.set_shader_parameter("zenith_color", Color(0.10, 0.14, 0.30).lerp(Color(0.22, 0.50, 0.85), k))
-		sky_mat.set_shader_parameter("horizon_color", Color(0.90, 0.52, 0.36).lerp(Color(0.75, 0.85, 0.95), k))
-		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.62, 0.30))
-=======
 		env.ambient_light_color = Color(0.56, 0.50, 0.52).lerp(Color(0.58, 0.66, 0.66), k)
 		env.ambient_light_energy = 0.62 + 0.33 * k
 		env.fog_light_color = Color(0.82, 0.64, 0.50).lerp(Color(0.66, 0.82, 0.76), k)
 		sky_mat.set_shader_parameter("zenith_color", Color(0.16, 0.34, 0.44).lerp(Color(0.30, 0.74, 0.69), k))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.98, 0.68, 0.42).lerp(Color(0.86, 0.95, 0.86), k))
 		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.66, 0.34))
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	else:
 		# malam: tetap terbaca, tidak gelap pekat
 		sun.light_color = Color(0.55, 0.65, 0.90)
 		sun.light_energy = 0.34
-<<<<<<< HEAD
-		env.ambient_light_color = Color(0.30, 0.36, 0.52)
-		env.ambient_light_energy = 0.62
-		env.fog_light_color = Color(0.16, 0.20, 0.30)
-		sky_mat.set_shader_parameter("zenith_color", Color(0.04, 0.06, 0.14))
-		sky_mat.set_shader_parameter("horizon_color", Color(0.09, 0.12, 0.20))
-		sky_mat.set_shader_parameter("sun_color", Color(0.8, 0.85, 1.0))
-=======
 		env.ambient_light_color = Color(0.30, 0.38, 0.46)
 		env.ambient_light_energy = 0.62
 		env.fog_light_color = Color(0.14, 0.19, 0.26)
 		sky_mat.set_shader_parameter("zenith_color", Color(0.05, 0.09, 0.16))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.10, 0.15, 0.22))
 		sky_mat.set_shader_parameter("sun_color", Color(0.62, 0.70, 0.85))
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	env.fog_density = 0.0009 * (quality_ref.get_preset().fog if quality_ref else 1.0)

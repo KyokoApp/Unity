@@ -32,11 +32,7 @@ static func toon_vertex_color(outline := false, outline_thickness := 0.012) -> S
 	_cache[key] = m
 	return m
 
-<<<<<<< HEAD
-static func make_outline(thickness := 0.012, color := Color(0.07, 0.05, 0.10)) -> ShaderMaterial:
-=======
 static func make_outline(thickness := 0.012, color := Color(0.24, 0.15, 0.14)) -> ShaderMaterial:
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	var key := "ol_%.3f_%s" % [thickness, color.to_html()]
 	if _cache.has(key):
 		return _cache[key]

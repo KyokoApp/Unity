@@ -186,11 +186,7 @@ func _build_palms() -> void:
 	add_child(ommi)
 
 func _build_shells() -> void:
-<<<<<<< HEAD
-	var cols := [Color(0.92, 0.75, 0.72), Color(0.85, 0.82, 0.70), Color(0.80, 0.70, 0.82), Color(0.88, 0.86, 0.80)]
-=======
 	var cols := [Color(0.95, 0.90, 0.76), Color(0.85, 0.49, 0.29), Color(0.56, 0.72, 0.47), Color(0.56, 0.82, 0.78)]
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	var groups := [{}, {}, {}, {}]
 	for s in _data["shells"]:
 		groups[s["ci"]][s["p"]] = s["s"]
@@ -225,11 +221,7 @@ func _build_dock() -> void:
 	root.rotation.y = cfg["rot"]
 	var static_body := StaticBody3D.new()
 	static_body.collision_layer = 1
-<<<<<<< HEAD
-	var mat := Materials.toon(Color(0.62, 0.48, 0.34), true, 0.03, 0.3)
-=======
 	var mat := Materials.toon(Color(0.72, 0.56, 0.40), true, 0.03, 0.3)
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	var mat2 := Materials.toon(Color(0.5, 0.36, 0.24), true, 0.03, 0.3)
 	var plank_mesh := MeshLib.to_mesh(MeshLib.from_box(Vector3(2.4, 0.14, 1.05), Color.WHITE))
 	var post_mesh := MeshLib.to_mesh(MeshLib.from_cyl(0.09, 0.11, 2.6, 6, Color.WHITE))
@@ -263,11 +255,7 @@ func _build_dock() -> void:
 			Transform3D(Basis.from_scale(Vector3(1.6, 0.45, 0.8)), Vector3.ZERO)))
 	var mi := MeshInstance3D.new()
 	mi.mesh = hull
-<<<<<<< HEAD
-	mi.material_override = Materials.toon(Color(0.85, 0.30, 0.25), true, 0.04, 0.3)
-=======
 	mi.material_override = Materials.toon(Color(0.86, 0.38, 0.30), true, 0.04, 0.3)
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	boat.add_child(mi)
 	var rim := MeshInstance3D.new()
 	rim.mesh = MeshLib.to_mesh(MeshLib.from_box(Vector3(2.9, 0.09, 0.5), Color.WHITE))
@@ -281,13 +269,8 @@ func _build_lighthouse() -> void:
 	var root := Node3D.new()
 	root.name = "Lighthouse"
 	root.position = best
-<<<<<<< HEAD
-	var white := Materials.toon(Color(0.93, 0.92, 0.88), true, 0.04, 0.3)
-	var red := Materials.toon(Color(0.82, 0.25, 0.22), true, 0.04, 0.3)
-=======
 	var white := Materials.toon(Color(0.95, 0.93, 0.86), true, 0.04, 0.3)
 	var red := Materials.toon(Color(0.85, 0.36, 0.28), true, 0.04, 0.3)
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	var dark := Materials.toon(Color(0.25, 0.27, 0.32), true, 0.04, 0.3)
 	var base := MeshInstance3D.new()
 	base.mesh = MeshLib.to_mesh(MeshLib.from_cyl(2.0, 2.5, 9.0, 10, Color.WHITE))
@@ -331,11 +314,7 @@ func _build_lighthouse() -> void:
 
 func _build_huts() -> void:
 	var wall := Materials.toon(Color(0.88, 0.80, 0.62), true, 0.04, 0.3)
-<<<<<<< HEAD
-	var roof := Materials.toon(Color(0.72, 0.36, 0.26), true, 0.04, 0.3)
-=======
 	var roof := Materials.toon(Color(0.80, 0.42, 0.28), true, 0.04, 0.3)
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	var doorc := Materials.toon(Color(0.45, 0.33, 0.22), false)
 	var wall_mesh: ArrayMesh = MeshLib.to_mesh(MeshLib.from_box(Vector3(3.4, 2.3, 3.0), Color.WHITE))
 	var roof_mesh: ArrayMesh = MeshLib.to_mesh(MeshLib.make_roof_prism(Vector3(4.0, 1.5, 3.6), Color.WHITE))

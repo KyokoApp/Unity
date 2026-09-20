@@ -203,21 +203,12 @@ func color_at(x: float, z: float, h: float) -> Color:
 	var s := slope_at(x, z)
 	var m := moisture_at(x, z)
 	# palet mid-tone jenuh sedang
-<<<<<<< HEAD
-	var sand := Color(0.85, 0.76, 0.54)
-	var grass_dry := Color(0.55, 0.66, 0.30)
-	var grass_lush := Color(0.30, 0.60, 0.24)
-	var forest := Color(0.22, 0.46, 0.20)
-	var rock := Color(0.52, 0.50, 0.47)
-	var seabed := Color(0.62, 0.68, 0.55)
-=======
 	var sand := Color(0.91, 0.84, 0.66)
 	var grass_dry := Color(0.58, 0.68, 0.42)
 	var grass_lush := Color(0.33, 0.64, 0.44)
 	var forest := Color(0.22, 0.49, 0.36)
 	var rock := Color(0.55, 0.56, 0.60)
 	var seabed := Color(0.66, 0.75, 0.62)
->>>>>>> a7dedaa (style: palet turquoise pastel seluruh game + pratinjau eksposur CPU (siang/senja/malam))
 	var c: Color
 	if h < SEA_LEVEL + 0.05:
 		c = seabed.lerp(sand, smoothstep(-3.0, 0.0, h))
