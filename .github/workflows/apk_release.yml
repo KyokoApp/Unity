@@ -30,6 +30,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Jaga-jaga — tolak marker konflik git di source
+        run: |
+          if grep -RInE '^(<<<<<<<|=======|>>>>>>>) ' project/ tools/ 2>/dev/null; then
+            echo "::error::ada marker konflik tersisa — merge/rebase belum bersih; build dibatalkan"
+            exit 1
+          fi
+          echo "bersih dari marker konflik"
+
       - name: Dependensi sistem untuk editor Godot
         run: |
           sudo apt-get update -qq || true
@@ -159,3 +167,4 @@ jobs:
 # rerun-kick 4 (fix seed manifest bundel AIO)
 
 # rerun-kick 5 (branding A-Sekai + ikon pengguna)
+# rerun-kick 6 (fix marker konflik dari upload — jalankan pengecekan guard)
