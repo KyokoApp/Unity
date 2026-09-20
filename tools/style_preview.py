@@ -23,7 +23,7 @@ PAL = dict(
     orange=(228, 158, 76), orange_d=(196, 130, 62), trunk=(140, 105, 77),
     rock=(140, 143, 153), cream=(240, 227, 194), terra=(153, 74, 51),
     terra_d=(128, 62, 45), teal=(89, 179, 140), ochre=(240, 174, 68),
-    shallow=(0, 204, 186), deep=(0, 108, 134), foam=(242, 252, 242),
+    shallow=(61, 196, 184), deep=(18, 97, 125), foam=(242, 252, 242),
 )
 ENV = {  # warna ambience siang/senja/malam persis world.gd
     "day": dict(tint=(1.0, 1.0, 1.0), fade=0.0, key=1.0, nom="day"),
@@ -101,7 +101,7 @@ def scene(name, e):
     global SUN_POS, SUN_F
     SUN_POS = {"day": (470, 66), "dusk": (150, 300), "night": (760, 90)}[e["nom"]]
     SUN_F = {"day": (255, 243, 209), "dusk": (255, 214, 160), "night": (220, 230, 250)}[e["nom"]]
-    hor = {"day": (219, 242, 219), "dusk": (242, 204, 158), "night": (26, 38, 56)}[e["nom"]]
+    hor = {"day": (158, 224, 204), "dusk": (242, 204, 158), "night": (26, 38, 56)}[e["nom"]]
     zen = {"day": (77, 189, 176), "dusk": (41, 87, 112), "night": (13, 23, 41)}[e["nom"]]
     gnd = (92, 112, 112) if e["nom"] != "night" else (26, 38, 56)
     im = grad_sky({"h": hor, "z": zen, "g": gnd})

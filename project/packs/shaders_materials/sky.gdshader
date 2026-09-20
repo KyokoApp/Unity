@@ -2,7 +2,7 @@ shader_type sky;
 // Langit kartun: gradasi 3-stop + cakram & halo matahari.
 // Nilai di-lerp oleh skrip siang-malam (daynight.gd).
 
-uniform vec3 horizon_color : source_color = vec3(0.86, 0.95, 0.86);
+uniform vec3 horizon_color : source_color = vec3(0.62, 0.88, 0.80);
 uniform vec3 zenith_color : source_color = vec3(0.30, 0.74, 0.69);
 uniform vec3 ground_color : source_color = vec3(0.36, 0.44, 0.44);
 uniform vec3 sun_color : source_color = vec3(1.0, 0.92, 0.72);

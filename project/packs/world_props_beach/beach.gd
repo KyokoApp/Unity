@@ -314,7 +314,7 @@ func _build_lighthouse() -> void:
 
 func _build_huts() -> void:
 	var wall := Materials.toon(Color(0.88, 0.80, 0.62), true, 0.04, 0.3)
-	var roof := Materials.toon(Color(0.80, 0.42, 0.28), true, 0.04, 0.3)
+	var roof := Materials.toon(Color(0.88, 0.52, 0.32), true, 0.04, 0.4)
 	var doorc := Materials.toon(Color(0.45, 0.33, 0.22), false)
 	var wall_mesh: ArrayMesh = MeshLib.to_mesh(MeshLib.from_box(Vector3(3.4, 2.3, 3.0), Color.WHITE))
 	var roof_mesh: ArrayMesh = MeshLib.to_mesh(MeshLib.make_roof_prism(Vector3(4.0, 1.5, 3.6), Color.WHITE))

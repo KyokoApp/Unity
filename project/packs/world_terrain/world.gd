@@ -82,19 +82,19 @@ func _setup_environment() -> void:
 	env.sky = sk
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.58, 0.66, 0.66)
-	env.ambient_light_energy = 0.95
+	env.ambient_light_energy = 0.70
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 1.0
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.66, 0.82, 0.76)
-	env.fog_density = 0.0009
+	env.fog_light_color = Color(0.62, 0.84, 0.78)
+	env.fog_density = 0.0015
 	env.fog_sky_affect = 0.3
 	world_env.environment = env
 	add_child(world_env)
 
 	sun = DirectionalLight3D.new()
 	sun.light_color = Color(1.0, 0.90, 0.72)
-	sun.light_energy = 1.05
+	sun.light_energy = 0.80
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_max_distance = 70.0
@@ -354,7 +354,7 @@ func get_island():
 func apply_quality(p: Dictionary) -> void:
 	chunk_rings = int(p.chunk_rings)
 	if world_env:
-		world_env.environment.fog_density = 0.0009 * float(p.fog)
+		world_env.environment.fog_density = 0.0015 * float(p.fog)
 	if forest_pack:
 		forest_pack.call("apply_density", float(p.tree_density), float(p.grass_density))
 	if beach_pack:
@@ -397,13 +397,13 @@ func _apply_daylight() -> void:
 		# siang
 		var k := smoothstep(0.15, 0.85, dayf)
 		sun.light_color = Color(1.0, 0.90, 0.72).lerp(Color(1.0, 0.96, 0.86), k)
-		sun.light_energy = 0.95 + 0.15 * k
+		sun.light_energy = 0.72 + 0.10 * k
 		sun.shadow_enabled = quality_ref.get_preset().shadows if quality_ref else true
 		env.ambient_light_color = Color(0.58, 0.66, 0.66)
-		env.ambient_light_energy = 0.95
-		env.fog_light_color = Color(0.66, 0.82, 0.76)
+		env.ambient_light_energy = 0.70
+		env.fog_light_color = Color(0.62, 0.84, 0.78)
 		sky_mat.set_shader_parameter("zenith_color", Color(0.30, 0.74, 0.69))
-		sky_mat.set_shader_parameter("horizon_color", Color(0.86, 0.95, 0.86))
+		sky_mat.set_shader_parameter("horizon_color", Color(0.62, 0.88, 0.80))
 		sky_mat.set_shader_parameter("ground_color", Color(0.36, 0.44, 0.44))
 		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.94, 0.74))
 	elif dayf > -0.12:
@@ -413,9 +413,9 @@ func _apply_daylight() -> void:
 		sun.light_energy = 0.55 + 0.5 * k
 		env.ambient_light_color = Color(0.56, 0.50, 0.52).lerp(Color(0.58, 0.66, 0.66), k)
 		env.ambient_light_energy = 0.62 + 0.33 * k
-		env.fog_light_color = Color(0.82, 0.64, 0.50).lerp(Color(0.66, 0.82, 0.76), k)
+		env.fog_light_color = Color(0.82, 0.64, 0.50).lerp(Color(0.62, 0.84, 0.78), k)
 		sky_mat.set_shader_parameter("zenith_color", Color(0.16, 0.34, 0.44).lerp(Color(0.30, 0.74, 0.69), k))
-		sky_mat.set_shader_parameter("horizon_color", Color(0.98, 0.68, 0.42).lerp(Color(0.86, 0.95, 0.86), k))
+		sky_mat.set_shader_parameter("horizon_color", Color(0.98, 0.68, 0.42).lerp(Color(0.62, 0.88, 0.80), k))
 		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.66, 0.34))
 	else:
 		# malam: tetap terbaca, tidak gelap pekat
@@ -427,4 +427,4 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("zenith_color", Color(0.05, 0.09, 0.16))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.10, 0.15, 0.22))
 		sky_mat.set_shader_parameter("sun_color", Color(0.62, 0.70, 0.85))
-	env.fog_density = 0.0009 * (quality_ref.get_preset().fog if quality_ref else 1.0)
+	env.fog_density = 0.0015 * (quality_ref.get_preset().fog if quality_ref else 1.0)
