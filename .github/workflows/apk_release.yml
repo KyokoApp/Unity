@@ -91,6 +91,28 @@ jobs:
       - name: Bangun pack + manifest (delta sanity)
         run: python3 tools/build_packs.py --godot ./godot | tail -6
 
+      - name: Publikasikan server konten -> branch "content" (raw)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          DEST=/tmp/ct
+          if ! git clone --depth 1 --branch content               https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY.git $DEST 2>/dev/null; then
+            git clone --depth 1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY.git $DEST
+            (cd $DEST && git checkout --orphan content && rm -rf ./*)
+          fi
+          rsync -a --delete --exclude=.git "$GITHUB_WORKSPACE/server/" "$DEST/"
+          cd "$DEST"
+          git config user.name "arena-ci" && git config user.email "ci@example.invalid"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "konten tidak berubah — tidak ada push"
+          else
+            git commit -m "konten game $(date -u +%Y-%m-%d) @${GITHUB_SHA:0:7}" -q
+            git push origin content -q
+            echo "konten terbit: manifest $(grep -o '"game_version": *"[^"]*"' manifest.json | head -1)"
+          fi
+
       - name: Export APK Launcher + AIO (dengan diagnostik)
         run: |
           export OUTDIR="$GITHUB_WORKSPACE/exports/android"
@@ -170,3 +192,4 @@ jobs:
 # rerun-kick 6 (fix marker konflik dari upload — jalankan pengecekan guard)
 
 # rerun-kick 7 (kalibrasi cahaya: matangkan warna pastel)
+# rerun-kick 8 (server konten publik + URL default launcher)

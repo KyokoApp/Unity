@@ -9,7 +9,8 @@ const CONFIG_PATH := "user://launcher_config.cfg"
 const BOOT_PATH := "user://boot.cfg"
 const GAME_SCENE := "res://packs/core_scripts/game_root.tscn"
 ## URL server default (ubah sesuai hosting Anda, lihat README).
-const DEFAULT_SERVER := "http://127.0.0.1:8787"
+const DEFAULT_SERVER := "https://raw.githubusercontent.com/KyokoApp/Unity/content"
+const LEGACY_SERVER := "http://127.0.0.1:8787"
 
 var _updater
 var _server_url := DEFAULT_SERVER
@@ -35,6 +36,10 @@ func _load_config() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(CONFIG_PATH) == OK:
 		_server_url = str(cfg.get_value("net", "server", DEFAULT_SERVER))
+		# migrasi: alamat dev lokal -> server konten publik default
+		if _server_url == LEGACY_SERVER:
+			_server_url = DEFAULT_SERVER
+			_save_config()
 
 func _save_config() -> void:
 	var cfg := ConfigFile.new()
