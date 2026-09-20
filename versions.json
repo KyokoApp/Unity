@@ -1,8 +1,8 @@
 {
  "packs": {
   "core_scripts": {
-   "content_hash": "97450918331fa565990c77c810220bb6bc23f53aa168d98af70bd5e303f698e2",
-   "version": "1.0.5"
+   "content_hash": "478c0ca3c81f37b79a213c3542d31224b56fa0b01158c2442e9f1d8672c516c2",
+   "version": "1.0.6"
   },
   "shaders_materials": {
    "content_hash": "2d160678f0a83caabe70399fd1e25d6ead7e7890dffa4459df34404ee50e32a6",
@@ -21,16 +21,16 @@
    "version": "1.0.4"
   },
   "animations": {
-   "content_hash": "aa64af0853258f727b0ff1d23d1e610979dae1a0831dd9bb592448a3d87abbaf",
-   "version": "1.0.3"
-  },
-  "character_player": {
-   "content_hash": "3f86aa72a333469ae3de4705798528927cff2900b6812c62d5f6615e94cc0378",
+   "content_hash": "4d10aeff6eeb2966d97affb5457b5e30a0fb8dd7240bac12b8ea5eaff8f8b028",
    "version": "1.0.4"
   },
-  "ui": {
-   "content_hash": "5dca6079279a7d9901ff8cc8d4bdd8b0841b84ba4cadfcef948f7ac7129fd4ed",
+  "character_player": {
+   "content_hash": "3cf03bc52b27ff2d89bcac0553004d7b0407edd432789441076a716d2650cdd8",
    "version": "1.0.6"
+  },
+  "ui": {
+   "content_hash": "56ad629a0a54fcf3692212fb81a527db9a063b2d9e84d49a6eb10b5be56d97a4",
+   "version": "1.0.7"
   },
   "audio_sfx": {
    "content_hash": "d43e8a08337984778388db77c8084ac7dadda641018bcfde5a2e3ec10ed29c91",
