@@ -5,16 +5,16 @@
    "version": "1.0.6"
   },
   "shaders_materials": {
-   "content_hash": "2d160678f0a83caabe70399fd1e25d6ead7e7890dffa4459df34404ee50e32a6",
-   "version": "1.0.7"
+   "content_hash": "d5d8d53c165e6efbcc735b33657d876978871fc505e8397d561f55387e97baa8",
+   "version": "1.0.8"
   },
   "world_terrain": {
-   "content_hash": "646c2eb844664702fd6f15cfeb0b746bbc797c7b5acdf0fb1d3276bfe8128fef",
-   "version": "1.0.11"
+   "content_hash": "60b4348dd4e90c87d147b2cd4f44ff7723c8871bbdd2b5bcde8816a85b1b26b5",
+   "version": "1.0.12"
   },
   "world_props_forest": {
-   "content_hash": "8d13c88668a2743a3116177c72a0029cd996905c018b7b145118a4bc848fbf35",
-   "version": "1.0.1"
+   "content_hash": "e999ee9b4aea6059cabdb1049fdfdd1c9220654cd7b6cf851b0b7b252b88bf63",
+   "version": "1.0.3"
   },
   "world_props_beach": {
    "content_hash": "1c0bc74cb8af4b3153fc1b1223da8d1d0570e47e03e2fdbde488ce538d63bb45",
