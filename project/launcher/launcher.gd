@@ -162,17 +162,30 @@ func _start_update() -> void:
 	_updater.finished_offline.connect(_on_finished_offline)
 	_updater.failed.connect(_on_failed)
 	# Seed manifest bundel (APK AIO): konten sudah ada di res://packs/*,
-	# catat sebagai manifest lokal agar boot offline-total tetap jalan.
-	if FileAccess.file_exists("res://packs/manifest.json") \
-			and not FileAccess.file_exists("user://local_manifest.json"):
+	# catat sebagai manifest lokal agar boot offline-total tetap jalan,
+	# dan sebagai state agar versi sama di server tak diunduh ulang.
+	if FileAccess.file_exists("res://packs/manifest.json"):
 		var f := FileAccess.open("res://packs/manifest.json", FileAccess.READ)
 		if f != null:
-			var w := FileAccess.open("user://local_manifest.json", FileAccess.WRITE)
-			if w != null:
-				w.store_string(f.get_as_text())
-				w.close()
-				_log_line("Konten bawaan terdeteksi — bisa langsung main offline.")
+			var text := f.get_as_text()
 			f.close()
+			if not FileAccess.file_exists("user://local_manifest.json"):
+				var w := FileAccess.open("user://local_manifest.json", FileAccess.WRITE)
+				if w != null:
+					w.store_string(text)
+					w.close()
+					_log_line("Konten bawaan terdeteksi — bisa langsung main offline.")
+			if not FileAccess.file_exists("user://launcher_state.json"):
+				var j = JSON.parse_string(text)
+				if typeof(j) == TYPE_DICTIONARY:
+					var st := {}
+					for pid in j.get("packs", {}):
+						var m: Dictionary = j["packs"][pid]
+						st[pid] = {"version": str(m.get("version", "")), "sha256": str(m.get("sha256", ""))}
+					var w2 := FileAccess.open("user://launcher_state.json", FileAccess.WRITE)
+					if w2 != null:
+						w2.store_string(JSON.stringify(st))
+						w2.close()
 	_updater.run(_server_url)
 
 func _on_pack_progress(pid: String, done: int, total: int) -> void:

@@ -394,11 +394,15 @@ func run(server_url: String) -> void:
 		if not local.is_empty():
 			var all_ok := true
 			for pid in local.get("pack_order", []):
-				if not _is_pack_present(pid, local["packs"][pid]):
+				# lengkap bila pck terunduh ada DI PERANGKAT, atau konten pack
+				# sudah ter-BBUNDEL di APK (res://packs/<id>) — fallback AIO.
+				var meta: Dictionary = local["packs"][pid]
+				if not ( _is_pack_present(pid, meta) \
+						or DirAccess.dir_exists_absolute("res://packs/" + pid) ):
 					all_ok = false
 					break
 			if all_ok:
-				_log("Server tidak terjangkau — memakai pack lokal (offline).")
+				_log("Server tidak terjangkau — memakai konten lokal/bundel (offline).")
 				finished_offline.emit(local)
 				return
 			_log("Server tidak terjangkau dan pack lokal belum lengkap.")
@@ -416,7 +420,8 @@ func run(server_url: String) -> void:
 		if local_state.has(pid):
 			var st: Dictionary = local_state[pid]
 			state_ok = str(st.get("version", "")) == str(meta.get("version", "")) and str(st.get("sha256", "")) == str(meta.get("sha256", ""))
-		if state_ok and _is_pack_present(pid, meta):
+		if state_ok and ( _is_pack_present(pid, meta) \
+				or DirAccess.dir_exists_absolute("res://packs/" + pid) ):
 			continue
 		needed.append(pid)
 		total_bytes += int(meta.get("size", 0))

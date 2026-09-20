@@ -87,18 +87,15 @@ jobs:
         run: |
           export OUTDIR="$GITHUB_WORKSPACE/exports/android"
           RC0=0; timeout 120 ./godot --headless --path project --quit > "$OUTDIR/quit.log" 2>&1 || RC0=$?
-          RC=0; timeout 900 ./godot --headless --verbose --path project --export-debug "Android Launcher" "$OUTDIR/PulauToon-debug.apk" > "$OUTDIR/export.log" 2>&1 || RC=$?
-          RCA=0; timeout 900 ./godot --headless --verbose --path project --export-debug "Android AIO" "$OUTDIR/PulauToon-aio.apk" > "$OUTDIR/export_aio.log" 2>&1 || RCA=$?
+          RC=0; timeout 900 ./godot --headless --verbose --path project --export-debug "Android AIO" "$OUTDIR/PulauToon.apk" > "$OUTDIR/export_aio.log" 2>&1 || RC=$?
           {
             echo "## Diagnostik build $GITHUB_SHA"
-            echo "quit.rc=$RC0 export.rc=$RC export-aio.rc=$RCA"
+            echo "quit.rc=$RC0 export-aio.rc=$RC"
             echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
             ls "$ANDROID_SDK_ROOT/build-tools" 2>/dev/null | tail -2
             echo '### import.log (akhir)'; tail -6 "$GITHUB_WORKSPACE/import.log"
-            echo '### export.log LAUNCHER (penuh)'
-            sed 's/\x1b\[[0-9;]*m//g' "$OUTDIR/export.log"
-            echo '### template dir'
-            ls -la "$HOME/.local/share/godot/$GDIR/" | head -6
+            echo '### export_aio.log (penuh)'
+            sed 's/\x1b\[[0-9;]*m//g' "$OUTDIR/export_aio.log"
             echo '### preset head'
             head -14 project/export_presets.cfg
           } > "$OUTDIR/diag.txt" 2>&1
@@ -119,21 +116,20 @@ jobs:
             exit 1
           fi
           OUTDIR="$GITHUB_WORKSPACE/exports/android"
-          if [ ! -s "$OUTDIR/PulauToon-aio.apk" ]; then
+          if [ ! -s "$OUTDIR/PulauToon.apk" ]; then
             echo "::notice::APK belum tersedia — lihat diagnostik di release notes"
             exit 0
           fi
           # 2) notes final + sha + upload aset dengan retry
-          cd "$OUTDIR" && sha256sum PulauToon-debug.apk PulauToon-aio.apk > "$GITHUB_WORKSPACE/SHA256SUMS.txt" && cd "$GITHUB_WORKSPACE"
+          cd "$OUTDIR" && sha256sum PulauToon.apk > "$GITHUB_WORKSPACE/SHA256SUMS.txt" && cd "$GITHUB_WORKSPACE"
           {
             echo "## Pulau Toon — APK debug (CI)"
             echo ""
             echo "Commit: \`$GITHUB_SHA\` — dibangun oleh GitHub Actions (runner full-internet)."
             echo ""
-            echo "| APK | Isi | Instal |"
-            echo "| --- | --- | --- |"
-            echo "| PulauToon-aio.apk | launcher + semua pack ter-bundle | **Rekomendasi — instal & main langsung** |"
-            echo "| PulauToon-debug.apk | hanya launcher | Perlu server konten (README §3) |"
+            echo "**PulauToon.apk** — launcher + seluruh konten ter-bundle di SATU aplikasi."
+            echo "Instal → langsung main offline; pembaruan konten berikutnya otomatis"
+            echo "delta (hanya pack yang berubah) saat kamu menjalankan server konten (README §3)."
             echo ""
             echo "Install: unduh APK → izinkan sumber tak dikenal → buka (landscape)."
             echo "Detail: README.md §5–§8; bukti uji: docs/BUKTI_UJI.md."
@@ -141,13 +137,17 @@ jobs:
             echo '```'; cat SHA256SUMS.txt; echo '```'
           } > notes.md
           gh release edit "$TAG" --notes-file notes.md
-          for f in "$OUTDIR/PulauToon-aio.apk" "$OUTDIR/PulauToon-debug.apk" "$GITHUB_WORKSPACE/SHA256SUMS.txt"; do
+          for f in "$OUTDIR/PulauToon.apk" "$GITHUB_WORKSPACE/SHA256SUMS.txt"; do
             ok=0
             for i in 1 2 3 4; do
               if OUT2=$(gh release upload "$TAG" "$f" --clobber 2>&1); then ok=1; echo "upload OK: $(basename "$f")"; break; fi
               echo "upload $(basename "$f") percobaan $i gagal: $(echo "$OUT2" | head -c 200)"; sleep 15
             done
             [ "$ok" = "1" ] || { echo "::error::gagal unggah $f — $(echo "$OUT2" | head -c 200)"; exit 1; }
+          done
+          # hapus aset legasi varian lama (bila masih menempel)
+          for a in PulauToon-aio.apk PulauToon-debug.apk; do
+            gh release delete-asset "$TAG" "$a" --yes 2>/dev/null && echo "aset legasi $a dihapus" || true
           done
 
 # rerun-kick 1
