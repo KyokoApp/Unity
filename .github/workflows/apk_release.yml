@@ -119,6 +119,15 @@ jobs:
           echo "::notice::ws manifest: $(grep -o '"game_version": *"[^"]*"' "$GITHUB_WORKSPACE/server/manifest.json" | head -1)"
           rsync -a --delete --exclude=.git "$GITHUB_WORKSPACE/server/" "$DEST/"; echo "::notice::rsync rc=$?"
           echo "::notice::dest manifest sesudah rsync: $(grep -o '"game_version": *"[^"]*"' "$DEST/manifest.json" | head -1)"
+          # Perbaikan deterministik: manifest+versions WAJIB identik dengan workspace
+          # (pernah 2x manifest di dest ketinggalan walau rsync rc=0 — race aneh runner).
+          for FN in manifest.json versions.json; do
+            if ! cmp -s "$GITHUB_WORKSPACE/server/$FN" "$DEST/$FN"; then
+              cp -f "$GITHUB_WORKSPACE/server/$FN" "$DEST/$FN"
+              echo "::notice::repair: $FN disalin paksa (dest ketinggalan)"
+            fi
+          done
+          echo "::notice::dest manifest pasca-repair: $(grep -o '"game_version": *"[^"]*"' "$DEST/manifest.json" | head -1)"
           cd "$DEST"
           git config user.name "arena-ci" && git config user.email "ci@example.invalid"
           git add -A
@@ -224,3 +233,5 @@ jobs:
 # rerun-kick 15 (hotfix: komentar bergaya // di island.gd = parse error -> layar biru; CI kini wajib lolos gdparse)
 
 # rerun-kick 17 (HUD RPG: joystick melayang + tombol bulat ber-icon; menu geser kiri; Mode Edit sculpt/jalur/cahaya; dunia 800m)
+
+# rerun-kick 18 (perbaikan deterministik publish konten: manifest+versions disalin paksa bila dest beda)
