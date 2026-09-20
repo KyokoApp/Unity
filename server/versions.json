@@ -1,0 +1,44 @@
+{
+ "packs": {
+  "core_scripts": {
+   "content_hash": "44939b30520eb9a8945e621b36356ec696d01dd986dbc4c440871b6e8e48a656",
+   "version": "1.0.2"
+  },
+  "shaders_materials": {
+   "content_hash": "3303a4de378c8cc18397c68a130c61a018bd05215a2121164f50882f51be661d",
+   "version": "1.0.4"
+  },
+  "world_terrain": {
+   "content_hash": "ad991acef1d085dc7c614c08ed9a5aeb62820214390a36455cb643830e84181f",
+   "version": "1.0.4"
+  },
+  "world_props_forest": {
+   "content_hash": "8d13c88668a2743a3116177c72a0029cd996905c018b7b145118a4bc848fbf35",
+   "version": "1.0.1"
+  },
+  "world_props_beach": {
+   "content_hash": "1c0bc74cb8af4b3153fc1b1223da8d1d0570e47e03e2fdbde488ce538d63bb45",
+   "version": "1.0.4"
+  },
+  "animations": {
+   "content_hash": "d0fabc24b4fa78d899a17cd98c23318dc3b1e6528e00541b54b3a087d346f7f8",
+   "version": "1.0.1"
+  },
+  "character_player": {
+   "content_hash": "c85f3f7202ee92ff589523e0533d74cbb8c362f901c20718143ed6b1ee9c88f3",
+   "version": "1.0.1"
+  },
+  "ui": {
+   "content_hash": "857cfb784d13495228d3a6a2df3644bc76eec27abac15b1e194550a7bfa739ba",
+   "version": "1.0.2"
+  },
+  "audio_sfx": {
+   "content_hash": "d43e8a08337984778388db77c8084ac7dadda641018bcfde5a2e3ec10ed29c91",
+   "version": "1.0.1"
+  },
+  "audio_music": {
+   "content_hash": "af1f821c9d55f8e6e7ef25d8dfab42b8560bfb2df13c9ec21954ad67bfa3cef7",
+   "version": "1.0.1"
+  }
+ }
+}

@@ -7,7 +7,7 @@
 *.apk
 *.aab
 *.keystore
-server/
+server/packs/
 artifacts/
 # Tools / scratch
 __pycache__/

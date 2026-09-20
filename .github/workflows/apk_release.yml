@@ -193,3 +193,5 @@ jobs:
 
 # rerun-kick 7 (kalibrasi cahaya: matangkan warna pastel)
 # rerun-kick 8 (server konten publik + URL default launcher)
+
+# rerun-kick 9 (versi konten persisten — delta update antar-bangun aktif)
