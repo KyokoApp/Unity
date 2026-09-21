@@ -65,46 +65,18 @@ func _make_flat_ground() -> void:
 	body.add_child(col)
 	add_child(body)
 
-## Tanah kartun: hijau rumput bercampur coklat tanah ("campuran hijau dan
-## apa-itu-yang-lupa" ⇒ ditebak: hijau + coklat — gampang diganti nanti),
-## tambah taburan bintik. Dua oktaf noise ⇒ tambalan lebar + rinci kecil;
-## UV ruang-dunia ⇒ mulus saat bidang mengikuti pemain.
+## Tanah kartun POLOS: satu warna rata, tanpa pola/noise — atas permintaan
+## user ("jangan ada gambar kotak-kotak biar polos aja"). Warna = hijau rumput
+## hangat; tinggal ubah konstanta bila minta warna lain.
 func _make_ground_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	var sh := Shader.new()
 	sh.code = """
 shader_type spatial;
 render_mode cull_back, depth_draw_opaque;
-uniform vec3 grass_a : source_color = vec3(0.36, 0.66, 0.33);   // hijau segar
-uniform vec3 grass_b : source_color = vec3(0.45, 0.72, 0.38);   // hijau muda
-uniform vec3 dirt    : source_color = vec3(0.58, 0.44, 0.28);   // coklat tanah
-uniform vec3 speck   : source_color = vec3(0.30, 0.52, 0.26);   // bintik gelap
-
-float h21(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
-}
-float vnoise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	float a = h21(i);
-	float b = h21(i + vec2(1.0, 0.0));
-	float c = h21(i + vec2(0.0, 1.0));
-	float d = h21(i + vec2(1.0, 1.0));
-	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}
-varying vec3 wp;
-void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+uniform vec3 ground_color : source_color = vec3(0.42, 0.70, 0.36);   // hijau rumput polos
 void fragment() {
-	vec2 p = wp.xz;
-	float patch = vnoise(p * 0.055);              // tambalan besar rumput/tanah
-	vec3 base = mix(grass_a, grass_b, vnoise(p * 0.37));
-	base = mix(dirt, base, smoothstep(0.35, 0.62, patch));
-	float s = step(0.975, h21(floor(p * 2.2)));   // bintik rinci jarang (2,2m grid)
-	base = mix(base, speck, s * 0.6);
-	ALBEDO = base;
+	ALBEDO = ground_color;
 	ROUGHNESS = 0.95;
 	SPECULAR = 0.0;
 }
