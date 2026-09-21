@@ -559,3 +559,16 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   (hijau rumput 0.42,0.70,0.36) memenuhi "polos aja warnanya".
 - Pelajaran berturut: sinkron versions.json SELALU via /tmp + validasi
   JSON sebelum menimpa (redirect gagal tak pernah memotong file lagi).
+
+## Ronde-31 — revert ke cicilan #1 persis (kick-47) (2026-09-21)
+
+- Arahan user eksplisit: "tanah dan penyihirnya jangan ini, balik yang tadi
+  aja" ⇒ player.gd & world.gd dipulihkan BIT-PERSIS dari commit cf5d38c
+  (konten = cicilan #1 / game 1.0.30): penyihir primitif ungu + tanah pola
+  noise (tampilan yang user sebut 'grafiti campuran hijau' di permintaan
+  asal); kick-46 (mannequin UAL + tanah polos) dibatalkan total;
+  ual_mannequin.glb dihapus lagi. Mesin revert-nya: checkout berkas dari
+  commit — bukan tulis ulang — jadi nol risiko jahitan.
+- Catatan alur: tampilan saling-ganti rasa begini murah & cepat lewat pack;
+  memori tiap iterasi tetap ada di riwayat git (1fc3c12/5cbce9e bila kelak
+  mannequin mau dicoba lagi).

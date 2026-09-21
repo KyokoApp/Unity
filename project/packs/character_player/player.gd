@@ -9,40 +9,15 @@ signal nearest_interactable_changed(meta)
 const AnimControllerScript := preload("res://packs/animations/animation_controller.gd")
 const Materials := preload("res://packs/shaders_materials/materials.gd")
 
-# Skin bawaan genre top-down: MANNEQUIN UAL (Quaternius CC0) dengan aksesori
-# penyihir procedural (topi+orb) yang dipasang oleh _load_skin — atas permintaan
-# user: "karakter apa saja yang penting BERANIMASI JALAN", dan BUKAN knight.
-# GLB knight/polygirl lama tetap dihapus; UAL dipulihkan dari riwayat.
+# PENYIHIR PROSEDURAL: model 100% dibangun dari mesh primitif oleh kode
+# (jubah kerucut + topi runcing + tongkat orb) — khusus genre top-down.
+# Bukan sekadar pengganti sementara knight: nol berkas GLB, nol risiko lisensi,
+# nol T-pose, dan ``anim'' sengaja null (gerak lucu digerakkan kode: bob/condong/
+# putar). Skin GLB lama (knight/polygirl/UAL) DIHAPUS beserta berkasnya.
 const SKINS := {
-	"wizard": {
-		# Universal Animation Library (Quaternius CC0):
-		# 43 animasi lengkap (idle/walk/run/sprint/crouch/jump/swim/roll/dance/punch...)
-		"path": "res://packs/character_player/ual_mannequin.glb",
-		"height": 1.45,
-		"wizard_accessories": true,
-		"states": {
-			"idle": ["Idle_Loop"],
-			"walk": ["Walk_Loop"],
-			"run": ["Jog_Fwd_Loop"],
-			"sprint": ["Sprint_Loop"],
-			"crouch_idle": ["Crouch_Idle_Loop"],
-			"crouch_move": ["Crouch_Fwd_Loop"],
-			"jump_start": ["Jump_Start"],
-			"jump_fall": ["Jump_Loop"],
-			"jump_land": ["Jump_Land"],
-			"swim_idle": ["Swim_Idle_Loop"],
-			"swim_move": ["Swim_Fwd_Loop"],
-			"pickup": ["PickUp_Table", "Interact"],
-			"interact": ["Interact"],
-			"emote": ["Dance_Loop"],
-			"attack": ["Punch_Jab"],
-			"attack2": ["Punch_Cross"],
-			"roll": ["Roll"],
-			"sit": ["Sitting_Idle_Loop"],
-		},
-	},
+	"wizard": {"path": "", "height": 1.5, "states": {}},
 }
-var char_skin := "wizard"   # penyihir = mannequin UAL + aksesori (beranimasi penuh)
+var char_skin := "wizard"   # penyihir prosedural (tanpa GLB) — skin lama dihapus
 
 # ------- gerak -------
 const SPEED_WALK := 2.4
@@ -122,64 +97,16 @@ func _ready() -> void:
 	is_ready = true
 
 func _load_skin() -> void:
-	var def: Dictionary = SKINS.get(char_skin, SKINS["wizard"])
-	var pa := load(def["path"])
-	if pa == null:
-		push_error("[player] skin hilang: " + str(def["path"]) + " — fallback penyihir prosedural")
-		_load_wizard_procedural()
-		return
 	if model_root and is_instance_valid(model_root):
 		model_root.queue_free()
-	model_root = pa.instantiate()
+	model_root = _build_wizard()
 	model_pivot.add_child(model_root)
-	# normalisasi skala: cocokkan tinggi karakter ke target antar-skin
-	var mesh_parents := []
-	_find_mesh_instances(model_root, mesh_parents)
-	var bbox := AABB()
-	var first_box := true
-	for mi in mesh_parents:
-		var b: AABB = mi.get_aabb()
-		if b.size == Vector3.ZERO:
-			continue
-		bbox = b if first_box else bbox.merge(b)
-		first_box = false
-	if not first_box and bbox.size.y > 0.05:
-		var target: float = float(def.get("height", 1.4))
-		model_root.scale = Vector3.ONE * clampf(target / bbox.size.y, 0.3, 3.0)
-	# hormati material bawaan GLB; cukup tambahkan outline TIPIS sebagai next_pass
-	var first := true
-	for mi in mesh_parents:
-		var smi: MeshInstance3D = mi
-		if (smi.mesh is Mesh) and smi.mesh.get_surface_count() > 0:
-			var base_mat: Material = smi.mesh.surface_get_material(0) if first else smi.get_active_material(0)
-			if base_mat and not base_mat.next_pass:
-				base_mat.next_pass = Materials.make_outline(0.008)
-		else:
-			smi.material_override = Materials.toon_vertex_color(true, 0.022)
-		first = false
-	var scale_k: float = model_root.scale.x
-	if bool(def.get("wizard_accessories", false)):
-		model_root.add_child(_build_wizard_accessories(bbox, scale_k))
-	anim = AnimControllerScript.new()
-	if not anim.setup(self, model_root, def.get("states", {})):
-		anim = null
+	anim = null  # sengaja: penyihir prosedural digerakkan kode (bob/condong/putar)
 	var rootc = get_tree().current_scene
 	if rootc and rootc.has_method("_trace"):
-		if anim:
-			var total_st: int = AnimControllerScript.STATES.size()
-			var ok_st: int = anim.resolved.size()
-			rootc.call("_trace", "boot: anim = %d/%d state ✔ skin=%s" % [ok_st, total_st, char_skin])
-		else:
-			rootc.call("_trace", "boot: ⚠ anim = NULL — AnimationPlayer tidak ketemu di skin")
+		rootc.call("_trace", "boot: skin = wizard prosedural ✔ (tanpa animasi GLB)")
 
-## Darurat bila GLB rusak/hilang: tetap ada PENYIHIR primitif (cicilan #1).
-func _load_wizard_procedural() -> void:
-	if model_root and is_instance_valid(model_root):
-		model_root.queue_free()
-	model_root = _wiz_part_group()
-	model_pivot.add_child(model_root)
-	anim = null
-
+## Bagian-bagian penyihir toon dari mesh primitif (outline tipis sesuai permintaan).
 func _wiz_part(mesh: Mesh, color: Color, pos: Vector3,
 			  rot_deg := Vector3.ZERO, unshaded := false) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -198,54 +125,65 @@ func _wiz_part(mesh: Mesh, color: Color, pos: Vector3,
 	mi.rotation_degrees = rot_deg
 	return mi
 
-func _cone(bottom_r: float, top_r: float, h: float, segs := 16) -> CylinderMesh:
-	var c := CylinderMesh.new()
-	c.bottom_radius = bottom_r
-	c.top_radius = top_r
-	c.height = h
-	c.radial_segments = segs
-	return c
-
-## Penyihir primitif utuh (dipakai hanya saat GLB gagal dimuat).
-func _wiz_part_group() -> Node3D:
+func _build_wizard() -> Node3D:
 	var w := Node3D.new()
 	w.name = "WizardRoot"
-	w.add_child(_wiz_part(_cone(0.34, 0.14, 0.95), Color(0.42, 0.30, 0.64), Vector3(0, 0.475, 0)))
-	var belt := TorusMesh.new(); belt.inner_radius = 0.135; belt.outer_radius = 0.175
+	# jubah: cylinder mengerucut ke atas
+	var robe := CylinderMesh.new()
+	robe.bottom_radius = 0.34
+	robe.top_radius = 0.14
+	robe.height = 0.95
+	robe.radial_segments = 16
+	w.add_child(_wiz_part(robe, Color(0.42, 0.30, 0.64), Vector3(0, 0.475, 0)))
+	# sabuk emas
+	var belt := TorusMesh.new()
+	belt.inner_radius = 0.135
+	belt.outer_radius = 0.175
 	w.add_child(_wiz_part(belt, Color(0.88, 0.70, 0.28), Vector3(0, 0.60, 0), Vector3(90, 0, 0)))
-	var chest := SphereMesh.new(); chest.radius = 0.17; chest.height = 0.30
+	# dada/pundak mungil mengembang
+	var chest := SphereMesh.new()
+	chest.radius = 0.17
+	chest.height = 0.30
 	w.add_child(_wiz_part(chest, Color(0.48, 0.35, 0.70), Vector3(0, 0.94, 0)))
-	var head := SphereMesh.new(); head.radius = 0.145; head.height = 0.26
+	# kepala + mata
+	var head := SphereMesh.new()
+	head.radius = 0.145
+	head.height = 0.26
 	w.add_child(_wiz_part(head, Color(0.95, 0.83, 0.69), Vector3(0, 1.10, 0.01)))
 	for ex in [-0.052, 0.052]:
-		var eye := SphereMesh.new(); eye.radius = 0.022; eye.height = 0.035
+		var eye := SphereMesh.new()
+		eye.radius = 0.022
+		eye.height = 0.035
 		w.add_child(_wiz_part(eye, Color(0.12, 0.09, 0.12), Vector3(ex, 1.115, 0.125)))
-	var star := SphereMesh.new(); star.radius = 0.035; star.height = 0.05
-	w.add_child(_wiz_part(star, Color(1.0, 0.86, 0.35), Vector3(0.055, 1.33, 0.10), Vector3.ZERO, true))
-	w.add_child(_build_wizard_accessories(AABB(Vector3(-0.4, 0, -0.4), Vector3(0.8, 1.5, 0.8)), 1.0))
+	# topi runcing: kerucut + lingkar pinggir (brim agak doyong = lucu)
+	var hat := CylinderMesh.new()
+	hat.bottom_radius = 0.13
+	hat.top_radius = 0.0
+	hat.height = 0.52
+	hat.radial_segments = 16
+	w.add_child(_wiz_part(hat, Color(0.35, 0.23, 0.54), Vector3(0, 1.42, -0.03), Vector3(-8, 0, 5)))
+	var brim := TorusMesh.new()
+	brim.inner_radius = 0.115
+	brim.outer_radius = 0.235
+	w.add_child(_wiz_part(brim, Color(0.35, 0.23, 0.54), Vector3(0, 1.19, -0.02), Vector3(86, 0, 5)))
+	# bintang emas di topi
+	var star := SphereMesh.new()
+	star.radius = 0.035
+	star.height = 0.05
+	w.add_child(_wiz_part(star, Color(1.0, 0.86, 0.35), Vector3(0.055, 1.33, 0.10), Vector3(0, 0, 0), true))
+	# tongkat di sisi kanan + orb pijar di ujung
+	var staff := CylinderMesh.new()
+	staff.bottom_radius = 0.018
+	staff.top_radius = 0.022
+	staff.height = 1.05
+	staff.radial_segments = 8
+	w.add_child(_wiz_part(staff, Color(0.38, 0.26, 0.16), Vector3(0.245, 0.62, 0.06), Vector3(6, 0, -9)))
+	var orb := SphereMesh.new()
+	orb.radius = 0.062
+	orb.height = 0.105
+	_orb_node = _wiz_part(orb, Color(0.55, 0.98, 0.90), Vector3(0.315, 1.17, 0.10), Vector3(0, 0, 0), true)
+	w.add_child(_orb_node)
 	return w
-
-## Aksesori penyihir (topi runcing + bintang, tongkat + orb pijar) untuk
-## dipasang PADA MODEL GLB — tinggi model penuh H (dalam unit model lokal).
-func _build_wizard_accessories(bbox: AABB, scale_k: float) -> Node3D:
-	var acc := Node3D.new()
-	acc.name = "WizardAccessories"
-	# bbox dalam RUANG MODEL (sebelum skala model_root) — anchor = tinggi manekin
-	var H: float = maxf(bbox.size.y, 0.6)
-	var inv: float = 1.0 / maxf(scale_k, 0.05)
-	var U: float = 1.45 / maxf(H, 0.2) * inv  # konversi tinggi dunia -> unit model
-	var hat := _cone(0.13, 0.0, 0.52)
-	acc.add_child(_wiz_part(hat, Color(0.35, 0.23, 0.54), Vector3(0, H * 1.02, -0.03 * U), Vector3(-8, 0, 5)))
-	var brim := TorusMesh.new(); brim.inner_radius = 0.115; brim.outer_radius = 0.235
-	acc.add_child(_wiz_part(brim, Color(0.35, 0.23, 0.54), Vector3(0, H * 0.79, -0.02 * U), Vector3(86, 0, 5)))
-	var star := SphereMesh.new(); star.radius = 0.035; star.height = 0.05
-	acc.add_child(_wiz_part(star, Color(1.0, 0.86, 0.35), Vector3(0.055 * U, H * 0.89, 0.10 * U), Vector3.ZERO, true))
-	var staff := _cone(0.018, 0.022, 1.05, 8)
-	acc.add_child(_wiz_part(staff, Color(0.38, 0.26, 0.16), Vector3(0.245 * U, H * 0.41, 0.06 * U), Vector3(6, 0, -9)))
-	var orb := SphereMesh.new(); orb.radius = 0.062; orb.height = 0.105
-	_orb_node = _wiz_part(orb, Color(0.55, 0.98, 0.90), Vector3(0.315 * U, H * 0.78, 0.10 * U), Vector3.ZERO, true)
-	acc.add_child(_orb_node)
-	return acc
 
 func _find_mesh_instances(n: Node, out: Array) -> void:
 	if n is MeshInstance3D:
@@ -388,7 +326,6 @@ func press_attack() -> void:
 		var st := "attack2" if (_attack_alt and anim.has("attack2")) else "attack"
 		_attack_alt = not _attack_alt
 		anim.action(st, 600)
-		_cast_orb()          # penyihir: pukulan ber-animasi TETAP menembakkan orb ✨
 		_action_lock = 0.5
 	else:
 		# tembak orb sihir ke arah hadap karakter (versi awal: belum mengenai apa-apa)
@@ -593,7 +530,6 @@ func _update_model(delta: float, move_dir: Vector3, speed: float) -> void:
 		var target_yaw := atan2(move_dir.x, move_dir.z)
 		model_pivot.rotation.y = lerp_angle(model_pivot.rotation.y, target_yaw, delta * 10.0)
 	var hspeed := Vector2(velocity.x, velocity.z).length()
-	_wiz_t += delta * (1.1 + hspeed * 0.85)   # denyut orb/bob proyektil — universal
 	if anim:
 		# jejak diagnostik ON-DEVICE (foto saat keluhannya muncul):
 		# menunjukkan state ANIMASI YANG BENAR-BENAR BERMAIN tiap 0,9 detik
@@ -610,10 +546,11 @@ func _update_model(delta: float, move_dir: Vector3, speed: float) -> void:
 			anim.set_air("jump_fall")
 		elif is_on_floor() and _action_lock <= 0.0:
 			anim.set_move(clampf(hspeed / SPEED_RUN, 0.0, 1.0), _target_speed() >= SPEED_SPRINT and hspeed > SPEED_RUN + 0.2, crouch)
-	if model_root != null and anim == null:
+	elif model_root != null:
 		# penyihir prosedural tanpa library animasi: bob melayang + condong ke
 		# arah lari dari kode; orb tongkat berdenyut; putar saat emote diatur
 		# oleh _spin_t di _physics_process.
+		_wiz_t += delta * (1.1 + hspeed * 0.85)
 		var bob_t: float = 0.032 if hspeed < 0.25 else 0.018 + hspeed * 0.003
 		model_root.position.y = sin(_wiz_t * 2.1) * bob_t
 		var lean: float = 0.16 if hspeed > 0.4 else 0.0
@@ -621,8 +558,8 @@ func _update_model(delta: float, move_dir: Vector3, speed: float) -> void:
 		model_root.rotation.z = lerp_angle(model_root.rotation.z, -lean * 0.5, delta * 7.0)
 		if velocity.y < -1.0 and not is_on_floor():
 			model_root.rotation.x = lerp_angle(model_root.rotation.x, -0.22, delta * 6.0)
-	if _orb_node and is_instance_valid(_orb_node):
-		_orb_node.scale = Vector3.ONE * (1.0 + 0.18 * sin(_wiz_t * 6.3))
+		if _orb_node and is_instance_valid(_orb_node):
+			_orb_node.scale = Vector3.ONE * (1.0 + 0.18 * sin(_wiz_t * 6.3))
 	# efek visual jongkok (memendek sedikit) & renang (mengambang lebih rendah)
 	var want_head := -0.28 if crouch else 0.0
 	head_offset_y = lerpf(head_offset_y, want_head, delta * 8.0)
