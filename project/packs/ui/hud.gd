@@ -163,7 +163,6 @@ var label_prompt: Label
 var label_stats: Label
 var label_fps: Label
 var label_clock: Label
-var label_debug: Label      # probe animasi on-device (permanen, tidak pernah dibebaskan)
 var toast_label: Label
 var _toast_timer := 0.0
 var _fps_acc := 0.0
@@ -364,17 +363,6 @@ func _build_layout() -> void:
 	label_stats.add_theme_constant_override("shadow_offset_y", 2)
 	root.add_child(label_stats)
 
-	# --- probe diagnostik animasi (kecil, kuning, bawah-tengah) ---
-	label_debug = Label.new()
-	label_debug.position = Vector2(vsz.x * 0.5 - 320, vsz.y - mb - 44)
-	label_debug.size = Vector2(640, 34)
-	label_debug.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label_debug.add_theme_font_size_override("font_size", 19)
-	label_debug.add_theme_color_override("font_color", Color(1.0, 0.95, 0.55, 0.85))
-	label_debug.add_theme_color_override("font_shadow", Color(0, 0, 0, 0.7))
-	label_debug.text = ""
-	root.add_child(label_debug)
-
 	# --- toast tengah atas ---
 	toast_label = Label.new()
 	toast_label.add_theme_font_size_override("font_size", 30)
@@ -523,11 +511,6 @@ func _on_stats(kind: String, count: int) -> void:
 		cocos = int(player.stats.get("coconut", 0))
 	label_stats.text = "🌼 %d   🥥 %d" % [flowers, cocos]
 	toast("+1 " + ("Kelapa 🥥" if kind == "coconut" else "Bunga 🌼"))
-
-## Dipanggil player tiap ~1 detik: teks diagnostik animasi on-device.
-func anim_debug(t: String) -> void:
-	if label_debug:
-		label_debug.text = t
 
 func toast(msg: String) -> void:
 	toast_label.text = msg

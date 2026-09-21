@@ -150,6 +150,11 @@ func _boot_world(progress_cb: Callable) -> void:
 	player = pp.instantiate()
 	player.set("char_skin", settings.char_skin)  # skin dari pengaturan (dipakai _ready)
 	add_child(player)
+	# FAILSAFE kick-41: bila script pack gagal menempel (token tidak cocok /
+	# pck rusak), instantiate() tetap mengembalikan node dan boot "sukses" —
+	# padahal pemain tak bertulang. Permukaan-kan TEGAS daripada diam-diam.
+	if player.get_script() == null:
+		_fatal("Pack PEMAIN rusak (script tidak terpasang).\nMinta unggah ulang konten / kosongkan cache update.")
 	var spawn = world.call("find_spawn_point")
 	player.global_position = spawn + Vector3(0, 0.12, 0)
 	player.call("set_world", world)
@@ -162,6 +167,8 @@ func _boot_world(progress_cb: Callable) -> void:
 		return
 	hud = hp.instantiate()
 	add_child(hud)
+	if hud.get_script() == null:
+		_fatal("Pack UI rusak (script tidak terpasang).\nMinta unggah ulang konten / kosongkan cache update.")
 	hud.call("bind_player", player)
 	hud.call("bind_root", self)
 	hud.call("set_settings", settings)

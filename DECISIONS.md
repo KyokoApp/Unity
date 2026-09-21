@@ -468,3 +468,24 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   _near_floor + lompat + gerbang anim ground), ui 1.0.10 (label anim_debug),
   world_terrain 1.0.28, core 1.0.10, animations 1.0.7. HP re-download delta
   otomatis (sha beda) saat aplikasi dibuka.
+
+## Ronde-26 — EMERGENCY: layar dunia tanpa HUD/pemain (kick-41 rollback+forensik) (2026-09-21)
+
+- Laporan user (foto 15:36): sesudah update kick-39/40 dunia TAMPIL dari
+  kamera pemain tapi TANPA model karakter, TANPA UI, tak ada jejak proses —
+  boot menurut watchdog 40 dtk SUKSES (overlay merah tak muncul) ⇒ node
+  terinstansiasi tapi script pada `player` & `hud` diduga gagal menempel
+  (kamera tetap hidup dari tscn, model & kontrol dibuat oleh script ⇒ lenyap
+  semua). Penyebab teknis token-pack belum tertangkap; lint syntax lokal
+  (gdtoolkit gdparse 4.5.0) bersih.
+- TINDAKAN user-first: ROLLBACK konten `player.gd` & `hud.gd` ke persis
+  kick-38 (terbukti bekerja di HP user) ⇒ terbit player 1.0.16, ui 1.0.11.
+  Fix `_near_floor`/anim_debug (ronde-24) DITUNDA — subjek baru: temukan dulu
+  penyebab attach gagal (kemungkinan token pck / kompatibilitas), pakai build
+  sampingan. HP user cukup buka ulang aplikasi → launcher ambil delta.
+- FAILSAFE permanen di core: sesudah instantiate pemain/HUD, periksa
+  `get_script()==null` → layar merah _fatal yang menamai pack rusak. Tak akan
+  ada lagi "stuck diam-diam" kelas ini. core → 1.0.11.
+- Insiden sandbox: clone lokal ke-reset (HEAD kosong di 552216e); pekerjaan
+  aman di refs/heads/arena/01a0ba2f-unity (a3d3385) — dipulihkan via fetch +
+  reset --hard. Pelajaran: sebelum tindakan destruktif lokal, cek reflog.
