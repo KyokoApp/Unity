@@ -1,8 +1,8 @@
 extends RefCounted
 ## AnimationController: resolver nama animasi + AnimationTree (state machine)
-## untuk skin karakter (GLB KayKit). Toleran terhadap nama animasi yang
+## untuk skin karakter (GLB KayKit/UAL). Toleran terhadap nama animasi yang
 ## berbeda antar pack — memakai daftar kandidat per state.
-## API dipakai player.gd: set_move, set_airbone, set_swim, action, dsb.
+## API dipakai player.gd: set_move, set_air, set_swim, action, dsb.
 
 class_name AnimController
 
@@ -25,6 +25,8 @@ const STATES := {
 	"interact": ["Interact", "Use_Item"],
 	"emote": ["Cheer", "Wave", "Dance"],
 	"attack": ["1H_Melee_Attack_Chop", "1H_Melee_Attack_Slice", "Unarmed_Melee_Attack_Punch_A"],
+	"attack2": ["Unarmed_Melee_Attack_Punch_B", "1H_Melee_Attack_Slice_Diagonal", "2H_Melee_Attack_Slice"],
+	"roll": ["Roll", "Dodge_Forward", "Dodge_Roll"],
 	"sit": ["Sit_Floor_Idle", "Sit_Chair_Idle"],
 }
 
@@ -96,6 +98,11 @@ func setup(node: Node3D, skin_root: Node, custom_states: Dictionary = {}) -> boo
 	# properti anim_player: path dari node tree menuju AnimationPlayer
 	tree.anim_player = tree.get_path_to(anim_player)
 	var sm := AnimationNodeStateMachine.new()
+	# WAJIB: tanpa ini, travel() ke state yang SEDANG aktif ("teleport ke diri
+	# sendiri") diam saja (lihat AnimationNodeStateMachine.allow_transition_to_self
+	# di dokumentasi Godot) — akibatnya re-trigger cepat aksi sekali-jalan (mis.
+	# serangan beruntun) tak pernah restart, cuma diam di frame terakhir.
+	sm.allow_transition_to_self = true
 	for st in resolved:
 		var anim_name: String = resolved[st]
 		if anim_name == "":
@@ -121,12 +128,34 @@ func _find_anim_player(root: Node) -> AnimationPlayer:
 	return null
 
 func _sm_setup_transitions(sm: AnimationNodeStateMachine) -> void:
-	# semua state bisa pindah ke semua (switch_mode synced agar halus);
+	# semua state bisa pindah ke semua; switch_mode dipilih PER PASANGAN:
+	#  - SYNC hanya antar dua state LOOP (locomotion) — fase kaki tetap nyambung
+	#    saat idle/walk/run/sprint/dst. berganti (tak "reset" canggung).
+	#  - IMMEDIATE untuk transisi apa pun yang menyentuh state aksi sekali-jalan
+	#    (attack/attack2/pickup/interact/emote/roll/sit/jump_start/jump_land):
+	#    SYNC di sana akan men-seek animasi baru ke posisi WAKTU animasi lama
+	#    (bisa di tengah/luar durasi klip pendek) -> animasi aksi keliatan
+	#    mulai dari tengah/patah, bukan dari ayunan awal.
+	#  - AT_END sempat dipakai utk transisi manapun MENUJU jump_start/jump_land,
+	#    tapi itu BUG: AT_END menunggu animasi SUMBER selesai dulu — kalau
+	#    sumbernya state LOOP (mis. lari/jatuh), ia "selesai" tiap 1 siklus
+	#    saja -> lompat/mendarat bisa telat hingga ~1 siklus animasi sumber
+	#    sebelum benar2 berpindah (input lag). Ditiadakan; jendela durasi aksi
+	#    sudah diatur lewat _action_until di set_air()/action(), bukan lewat
+	#    switch_mode transisi.
 	# node yang tidak ter-resolve (animasi tak ada) dilewati.
 	var states: Array = resolved.keys()
 	for a in states:
 		if str(resolved.get(a, "")) == "":
 			continue
+		if sm.has_node(a) and not LOOP_STATES.has(a):
+			# transisi-ke-diri-sendiri utk state aksi: re-trigger cepat (mis.
+			# serangan beruntun) restart dari frame 0 (lihat
+			# allow_transition_to_self di setup() + force_restart di travel()).
+			var self_t := AnimationNodeStateMachineTransition.new()
+			self_t.switch_mode = AnimationNodeStateMachineTransition.SWITCH_MODE_IMMEDIATE
+			self_t.xfade_time = 0.05
+			sm.add_transition(a, a, self_t)
 		for b in states:
 			if a == b:
 				continue
@@ -135,19 +164,28 @@ func _sm_setup_transitions(sm: AnimationNodeStateMachine) -> void:
 			if not sm.has_node(a) or not sm.has_node(b):
 				continue
 			var t := AnimationNodeStateMachineTransition.new()
-			t.switch_mode = AnimationNodeStateMachineTransition.SWITCH_MODE_AT_END if b in ["jump_land", "jump_start"] else AnimationNodeStateMachineTransition.SWITCH_MODE_SYNC
+			var both_loop: bool = LOOP_STATES.has(a) and LOOP_STATES.has(b)
+			t.switch_mode = AnimationNodeStateMachineTransition.SWITCH_MODE_SYNC if both_loop else AnimationNodeStateMachineTransition.SWITCH_MODE_IMMEDIATE
 			t.xfade_time = 0.22 if b in ["idle", "walk", "run", "sprint", "swim_move", "swim_idle", "crouch_idle", "crouch_move"] else 0.08
 			sm.add_transition(a, b, t)
 
 func has(state: String) -> bool:
 	return resolved.has(state) and resolved[state] != ""
 
-func travel(state: String) -> void:
+## force_restart: paksa restart walau target == state yang sedang aktif
+## (dipakai action()/jump agar re-trigger cepat tidak diam di frame terakhir —
+## lihat allow_transition_to_self di setup()). Locomotion (set_move/set_swim)
+## TIDAK memakainya: di sana state yang sama dipanggil berkali-kali per detik
+## dan MEMANG harus diam (restart tiap frame = animasi keliatan macet).
+func travel(state: String, force_restart := false) -> void:
 	if not has(state):
 		state = "idle"
-	if playback and current != state:
-		playback.travel(state)
-		current = state
+	if not playback:
+		return
+	if current == state and not force_restart:
+		return
+	playback.travel(state)
+	current = state
 
 ## Input gerak: speed01 (0..1), sprint, crouch.
 func set_move(speed01: float, sprint: bool, crouch: bool) -> void:
@@ -182,7 +220,11 @@ func set_air(state: String) -> void:
 	if state == "jump_land":
 		_air = false
 	_action_until = Time.get_ticks_msec() + 350.0
-	travel(state)
+	# jump_fall dipanggil ULANG TIAP FRAME selama jatuh (state loop) ->
+	# force_restart HARUS false di situ, atau animasi jatuh restart tiap
+	# frame (kelihatan macet di frame 0). jump_start/jump_land aksi
+	# sekali-jalan -> aman & perlu di-force restart.
+	travel(state, state != "jump_fall")
 
 func set_swim(swimming: bool, speed01: float) -> void:
 	if swimming != _swimming:
@@ -193,11 +235,14 @@ func set_swim(swimming: bool, speed01: float) -> void:
 	if _swimming:
 		travel("swim_move" if speed01 > 0.15 else "swim_idle")
 
-## Aksi sekali jalan: "pickup" | "interact" | "emote" | "attack" | "jump_land"
+## Aksi sekali jalan: "pickup" | "interact" | "emote" | "attack" | "attack2" |
+## "roll" | "jump_land" | "sit". Selalu force_restart supaya re-trigger cepat
+## (mis. serangan beruntun / dash berulang) restart dari awal, bukan diam di
+## frame terakhir (lihat allow_transition_to_self di setup()).
 func action(state: String, duration_ms := 900) -> void:
 	if not has(state):
 		return
-	travel(state)
+	travel(state, true)
 	_action_until = Time.get_ticks_msec() + duration_ms
 
 func set_scale_speed(state: String, scale: float) -> void:
