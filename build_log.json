@@ -3,7 +3,7 @@
   "pack": "core_scripts",
   "version": "1.0.10",
   "returncode": 0,
-  "duration_s": 3.6,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -19,7 +19,7 @@
  },
  {
   "pack": "world_terrain",
-  "version": "1.0.27",
+  "version": "1.0.28",
   "returncode": 0,
   "duration_s": 3.6,
   "messages": [
@@ -37,7 +37,7 @@
  },
  {
   "pack": "character_player",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "returncode": 0,
   "duration_s": 3.6,
   "messages": [
@@ -52,7 +52,7 @@
  },
  {
   "pack": "ui",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "returncode": 0,
   "duration_s": 3.6,
   "messages": [
