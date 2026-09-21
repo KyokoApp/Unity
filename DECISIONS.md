@@ -526,3 +526,18 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   core/ui/audio dipertahankan penuh (generate_async, find_spawn_point,
   set_joy/press_*, time_of_day, height_at=0). APK tak disentuh.
 - pause_menu: daftar skin = ["wizard"] (GLB lama tak lagi ditawarkan).
+
+## Ronde-29 — INSIDEN 06496a4: konten live tersapu rsync (kick-44) (2026-09-21)
+
+- Kick-43: langkah build_packs GAGAL SUNYI (tanpa `set -e`, rc tertelan pipe
+  `| tail -8`) → publish tetap berjalan → `rsync -a --delete` dari workspace
+  kosong menghapus SEMUA pck di branch content + manifest STALE ter-commit
+  (ukuran 0/sha kosong, versi antik 1.0.12 dsb).
+- TINDAKAN: content DI-PULIHKAN SEKETIKA via force-push ke a0aa355 (kondisi
+  1.0.29 — versi & sha IDENTIK dengan yang ada di HP ⇒ launcher tak men-download
+  apa-apa; pengguna tidak merasakan apa pun). Biang run tidak dapat dibaca
+  dari sandbox (log Azure diblok) — observabilitas diperkuat:
+  (1) build step kini `exit 1` kalau build_packs gagal + isinya masuk
+  ANOTASI run (::error, terbaca lewat API walau log mentah terblok);
+  (2) build step MENOLAK bila pck terbangun <5; (3) publish step = gembok
+  terakhir yang sama. rsync --delete tak akan pernah lagi menyapu live.

@@ -107,7 +107,21 @@ jobs:
       - name: Bangun pack + manifest (delta sanity)
         run: |
           echo "::notice::checkout versions.json: $(head -c 90 server/versions.json | tr '\n' ' ')"
-          python3 tools/build_packs.py --godot ./godot | tail -8
+          # kick-44: DULU tanpa set -e — build_packs exit!=0 tertelan pipe, publish
+          # tetap jalan → rsync --delete menghapus SEMUA pck live (insiden 06496a4).
+          # Kini: gagal keras + isinya masuk anotasi (karena log run sulit diunduh).
+          if ! python3 tools/build_packs.py --godot ./godot > /tmp/packs.log 2>&1; then
+            echo "::error file=tools/build_packs.py,title=BUILD PACK GAGAL::$(tail -c 1500 /tmp/packs.log | tr '\n' '|')"
+            tail -25 /tmp/packs.log
+            exit 1
+          fi
+          tail -10 /tmp/packs.log
+          PCKS=$(ls server/packs/*.pck 2>/dev/null | wc -l)
+          echo "::notice::jumlah pck terbangun: $PCKS"
+          if [ "$PCKS" -lt 5 ]; then
+            echo "::error title=PCK KURANG::hanya $PCKS pck terbangun — menolak publish agar rsync tidak menyapu live (insiden 06496a4)"
+            exit 1
+          fi
           echo "::notice::manifest hasil: $(python3 -c 'import json; m=json.load(open("server/manifest.json")); print(m["game_version"]); print({k: v["version"] for k, v in list(m["packs"].items())[:3]})')"
 
       - name: Publikasikan server konten -> branch "content" (raw)
@@ -115,6 +129,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          # GEMBOK TERAKHIR (insiden 06496a4): jangan pernah rsync kalau pck tidak ada
+          PCKS=$(ls "$GITHUB_WORKSPACE/server/packs/"*.pck 2>/dev/null | wc -l)
+          if [ "$PCKS" -lt 5 ]; then
+            echo "::error title=PUBLIKASI DITOLAK::hanya $PCKS pck di workspace — live dijaga tetap utuh"
+            exit 1
+          fi
           DEST=/tmp/ct
           if ! git clone --depth 1 --branch content               https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY.git $DEST 2>/dev/null; then
             git clone --depth 1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY.git $DEST
@@ -277,3 +297,4 @@ jobs:
 # rerun-kick 41 (DARURAT rollback player+ui ke isi kick-38 yg terbukti jalan; failsafe get_script()==null di game_root)
 # rerun-kick 42 (kosmetik: ground_color langit per fase — basmi langit marun saat senja di bawah cakrawala)
 # rerun-kick 43 (CICILAN1 genre baru: dunia datar tak berbatas + penyihir prosedural top-down — hapus semua karakter/world GLB; orb sihir proyektil)
+# rerun-kick 44 (guard anti-rsync-wipe: set-e+annot di build, gembok jumlah pck di publish; jalankan ulang cicilan1 pasca insiden 06496a4)
