@@ -365,3 +365,14 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
 - Default `char_skin` = "mannequin" di settings + player + pause menu
   (pilihan kini triple: Mannequin/PolyGirl/Knight — dua skin lama tetap tersedia).
 - CREDITS: entri Quaternius CC0 + License.txt asli tetap di repo.
+
+## Ronde-20 — T-pose mannequin (resolver nama animasi) 2026-09-21
+
+- Gejala: skin mannequin muncul tapi T-pose abadi → animasi resolved kosong atau
+  tersingkir. Teori duga kuat: di ekspor, animasi GLB tampil dengan prefix library
+  ("LIB/Idle_Loop") sehingga candidate exact-name luput — resolver stok lama hanya
+  melakukan `names.has(cand)`.
+- Solusi: resolver 3-tahap di AnimController (exact → basename strip-prefix →
+  lower-substring) + fallback akhir "yang ada kata idle" (TAK PERNAH T-pose) +
+  print resolusi ke konsol + trace on-device menunjukkan state yang gagal-resolve.
+- Dble cepatnya: tak perlu import-settings apapun di editor.

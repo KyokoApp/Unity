@@ -38,21 +38,50 @@ var _move_state := "idle"
 var _air := false
 var _swimming := false
 
+## Resolver nama anim TAHAP 3 (tahan prefix library dari GLB impor):
+##  1) exact   — "Idle_Loop"
+##  2) basename — "UAL1_Standard/Idle_Loop" (library ber-prefix dari export GLB mannequin)
+##  3) lowercase-substring — "idle_loop" / "idle-loop"…
+## Mengembalikan nama LENGKAP seperti yang diminta get_animation()/travel, atau bila benar-benar tak ada.
+func _resolve_name(names: PackedStringArray, cands: Array) -> String:
+	for cand in cands:
+		if names.has(cand):
+			return cand
+	for cand in cands:
+		for n in names:
+			var base: String = str(n).get_file()  # strip "LIB/…"
+			if base == cand:
+				return str(n)
+	for cand in cands:
+		for n in names:
+			var base2: String = str(n).get_file().to_lower()
+			if base2 == str(cand).to_lower():
+				return str(n)
+	for cand in cands:
+		for n in names:
+			if str(n).to_lower().contains(str(cand).to_lower()):
+				return str(n)
+	# fallback akhir: utamakan yang ada kata "idle" supaya minimal TAK T-pose
+	for n in names:
+		if "idle" in str(n).to_lower():
+			return str(n)
+	return ""
+
 func setup(node: Node3D, skin_root: Node, custom_states: Dictionary = {}) -> bool:
 	anim_player = _find_anim_player(skin_root)
 	if anim_player == null:
 		push_error("[anim] AnimationPlayer tidak ditemukan di skin")
 		return false
 	var names := anim_player.get_animation_list()
+	var unresolved := []
 	for st in STATES:
 		var cands: Array = custom_states.get(st, STATES[st])
-		for cand in cands:
-			if names.has(cand):
-				resolved[st] = cand
-				break
-		if not resolved.has(st) and not st in ["attack", "emote", "sit", "crouch_idle"]:
-			# fallback generik supaya tidak ada state kosong
-			resolved[st] = names[0] if names.size() > 0 else ""
+		var found := _resolve_name(names, cands)
+		if found == "":
+			unresolved.append(st)
+		else:
+			resolved[st] = found
+	print("[anim] resolusi: ", JSON.stringify(resolved))
 	# WAJIB: animasi GLB impor tidak loop secara bawaan — tanpa ini, walk
 	# berhenti di frame terakhir setelah ~1 siklus ("beberapa langkah lalu kaku").
 	for st in resolved:

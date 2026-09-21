@@ -187,7 +187,15 @@ func _load_skin() -> void:
 	var rootc = get_tree().current_scene
 	if rootc and rootc.has_method("_trace"):
 		if anim:
-			rootc.call("_trace", "boot: anim = OK (%d state teresolusi) skin=%s" % [anim.resolved.size(), char_skin])
+			var total_st: int = AnimControllerScript.STATES.size()
+			var ok_st: int = anim.resolved.size()
+			rootc.call("_trace", "boot: anim = %d/%d state ✔ skin=%s" % [ok_st, total_st, char_skin])
+			if ok_st < total_st:
+				var miss := []
+				for st in AnimControllerScript.STATES:
+					if not anim.resolved.has(st):
+						miss.append(st)
+				rootc.call("_trace", "boot: ⚠ anim tak terselesaikan: %s" % [", ".join(miss)])
 		else:
 			rootc.call("_trace", "boot: ⚠ anim = NULL — AnimationPlayer tidak ketemu di skin")
 
