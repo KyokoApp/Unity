@@ -503,3 +503,26 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
 - Fix jalan-jongkok (`_near_floor`/anim_debug ronde-24) tetap DITAHAN sengaja:
   penyebab kemacetan kick-39/40 belum direproduksi secara lokal; jangan
   judi dgn HP user dua kali.
+
+## Ronde-28 — CICILAN #1 GENRE BARU: dunia datar tanpa batas + penyihir top-down (kick-43) (2026-09-21)
+
+- User: "map tanpa batas datar, karakter penyihir (JANGAN knight), kamera
+  top-down lihat dari atas, tanah hijau campur (coklat — kata ke-2 lupa,
+  ditebak)". Dunia/karakter lama DIHAPUS: gravity_falls.glb, knight/polygirl/
+  ual_mannequin.glb + tekstur knight (pack player menyusut 9,7MB → 29KB).
+- WORLD BARU (world_terrain): bidang datar TAK BERUJUNG — collider tunggal
+  WorldBoundaryShape3D y=0 (POLA SEDERHANA ⇒ is_on_floor() engine permanen
+  benar; bug jongkok/jump-fall mati di akarnya, tak perlu _near_floor lagi),
+  visual PlaneMesh 1600m mengikuti pemain, pola tanah UV ruang-dunia (mulus),
+  langit + siang-malam + sky ground_color per-fase dipertahankan utuh.
+- Tanah shader toon prosedural: hijau rumput bercampur tambalan coklat tanah
+  (value-noise 2 oktaf) + bintik gelap — sesuai tebakan "hijau dan coklat".
+- PEMAIN BARU (character_player): "wizard" 100% prosedural dari primitif
+  (jubah kerucut ungu, sabuk emas, topi runcing + bintang, tongkat + orb
+  pijar cyan). anim = null sengaja; gerak dari kode: bob melayang, condong
+  saat lari, putar riang saat EMOTE, orb berdenyut. SERANG = orb sihir
+  proyektil emisi (belum mengenai apa-apa — cicilan berikut: musuh/latihan).
+- Kamera: top-down 52° jarak 11m (geser tetap bisa memutar). Kontrak API ke
+  core/ui/audio dipertahankan penuh (generate_async, find_spawn_point,
+  set_joy/press_*, time_of_day, height_at=0). APK tak disentuh.
+- pause_menu: daftar skin = ["wizard"] (GLB lama tak lagi ditawarkan).

@@ -175,7 +175,7 @@ func _build_settings() -> void:
 		opt_skin.add_item(n)
 	opt_skin.custom_minimum_size = Vector2(0, 56)
 	opt_skin.add_theme_font_size_override("font_size", 24)
-	var _skin_ids := ["mannequin", "polygirl", "knight"]
+	var _skin_ids := ["wizard"]   # penyihir prosedural (skin GLB lama sudah dihapus)
 	var cur := -1
 	for i in range(_skin_ids.size()):
 		if _settings and str(_settings.char_skin) == _skin_ids[i]:

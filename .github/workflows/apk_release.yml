@@ -276,3 +276,4 @@ jobs:
 # rerun-kick 40 (fix: paksa ui 1.0.10 — pck 1.0.9 yg tersebar konten LAMA; folder_hash deterministik antar-mesin)
 # rerun-kick 41 (DARURAT rollback player+ui ke isi kick-38 yg terbukti jalan; failsafe get_script()==null di game_root)
 # rerun-kick 42 (kosmetik: ground_color langit per fase — basmi langit marun saat senja di bawah cakrawala)
+# rerun-kick 43 (CICILAN1 genre baru: dunia datar tak berbatas + penyihir prosedural top-down — hapus semua karakter/world GLB; orb sihir proyektil)
