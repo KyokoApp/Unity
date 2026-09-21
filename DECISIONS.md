@@ -541,3 +541,21 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   ANOTASI run (::error, terbaca lewat API walau log mentah terblok);
   (2) build step MENOLAK bila pck terbangun <5; (3) publish step = gembok
   terakhir yang sama. rsync --delete tak akan pernah lagi menyapu live.
+
+## Ronde-30 — umpan balik user: karakter beneran beranimasi jalan + tanah polos (kick-46) (2026-09-21)
+
+- User: "pake karakter asset penyihir terserah apa yang penting beranimasi
+  jalan, tanah jangan kotak-kotak, polos aja". Diwujudkan MURNI dari aset
+  yang SUDAH legal di repo:
+  (1) ual_mannequin.glb (Quaternius CC0, 43 animasi) DIKEMBALIKAN dari
+  riwayat 1fc3c12 + AKSESORI penyihir procedural dipasang di atasnya
+  (topi runcing+bintang, tongkat+orb pijar) — jadi "mannequin penyihir":
+  jalan/lari/jongkok/lompat/roll/dance beranimasi betulan.
+  (2) Bila GLB gagal dimuat: fallback penyihir primitif (cicilan #1) — tak
+  akan ada lagi karakter hilang.
+  (3) Serang GLB memainkan Punch TETAP menembakkan orb sihir; emote
+  menari Dance_Loop; _anim_probe warisan kembali aktif (anim!=null).
+- Tanah: shader noise/bintik DIHAPUS TOTAL — satu warna polos rata
+  (hijau rumput 0.42,0.70,0.36) memenuhi "polos aja warnanya".
+- Pelajaran berturut: sinkron versions.json SELALU via /tmp + validasi
+  JSON sebelum menimpa (redirect gagal tak pernah memotong file lagi).
