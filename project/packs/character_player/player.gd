@@ -31,7 +31,9 @@ const SKINS := {
 			"pickup": ["PickUp_Table", "Interact"],
 			"interact": ["Interact"],
 			"emote": ["Dance_Loop"],
-			"attack": ["Punch_Jab", "Punch_Cross"],
+			"attack": ["Punch_Jab"],
+			"attack2": ["Punch_Cross"],
+			"roll": ["Roll"],
 			"sit": ["Sitting_Idle_Loop"],
 		},
 	},
@@ -118,6 +120,7 @@ var _near_timer := 0.0
 var stats := {"flower": 0, "coconut": 0}
 var head_offset_y := 0.0      # untuk efek visual renang
 var _action_lock := 0.0
+var _attack_alt := false      # selang-seling attack/attack2 (pakai 2 animasi pukulan, bukan 1 terus)
 
 func set_world(w: Node) -> void:
 	world = w
@@ -295,8 +298,11 @@ func press_dash() -> void:
 		dir = Basis(Vector3.UP, yaw) * Vector3(0, 0, -1)
 	velocity.x = dir.x * DASH_IMPULSE
 	velocity.z = dir.z * DASH_IMPULSE
-	if anim and anim.has("sprint"):
-		anim.action("sprint", 320)
+	if anim:
+		if anim.has("roll"):
+			anim.action("roll", 320)
+		elif anim.has("sprint"):
+			anim.action("sprint", 320)
 
 func press_crouch(down: bool) -> void:
 	crouch = down
@@ -319,7 +325,9 @@ func press_emote() -> void:
 
 func press_attack() -> void:
 	if anim and _action_lock <= 0.0:
-		anim.action("attack", 600)
+		var st := "attack2" if (_attack_alt and anim.has("attack2")) else "attack"
+		_attack_alt = not _attack_alt
+		anim.action(st, 600)
 		_action_lock = 0.5
 
 func _apply_crouch_shape() -> void:
