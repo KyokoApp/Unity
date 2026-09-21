@@ -3,7 +3,7 @@
   "pack": "core_scripts",
   "version": "1.0.11",
   "returncode": 0,
-  "duration_s": 3.0,
+  "duration_s": 3.6,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -12,16 +12,16 @@
   "pack": "shaders_materials",
   "version": "1.0.9",
   "returncode": 0,
-  "duration_s": 3.0,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
  },
  {
   "pack": "world_terrain",
-  "version": "1.0.31",
+  "version": "1.0.32",
   "returncode": 0,
-  "duration_s": 3.0,
+  "duration_s": 3.6,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -30,16 +30,16 @@
   "pack": "animations",
   "version": "1.0.7",
   "returncode": 0,
-  "duration_s": 3.0,
+  "duration_s": 3.6,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
  },
  {
   "pack": "character_player",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "returncode": 0,
-  "duration_s": 3.0,
+  "duration_s": 3.6,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -48,7 +48,7 @@
   "pack": "ui",
   "version": "1.0.12",
   "returncode": 0,
-  "duration_s": 3.0,
+  "duration_s": 3.6,
   "messages": [
    "SCRIPT ERROR: Parse Error: Cannot infer the type of \"id\" variable because the value doesn't have a set type.",
    "          at: GDScript::reload (res://packs/ui/pause_menu.gd:186)",
@@ -61,7 +61,7 @@
   "pack": "audio_sfx",
   "version": "1.0.1",
   "returncode": 0,
-  "duration_s": 3.0,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -70,7 +70,7 @@
   "pack": "audio_music",
   "version": "1.0.1",
   "returncode": 0,
-  "duration_s": 3.0,
+  "duration_s": 3.6,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
