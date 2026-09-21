@@ -13,6 +13,7 @@ class RpgButton:
 	var radius := 44.0
 	var active := false
 	var _down := false
+	var _tidx := -1
 	var _label: Label
 
 	func _init(ic: String, r: float, emj := "") -> void:
@@ -37,23 +38,43 @@ class RpgButton:
 		active = a
 		queue_redraw()
 
+	## Kasus nyangkut-hold (crouch jongkok abadi): bila jari bergeser keluar
+	## bounds lalu diangkat, release tidak pernah sampai ke _gui_input →
+	## "released" hilang. Tangani dengan pelacakan INDEX sentuhan + _input global.
+	func _press(idx: int) -> void:
+		if _down:
+			return
+		_down = true
+		_tidx = idx
+		queue_redraw()
+		pressed.emit()
+
+	func _release(idx: int) -> void:
+		if not _down or idx != _tidx:
+			return
+		_down = false
+		_tidx = -1
+		queue_redraw()
+		released.emit()
+
 	func _gui_input(e: InputEvent) -> void:
 		if e is InputEventScreenTouch:
 			if e.pressed:
-				_down = true
-				pressed.emit()
-			elif _down:
-				_down = false
-				released.emit()
-			queue_redraw()
+				_press(e.index)
+			else:
+				_release(e.index)
 		elif e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 			if e.pressed:
-				_down = true
-				pressed.emit()
-			elif _down:
-				_down = false
-				released.emit()
-			queue_redraw()
+				_press(0)
+			else:
+				_release(0)
+
+	func _input(e: InputEvent) -> void:
+		# jaring pengaman: release di LUAR bounds (drag off) tangkap di sini.
+		if e is InputEventScreenTouch and not e.pressed:
+			_release(e.index)
+		elif e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and not e.pressed:
+			_release(0)
 
 	func _draw() -> void:
 		var c := Vector2(radius, radius)
@@ -99,6 +120,29 @@ class RpgButton:
 			"pause":
 				draw_line(c + Vector2(-0.2, -0.42) * r, c + Vector2(-0.2, 0.42) * r, w, 7.0, true)
 				draw_line(c + Vector2(0.2, -0.42) * r, c + Vector2(0.2, 0.42) * r, w, 7.0, true)
+			"bolt":  # sprint (petir) — ganti glyph "»" yang pecah di HP
+				draw_line(c + Vector2(0.18, -0.55) * r, c + Vector2(-0.24, 0.02) * r, w, 4.5, true)
+				draw_line(c + Vector2(-0.24, 0.02) * r, c + Vector2(0.12, 0.02) * r, w, 4.5, true)
+				draw_line(c + Vector2(0.12, 0.02) * r, c + Vector2(-0.18, 0.55) * r, w, 4.5, true)
+			"crouch":  # chevron ganda turun + kepala
+				draw_line(c + Vector2(-0.32, -0.08) * r, c + Vector2(0, 0.18) * r, w, 4.5, true)
+				draw_line(c + Vector2(0, 0.18) * r, c + Vector2(0.32, -0.08) * r, w, 4.5, true)
+				draw_line(c + Vector2(-0.32, 0.18) * r, c + Vector2(0, 0.44) * r, w, 4.5, true)
+				draw_line(c + Vector2(0, 0.44) * r, c + Vector2(0.32, 0.18) * r, w, 4.5, true)
+				draw_arc(c + Vector2(0, -0.34) * r, r * 0.13, 0.0, TAU, 16, w, 3.0, true)
+			"smile":  # emote: dua mata + lengkung senyum
+				draw_arc(c, r * 0.48, 0.55, PI - 0.55, 18, w, 4.0, true)
+				draw_arc(c + Vector2(-0.2, -0.18) * r, r * 0.055, 0.0, TAU, 10, w, 4.0, true)
+				draw_arc(c + Vector2(0.2, -0.18) * r, r * 0.055, 0.0, TAU, 10, w, 4.0, true)
+				draw_line(c + Vector2(-0.28, -0.3) * r, c + Vector2(-0.2, -0.25) * r, w, 3.5, true)
+				draw_line(c + Vector2(0.28, -0.3) * r, c + Vector2(0.2, -0.25) * r, w, 3.5, true)
+			"hand":  # aksi/interaksi: panah masuk ke bawah ke telapak
+				draw_arc(c + Vector2(0, 0.2) * r, r * 0.16, 0.0, TAU, 14, w, 3.5, true)
+				draw_line(c + Vector2(0, 0.2) * r, c + Vector2(-0.2, 0.38) * r, w, 3.5, true)
+				draw_line(c + Vector2(0, 0.2) * r, c + Vector2(0.2, 0.38) * r, w, 3.5, true)
+				draw_line(c + Vector2(0, -0.5) * r, c + Vector2(0, -0.12) * r, w, 4.5, true)
+				draw_line(c + Vector2(-0.16, -0.28) * r, c + Vector2(0, -0.12) * r, w, 4.5, true)
+				draw_line(c + Vector2(0.16, -0.28) * r, c + Vector2(0, -0.12) * r, w, 4.5, true)
 
 var player: Node
 var root_node: Node
@@ -232,7 +276,7 @@ func _build_layout() -> void:
 	joy_base = Panel.new()
 	joy_base.name = "JoyBase"
 	joy_base.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	joy_base.add_theme_stylebox_override("panel", _make_panel_col(Color(0.0, 0.0, 0.0, 0.25), 100))
+	joy_base.add_theme_stylebox_override("panel", _make_panel_col(Color(0.0, 0.0, 0.0, 0.16), int(JOY_RADIUS)))
 	joy_base.custom_minimum_size = Vector2(JOY_RADIUS * 2, JOY_RADIUS * 2)
 	joy_base.size = Vector2(JOY_RADIUS * 2, JOY_RADIUS * 2)
 	joy_base.position = Vector2(ml + 10, vsz.y - mb - JOY_RADIUS * 2 - 16)
@@ -240,7 +284,7 @@ func _build_layout() -> void:
 	root.add_child(joy_base)
 	joy_knob = Panel.new()
 	joy_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	joy_knob.add_theme_stylebox_override("panel", _make_panel_col(Color(1.0, 1.0, 1.0, 0.50), 50))
+	joy_knob.add_theme_stylebox_override("panel", _make_panel_col(Color(1.0, 1.0, 1.0, 0.44), 48))
 	joy_knob.custom_minimum_size = Vector2(96, 96)
 	joy_knob.size = Vector2(96, 96)
 	joy_knob.position = Vector2(JOY_RADIUS - 48, JOY_RADIUS - 48)
@@ -248,17 +292,17 @@ func _build_layout() -> void:
 
 	# --- tombol aksi bulat gaya RPG (klaster kanan ala referensi) ---
 	# attack besar kanan-tengah-bawah; dash di bawah-kanannya; lompat pojok kanan bawah
-	var att_c := Vector2(vsz.x - mr - 148, vsz.y - mb - 230)
-	_add_rpg(root, "BtnAtk", "sword", 60.0, att_c - Vector2(60.0, 60.0))
-	_add_rpg(root, "BtnDash", "dash", 40.0, att_c + Vector2(86.0, 100.0) - Vector2(40.0, 40.0))
-	_add_rpg(root, "BtnJump", "jump", 46.0, Vector2(vsz.x - mr - 96.0, vsz.y - mb - 96.0) - Vector2(46.0, 46.0))
-	_add_rpg(root, "BtnAction", "", 36.0, att_c + Vector2(-112.0, -8.0) - Vector2(36.0, 36.0), "✋")
-	_add_rpg(root, "BtnSprint", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.34), "»")
-	_add_rpg(root, "BtnCrouch", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.34 + 72.0), "▼")
-	_add_rpg(root, "BtnEmote", "", 30.0, Vector2(vsz.x - mr - 60, vsz.y * 0.34 + 144.0), "🙂")
+	var att_c := Vector2(vsz.x - mr - 156.0, vsz.y - mb - 234.0)
+	_add_rpg(root, "BtnAtk", "sword", 58.0, att_c - Vector2(58.0, 58.0))
+	_add_rpg(root, "BtnDash", "dash", 40.0, att_c + Vector2(96.0, 116.0) - Vector2(40.0, 40.0))
+	_add_rpg(root, "BtnJump", "jump", 50.0, Vector2(vsz.x - mr - 100.0, vsz.y - mb - 100.0) - Vector2(50.0, 50.0))
+	_add_rpg(root, "BtnAction", "hand", 36.0, att_c + Vector2(-132.0, -70.0) - Vector2(36.0, 36.0))
+	_add_rpg(root, "BtnCrouch", "crouch", 32.0, att_c + Vector2(-132.0, 2.0) - Vector2(32.0, 32.0))
+	_add_rpg(root, "BtnSprint", "bolt", 32.0, att_c + Vector2(-44.0, -118.0) - Vector2(32.0, 32.0))
+	_add_rpg(root, "BtnEmote", "smile", 27.0, Vector2(vsz.x - mr - 54.0, mt + 96.0))
 	_connect_rpg("BtnJump", Callable(self, "_on_jump"), false)
 	_connect_rpg("BtnSprint", Callable(self, "_on_sprint"), true)
-	_connect_rpg("BtnCrouch", Callable(self, "_on_crouch"), true)
+	_connect_rpg("BtnCrouch", Callable(self, "_on_crouch_toggle"), false)
 	_connect_rpg("BtnAction", Callable(self, "_on_action"), false)
 	_connect_rpg("BtnAtk", Callable(self, "_on_attack"), false)
 	_connect_rpg("BtnDash", Callable(self, "_on_dash"), false)
@@ -355,10 +399,16 @@ func _on_sprint(down: bool) -> void:
 		player.press_sprint(down)
 	_buttons["BtnSprint"].set_active(down)
 
-func _on_crouch(down: bool) -> void:
-	if player:
-		player.press_crouch(down)
-	_buttons["BtnCrouch"].set_active(down)
+## Crouch jadi TOGGLE TAP (bukan tahan): hold yang bergeser-jari dulu menyebabkan
+## releasenya tersesat → crouch nyangkut dan walk/run tak pernah dimainkan.
+## Status visual tombol mengikuti flag player.crouch yang sebenarnya.
+func _on_crouch_toggle(down: bool) -> void:
+	if not down:
+		return
+	if player and player.has_method("press_crouch_toggle"):
+		player.press_crouch_toggle()
+		if _buttons.has("BtnCrouch"):
+			_buttons["BtnCrouch"].set_active(bool(player.get("crouch")))
 
 func _on_action(down: bool) -> void:
 	if down and player:

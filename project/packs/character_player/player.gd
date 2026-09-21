@@ -308,6 +308,12 @@ func press_crouch(down: bool) -> void:
 	crouch = down
 	_apply_crouch_shape()
 
+## Toggle dari tombol HUD (satu ketuk = ubah stwsan). Versi hold dulu bisa
+## nyangkut apabila jari bergeser sebelum diangkat (release tersesat).
+func press_crouch_toggle() -> void:
+	crouch = not crouch
+	_apply_crouch_shape()
+
 func press_interact() -> void:
 	if _near and _action_lock <= 0.0:
 		_do_interact(_near)

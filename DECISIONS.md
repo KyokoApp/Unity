@@ -387,3 +387,17 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   "attack" karena tak ada perjalanan balik menuju move-state).
 - Solusi: set_move() mengandalkan fakta bahwa player.gd hanya memanggilnya saat
   grounded — ia mereset _air/_swimming di awal. Ketahanan devikit bertambah.
+
+## Ronde-22 — crouch nyangkut (jalan jongkok) + ikon HUD digambar (2026-09-21)
+
+- Akar "jalan jongkok / tak ada walk-run": tombol Crouch = HOLD; bila jari
+  bergeser lalu diangkat di luar bounds, `released` tersesat → crouch=true
+  permanen → set_move selalu crouch. Kini: Crouch = TOGGLE TAP; status visual
+  mengikuti player.crouch. PLUS: RpgButton _input global melepas berdasarkan
+  INDEX sentuhan → release tak pernah hilang lagi untuk semua tombol hold
+  (sprint mis.).
+- Ikon: emoji/glyph (✋ » ▼ 🙂 pecah jelek di HP) diganti ikon canvas digambar
+  tangan: bolt (sprint), chevron-kepala (crouch), smile (emote), arrow-down-to-
+  palm (aksi). Layout disusun ulang mengacu referensi: attack besar kanan-bawah
+  tengah, dash bawah-kanannya, lompat pojok kanan bawah, kolom kecil di kirinya.
+- Joystick: panel dasar kini LINGKARAN penuh (radius JOY_RADIUS), alfa dipudupkan.
