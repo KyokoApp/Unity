@@ -25,12 +25,12 @@
    "version": "1.0.7"
   },
   "character_player": {
-   "content_hash": "b4e19bc0b1c51fba35f6ad3ca59da7899f51b9a09c4bca781d18e4a3f072d945",
-   "version": "1.0.10"
+   "content_hash": "d19c3a62c380c4599636966d964b85ab02436758643d25f2d09e30064f644bab",
+   "version": "1.0.12"
   },
   "ui": {
-   "content_hash": "652c9557505c90c2ed19d223910cedba617e021aa3d82af23ece9cb086424c29",
-   "version": "1.0.8"
+   "content_hash": "927b6062415154890749675abfac645e564532e17459bcf5293b1cdbb5f845a7",
+   "version": "1.0.9"
   },
   "audio_sfx": {
    "content_hash": "d43e8a08337984778388db77c8084ac7dadda641018bcfde5a2e3ec10ed29c91",

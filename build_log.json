@@ -37,7 +37,7 @@
  },
  {
   "pack": "character_player",
-  "version": "1.0.10",
+  "version": "1.0.12",
   "returncode": 0,
   "duration_s": 2.5,
   "messages": [
@@ -46,9 +46,9 @@
  },
  {
   "pack": "ui",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "returncode": 0,
-  "duration_s": 2.5,
+  "duration_s": 2.7,
   "messages": [
    "SCRIPT ERROR: Parse Error: Cannot infer the type of \"id\" variable because the value doesn't have a set type.",
    "          at: GDScript::reload (res://packs/ui/pause_menu.gd:186)",
