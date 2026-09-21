@@ -21,12 +21,12 @@
    "version": "1.0.6"
   },
   "animations": {
-   "content_hash": "4d10aeff6eeb2966d97affb5457b5e30a0fb8dd7240bac12b8ea5eaff8f8b028",
-   "version": "1.0.4"
+   "content_hash": "dd5f49e88afe4561033a959737e0088a5cc2039371b02c24b12f3c975e3ef332",
+   "version": "1.0.5"
   },
   "character_player": {
-   "content_hash": "f64c86d8776fc138b824c9cc13b0148a264b04fa2d0c6828666164dcfdd22230",
-   "version": "1.0.9"
+   "content_hash": "2ade55de22816ca28a50625c33caba3638a631349a87e098801f2a088bd024b4",
+   "version": "1.0.10"
   },
   "ui": {
    "content_hash": "652c9557505c90c2ed19d223910cedba617e021aa3d82af23ece9cb086424c29",
