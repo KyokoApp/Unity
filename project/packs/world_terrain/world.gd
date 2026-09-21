@@ -259,11 +259,52 @@ func height_at(x: float, z: float) -> float:
 	return _static_floor_at(x, z)
 
 func find_spawn_point() -> Vector3:
+	# Titik spawn = DI DEPAN RUMAH, bukan di atas atap.
+	# Metode: pindai 8 arah menjauhi pusat ground (0,0); "jalur landai" =
+	# rangkaian titik dengan floor VALID & < 1.8m (atap 5m+ tak lolos);
+	# arah dengan jalur TERPANJANG dianggap jalanan depan rumah; spawn di
+	# ujung awal jamur itu. Celah (gap) tak valid ditoleransi maksimal 2 titik.
+	var dirs := [Vector2(0, 1), Vector2(-0.707, 0.707), Vector2(0.707, 0.707),
+			Vector2(1, 0), Vector2(-1, 0), Vector2(0.707, -0.707),
+			Vector2(-0.707, -0.707), Vector2(0, -1)]
+	var best_dir := Vector2.ZERO
+	var best_start := -1.0
+	var best_run := 0.0
+	for d in dirs:
+		var first_r := -1.0
+		var gap := 0
+		var r := 4.0
+		while r <= 90.0:
+			var fy := _static_floor_at(d.x * r, d.y * r)
+			if fy > -900.0 and fy < 1.8:
+				if first_r < 0.0:
+					first_r = r
+				gap = 0
+			else:
+				if first_r < 0.0:
+					pass  # belum lepas zona atap/dinding — terus menjauh
+				else:
+					gap += 1
+					if gap > 2:
+						break  # jalurnya putus di sini (tebing/asset tinggi)
+			r += 1.5
+		if first_r >= 0.0:
+			var run := r - 1.5 - first_r
+			if run > best_run:
+				best_run = run
+				best_start = first_r
+				best_dir = d
+	if best_dir != Vector2.ZERO and best_run >= 3.0:
+		var s := best_dir * (best_start + 1.5)
+		var fy2 := _static_floor_at(s.x, s.y)
+		if fy2 > -900.0:
+			return Vector3(s.x, fy2 + 0.25, s.y)
+	# jaring 9 kandidat lama — kini dgn FILTER atap juga
 	for cand in [Vector2(0, 0), Vector2(4, 0), Vector2(-4, 0), Vector2(0, 4), Vector2(0, -4),
 			Vector2(8, 8), Vector2(-8, -8), Vector2(8, -8), Vector2(-8, 8)]:
-		var fy := _static_floor_at(cand.x, cand.y)
-		if fy > -999.0:
-			return Vector3(cand.x, fy + 0.25, cand.y)
+		var fy3 := _static_floor_at(cand.x, cand.y)
+		if fy3 > -999.0 and fy3 < 1.8:
+			return Vector3(cand.x, fy3 + 0.25, cand.y)
 	return Vector3(0, 0.3, 0)
 
 # ---------------- API kompatibel (no-op / kosong) ----------------

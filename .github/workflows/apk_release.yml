@@ -271,3 +271,4 @@ jobs:
 # rerun-kick 35 (fix macet walk+attack: reset flag air/swim di set_move)
 # rerun-kick 36 (terbitkan perbaikan anim dari USER: self-transition+force_restart, IMMEDIATE utk aksi, serangan selang-seling, dash=Roll)
 # rerun-kick 37 (fix crouch-nyangkut layout+ikon digambar; release-off-bounds)
+# rerun-kick 38 (spawn depan rumah + probe animasi on-device)

@@ -174,7 +174,9 @@ func _boot_world(progress_cb: Callable) -> void:
 	progress_cb.call(1.0, "Selesai")
 	_boot_ok = true
 	_trace("boot: HUD ✔ — selamat bermain")
-	get_tree().create_timer(3.0).timeout.connect(func():
+	# jejak boot bertahan 20 dtk (dulu 3): probe animasi on-device butuh waktu
+	# sampai user mulai berjalan; setelah itu jalan playa bersihkan diri sendiri
+	get_tree().create_timer(20.0).timeout.connect(func():
 		if is_instance_valid(_trail):
 			_trail.get_parent().queue_free()
 			_trail = null

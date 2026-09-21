@@ -120,7 +120,8 @@ var _near_timer := 0.0
 var stats := {"flower": 0, "coconut": 0}
 var head_offset_y := 0.0      # untuk efek visual renang
 var _action_lock := 0.0
-var _attack_alt := false      # selang-seling attack/attack2 (pakai 2 animasi pukulan, bukan 1 terus)
+var _attack_alt := false
+var _anim_probe := 0.0        # timer jejak anim on-device (diagnostik)      # selang-seling attack/attack2 (pakai 2 animasi pukulan, bukan 1 terus)
 
 func set_world(w: Node) -> void:
 	world = w
@@ -482,6 +483,15 @@ func _update_model(delta: float, move_dir: Vector3, speed: float) -> void:
 		model_pivot.rotation.y = lerp_angle(model_pivot.rotation.y, target_yaw, delta * 10.0)
 	var hspeed := Vector2(velocity.x, velocity.z).length()
 	if anim:
+		# jejak diagnostik ON-DEVICE (foto saat keluhannya muncul):
+		# menunjukkan state ANIMASI YANG BENAR-BENAR BERMAIN tiap 0,9 detik
+		_anim_probe -= delta
+		if _anim_probe <= 0.0:
+			_anim_probe = 0.9
+			var rc2 = get_tree().current_scene
+			if rc2 and rc2.has_method("_trace"):
+				rc2.call("_trace", "anim:%s sp:%.1f crouch:%s | %s" % [
+					str(anim.current), hspeed, str(crouch), char_skin])
 		if _swimming:
 			anim.set_swim(true, hspeed / SPEED_SWIM)
 		elif not _swimming and not is_on_floor() and velocity.y < -2.5:

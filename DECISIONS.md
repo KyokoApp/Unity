@@ -401,3 +401,13 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   palm (aksi). Layout disusun ulang mengacu referensi: attack besar kanan-bawah
   tengah, dash bawah-kanannya, lompat pojok kanan bawah, kolom kecil di kirinya.
 - Joystick: panel dasar kini LINGKARAN penuh (radius JOY_RADIUS), alfa dipudupkan.
+
+## Ronde-23 — spawn depan rumah + jejak animasi on-device (2026-09-21)
+
+- Spawn baru: pindai 8 arah dari pusat ground, tolak titik floor ≥1.8m (atap);
+  arah dgn jalur landai terpanjang = depan rumah. Fallback: kandidat lama tapi
+  kini juga lolos filter atap. Untuk "dong di atas" dari atap-atap-an.
+- Jejak diagnostik "anim:%s sp:%.1f crouch:%s skin:%s" tiap 0,9 dtk (teks kuning
+  kiri bawah; trail boot kini hidup 20 detik) — foto dua detik setelah berjalan
+  membuktikan state mana yg benar-benar bermain dalam kasus "jalan jongkok".
+- Selanjutnya mengandalkan bukti foto itu (bukan tebakan).
