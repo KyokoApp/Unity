@@ -1,6 +1,6 @@
 {
- "game_version": "1.0.32",
- "generated_at": "2026-09-21T21:42:25Z",
+ "game_version": "1.0.33",
+ "generated_at": "2026-09-21T22:00:06Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -27,10 +27,10 @@
    "deps": []
   },
   "world_terrain": {
-   "version": "1.0.32",
-   "size": 319772,
-   "sha256": "58fe2ad3a98ff5a9c549c91dc7ddd6abceb600ea1e86843f5d06e1e178444ebb",
-   "url": "packs/world_terrain-1.0.32.pck",
+   "version": "1.0.33",
+   "size": 320204,
+   "sha256": "1dd0952bb138a602e1061275f4eacccba671b83d2e42ce0c7ae8acd38adaa638",
+   "url": "packs/world_terrain-1.0.33.pck",
    "deps": [
     "shaders_materials"
    ]
@@ -43,10 +43,10 @@
    "deps": []
   },
   "character_player": {
-   "version": "1.0.19",
-   "size": 329740,
-   "sha256": "2618da6de488ff2a5d29baf2ca61c3bd0501952deb81049251adc51fce0ce7df",
-   "url": "packs/character_player-1.0.19.pck",
+   "version": "1.0.20",
+   "size": 336076,
+   "sha256": "3861b41d2f9d8ae153c59f0492d88c4d555b8d640ae064a4a3116491312fb1a3",
+   "url": "packs/character_player-1.0.20.pck",
    "deps": [
     "animations",
     "shaders_materials"
