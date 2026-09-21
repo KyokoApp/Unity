@@ -151,8 +151,13 @@ func travel(state: String) -> void:
 
 ## Input gerak: speed01 (0..1), sprint, crouch.
 func set_move(speed01: float, sprint: bool, crouch: bool) -> void:
-	if _air or _swimming:
-		return
+	# set_move hanya dipanggil ketika kaki benar-benar MENYENTUH tanah
+	# (player.gd menjaga: is_on_floor() && !_swimming). Maka flag air/swim
+	# pada titik ini PASTI kedaluwarsa — mereka tak pernah di-reset sendiri
+	# dulu → setelah 1x lompat/renang, set_move ter-blokir SELAMANYA:
+	# walk tak pernah animasi & attack hanya bisa sekali (_current tersumpal).
+	_air = false
+	_swimming = false
 	var prev := _move_state
 	if speed01 < 0.05:
 		_move_state = "crouch_idle" if crouch else "idle"

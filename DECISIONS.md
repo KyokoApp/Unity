@@ -376,3 +376,14 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   lower-substring) + fallback akhir "yang ada kata idle" (TAK PERNAH T-pose) +
   print resolusi ke konsol + trace on-device menunjukkan state yang gagal-resolve.
 - Dble cepatnya: tak perlu import-settings apapun di editor.
+
+## Ronde-21 — macet walk & attack-sekali: flag air/swim tak pernah turun (2026-09-21)
+
+- Kedua gejala satu akar di AnimController: set_move() early-return kalau
+  _air/_swimming true; keduanya diset via set_air("jump_start"/"jump_fall")/
+  set_swim(true) tapi TAK PERNAH di-reset di alur (player tak pernah memanggil
+  set_air(""); pendaratan kecil lewat action("jump_land") yg tak menyentuh flag).
+- Dampak: walk hilang permanen & 'attack hanya sekali' (current tersumpal di
+  "attack" karena tak ada perjalanan balik menuju move-state).
+- Solusi: set_move() mengandalkan fakta bahwa player.gd hanya memanggilnya saat
+  grounded — ia mereset _air/_swimming di awal. Ketahanan devikit bertambah.
