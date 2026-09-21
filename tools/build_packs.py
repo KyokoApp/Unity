@@ -54,16 +54,22 @@ def file_sha256(path):
 
 def folder_hash(path):
     h = hashlib.sha256()
+    # DETERMINISTIK: kumpulkan dulu SEMUA path relatif lalu urutkan —
+    # os.walk() menelusuri subdir sesuai urutan filesystem (beda antar mesin/
+    # checkout) yang pernah bikin hash sama-isi beda-urutan → bump versi liar
+    # (world_terrain 1.0.26→1.0.27 tanpa perubahan, kick-39).
+    rels = []
     for dirpath, _dirs, files in os.walk(path):
-        for fn in sorted(files):
+        for fn in files:
             if fn.endswith(".import"):
                 continue  # dihasilkan ulang saat export; tidak menandai perubahan konten
-            full = os.path.join(dirpath, fn)
-            rel = os.path.relpath(full, path).replace(os.sep, "/")
-            h.update(rel.encode())
-            h.update(b"\0")
-            h.update(file_sha256(full).encode())
-            h.update(b"\n")
+            rels.append(os.path.relpath(os.path.join(dirpath, fn), path).replace(os.sep, "/"))
+    for rel in sorted(rels):
+        full = os.path.join(path, rel)
+        h.update(rel.encode())
+        h.update(b"\0")
+        h.update(file_sha256(full).encode())
+        h.update(b"\n")
     return h.hexdigest()
 
 def load_db():

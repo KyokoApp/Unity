@@ -273,3 +273,4 @@ jobs:
 # rerun-kick 37 (fix crouch-nyangkut layout+ikon digambar; release-off-bounds)
 # rerun-kick 38 (spawn depan rumah + probe animasi on-device)
 # rerun-kick 39 (near-floor ray: hilangkan pose jump_fall saat jalan + lompat mati di rumput; probe pindah ke label HUD permanen anim_debug)
+# rerun-kick 40 (fix: paksa ui 1.0.10 — pck 1.0.9 yg tersebar konten LAMA; folder_hash deterministik antar-mesin)

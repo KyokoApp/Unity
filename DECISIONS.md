@@ -433,3 +433,21 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   apa" dari user). Menampilkan `anim:<state> sp dh onf cr` tiap 0,9 detik;
   foto berikutnya memfilter tiga cabang (cr nyangkut / onf:false engine /
   sp:0 jalur input) bila gejala masih tersisa.
+
+## Ronde-25 — pelajaran kick-39: ui pack tertinggal + bump liar (2026-09-21)
+
+- Kick-39 terbit dgn DUA kekeliruan manifest: (1) pack `ui` tidak ter-bump
+  (tetap 1.0.9 dgn sha IDENTIK ke yg di HP) → `hud.anim_debug` TIDAK terkirim,
+  padahal player 1.0.14 sudah memanggilnya (aman: has_method guard, tapi probe
+  tak tampak). Sebab: run build_packs lokal sebelumnya sudah menaikkan ui ke
+  1.0.10+hash-baru di versions.json, lalu skrip sinkronisasi LIVE menimpanya
+  balik ke 1.0.9 + hash FRESH (=konten baru ⇒ tak terdeteksi berubah).
+  (2) world_terrain bump liar 1.0.26→1.0.27 tanpa edit — folder_hash memakai
+  urutan os.walk (urutan filesystem) sehingga hash beda antar mesin.
+- Perbaikan permanen: folder_hash kini mengumpulkan SEMUA path relatif lalu
+  mengurutkannya (deterministik antar-mesin); versions.json disinkronkan ke
+  manifest LIVE pasca-39 (player 1.0.14, world 1.0.27 …) dengan hash orde-
+  terurut; ui dipaksa hash-nol agar CI menaikkannya ke 1.0.10 dan mengekspor
+  ulang dgn konten barunya (anim_debug).
+- Aturan baru: JANGAN menimpa paksa versions.json bila build_packs sudah
+  menaikkan versi — selalu tanya manifest branch content yang LIVE.
