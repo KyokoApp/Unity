@@ -298,3 +298,4 @@ jobs:
 # rerun-kick 42 (kosmetik: ground_color langit per fase — basmi langit marun saat senja di bawah cakrawala)
 # rerun-kick 43 (CICILAN1 genre baru: dunia datar tak berbatas + penyihir prosedural top-down — hapus semua karakter/world GLB; orb sihir proyektil)
 # rerun-kick 44 (guard anti-rsync-wipe: set-e+annot di build, gembok jumlah pck di publish; jalankan ulang cicilan1 pasca insiden 06496a4)
+# rerun-kick 45 (perbaiki versions.json yg terpotong kosong; load_db tahan file rusak)

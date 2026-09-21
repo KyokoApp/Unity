@@ -74,8 +74,15 @@ def folder_hash(path):
 
 def load_db():
     if os.path.isfile(DB_PATH):
-        with open(DB_PATH) as f:
-            return json.load(f)
+        try:
+            with open(DB_PATH) as f:
+                return json.load(f)
+        except Exception as e:
+            # insiden 06496a4: file bisa kosong/terpotong redirect shell —
+            # jangan meledak; mulai dari db kosong (semua pack akan terbump
+            # satu tingkat — aman) alih-alih membatalkan build.
+            print(f"[warn] versions.json rusak ({e}); mulai dari kosong")
+            return {"packs": {}}
     return {"packs": {}}
 
 def save_db(db):
