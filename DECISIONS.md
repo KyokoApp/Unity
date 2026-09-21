@@ -489,3 +489,17 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
 - Insiden sandbox: clone lokal ke-reset (HEAD kosong di 552216e); pekerjaan
   aman di refs/heads/arena/01a0ba2f-unity (a3d3385) — dipulihkan via fetch +
   reset --hard. Pelajaran: sebelum tindakan destruktif lokal, cek reflog.
+
+## Ronde-27 — langit bawah-cakrawala marun saat kamera didongakkan bawah (kick-42) (2026-09-21)
+
+- Foto 17:17: saat kamera digeser ke bawah, 3/4 layar atas berubah marun gelap
+  datar. Sebab: cabang senja `_apply_daylight` menyetel horizon oranye
+  (0.95,0.55,0.34) tapi TIDAK menyetel `ground_color` → waru abu-abu gelap
+  sisa siang (0.30,0.38,0.37) ⇒ shader sky mencampur oranye+abu-abu gelap di
+  bawah cakrawala = coklat-marun berlumpur. Malam pun menyandang nilai default.
+- Fix kosmetik di world.gd (TANPA sentuh player/ui): ground_color eksplisit
+  per fase — siang (0.42,0.55,0.50), senja terracotta (0.55,0.40,0.34)→lerp
+  siang, malam (0.07,0.11,0.16). Bawah cakrawala kini harmonis dgn fase langit.
+- Fix jalan-jongkok (`_near_floor`/anim_debug ronde-24) tetap DITAHAN sengaja:
+  penyebab kemacetan kick-39/40 belum direproduksi secara lokal; jangan
+  judi dgn HP user dua kali.

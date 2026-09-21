@@ -426,7 +426,7 @@ func _apply_daylight() -> void:
 		env.fog_light_color = Color(0.54, 0.74, 0.68)
 		sky_mat.set_shader_parameter("zenith_color", Color(0.19, 0.42, 0.46))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.62, 0.80, 0.66))
-		sky_mat.set_shader_parameter("ground_color", Color(0.30, 0.38, 0.37))
+		sky_mat.set_shader_parameter("ground_color", Color(0.42, 0.55, 0.50))
 		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.90, 0.66))
 	elif dayf > -0.12:
 		var k2 := smoothstep(-0.12, 0.15, dayf)
@@ -437,6 +437,9 @@ func _apply_daylight() -> void:
 		env.fog_light_color = Color(0.72, 0.55, 0.48).lerp(Color(0.54, 0.74, 0.68), k2)
 		sky_mat.set_shader_parameter("zenith_color", Color(0.11, 0.24, 0.38).lerp(Color(0.19, 0.42, 0.46), k2))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.95, 0.55, 0.34).lerp(Color(0.62, 0.80, 0.66), k2))
+		# bawah cakrawala JANGAN coklat-marun berlumpur (laporan foto 17:17):
+		# harmonis dgn senja — terracotta lembut, bukan abu-abu sisa siang
+		sky_mat.set_shader_parameter("ground_color", Color(0.55, 0.40, 0.34).lerp(Color(0.42, 0.55, 0.50), k2))
 		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.60, 0.30))
 	else:
 		sun.light_color = Color(0.55, 0.65, 0.90)
@@ -446,6 +449,7 @@ func _apply_daylight() -> void:
 		env.fog_light_color = Color(0.14, 0.19, 0.26)
 		sky_mat.set_shader_parameter("zenith_color", Color(0.05, 0.09, 0.16))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.10, 0.15, 0.22))
+		sky_mat.set_shader_parameter("ground_color", Color(0.07, 0.11, 0.16))
 		sky_mat.set_shader_parameter("sun_color", Color(0.62, 0.70, 0.85))
 	env.fog_density = 0.0026 * float(_lo.fog)
 	sun.light_energy *= float(_lo.sun)

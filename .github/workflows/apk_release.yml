@@ -275,3 +275,4 @@ jobs:
 # rerun-kick 39 (near-floor ray: hilangkan pose jump_fall saat jalan + lompat mati di rumput; probe pindah ke label HUD permanen anim_debug)
 # rerun-kick 40 (fix: paksa ui 1.0.10 — pck 1.0.9 yg tersebar konten LAMA; folder_hash deterministik antar-mesin)
 # rerun-kick 41 (DARURAT rollback player+ui ke isi kick-38 yg terbukti jalan; failsafe get_script()==null di game_root)
+# rerun-kick 42 (kosmetik: ground_color langit per fase — basmi langit marun saat senja di bawah cakrawala)
