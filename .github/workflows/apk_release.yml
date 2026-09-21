@@ -269,3 +269,4 @@ jobs:
 # rerun-kick 33 (skin bawaan Mannequin UAL — 43 animasi, upload user CC0)
 # rerun-kick 34 (fix T-pose: resolver anim 3-tahap + fallback idle; trace resolusi on-device)
 # rerun-kick 35 (fix macet walk+attack: reset flag air/swim di set_move)
+# rerun-kick 36 (terbitkan perbaikan anim dari USER: self-transition+force_restart, IMMEDIATE utk aksi, serangan selang-seling, dash=Roll)
