@@ -451,3 +451,20 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   ulang dgn konten barunya (anim_debug).
 - Aturan baru: JANGAN menimpa paksa versions.json bila build_packs sudah
   menaikkan versi — selalu tanya manifest branch content yang LIVE.
+
+### Lanjutan ronde-25 — resolusi akhir (kick-40)
+
+- ALARM "ui pck konten lama" = salah baca: pck menyimpan GDScript terkompilasi
+  (token biner), jadi grep string sumber selalu gagal. Bukti riwayat sha pck ui
+  di branch content: 6fdcaa (kick-37/38) → fa65cc (kick-39 @eb478bf, SAMA dgn
+  kick-40) → anim_debug/l near_floor MEMANG sudah LIVE sejak kick-39/40.
+- Bump liar player/world berulang padahal isi identik & file-set identik dgn
+  git: versi base repo buatan lokal ≠ hash hasil CI hanya untuk 2 pack tsb
+  (6 lain cocok). Diduga langkah `--import` Godot di CI menulis ulang metadata
+  di dalam dua folder itu. Solusi permanen MURAH: base versions.json WAJIB
+  disalin dari branch `content` (versions.json yang ditulis CI sendiri),
+  BUKAN dihitung lokal: `git show origin/content:versions.json > server/versions.json`.
+- Status LIVE final ronde ini: game 1.0.28 — character_player 1.0.15 (ray
+  _near_floor + lompat + gerbang anim ground), ui 1.0.10 (label anim_debug),
+  world_terrain 1.0.28, core 1.0.10, animations 1.0.7. HP re-download delta
+  otomatis (sha beda) saat aplikasi dibuka.
