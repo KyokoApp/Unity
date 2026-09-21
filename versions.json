@@ -1,16 +1,16 @@
 {
  "packs": {
   "core_scripts": {
-   "content_hash": "0b54253ff3ed3f4c7a16abe4c995ac61f3d8647d808765eaf4ec222cfb7e72ee",
-   "version": "1.0.9"
+   "content_hash": "7a2aa93755129982d6099ded0a2b6f92c5f19db16605683550fdd2c63377d958",
+   "version": "1.0.10"
   },
   "shaders_materials": {
    "content_hash": "e93538aef9ae0513b9211cfab3456146c919a2d8183de726a31a8365ed5c7f6f",
    "version": "1.0.9"
   },
   "world_terrain": {
-   "content_hash": "7ef4babe2fd784e03f735d41cd3c0a63c5d215620dfb8c91daf0a665c4eea8ce",
-   "version": "1.0.25"
+   "content_hash": "3fde090345179433f0e4ad766990b57c5304763928f5568ecc87022bd8a680c4",
+   "version": "1.0.26"
   },
   "world_props_forest": {
    "content_hash": "8a1b9332ad6e8b6abf79009a280d17570bd50453004cea27b1c5bd3270b00dba",
@@ -25,8 +25,8 @@
    "version": "1.0.7"
   },
   "character_player": {
-   "content_hash": "d19c3a62c380c4599636966d964b85ab02436758643d25f2d09e30064f644bab",
-   "version": "1.0.12"
+   "content_hash": "41d40669d29b1936b8f7c7a736d337846ea60876de2e50dc2baa4364d371eecc",
+   "version": "1.0.13"
   },
   "ui": {
    "content_hash": "927b6062415154890749675abfac645e564532e17459bcf5293b1cdbb5f845a7",
