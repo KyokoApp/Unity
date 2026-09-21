@@ -120,8 +120,9 @@ var _near_timer := 0.0
 var stats := {"flower": 0, "coconut": 0}
 var head_offset_y := 0.0      # untuk efek visual renang
 var _action_lock := 0.0
-var _attack_alt := false
-var _anim_probe := 0.0        # timer jejak anim on-device (diagnostik)      # selang-seling attack/attack2 (pakai 2 animasi pukulan, bukan 1 terus)
+var _attack_alt := false      # selang-seling attack/attack2 (pakai 2 animasi pukulan, bukan 1 terus)
+var _anim_probe := 0.0        # timer jejak anim on-device (diagnostik)
+var _near_floor := false      # grounded menurut ray-native (pengganti is_on_floor yg ngambang)
 
 func set_world(w: Node) -> void:
 	world = w
@@ -352,6 +353,13 @@ func _physics_process(delta: float) -> void:
 	var floor_h := -999.0
 	if world:
 		floor_h = world.height_at(global_position.x, global_position.z)
+	# MESIR TAULT: is_on_floor() dari engine mengambang di atas collider trimesh
+	# diorama (kontak ada tapi status true tak pernah/naik-turun) → jump_fall
+	# dimainkan terus (terlihat "jongkok") + coyote mati → lompat tidak jalan.
+	# Tambahan kriteria "dekat lantai" berdasar ray-native height_at yang AKURAT:
+	# ketika kaki ≤0,42 m di atas lantai terlapor, anggap grounded meski
+	# is_on_floor() enggan mengakui.
+	_near_floor = (floor_h > -900.0 and (global_position.y - floor_h) <= 0.42)
 	if floor_h < -900.0:
 		_swimming = false  # lantai tak ketemu = BUKAN air (world statis tak punya laut)
 	else:
@@ -391,7 +399,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		_ground_move(delta, move_dir, speed, on_floor)
 	# melompat
-	if _jump_buffer > 0.0 and (_coyote > 0.0) and not _swimming and not crouch:
+	if _jump_buffer > 0.0 and (_coyote > 0.0 or _near_floor) and not _swimming and not crouch:
 		velocity.y = JUMP_VEL
 		_jump_buffer = 0.0
 		_coyote = 0.0
@@ -483,21 +491,27 @@ func _update_model(delta: float, move_dir: Vector3, speed: float) -> void:
 		model_pivot.rotation.y = lerp_angle(model_pivot.rotation.y, target_yaw, delta * 10.0)
 	var hspeed := Vector2(velocity.x, velocity.z).length()
 	if anim:
-		# jejak diagnostik ON-DEVICE (foto saat keluhannya muncul):
-		# menunjukkan state ANIMASI YANG BENAR-BENAR BERMAIN tiap 0,9 detik
+		# jejak diagnostik ON-DEVICE permanen (label HUD): menunjukkan state yang
+		# BENAR-BENAR BERMAIN + kesaksian fisika (on_floor + jarak kaki ke tanah)
 		_anim_probe -= delta
 		if _anim_probe <= 0.0:
 			_anim_probe = 0.9
 			var rc2 = get_tree().current_scene
-			if rc2 and rc2.has_method("_trace"):
-				rc2.call("_trace", "anim:%s sp:%.1f crouch:%s | %s" % [
-					str(anim.current), hspeed, str(crouch), char_skin])
+			var h2 = rc2.get("hud") if rc2 else null
+			if h2 and h2.has_method("anim_debug"):
+				var dh := 0.0
+				if floor_h > -900.0:
+					dh = global_position.y - floor_h
+				h2.anim_debug("anim:%s sp:%.1f cr:%s onf:%s dh:%.2f" % [
+					str(anim.current), hspeed, str(crouch),
+					str(is_on_floor()), dh])
 		if _swimming:
 			anim.set_swim(true, hspeed / SPEED_SWIM)
-		elif not _swimming and not is_on_floor() and velocity.y < -2.5:
-			anim.set_air("jump_fall")
-		elif is_on_floor() and _action_lock <= 0.0:
+		elif _near_floor and _action_lock <= 0.0:
+			# grounded via RAY (tahan kalau is_on_floor() ngambang) → walk/run main
 			anim.set_move(clampf(hspeed / SPEED_RUN, 0.0, 1.0), _target_speed() >= SPEED_SPRINT and hspeed > SPEED_RUN + 0.2, crouch)
+		elif not is_on_floor() and velocity.y < -2.5:
+			anim.set_air("jump_fall")
 	# efek visual jongkok (memendek sedikit) & renang (mengambang lebih rendah)
 	var want_head := -0.28 if crouch else 0.0
 	head_offset_y = lerpf(head_offset_y, want_head, delta * 8.0)

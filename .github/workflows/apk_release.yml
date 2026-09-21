@@ -272,3 +272,4 @@ jobs:
 # rerun-kick 36 (terbitkan perbaikan anim dari USER: self-transition+force_restart, IMMEDIATE utk aksi, serangan selang-seling, dash=Roll)
 # rerun-kick 37 (fix crouch-nyangkut layout+ikon digambar; release-off-bounds)
 # rerun-kick 38 (spawn depan rumah + probe animasi on-device)
+# rerun-kick 39 (near-floor ray: hilangkan pose jump_fall saat jalan + lompat mati di rumput; probe pindah ke label HUD permanen anim_debug)

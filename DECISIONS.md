@@ -411,3 +411,25 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   kiri bawah; trail boot kini hidup 20 detik) — foto dua detik setelah berjalan
   membuktikan state mana yg benar-benar bermain dalam kasus "jalan jongkok".
 - Selanjutnya mengandalkan bukti foto itu (bukan tebakan).
+
+## Ronde-24 — "jongkok" = jump_fall tak pernah turun dari trimesh (2026-09-21)
+
+- Dua screenshot user (jalan di halaman: kaki terlipat = pose `jump_fall`/tuck,
+  dan "stuck gk bisa lompat di rumput") menyatu jadi SATU sebab kandidat:
+  `is_on_floor()` engine tidak pernah true di atas trimesh collider diorama —
+  kontak FISIKA ada (tidak tembus), tapi status floor tak tercatat. Akibatnya:
+  (1) `_update_model` menge-set `anim.set_air("jump_fall")` tiap frame →
+  karakter tampak jongkok/lipat-kaki saat berjalan; (2) coyote tak pernah
+  terisi → lompat mati di rumput.
+- Fix: grounded kini diuji via RAY native `world.height_at()` (distance kaki —
+  persis yg dipakai sistem renang/y offset posisi → nol risiko salah-hit):
+  `_near_floor = floor_h > -900 and (y - floor_h) <= 0.42`.
+  - Gerbang lompat: `(_coyote > 0.0 or _near_floor)` → lompat SELALU hidup
+    di permukaan manapun yg kakinya memang menyentuh tanah.
+  - Gerbang animasi: `_near_floor and _action_lock<=0` → `anim.set_move(...)`
+    sebelum cabang airborne; pose tuck saat berjalan musnah.
+- Diagnostik permanen: label kuning bawah-tengah `hud.anim_debug(...)`
+  (pengganti `_trace` yg mati bareng trail boot 20 detik — "gk ada teks apa
+  apa" dari user). Menampilkan `anim:<state> sp dh onf cr` tiap 0,9 detik;
+  foto berikutnya memfilter tiga cabang (cr nyangkut / onf:false engine /
+  sp:0 jalur input) bila gejala masih tersisa.

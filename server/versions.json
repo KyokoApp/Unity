@@ -10,7 +10,7 @@
   },
   "world_terrain": {
    "content_hash": "f34de698d866e5ba820d2f2e14ca6c93d45a89a14ce60a4f437bbdef0f5e3afe",
-   "version": "1.0.25"
+   "version": "1.0.26"
   },
   "world_props_forest": {
    "content_hash": "8a1b9332ad6e8b6abf79009a280d17570bd50453004cea27b1c5bd3270b00dba",
@@ -25,11 +25,11 @@
    "version": "1.0.7"
   },
   "character_player": {
-   "content_hash": "1c269aab50ffa7c09351390a62b2bda4257268867479ae0448f0f4194118b264",
-   "version": "1.0.12"
+   "content_hash": "c3677af15946dedc77515fbe85d71dbf6d085fe0368e119dca659ae31cb8e102",
+   "version": "1.0.13"
   },
   "ui": {
-   "content_hash": "927b6062415154890749675abfac645e564532e17459bcf5293b1cdbb5f845a7",
+   "content_hash": "47de15fe3fb51451f9a43696f3ec8187f54b32ba4768634b16cc676e4fd3a308",
    "version": "1.0.9"
   },
   "audio_sfx": {
