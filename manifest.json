@@ -1,6 +1,6 @@
 {
- "game_version": "1.0.28",
- "generated_at": "2026-09-21T08:56:48Z",
+ "game_version": "1.0.29",
+ "generated_at": "2026-09-21T09:27:01Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -27,10 +27,10 @@
    "deps": []
   },
   "world_terrain": {
-   "version": "1.0.28",
-   "size": 13372356,
-   "sha256": "8a81723331ef777f790fd05af5b4b7eec4481d6aad41403e5779a4beca2ba736",
-   "url": "packs/world_terrain-1.0.28.pck",
+   "version": "1.0.29",
+   "size": 13372468,
+   "sha256": "1b34dcd9acf7d57bda47741020cf0cf74a5bf40592d44f0ab22a30fb78b58138",
+   "url": "packs/world_terrain-1.0.29.pck",
    "deps": [
     "shaders_materials"
    ]
