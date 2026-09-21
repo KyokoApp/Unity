@@ -572,3 +572,27 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
 - Catatan alur: tampilan saling-ganti rasa begini murah & cepat lewat pack;
   memori tiap iterasi tetap ada di riwayat git (1fc3c12/5cbce9e bila kelak
   mannequin mau dicoba lagi).
+
+## Ronde-32 — penyihir terbang + serangan sihir berpartikel (kick-48) (2026-09-21)
+
+- Arahan user: hapus tongkat; penyihir TERBANG dengan jubah bergelombang;
+  topi diperbesar menutupi muka; basic attack "efek particle yang bagus"
+  + pencahayaan bagus; aset eksternal kalau bisa — DITOLAK bila lisensi
+  pencarian acak (kutahu dari ronde-26: hanya aset legal-tersimpan yang masuk).
+- Wujud: jubah = cylinder 24 segmen/20 ring dgn SHADER VERTEKS GELOMBANG
+  (arena penyihir terbang, kain bergoyang betulan); topi besar menaungi,
+  mata dihapus; terbang = baseline melayang 0,30m + bob (crouch 0,14m) +
+  lean saat lari/sprint + LINGKARAN SIHIR berputar samar di tanah (saudara
+  model ⇒ tetap di tanah, bayangan blob juga).
+- Serangan (3 lapis prosedural): denyut mantera di tangan → inti proyektil
+  additive emisi 4.0 + JEJAK partikel (26 quad glow, local_coords=false) +
+  OmniLight cyan 1.6/3.6m → saat impact/habis: burst 34+10 percikan bergrav.
+  ringan, CINCIN TORUS membesar-pudar, BEKAS HANGUS 1,8 dtk; sprite glow
+  radial 64px dibangun runtime (tanpa berkas aset, tanpa lampiran lisensi).
+- Lingkungan: env.glow_enabled di mobile-hemat (level 1/3/5, intensity 0.55)
+  — "efek pencahayaan bagus" DIPERBOLEHKAN user kali ini (batas lama hanya
+  "hindari post-process BERAT"), seimbang fps.
+- INSIDEN EDIT-force stop ronde ini: bedah python menelan _physics_process
+  → segera direkonstruksi dari snapshot cf5d38c dengan span fungsi tepat +
+  verifikasi daftar fungsi lengkap + gdparse. Pelajaran: edit besar HANYA
+  dengan batas fungsi pasti + cek daftar fungsi sebelum/sesudah.

@@ -188,6 +188,21 @@ func _setup_environment() -> void:
 	env.fog_light_color = Color(0.56, 0.76, 0.68)
 	env.fog_density = 0.0026
 	env.fog_sky_affect = 0.3
+	# glow lembut utk pijar sihir (permintaan user) — SETINGAN HEMAT khusus
+	# mobile: radius kecil, tanpa level tinggi (post-process berat tetap no)
+	env.glow_enabled = true
+	env.glow_normalized = true
+	env.glow_intensity = 0.55
+	env.glow_strength = 1.0
+	env.glow_bloom = 0.08
+	env.glow_hdr_threshold = 0.85
+	env.set("glow_levels/1", true)
+	env.set("glow_levels/2", false)
+	env.set("glow_levels/3", true)
+	env.set("glow_levels/4", false)
+	env.set("glow_levels/5", true)
+	env.set("glow_levels/6", false)
+	env.set("glow_levels/7", false)
 	world_env.environment = env
 	add_child(world_env)
 
