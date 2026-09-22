@@ -116,6 +116,7 @@ func _load_skin() -> void:
 	if mesh_path == "" or anim_paths.is_empty():
 		_use_empty_root("skin '%s' tanpa GLB (prosedural/kosong)" % char_skin)
 		return
+	_trace("boot: pemain… memuat GLB skin '%s'" % char_skin)
 	var built := _build_mannequin(mesh_path, anim_paths)
 	if built == null:
 		# FAILSAFE (pelajaran Ronde-26): GLB/skeleton gagal tak boleh
@@ -147,50 +148,67 @@ func _trace(msg: String) -> void:
 ## MeshInstance3D.skeleton (aman krn nama 65 joint identik di ketiga file
 ## — dicek manual sebelum ronde ini, pola sama dgn "shared skeleton" utk
 ## sistem equipment di Godot). Library animasi lain digabung sesudahnya.
+## NB (Ronde-37): variabel resource SENGAJA tak diberi type-hint eksplisit
+## (var polos, bukan `: Resource`/`: PackedScene`) sebelum instantiate() —
+## GDScript 4 bisa gagal resolve method lewat type-hint base class yg tak
+## punya method itu. Var polos = dispatch dinamis by tipe RUNTIME, aman.
 func _build_mannequin(mesh_path: String, anim_paths: Dictionary) -> Node3D:
 	var first_key: String = anim_paths.keys()[0]
 	if not ResourceLoader.exists(anim_paths[first_key]) or not ResourceLoader.exists(mesh_path):
+		_trace("boot: pemain… GLB tak ditemukan di pack")
 		return null
-	var host_res: Resource = load(anim_paths[first_key])
+	var host_res = load(anim_paths[first_key])
 	if host_res == null or not (host_res is PackedScene):
+		_trace("boot: pemain… load() library '%s' gagal" % first_key)
 		return null
+	_trace("boot: pemain… library '%s' termuat, instantiate…" % first_key)
 	var host: Node3D = host_res.instantiate()
 	var skeleton := _find_skeleton(host)
 	var aplayer := _find_anim_player(host)
 	if skeleton == null or aplayer == null or skeleton.get_bone_count() == 0:
+		_trace("boot: pemain… skeleton/AnimationPlayer tak ketemu di '%s'" % first_key)
 		host.queue_free()
 		return null
-	var mesh_res: Resource = load(mesh_path)
+	_trace("boot: pemain… skeleton ✔ (%d tulang), memuat mesh…" % skeleton.get_bone_count())
+	var mesh_res = load(mesh_path)
 	if mesh_res == null or not (mesh_res is PackedScene):
+		_trace("boot: pemain… load() mesh gagal")
 		host.queue_free()
 		return null
 	var mesh_holder: Node = mesh_res.instantiate()
 	var meshes: Array = []
 	_find_mesh_instances(mesh_holder, meshes)
 	if meshes.is_empty():
+		_trace("boot: pemain… tak ada MeshInstance3D di mesh_holder")
 		host.queue_free()
 		mesh_holder.queue_free()
 		return null
+	_trace("boot: pemain… %d mesh ditemukan, menempel ke skeleton…" % meshes.size())
 	for mi in meshes:
 		var mi3: MeshInstance3D = mi
-		mi3.get_parent().remove_child(mi3)
+		var old_parent := mi3.get_parent()
+		if old_parent:
+			old_parent.remove_child(mi3)
 		host.add_child(mi3)   # taruh di root host; NodePath skeleton tetap relatif-benar
 		mi3.transform = Transform3D.IDENTITY
 		mi3.skeleton = mi3.get_path_to(skeleton)
 		_apply_toon(mi3)
 	mesh_holder.queue_free()
+	_trace("boot: pemain… mesh tertempel ✔, menggabung library lain…")
 	for key in anim_paths.keys():
 		if key != first_key:
 			_merge_library(aplayer, key, anim_paths[key])
 	host.name = "Model"
 	anim = AnimController.new()
 	anim.setup(aplayer)
+	_trace("boot: pemain… AnimController siap ✔")
 	return host
 
 func _merge_library(target: AnimationPlayer, ns: String, path: String) -> void:
+	_trace("boot: pemain… gabung library '%s'…" % ns)
 	if not ResourceLoader.exists(path):
 		return
-	var res: Resource = load(path)
+	var res = load(path)
 	if res == null or not (res is PackedScene):
 		return
 	var inst: Node = res.instantiate()
@@ -198,6 +216,8 @@ func _merge_library(target: AnimationPlayer, ns: String, path: String) -> void:
 	if src:
 		for lib_name in src.get_animation_library_list():
 			var lib := src.get_animation_library(lib_name)
+			if lib == null:
+				continue
 			if target.has_animation_library(ns):
 				target.remove_animation_library(ns)
 			target.add_animation_library(ns, lib)
