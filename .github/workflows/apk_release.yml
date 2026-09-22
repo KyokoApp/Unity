@@ -306,3 +306,4 @@ jobs:
 # rerun-kick 50 (UI minimal permintaan user: hanya joystick+pause — sembunyikan semua tombol/label lain; ikon pause palang ramping)
 # rerun-kick 51 (bersih-bersih: hapus UAL 61MB + gravity_falls.txt 9MB + pack animations yg tak terpakai; netralkan rujukan)
 # rerun-kick 52 (user upload: mannequin Quaternius + 86 anim UAL1/UAL2 ke character_player — picu build)
+# rerun-kick 53 (fix bump-tabrakan 1.0.22: paksa export ulang character_player jadi 1.0.23)
