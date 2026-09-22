@@ -1,22 +1,33 @@
 extends CharacterBody3D
 ## Player: kontroler third-person dengan dukungan touch (di-set dari HUD),
 ## jalan/lari/sprint/jongkok/renang, interaksi dunia, SFX langkah, dan
-## blob shadow (untuk preset rendah). Model = GLB KayKit (Knight).
+## blob shadow (untuk preset rendah). Model = Mannequin (Quaternius UAL).
 
 signal stats_changed(kind: String, count: int)
 signal nearest_interactable_changed(meta)
 
 const Materials := preload("res://packs/shaders_materials/materials.gd")
+const AnimController := preload("res://packs/character_player/anim_controller.gd")
 
-# PENYIHIR PROSEDURAL: model 100% dibangun dari mesh primitif oleh kode
-# (jubah kerucut + topi runcing + tongkat orb) — khusus genre top-down.
-# Bukan sekadar pengganti sementara knight: nol berkas GLB, nol risiko lisensi,
-# nol T-pose, dan ``anim'' sengaja null (gerak lucu digerakkan kode: bob/condong/
-# putar). Skin GLB lama (knight/polygirl/UAL) DIHAPUS beserta berkasnya.
+# SKIN "mannequin": mesh Quaternius Female Mannequin + animasi gabungan
+# ual1 (lokomosi dasar: jalan/lari/sprint/jongkok/lompat/renang/roll) +
+# ual2 (aksi: kombo pedang/dst). Ketiga file berbagi 1 skeleton persis
+# (65 joint, nama sama) — tak perlu retarget BoneMap, cukup gabung
+# AnimationLibrary di satu AnimationPlayer. anim=null -> fallback tanpa
+# model (EmptyRoot), sesuai FAILSAFE lama (Ronde-26): GLB gagal tak pernah
+# menjatuhkan boot.
 const SKINS := {
-	"wizard": {"path": "", "height": 1.5, "states": {}},
+	"mannequin": {
+		"mesh": "res://packs/character_player/assets/mannequin_f.glb",
+		"anims": {
+			"ual1": "res://packs/character_player/assets/ual1_standard.glb",
+			"ual2": "res://packs/character_player/assets/ual2_standard.glb",
+		},
+		"height": 1.75,
+	},
+	"wizard": {"mesh": "", "anims": {}, "height": 1.5},
 }
-var char_skin := "wizard"   # penyihir prosedural (tanpa GLB) — skin lama dihapus
+var char_skin := "mannequin"
 
 # ------- gerak -------
 const SPEED_WALK := 2.4
@@ -98,15 +109,129 @@ func _ready() -> void:
 func _load_skin() -> void:
 	if model_root and is_instance_valid(model_root):
 		model_root.queue_free()
-	# RESET TOTAL atas perintah user: tidak ada karakter/model/model apa pun —
-	# pemain sengaja TAK KASAT MATA (fase "mulai dari awal": world grid dulu).
+	anim = null
+	var def: Dictionary = SKINS.get(char_skin, {})
+	var mesh_path: String = def.get("mesh", "")
+	var anim_paths: Dictionary = def.get("anims", {})
+	if mesh_path == "" or anim_paths.is_empty():
+		_use_empty_root("skin '%s' tanpa GLB (prosedural/kosong)" % char_skin)
+		return
+	var built := _build_mannequin(mesh_path, anim_paths)
+	if built == null:
+		# FAILSAFE (pelajaran Ronde-26): GLB/skeleton gagal tak boleh
+		# menjatuhkan boot — mundur ke EmptyRoot, game tetap jalan.
+		_use_empty_root("skin '%s' GAGAL dimuat, fallback aman" % char_skin)
+		return
+	model_root = built
+	model_pivot.add_child(model_root)
+	var n_anims := anim.player.get_animation_list().size() if anim else 0
+	_trace("boot: skin '%s' siap — %d animasi tergabung ✔" % [char_skin, n_anims])
+
+func _use_empty_root(reason: String) -> void:
 	model_root = Node3D.new()
 	model_root.name = "EmptyRoot"
 	model_pivot.add_child(model_root)
 	anim = null
+	_trace("boot: %s" % reason)
+
+func _trace(msg: String) -> void:
 	var rootc = get_tree().current_scene
 	if rootc and rootc.has_method("_trace"):
-		rootc.call("_trace", "boot: pemain tanpa model (reset total) ✔")
+		rootc.call("_trace", msg)
+
+## Bangun node model: mesh (skin) ditumpangkan ke Skeleton3D milik file
+## animasi PERTAMA (anim_paths diproses sesuai urutan key — Dictionary di
+## GDScript 4 mempertahankan urutan insersi). File animasi datang dengan
+## AnimationPlayer+Skeleton3D yang sudah saling konsisten secara native,
+## jadi track path animasi dijamin benar; mesh cuma "numpang" lewat
+## MeshInstance3D.skeleton (aman krn nama 65 joint identik di ketiga file
+## — dicek manual sebelum ronde ini, pola sama dgn "shared skeleton" utk
+## sistem equipment di Godot). Library animasi lain digabung sesudahnya.
+func _build_mannequin(mesh_path: String, anim_paths: Dictionary) -> Node3D:
+	var first_key: String = anim_paths.keys()[0]
+	if not ResourceLoader.exists(anim_paths[first_key]) or not ResourceLoader.exists(mesh_path):
+		return null
+	var host_res: Resource = load(anim_paths[first_key])
+	if host_res == null or not (host_res is PackedScene):
+		return null
+	var host: Node3D = host_res.instantiate()
+	var skeleton := _find_skeleton(host)
+	var aplayer := _find_anim_player(host)
+	if skeleton == null or aplayer == null or skeleton.get_bone_count() == 0:
+		host.queue_free()
+		return null
+	var mesh_res: Resource = load(mesh_path)
+	if mesh_res == null or not (mesh_res is PackedScene):
+		host.queue_free()
+		return null
+	var mesh_holder: Node = mesh_res.instantiate()
+	var meshes: Array = []
+	_find_mesh_instances(mesh_holder, meshes)
+	if meshes.is_empty():
+		host.queue_free()
+		mesh_holder.queue_free()
+		return null
+	for mi in meshes:
+		var mi3: MeshInstance3D = mi
+		mi3.get_parent().remove_child(mi3)
+		host.add_child(mi3)   # taruh di root host; NodePath skeleton tetap relatif-benar
+		mi3.transform = Transform3D.IDENTITY
+		mi3.skeleton = mi3.get_path_to(skeleton)
+		_apply_toon(mi3)
+	mesh_holder.queue_free()
+	for key in anim_paths.keys():
+		if key != first_key:
+			_merge_library(aplayer, key, anim_paths[key])
+	host.name = "Model"
+	anim = AnimController.new()
+	anim.setup(aplayer)
+	return host
+
+func _merge_library(target: AnimationPlayer, ns: String, path: String) -> void:
+	if not ResourceLoader.exists(path):
+		return
+	var res: Resource = load(path)
+	if res == null or not (res is PackedScene):
+		return
+	var inst: Node = res.instantiate()
+	var src := _find_anim_player(inst)
+	if src:
+		for lib_name in src.get_animation_library_list():
+			var lib := src.get_animation_library(lib_name)
+			if target.has_animation_library(ns):
+				target.remove_animation_library(ns)
+			target.add_animation_library(ns, lib)
+	inst.queue_free()
+
+func _apply_toon(mi: MeshInstance3D) -> void:
+	var mesh := mi.mesh
+	if mesh == null:
+		return
+	for i in range(mesh.get_surface_count()):
+		var mat := mesh.surface_get_material(i)
+		var mname: String = mat.resource_name if mat else ""
+		if mname.find("Joint") != -1:
+			mi.set_surface_override_material(i, Materials.toon(Color(0.80, 0.40, 0.04), true, 0.008))
+		else:
+			mi.set_surface_override_material(i, Materials.toon(Color(0.40, 0.19, 0.71), true, 0.008))
+
+func _find_skeleton(n: Node) -> Skeleton3D:
+	if n is Skeleton3D:
+		return n
+	for c in n.get_children():
+		var r := _find_skeleton(c)
+		if r:
+			return r
+	return null
+
+func _find_anim_player(n: Node) -> AnimationPlayer:
+	if n is AnimationPlayer:
+		return n
+	for c in n.get_children():
+		var r := _find_anim_player(c)
+		if r:
+			return r
+	return null
 
 func _find_mesh_instances(n: Node, out: Array) -> void:
 	if n is MeshInstance3D:
@@ -230,10 +355,18 @@ func set_blob_shadow(enabled: bool) -> void:
 		blob.visible = enabled
 
 func press_emote() -> void:
-	return  # dinonaktifkan pada fase reset (tak ada karakter/sihir)
+	if anim and anim.has("emote"):
+		anim.action("emote", 150)
+		_play("emote")
 
+## Kombo pedang UAL2 (satu klip gabungan 3 hit, ~3 dtk) — dikunci lewat
+## AnimController._busy sampai selesai, jadi tak bisa di-spam-tap (aman,
+## tak ada state-machine kombo manual yang rawan nyangkut seperti dulu).
 func press_attack() -> void:
-	return  # dinonaktifkan pada fase reset (sihir dihapus; dipulihkan kelak)
+	if _action_lock > 0.0 or anim == null or not anim.has("attack"):
+		return
+	anim.action("attack", 120)
+	_action_lock = 0.2
 
 ## Orb pijar: bola tak-terteduh + material emisi, terbang+pijar memudar saat lenyap.
 func _cast_orb() -> void:

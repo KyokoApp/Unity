@@ -2,11 +2,23 @@
 
 ## Aset pihak ketiga (disertakan)
 
-### Karakter & Animasi: Mannequin — "Universal Animation Library [Standard]" (v1, Quaternius)
+### Karakter & Animasi: Female Mannequin + Universal Animation Library 1 & 2 (Quaternius)
 - **Pembuat:** Quaternius — https://quaternius.com
-- **File:** `project/packs/character_player/ual_mannequin.glb` (mannequin + skin + **43 animasi**)
-- **Sumber:** diunggah pengguna ke branch (`Universal Animation Library[Standard]/`,
-  berisi License.txt + README.txt asli); varian yang dipakai: Standard (root motion off).
+- **File:**
+  - `project/packs/character_player/assets/mannequin_f.glb` — mesh + skeleton
+    (Female Mannequin, 65 joint, tanpa animasi bawaan)
+  - `project/packs/character_player/assets/ual1_standard.glb` — 43 animasi
+    lokomosi/aksi dasar (idle/walk/jog/sprint/crouch/jump/swim/roll/interact/
+    dance/pistol/spell/punch/dst)
+  - `project/packs/character_player/assets/ual2_standard.glb` — 43 animasi
+    aksi/kombat (kombo pedang, perisai, berkebun, ninja-jump, slide, zombie,
+    memanjat, dst)
+  - Digabung runtime jadi satu AnimationPlayer via
+    `project/packs/character_player/anim_controller.gd` (namespace `ual1/*`
+    dan `ual2/*`) — lihat DECISIONS.md Ronde-36.
+- **Sumber:** diunggah pengguna langsung (paket resmi Quaternius, berisi
+  License.txt + README.txt asli); varian yang dipakai: Standard (root motion
+  off — gerak dikendalikan CharacterBody3D).
 - **Lisensi:** Creative Commons Zero (CC0 1.0) — domain publik
   (teks lisensi: https://creativecommons.org/publicdomain/zero/1.0/).
 - **Ringkasan lisensi:** bebas dipakai/dimodifikasi untuk apa pun, termasuk komersial.

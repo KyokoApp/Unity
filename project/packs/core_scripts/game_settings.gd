@@ -23,7 +23,7 @@ var gfx_faceted: bool = false  # gaya low-poly segi datar pada terrain
 var camera_sens: float = 1.0   # 0.3 .. 2.5
 var button_scale: float = 1.0  # 0.8 .. 1.5
 var invert_y: bool = false
-var char_skin: String = "mannequin"  # "mannequin" | "polygirl" | "knight" (bawaan: UAL mannequin)
+var char_skin: String = "mannequin"  # "mannequin" | "wizard" (bawaan: UAL mannequin) — Ronde-36
 var button_offsets := {}  # nama tombol -> Vector2 (offset dari posisi default)
 
 # --- Audio (dB) ---

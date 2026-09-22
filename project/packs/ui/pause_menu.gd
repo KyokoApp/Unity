@@ -171,11 +171,16 @@ func _build_settings() -> void:
 	# karakter (skin)
 	s.add_child(_field_header("Karakter"))
 	var opt_skin := OptionButton.new()
-	for n in ["Mannequin UAL (bawaan)", "PolyGirl", "Knight (KayKit)"]:
+	# NB (Ronde-36): sebelumnya label di sini ["Mannequin UAL (bawaan)",
+	# "PolyGirl", "Knight (KayKit)"] tak sinkron dgn _skin_ids yg cuma
+	# ["wizard"] (1 elemen) — pilih index 1/2 di dropdown = crash
+	# index-out-of-range (_skin_ids[ix]). Diperbaiki: label & id sekarang
+	# selalu berpasangan 1:1, sama persis kunci SKINS di player.gd.
+	var _skin_ids := ["mannequin", "wizard"]
+	for n in ["Mannequin (UAL, bawaan)", "Wizard (prosedural)"]:
 		opt_skin.add_item(n)
 	opt_skin.custom_minimum_size = Vector2(0, 56)
 	opt_skin.add_theme_font_size_override("font_size", 24)
-	var _skin_ids := ["wizard"]   # penyihir prosedural (skin GLB lama sudah dihapus)
 	var cur := -1
 	for i in range(_skin_ids.size()):
 		if _settings and str(_settings.char_skin) == _skin_ids[i]:

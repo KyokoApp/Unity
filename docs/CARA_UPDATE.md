@@ -13,8 +13,8 @@ Semua di dalam `project/`. Yang paling sering kamu sentuh:
 
 | Mau mengubah… | File | Catatan |
 |---|---|---|
-| Gerakan/peta animasi karakter | `project/packs/character_player/player.gd` → tabel `SKINS` (states per skin) | Tambah nama anim = tulis nama persis di GLB |
-| Aturan state machine animasi | `project/packs/animations/animation_controller.gd` (`STATES` = kandidat nama; `_sm_setup_transitions`) | Loop vs sekali-jalan = daftar `LOOP_STATES` |
+| Ganti mesh/library animasi karakter | `project/packs/character_player/player.gd` → tabel `SKINS` (path GLB per skin) | Tambah nama anim = tulis nama persis di GLB, prefiks namespace (`ual1/…`, `ual2/…`) |
+| Resolusi nama & alias animasi (jalan/serang/dst → nama klip asli) | `project/packs/character_player/anim_controller.gd` (`ALIASES`) | Loop vs sekali-jalan = daftar `LOOP_STATES` (whitelist eksplisit, lihat Ronde-36) |
 | Dunia (load, sky, lighting, collision, spawn) | `project/packs/world_terrain/world.gd` | File world = `gravity_falls.glb` di folder yang sama |
 | Ganti dunia total | unggah GLB baru ke `project/packs/world_terrain/` + set `STATIC_WORLD_PATH` | Catat kreditnya di `CREDITS.md` (harus CC0/legal) |
 | HUD/tombol aksi | `project/packs/ui/hud.gd` | Geometri lingkaran dsb di `_build()` |

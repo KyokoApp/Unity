@@ -640,3 +640,49 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   · deps character_player di build_packs.py dipangkas: animations ← dihapus.
 - Ruang kerja repo kini jauh lebih ringan; CI/HP tak terpengaruh isinya
   (yang tetap LIVE: grid world + joystick + pause).
+
+## Ronde-36 — Mannequin + UAL1 (lokomosi) + UAL2 (aksi) sekaligus (2026-09-22)
+
+- Permintaan user: pasang "pack animasi universal" biar semua animasinya
+  bisa dipakai lancar; belakangan ditambah upload UAL1 (versi lama yang
+  sempat dihapus Ronde-35) supaya lokomosi dasar tersedia — UAL2 sendiri
+  TIDAK punya idle/walk/run/jump dasar (isinya klip aksi: pedang, perisai,
+  berkebun, ninja-jump, slide, zombie).
+- Verifikasi manual sebelum eksekusi: mesh `Mannequin_F.glb`, `UAL1_Standard.glb`,
+  dan `UAL2_Standard.glb` berbagi SKELETON PERSIS SAMA (65 joint, nama
+  identik semua) → tak perlu retarget BoneMap/SkeletonProfileHumanoid
+  (langkah editor manual di panduan resmi Quaternius); cukup gabung
+  AnimationLibrary runtime di satu AnimationPlayer.
+- Arsitektur baru:
+  1. `_build_mannequin()` (player.gd) instantiate `ual1_standard.glb`
+     TERLEBIH DULU sebagai host (skeleton+AnimationPlayer bawaannya sudah
+     konsisten secara native, nol risiko NodePath track salah) — mesh dari
+     `mannequin_f.glb` "ditumpangkan" ke Skeleton3D itu lewat
+     `MeshInstance3D.skeleton` (pola shared-skeleton, aman krn nama joint
+     identik). Library `ual2` digabung sesudahnya via `add_animation_library`.
+  2. `anim_controller.gd` (baru, di dalam pack character_player — bukan
+     pack `animations` terpisah yg sudah dihapus Ronde-35): resolver 3-tahap
+     + fallback anti-T-pose (pelajaran Ronde-20), whitelist eksplisit klip
+     loop (Ronde-3, TAPI hanya utk state lokomosi — klip aksi ber-akhiran
+     "_Loop" spt Dance_Loop/Slide_Loop sengaja TIDAK dipaksa loop, karena
+     dipakai one-shot lewat action() dan butuh animation_finished utk
+     melepas kunci `_busy`).
+  3. FAILSAFE (Ronde-26): tiap tahap (load resource, cari Skeleton3D/
+     AnimationPlayer, cari MeshInstance3D) dicek null → gagal di titik mana
+     pun mundur ke EmptyRoot (game tetap boot, bukan crash/blue-screen).
+- Aksi yang disambungkan: jalan/lari/sprint/jongkok/lompat/renang (ual1),
+  roll=dash, pickup=Interact, jump_land, emote=Dance_Loop (ual1); serang
+  (tombol baru diaktifkan, sebelumnya no-op sejak Ronde-33) = satu klip
+  `Sword_Regular_Combo` (ual2, ~3 dtk, dikunci sampai selesai — SENGAJA
+  bukan state-machine kombo A/B/C manual demi hindari kelas bug "nyangkut"
+  yang berulang di riwayat proyek ini).
+- Sisa ~80 animasi (farming, shield, ninja-jump, climb, zombie, dst) TIDAK
+  disambungkan ke kontrol apa pun — tapi sudah ter-merge & bisa dipanggil
+  manual (`anim.action("ual2/Farm_Harvest")` dst) kapan pun mau dipakai
+  buat fitur baru.
+- Ukuran pack `character_player` naik dari ~29KB → ~16,5MB (mesh 1,4MB +
+  2×library ~7,3–7,8MB); tetap 1 pack terpisah, diunduh sekali via delta.
+- **BELUM DIVERIFIKASI DI PERANGKAT** (sandbox tak bisa jalankan editor
+  Godot/GPU — lihat D-9/D-15). Risiko tertinggi ada di retarget mesh↔skeleton
+  lintas-file (langkah 1 di atas): kalau pose tampak aneh/hancur, itu titik
+  pertama yang dicek — lihat CARA_UPDATE.md bagian troubleshooting baru.
