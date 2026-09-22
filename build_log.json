@@ -3,7 +3,7 @@
   "pack": "core_scripts",
   "version": "1.0.12",
   "returncode": 0,
-  "duration_s": 3.6,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -12,7 +12,7 @@
   "pack": "shaders_materials",
   "version": "1.0.9",
   "returncode": 0,
-  "duration_s": 3.8,
+  "duration_s": 3.6,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -28,12 +28,12 @@
  },
  {
   "pack": "character_player",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "returncode": 0,
   "duration_s": 3.6,
   "messages": [
    "SCRIPT ERROR: Parse Error: Cannot infer the type of \"n_anims\" variable because the value doesn't have a set type.",
-   "          at: GDScript::reload (res://packs/character_player/player.gd:127)",
+   "          at: GDScript::reload (res://packs/character_player/player.gd:128)",
    "ERROR: Failed to load script \"res://packs/character_player/player.gd\" with error \"Parse error\".",
    "   at: load (modules/gdscript/gdscript.cpp:3041)",
    "cannot connect to daemon at tcp:5037: Connection refused"
@@ -65,7 +65,7 @@
   "pack": "audio_music",
   "version": "1.0.1",
   "returncode": 0,
-  "duration_s": 3.7,
+  "duration_s": 3.6,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
