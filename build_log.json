@@ -12,7 +12,7 @@
   "pack": "shaders_materials",
   "version": "1.0.9",
   "returncode": 0,
-  "duration_s": 3.6,
+  "duration_s": 3.8,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -30,7 +30,7 @@
   "pack": "character_player",
   "version": "1.0.23",
   "returncode": 0,
-  "duration_s": 3.8,
+  "duration_s": 3.6,
   "messages": [
    "SCRIPT ERROR: Parse Error: Cannot infer the type of \"n_anims\" variable because the value doesn't have a set type.",
    "          at: GDScript::reload (res://packs/character_player/player.gd:127)",
@@ -43,7 +43,7 @@
   "pack": "ui",
   "version": "1.0.14",
   "returncode": 0,
-  "duration_s": 3.8,
+  "duration_s": 3.6,
   "messages": [
    "SCRIPT ERROR: Parse Error: Cannot infer the type of \"id\" variable because the value doesn't have a set type.",
    "          at: GDScript::reload (res://packs/ui/pause_menu.gd:191)",
@@ -65,7 +65,7 @@
   "pack": "audio_music",
   "version": "1.0.1",
   "returncode": 0,
-  "duration_s": 3.6,
+  "duration_s": 3.7,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
