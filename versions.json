@@ -1,8 +1,8 @@
 {
  "packs": {
   "core_scripts": {
-   "content_hash": "3c4aca49307fa0c997a2119a279c21b43e38522e4002332203f10b34e9f0d005",
-   "version": "1.0.11"
+   "content_hash": "57e1567fb1c461d4c12f5dceac2f99be3e30efc4c628bfac2dfd455bfd810576",
+   "version": "1.0.12"
   },
   "shaders_materials": {
    "content_hash": "fed0f185f9dc4ebb89ebb50afd7a882d4706aa9441732235212cc9be44545684",
@@ -25,12 +25,12 @@
    "version": "1.0.7"
   },
   "character_player": {
-   "content_hash": "c724707df8dc207c0685d1719587b23fdb5f210fdd4f4f582b1ad8e01163a7c4",
+   "content_hash": "781ef8725741218fe75f4b363a4603b78fc3faa61326dc97ab79a5ab9269b2d2",
    "version": "1.0.22"
   },
   "ui": {
-   "content_hash": "51d3cc4a402f7b60964d77911f513fdb43fbd1c59d0143c7245a832c6bde44c5",
-   "version": "1.0.13"
+   "content_hash": "288430109bfab88a79032f0e2fe220bc50d8bd73abb2f199e167862ef0638626",
+   "version": "1.0.14"
   },
   "audio_sfx": {
    "content_hash": "d43e8a08337984778388db77c8084ac7dadda641018bcfde5a2e3ec10ed29c91",
