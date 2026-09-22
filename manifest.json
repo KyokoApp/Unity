@@ -1,6 +1,6 @@
 {
  "game_version": "1.0.34",
- "generated_at": "2026-09-22T18:46:53Z",
+ "generated_at": "2026-09-22T18:55:00Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -35,10 +35,10 @@
    ]
   },
   "character_player": {
-   "version": "1.0.22",
+   "version": "1.0.23",
    "size": 2904120,
    "sha256": "59d2ad9fa4e2c90bc5b6f33e39fc8af8b58c2241fc8ed05abba6c611656480ac",
-   "url": "packs/character_player-1.0.22.pck",
+   "url": "packs/character_player-1.0.23.pck",
    "deps": [
     "shaders_materials"
    ]
