@@ -65,46 +65,30 @@ func _make_flat_ground() -> void:
 	body.add_child(col)
 	add_child(body)
 
-## Tanah kartun: hijau rumput bercampur coklat tanah ("campuran hijau dan
-## apa-itu-yang-lupa" ⇒ ditebak: hijau + coklat — gampang diganti nanti),
-## tambah taburan bintik. Dua oktaf noise ⇒ tambalan lebar + rinci kecil;
-## UV ruang-dunia ⇒ mulus saat bidang mengikuti pemain.
+## Lantai GRID PUTIH ala blueprint (permintaan user: "dunia datar tanpa batas
+## ada garis kotak-kotak putih"). Petak 1×1 m, garis tebal 2 cm, dilicinkan
+## dengan fwidth (anti-alias) supaya tenang dari kamera top-down; UV ruang-
+## dunia ⇒ mulus saat bidang mengikuti pemain. Dasar slate gelap (gaya
+## rancangan); ubah `base` bila mau warna latar lain.
 func _make_ground_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	var sh := Shader.new()
 	sh.code = """
 shader_type spatial;
 render_mode cull_back, depth_draw_opaque;
-uniform vec3 grass_a : source_color = vec3(0.36, 0.66, 0.33);   // hijau segar
-uniform vec3 grass_b : source_color = vec3(0.45, 0.72, 0.38);   // hijau muda
-uniform vec3 dirt    : source_color = vec3(0.58, 0.44, 0.28);   // coklat tanah
-uniform vec3 speck   : source_color = vec3(0.30, 0.52, 0.26);   // bintik gelap
-
-float h21(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
-}
-float vnoise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	float a = h21(i);
-	float b = h21(i + vec2(1.0, 0.0));
-	float c = h21(i + vec2(0.0, 1.0));
-	float d = h21(i + vec2(1.0, 1.0));
-	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}
+uniform vec3 base : source_color = vec3(0.13, 0.17, 0.21);   // slate gelap
+uniform vec3 line : source_color = vec3(1.0, 1.0, 1.0);      // garis putih
+uniform float cell = 1.0;    // sisi petak (meter)
+uniform float lw = 0.02;     // tebal garis (meter)
 varying vec3 wp;
 void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
-	vec2 p = wp.xz;
-	float patch = vnoise(p * 0.055);              // tambalan besar rumput/tanah
-	vec3 base = mix(grass_a, grass_b, vnoise(p * 0.37));
-	base = mix(dirt, base, smoothstep(0.35, 0.62, patch));
-	float s = step(0.975, h21(floor(p * 2.2)));   // bintik rinci jarang (2,2m grid)
-	base = mix(base, speck, s * 0.6);
-	ALBEDO = base;
+	vec2 q = wp.xz / cell;
+	vec2 g = abs(fract(q) - 0.5);
+	float lv = max(g.x, g.y);
+	float aa = fwidth(lv);
+	float l = smoothstep(0.5 - lw / cell - aa, 0.5 - lw / cell + aa, lv);
+	ALBEDO = mix(base, line, l);
 	ROUGHNESS = 0.95;
 	SPECULAR = 0.0;
 }
@@ -190,7 +174,9 @@ func _setup_environment() -> void:
 	env.fog_sky_affect = 0.3
 	# glow lembut utk pijar sihir (permintaan user) — SETINGAN HEMAT khusus
 	# mobile: radius kecil, tanpa level tinggi (post-process berat tetap no)
-	env.glow_enabled = true
+	# glow DINONAKTIFKAN di fase reset total (tak ada objek berefek — hemat baterai;
+	# setingan siap pakai dibiarkan di bawah bila efek sihir kelak dipulihkan)
+	env.glow_enabled = false
 	env.glow_normalized = true
 	env.glow_intensity = 0.55
 	env.glow_strength = 1.0

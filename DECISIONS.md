@@ -596,3 +596,18 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   → segera direkonstruksi dari snapshot cf5d38c dengan span fungsi tepat +
   verifikasi daftar fungsi lengkap + gdparse. Pelajaran: edit besar HANYA
   dengan batas fungsi pasti + cek daftar fungsi sebelum/sesudah.
+
+## Ronde-33 — RESET TOTAL oleh user: cuma dunia grid putih (kick-49) (2026-09-21)
+
+- Arahan persis: "hapus semuanya, mulai dari awal — pasang dunia datar tanpa
+  batas ada garis kotak-kotak putih itu dulu". DIEKSEKUSI harfiah:
+  (1) karakter & seluruh efek sihir DIHAPUS dari tampilan — `_load_skin`
+  kini menempelkan EmptyRoot (pemain tanpa model; kamera/joystick tetap
+  berfungsi seperti biasa); press_attack/press_emote = no-op; kode berkas
+  lama (orb/emote/wizard) tetap tersimpan di riwayat bila dipulihkan kelak.
+  (2) world: tanah = slate gelap + GRID PUTIH petak 1×1m (fwidth anti-alias,
+  UV ruang-dunia → mulus tak berbatas) gaya blueprint perancang.
+  (3) glow environment dimatikan (hemat daya; setingannya disimpan utk nanti).
+  (4) player.gd dasar tetap dari cf5d38c (gerak/top-down/kamera terbukti).
+- Pesan untuk user: fondasi bersih sudah berdiri; titik mulai berikutnya
+  tinggal ditambah satu per satu sesuai perintah.

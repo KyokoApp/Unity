@@ -76,8 +76,7 @@ var _attack_alt := false
 var _anim_probe := 0.0        # timer jejak anim on-device (diagnostik)
 var _wiz_t := 0.0             # fase animasi kode penyihir (bob)
 var _spin_t := 0.0            # sisa waktu putar saat emote
-var _orb_node: MeshInstance3D # (warisan: tak dipakai — tongkat sudah dihapus)
-var _hover_ring: MeshInstance3D # lingkaran sihir terbang (di bawah penyihir)
+var _orb_node: MeshInstance3D # orb tongkat (berdenyut)
 var _orbs := []               # proyektil sihir terbang: {n=node, v=vel, t=ttl}      # selang-seling attack/attack2 (pakai 2 animasi pukulan, bukan 1 terus)
 
 func set_world(w: Node) -> void:
@@ -100,125 +99,15 @@ func _ready() -> void:
 func _load_skin() -> void:
 	if model_root and is_instance_valid(model_root):
 		model_root.queue_free()
-	model_root = _build_wizard()
+	# RESET TOTAL atas perintah user: tidak ada karakter/model/model apa pun —
+	# pemain sengaja TAK KASAT MATA (fase "mulai dari awal": world grid dulu).
+	model_root = Node3D.new()
+	model_root.name = "EmptyRoot"
 	model_pivot.add_child(model_root)
-	anim = null  # sengaja: penyihir prosedural digerakkan kode (bob/condong/putar)
+	anim = null
 	var rootc = get_tree().current_scene
 	if rootc and rootc.has_method("_trace"):
-		rootc.call("_trace", "boot: skin = wizard prosedural ✔ (tanpa animasi GLB)")
-
-## Bagian-bagian penyihir toon dari mesh primitif (outline tipis sesuai permintaan).
-func _wiz_part(mesh: Mesh, color: Color, pos: Vector3,
-			  rot_deg := Vector3.ZERO, unshaded := false) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	if unshaded:
-		var sm := StandardMaterial3D.new()
-		sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		sm.albedo_color = color
-		sm.emission_enabled = true
-		sm.emission = color
-		sm.emission_energy_multiplier = 2.2
-		mi.material_override = sm
-	else:
-		mi.material_override = Materials.toon(color, true, 0.012)
-	mi.position = pos
-	mi.rotation_degrees = rot_deg
-	return mi
-
-func _wiz_part_with(mesh: Mesh, mat: Material, pos: Vector3, rot_deg := Vector3.ZERO) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.material_override = mat
-	mi.position = pos
-	mi.rotation_degrees = rot_deg
-	return mi
-
-## JUBAH BERGELOMBANG: shader verteks bergelombang (amplitudo makin besar ke
-## bawah) di atas warna toon penyihir — kain benar-benar bergerak saat terbang.
-const ROBE_WAVE_GLSL := """
-shader_type spatial;
-render_mode cull_back, depth_draw_opaque;
-uniform vec3 base : source_color = vec3(0.42, 0.30, 0.64);
-uniform float wave_amp = 0.045;
-uniform float wave_speed = 5.2;
-uniform float wave_freq = 7.5;
-void vertex() {
-	float k = clamp(1.0 - (VERTEX.y) / 0.95, 0.0, 1.0);   // 0 di pundak, 1 di ujung bawah
-	float a = atan(VERTEX.z, VERTEX.x);
-	vec2 w = vec2(
-		sin(TIME * wave_speed + a * 2.0 + VERTEX.y * wave_freq),
-		cos(TIME * wave_speed * 0.83 + a * 3.0 - VERTEX.y * wave_freq * 0.7));
-	VERTEX.xz += w * wave_amp * k;
-}
-void fragment() {
-	ALBEDO = base;
-	ROUGHNESS = 0.9;
-	SPECULAR = 0.0;
-}
-"""
-static var _robe_wave_shader: Shader
-
-func _build_wizard() -> Node3D:
-	var w := Node3D.new()
-	w.name = "WizardRoot"
-	if _robe_wave_shader == null:
-		_robe_wave_shader = Shader.new()
-		_robe_wave_shader.code = ROBE_WAVE_GLSL
-	var robe := CylinderMesh.new()
-	robe.bottom_radius = 0.36
-	robe.top_radius = 0.14
-	robe.height = 0.95
-	robe.radial_segments = 24
-	robe.rings = 20
-	var robe_mat := ShaderMaterial.new()
-	robe_mat.shader = _robe_wave_shader
-	robe_mat.next_pass = Materials.make_outline(0.008)
-	w.add_child(_wiz_part_with(robe, robe_mat, Vector3(0, 0.475, 0)))
-	var belt := TorusMesh.new()
-	belt.inner_radius = 0.135
-	belt.outer_radius = 0.175
-	w.add_child(_wiz_part(belt, Color(0.88, 0.70, 0.28), Vector3(0, 0.60, 0), Vector3(90, 0, 0)))
-	var chest := SphereMesh.new()
-	chest.radius = 0.17
-	chest.height = 0.30
-	w.add_child(_wiz_part(chest, Color(0.48, 0.35, 0.70), Vector3(0, 0.94, 0)))
-	# kepala (muka SENGAJA tanpa mata — tertutup topi besar)
-	var head := SphereMesh.new()
-	head.radius = 0.145
-	head.height = 0.26
-	w.add_child(_wiz_part(head, Color(0.95, 0.83, 0.69), Vector3(0, 1.10, 0.01)))
-	# TOPI DIPERBESAR menaungi muka: kerucut lebar, brim menjuntai doyong ke depan
-	var hat := CylinderMesh.new()
-	hat.bottom_radius = 0.21
-	hat.top_radius = 0.0
-	hat.height = 0.64
-	hat.radial_segments = 20
-	w.add_child(_wiz_part(hat, Color(0.35, 0.23, 0.54), Vector3(0, 1.40, -0.10), Vector3(-14, 0, 3)))
-	var brim := TorusMesh.new()
-	brim.inner_radius = 0.15
-	brim.outer_radius = 0.385
-	w.add_child(_wiz_part(brim, Color(0.35, 0.23, 0.54), Vector3(0, 1.17, 0.06), Vector3(80, 0, 3)))
-	var star := SphereMesh.new()
-	star.radius = 0.04
-	star.height = 0.055
-	w.add_child(_wiz_part(star, Color(1.0, 0.86, 0.35), Vector3(0.07, 1.33, 0.13), Vector3.ZERO, true))
-	# [tongkat & orb DIHAPUS atas permintaan user — sihir kini dari tangan]
-	# LINGKARAN SIHIR TERBANG (samar, berputar pelan, tinggal di tanah)
-	var ring := TorusMesh.new()
-	ring.inner_radius = 0.42
-	ring.outer_radius = 0.50
-	var rm := StandardMaterial3D.new()
-	rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	rm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	rm.albedo_color = Color(0.40, 0.95, 0.85, 0.34)
-	rm.emission_enabled = true
-	rm.emission = Color(0.40, 0.95, 0.85)
-	rm.emission_energy_multiplier = 1.6
-	_hover_ring = _wiz_part_with(ring, rm, Vector3(0, 0.045, 0), Vector3(90, 0, 0))
-	model_pivot.add_child(_hover_ring)  # saudara model: tetap di tanah saat terbang
-	return w
+		rootc.call("_trace", "boot: pemain tanpa model (reset total) ✔")
 
 func _find_mesh_instances(n: Node, out: Array) -> void:
 	if n is MeshInstance3D:
@@ -342,208 +231,32 @@ func set_blob_shadow(enabled: bool) -> void:
 		blob.visible = enabled
 
 func press_emote() -> void:
-	if _action_lock > 0.0:
-		return
-	if anim:
-		anim.action("emote", 1600)
-		_action_lock = 1.2
-		_play("emote")
-	else:
-		# penyihir prosedural: emote = putar riang + denyut orb
-		_spin_t = 0.9
-		_action_lock = 0.9
-		_play("emote")
+	return  # dinonaktifkan pada fase reset (tak ada karakter/sihir)
 
 func press_attack() -> void:
-	if _action_lock > 0.0:
-		return
-	if anim:
-		var st := "attack2" if (_attack_alt and anim.has("attack2")) else "attack"
-		_attack_alt = not _attack_alt
-		anim.action(st, 600)
-		_action_lock = 0.5
-	else:
-		# tembak orb sihir ke arah hadap karakter (versi awal: belum mengenai apa-apa)
-		_cast_orb()
-		_action_lock = 0.4
+	return  # dinonaktifkan pada fase reset (sihir dihapus; dipulihkan kelak)
 
 ## Orb pijar: bola tak-terteduh + material emisi, terbang+pijar memudar saat lenyap.
-# === SERANG DASAR SIHIR ===
-# lapisan 1: denyut kilat di tangan, 2: inti proyektil + jejak partikel +
-# lampu cyan, 3: ledakan kembang api + cincin gelombang + bekas hangus.
-# Semua prosedural (lisensi bersih) — sprite glow radial dibangun di runtime.
-static var _tex_glow: Texture2D
-static func glow_tex() -> Texture2D:
-	if _tex_glow:
-		return _tex_glow
-	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
-	for yy in range(64):
-		for xx in range(64):
-			var d: float = Vector2(xx - 31.5, yy - 31.5).length() / 31.5
-			var aa: float = clampf(1.0 - d, 0.0, 1.0)
-			aa = aa * aa * (3.0 - 2.0 * aa)
-			img.set_pixel(xx, yy, Color(1, 1, 1, aa * aa))
-	_tex_glow = ImageTexture.create_from_image(img)
-	return _tex_glow
-
-func _quad_mat(color: Color, energy := 2.2) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	m.vertex_color_use_as_albedo = true
-	m.albedo_texture = glow_tex()
-	m.albedo_color = color
-	m.emission_enabled = true
-	m.emission = color
-	m.emission_energy_multiplier = energy
-	return m
-
-func _burst(pos: Vector3, color: Color, count: int, speed: float,
-		life: float, size: float, gravity := Vector3.ZERO, spread := 1.0) -> void:
-	var p := GPUParticles3D.new()
-	p.amount = count
-	p.lifetime = life
-	p.one_shot = true
-	p.explosiveness = 0.92
-	p.interpolate = true
-	p.local_coords = false
-	var pm := ParticleProcessMaterial.new()
-	pm.spread = 180.0 * spread
-	pm.initial_velocity_min = speed * 0.45
-	pm.initial_velocity_max = speed
-	pm.angular_velocity_min = -60.0
-	pm.angular_velocity_max = 60.0
-	pm.gravity = gravity
-	pm.scale_min = size * 0.5
-	pm.scale_max = size
-	pm.damping_min = 2.0
-	pm.damping_max = 5.0
-	var ramp := Gradient.new()
-	ramp.set_color(0, Color(1, 1, 1, 1))
-	ramp.set_color(1, Color(1, 1, 1, 0))
-	var ramp_tex := GradientTexture1D.new()
-	ramp_tex.gradient = ramp
-	pm.color_ramp = ramp_tex
-	p.process_material = pm
-	var q := QuadMesh.new()
-	q.size = Vector2(0.20, 0.20)
-	q.material = _quad_mat(color, 3.0)
-	p.draw_pass_1 = q
-	get_tree().current_scene.add_child(p)
-	p.global_position = pos
-	p.emitting = true
-	var t := get_tree().create_timer(life + 0.15)
-	t.timeout.connect(p.queue_free)
-
 func _cast_orb() -> void:
-	var dir := Vector3(sin(model_pivot.rotation.y), 0.0, cos(model_pivot.rotation.y))
-	var hand := global_position + dir * 0.42 + Vector3(0, 1.05, 0)
-	# denyut sihir saat mantera dirapalkan
-	_burst(hand, Color(0.55, 0.95, 0.88), 14, 2.4, 0.30, 0.55)
 	var orb := MeshInstance3D.new()
 	var sm := SphereMesh.new()
-	sm.radius = 0.10
-	sm.height = 0.20
+	sm.radius = 0.12
+	sm.height = 0.22
 	sm.radial_segments = 12
 	sm.rings = 8
 	orb.mesh = sm
-	orb.material_override = _quad_mat(Color(0.60, 1.0, 0.92), 4.0)
-	orb.position = hand
-	var trail := GPUParticles3D.new()
-	trail.amount = 26
-	trail.lifetime = 0.34
-	trail.interpolate = true
-	trail.local_coords = false
-	trail.emitting = true
-	var tpm := ParticleProcessMaterial.new()
-	tpm.spread = 30.0
-	tpm.initial_velocity_min = 0.05
-	tpm.initial_velocity_max = 0.35
-	tpm.gravity = Vector3.ZERO
-	tpm.scale_min = 0.10
-	tpm.scale_max = 0.42
-	tpm.damping_min = 1.0
-	tpm.damping_max = 3.0
-	var tramp := Gradient.new()
-	tramp.set_color(0, Color(1, 1, 1, 1))
-	tramp.set_color(1, Color(0.6, 1.0, 0.9, 0))
-	var trt := GradientTexture1D.new()
-	trt.gradient = tramp
-	tpm.color_ramp = trt
-	trail.process_material = tpm
-	var tq := QuadMesh.new()
-	tq.size = Vector2(0.16, 0.16)
-	tq.material = _quad_mat(Color(0.45, 0.95, 0.83), 2.4)
-	trail.draw_pass_1 = tq
-	orb.add_child(trail)
-	var lit := OmniLight3D.new()
-	lit.light_color = Color(0.45, 0.95, 0.85)
-	lit.light_energy = 1.6
-	lit.omni_range = 3.6
-	lit.shadow_enabled = false
-	orb.add_child(lit)
+	var smat := StandardMaterial3D.new()
+	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smat.albedo_color = Color(0.55, 0.98, 0.90)
+	smat.emission_enabled = true
+	smat.emission = Color(0.50, 1.0, 0.90)
+	smat.emission_energy_multiplier = 3.0
+	orb.material_override = smat
+	var dir := Vector3(sin(model_pivot.rotation.y), 0.0, cos(model_pivot.rotation.y))
+	orb.position = global_position + dir * 0.5 + Vector3(0, 1.15, 0)
 	get_tree().current_scene.add_child(orb)
-	_orbs.append({"n": orb, "v": dir * 13.5 + Vector3(0, 0.2, 0), "t": 1.5, "hit": false})
+	_orbs.append({"n": orb, "v": dir * 13.0 + Vector3(0, 0.4, 0), "t": 1.6})
 	_play("attack")
-
-func _spawn_impact(pos: Vector3) -> void:
-	_burst(pos, Color(0.62, 1.0, 0.92), 34, 5.2, 0.5, 0.75, Vector3(0, -3.0, 0))
-	_burst(pos + Vector3(0, 0.05, 0), Color(0.95, 1.0, 0.98), 10, 7.5, 0.32, 0.5)
-	var ring := MeshInstance3D.new()
-	var tm := TorusMesh.new()
-	tm.inner_radius = 0.55
-	tm.outer_radius = 0.72
-	ring.mesh = tm
-	var rm := StandardMaterial3D.new()
-	rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	rm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	rm.albedo_color = Color(0.40, 0.95, 0.85, 0.75)
-	rm.emission_enabled = true
-	rm.emission = Color(0.40, 0.95, 0.85)
-	rm.emission_energy_multiplier = 2.2
-	ring.material_override = rm
-	ring.rotation_degrees = Vector3(90, 0, 0)
-	ring.position = Vector3(pos.x, 0.06, pos.z)
-	ring.scale = Vector3(0.4, 0.4, 0.4)
-	get_tree().current_scene.add_child(ring)
-	_fx.append({"n": ring, "t": 0.38, "T": 0.38, "kind": "ring"})
-	var scorch := MeshInstance3D.new()
-	var sq := PlaneMesh.new()
-	sq.size = Vector2(0.9, 0.9)
-	scorch.mesh = sq
-	var scm := StandardMaterial3D.new()
-	scm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	scm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	scm.albedo_color = Color(0.05, 0.09, 0.08, 0.55)
-	scorch.material_override = scm
-	scorch.rotation_degrees = Vector3(0, randf() * 360.0, 0)
-	scorch.position = Vector3(pos.x, 0.055, pos.z)
-	get_tree().current_scene.add_child(scorch)
-	_fx.append({"n": scorch, "t": 1.8, "T": 1.8, "kind": "scorch"})
-
-var _fx := []
-
-func _update_fx(delta: float) -> void:
-	for i in range(_fx.size() - 1, -1, -1):
-		var o: Dictionary = _fx[i]
-		var n: Node3D = o["n"]
-		if not is_instance_valid(n):
-			_fx.remove_at(i)
-			continue
-		o["t"] = o["t"] - delta
-		var k: float = clampf(o["t"] / o["T"], 0.0, 1.0)
-		if o["kind"] == "ring":
-			var g: float = 0.4 + (1.0 - k) * 2.6
-			n.scale = Vector3(g, g, g)
-			(n.material_override as StandardMaterial3D).albedo_color.a = 0.75 * k
-		elif o["kind"] == "scorch":
-			(n.material_override as StandardMaterial3D).albedo_color.a = 0.55 * k
-		if o["t"] <= 0.0:
-			n.queue_free()
-			_fx.remove_at(i)
 
 func _update_orbs(delta: float) -> void:
 	for i in range(_orbs.size() - 1, -1, -1):
@@ -556,12 +269,20 @@ func _update_orbs(delta: float) -> void:
 		n.position += o["v"] * delta
 		n.scale = Vector3.ONE * (1.0 + 0.15 * sin(_wiz_t * 9.0))
 		o["t"] = o["t"] - delta
-		var dying: bool = o["t"] <= 0.0 or n.position.y < 0.06
-		if dying and not o.get("hit", false):
-			o["hit"] = true
-			_spawn_impact(n.position)
-			n.queue_free()
-			_orbs.remove_at(i)
+		var dying: bool = o["t"] <= 0.0 or n.position.y < 0.05
+		if dying:
+			# menyentuh tanah/habis umur: berhenti, memudar mengecil, lalu lenyap
+			o["v"] = Vector3.ZERO
+			if n.position.y < 0.05:
+				n.position.y = 0.05
+			o["t"] = minf(o["t"], 0.18)
+			if o["t"] <= 0.0:
+				n.queue_free()
+				_orbs.remove_at(i)
+				continue
+			n.scale = Vector3.ONE * maxf(o["t"] / 0.18, 0.05)
+		else:
+			n.scale = Vector3.ONE * (1.0 + 0.15 * sin(_wiz_t * 9.0))
 
 func _apply_crouch_shape() -> void:
 	var cap: CapsuleShape3D = col_shape.shape
@@ -638,7 +359,6 @@ func _physics_process(delta: float) -> void:
 	# animasi & model
 	_update_model(delta, move_dir, speed)
 	_update_orbs(delta)
-	_update_fx(delta)
 	if _spin_t > 0.0:
 		_spin_t -= delta
 		if model_root:
@@ -735,17 +455,13 @@ func _update_model(delta: float, move_dir: Vector3, speed: float) -> void:
 		# arah lari dari kode; orb tongkat berdenyut; putar saat emote diatur
 		# oleh _spin_t di _physics_process.
 		_wiz_t += delta * (1.1 + hspeed * 0.85)
-		var hover: float = 0.30 if not crouch else 0.14     # terbang melayang!
-		model_root.position.y = hover + sin(_wiz_t * 2.1) * 0.045
-		var lean: float = 0.26 if hspeed > SPEED_RUN + 0.2 else (0.14 if hspeed > 0.4 else 0.0)
+		var bob_t: float = 0.032 if hspeed < 0.25 else 0.018 + hspeed * 0.003
+		model_root.position.y = sin(_wiz_t * 2.1) * bob_t
+		var lean: float = 0.16 if hspeed > 0.4 else 0.0
 		model_root.rotation.x = lerp_angle(model_root.rotation.x, lean, delta * 7.0)
-		model_root.rotation.z = lerp_angle(model_root.rotation.z, -lean * 0.45, delta * 7.0)
+		model_root.rotation.z = lerp_angle(model_root.rotation.z, -lean * 0.5, delta * 7.0)
 		if velocity.y < -1.0 and not is_on_floor():
 			model_root.rotation.x = lerp_angle(model_root.rotation.x, -0.22, delta * 6.0)
-		if _hover_ring and is_instance_valid(_hover_ring):
-			_hover_ring.rotation.y += delta * 0.9
-			var pr: float = 1.0 + 0.10 * sin(_wiz_t * 3.3)
-			_hover_ring.scale = Vector3(pr, pr, pr)
 		if _orb_node and is_instance_valid(_orb_node):
 			_orb_node.scale = Vector3.ONE * (1.0 + 0.18 * sin(_wiz_t * 6.3))
 	# efek visual jongkok (memendek sedikit) & renang (mengambang lebih rendah)
