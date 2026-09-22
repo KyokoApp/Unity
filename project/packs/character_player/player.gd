@@ -6,7 +6,6 @@ extends CharacterBody3D
 signal stats_changed(kind: String, count: int)
 signal nearest_interactable_changed(meta)
 
-const AnimControllerScript := preload("res://packs/animations/animation_controller.gd")
 const Materials := preload("res://packs/shaders_materials/materials.gd")
 
 # PENYIHIR PROSEDURAL: model 100% dibangun dari mesh primitif oleh kode
@@ -42,7 +41,7 @@ const LOOK_K := 0.0036
 
 var world: Node
 var settings
-var anim: AnimControllerScript
+var anim
 var model_root: Node3D
 var model_pivot: Node3D
 var cam_pivot: Node3D

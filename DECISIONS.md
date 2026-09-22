@@ -625,3 +625,18 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   tetap bulat gelap translusen konsisten gaya Genshin-nya.
 - Fisika/gerak tak diutak-atik; tombol aksi yang disembunyikan tetap
   terdaftar (mudah dipulihkan per-tombol bila diminta).
+
+## Ronde-35 — bersih-bersih berkas tak terpakai (kick-51) (2026-09-22)
+
+- Perintah user: "hapus file yang udah gk kepake". Dibuang (selalu bisa
+  dipulihkan dari riwayat bila dibutuhkan):
+  · `Universal Animation Library[Standard]/`  *61 MB* — bahan GLB mentah
+    di luar pack, sisa era karakter kerangka.
+  · `gravity_falls.txt`  *9,2 MB* — artefak dunia lama.
+  · `project/packs/animations/`  *13 KB* — pustaka AnimController (penyihir
+    top-down prosedural tak memakai); dua rujukan di player.gd
+    (preload const + tipe var anim) dinetralkan agar pack bisa dihapus tanpa
+    merusak parse.
+  · deps character_player di build_packs.py dipangkas: animations ← dihapus.
+- Ruang kerja repo kini jauh lebih ringan; CI/HP tak terpengaruh isinya
+  (yang tetap LIVE: grid world + joystick + pause).

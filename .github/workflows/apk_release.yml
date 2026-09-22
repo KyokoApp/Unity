@@ -304,3 +304,4 @@ jobs:
 # rerun-kick 48 (penyihir terbang: jubah bergelombang+topi besar+tanpa tongkat; serangan sihir partikel+lampu+cincin+hangus; glow mobile-hemat)
 # rerun-kick 49 (RESET TOTAL permintaan user: semua karakter/efek dihapus — tinggal dunia datar grid putih 1m + kontrol)
 # rerun-kick 50 (UI minimal permintaan user: hanya joystick+pause — sembunyikan semua tombol/label lain; ikon pause palang ramping)
+# rerun-kick 51 (bersih-bersih: hapus UAL 61MB + gravity_falls.txt 9MB + pack animations yg tak terpakai; netralkan rujukan)
