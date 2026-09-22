@@ -686,3 +686,15 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   Godot/GPU — lihat D-9/D-15). Risiko tertinggi ada di retarget mesh↔skeleton
   lintas-file (langkah 1 di atas): kalau pose tampak aneh/hancur, itu titik
   pertama yang dicek — lihat CARA_UPDATE.md bagian troubleshooting baru.
+
+## Ronde-36 — auto-build per push (permintaan user: "auto update, gak pusing manual") (2026-09-22)
+
+- Workflow `apk-release` dulunya cuma jalan jika file workflow-nya sendiri
+  berubah (makanya butuh "kick" manual tiap ronde) + tombol Run workflow.
+- Kini: push APA PUN yang menyentuh `project/**`, `tools/**`, `server/**`,
+  `docs/**`, CREDITS/DECISIONS/BACA_INI di branch kerja/main → langsung build.
+  Upload file lewat web GitHub (HP) ikut memicu otomatis.
+- Anti-loop: branch `content` (hasil build) tidak didaftarkan sebagai pemicu.
+- Anti-tabrakan versi: langkah baru menyinkron `server/versions.json` dari
+  branch `content` SEBELUM build (akar insiden 1.0.22 tertimpa di kick-52 —
+  DB lokal basi bikin bump memakai nomor yang sudah rilis).

@@ -4,8 +4,22 @@ name: apk-release
 ## export kedua preset, lalu terbitkan aset ke GitHub Release $TAG.
 ## Diagnostik build ditulis ke release notes agar terbaca via API.
 on:
+  # AUTO-UPDATE (permintaan user, kick-54): push apa pun yang menyentuh konten
+  # game di branch kerja/main LANGSUNG build — tak perlu kick manual lagi.
+  # Branch 'content' sengaja TAK didaftarkan → push hasil build ke content
+  # tidak memicu build ulang (anti-loop tak berujung).
   push:
+    branches:
+      - main
+      - arena/01a0ba2f-unity
     paths:
+      - "project/**"
+      - "tools/**"
+      - "server/**"
+      - "docs/**"
+      - "CREDITS.md"
+      - "DECISIONS.md"
+      - "BACA_INI.md"
       - ".github/workflows/apk_release.yml"
   workflow_dispatch:
 
@@ -25,6 +39,17 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
+      - name: Sinkron DB versi dari branch content (cegah bump tabrakan)
+        # versions.json di branch kerja cepat basi karena build menulis ke
+        # branch content; build BERBASIS DB basi pernah menimpa versi lama
+        # tanpa ganti nomor (insiden 1.0.22 tertimpa, kick-52/53). Selalu
+        # mulai dari DB content terbaru supaya bump versi tak pernah tabrakan.
+        run: |
+          git fetch origin content:refs/remotes/origin/content --depth 1 -q && \
+            git show origin/content:versions.json > server/versions.json && \
+            echo "versions.json disinkron dari content ✔" || \
+            echo "branch content belum ada — pakai versions.json milik repo"
 
       - uses: actions/setup-python@v5
         with:
