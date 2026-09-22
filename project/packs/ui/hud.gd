@@ -118,8 +118,9 @@ class RpgButton:
 				draw_line(c + Vector2(-0.78, 0.1) * r, c + Vector2(-0.6, 0.1) * r, w, 3.0, true)
 				draw_line(c + Vector2(-0.78, 0.34) * r, c + Vector2(-0.64, 0.34) * r, w, 3.0, true)
 			"pause":
-				draw_line(c + Vector2(-0.2, -0.42) * r, c + Vector2(-0.2, 0.42) * r, w, 7.0, true)
-				draw_line(c + Vector2(0.2, -0.42) * r, c + Vector2(0.2, 0.42) * r, w, 7.0, true)
+				# dua palang ramping (garis 4px) — dulu 7px melebur jadi kotak
+				draw_line(c + Vector2(-0.19, -0.50) * r, c + Vector2(-0.19, 0.50) * r, w, 4.0, true)
+				draw_line(c + Vector2(0.19, -0.50) * r, c + Vector2(0.19, 0.50) * r, w, 4.0, true)
 			"bolt":  # sprint (petir) — ganti glyph "»" yang pecah di HP
 				draw_line(c + Vector2(0.18, -0.55) * r, c + Vector2(-0.24, 0.02) * r, w, 4.5, true)
 				draw_line(c + Vector2(-0.24, 0.02) * r, c + Vector2(0.12, 0.02) * r, w, 4.5, true)
@@ -197,7 +198,7 @@ func _on_setting_changed(key: String) -> void:
 	if key in ["button_scale"]:
 		_apply_scale()
 	if key in ["show_fps"]:
-		label_fps.visible = settings.show_fps
+		label_fps.visible = false    # UI minimal: fps tersembunyi selalu
 
 # ---------- konstruksi UI ----------
 
@@ -308,6 +309,11 @@ func _build_layout() -> void:
 	_connect_rpg("BtnDash", Callable(self, "_on_dash"), false)
 	_connect_rpg("BtnEmote", Callable(self, "_on_emote"), false)
 	_buttons["BtnAction"].visible = false
+	# UI MINIMAL (perintah user 22/09): SEMUA tombol disembunyikan, sisakan
+	# hanya JOYSTICK (jalan) + PAUSE. Tombol tak terlihat = tak menerima sentuh.
+	for k in ["BtnJump", "BtnAtk", "BtnDash", "BtnCrouch", "BtnSprint", "BtnEmote", "BtnAction"]:
+		if _buttons.has(k):
+			_buttons[k].visible = false
 
 	# --- pause: bulat kecil pojok kiri atas ---
 	var bpause := RpgButton.new("pause", 32.0)
@@ -328,13 +334,14 @@ func _build_layout() -> void:
 	label_clock.add_theme_color_override("font_shadow", Color(0, 0, 0, 0.55))
 	label_clock.add_theme_constant_override("shadow_offset_x", 2)
 	label_clock.add_theme_constant_override("shadow_offset_y", 2)
+	label_clock.visible = false          # UI minimal
 	root.add_child(label_clock)
 	label_fps = Label.new()
 	label_fps.position = Vector2(ml + 100, mt + 44)
 	label_fps.text = ""
 	label_fps.add_theme_font_size_override("font_size", 24)
 	label_fps.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
-	label_fps.visible = settings.show_fps if settings else false
+	label_fps.visible = false            # UI minimal
 	root.add_child(label_fps)
 
 	# --- prompt interaksi (tengah bawah) ---
@@ -349,6 +356,7 @@ func _build_layout() -> void:
 	label_prompt.position = Vector2(vsz.x * 0.5 - 260, vsz.y - mb - 260)
 	label_prompt.size = Vector2(520, 50)
 	label_prompt.text = ""
+	label_prompt.visible = false         # UI minimal
 	root.add_child(label_prompt)
 
 	# --- statistik pickup (atas kanan) ---
@@ -361,6 +369,7 @@ func _build_layout() -> void:
 	label_stats.add_theme_color_override("font_shadow", Color(0, 0, 0, 0.55))
 	label_stats.add_theme_constant_override("shadow_offset_x", 2)
 	label_stats.add_theme_constant_override("shadow_offset_y", 2)
+	label_stats.visible = false          # UI minimal
 	root.add_child(label_stats)
 
 	# --- toast tengah atas ---

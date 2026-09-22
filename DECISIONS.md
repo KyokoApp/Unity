@@ -611,3 +611,17 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
   (4) player.gd dasar tetap dari cf5d38c (gerak/top-down/kamera terbukti).
 - Pesan untuk user: fondasi bersih sudah berdiri; titik mulai berikutnya
   tinggal ditambah satu per satu sesuai perintah.
+
+## Ronde-34 — UI minimal: hanya joystick + pause (kick-50) (2026-09-22)
+
+- Screenshot user membuktikan grid bekerja; arahan: "semua ui ilangin sisain
+  tombol jalan dan pause juga design pause … nempel di pojok kiri atas".
+- UI hud.gd: SEMUA tombol aksi (jump/serang/dash/crouch/sprint/emote/aksi)
+  + SEMUA label (jam, fps, stats, prompt) → visible=false (tak tampil, tak
+  menerima sentuh). Yang tersisa: JOYSTICK (muncul-saat-sentuh) + tombol
+  PAUSE tetap menempel di pojok kiri atas.
+- Desain pause diperbaiki: dua palang kini RAMPING (4px; dulu 7px melebur
+  tampak seperti kotak penuh di fotonya) dan ukuran disesuaikan r=32,
+  tetap bulat gelap translusen konsisten gaya Genshin-nya.
+- Fisika/gerak tak diutak-atik; tombol aksi yang disembunyikan tetap
+  terdaftar (mudah dipulihkan per-tombol bila diminta).
