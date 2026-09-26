@@ -28,6 +28,25 @@ uniform float wrap_size = 84.0;
 uniform float trample_power : hint_range(0.0, 3.0) = 1.1;
 uniform float trample_radius : hint_range(0.1, 5.0) = 1.3;
 
+// Batas pulau (ronde-46 lanjutan bag. C, permintaan user "pulau 12km +
+// laut"): rumput TAK BOLEH tumbuh di pasir/laut. Rumus disalin manual dr
+// island_shape.gd (IslandShape) & dr shader tanah di world.gd — WAJIB
+// disamakan kalau salah satu diubah (lihat komentar di island_shape.gd).
+const float ISLAND_RADIUS = 6000.0;
+const float BEACH_WIDTH = 55.0;
+float island_radius_at(float theta) {
+	return ISLAND_RADIUS * (1.0
+		+ 0.20 * sin(theta * 3.0 + 1.3)
+		+ 0.11 * sin(theta * 7.0 + 0.7)
+		+ 0.06 * sin(theta * 11.0 + 2.4));
+}
+float island_water_factor(vec2 p) {
+	float theta = atan(p.y, p.x);
+	float r = length(p);
+	float coast = island_radius_at(theta);
+	return clamp((r - (coast - BEACH_WIDTH)) / BEACH_WIDTH, 0.0, 1.0);
+}
+
 varying float height_w;   // 0=akar, 1=ujung (dibaca dari COLOR.a mesh)
 varying float variant;    // keacakan warna per-instance (INSTANCE_CUSTOM.x)
 
@@ -53,6 +72,14 @@ void vertex() {
 	VERTEX *= edge_fade;
 
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+
+	// Rumput lenyap sblm garis pantai (bukan tumbuh di pasir/laut) — fade
+	// mulai SEBELUM pasir penuh (wf 0.0-0.3) spy transisinya alami, bukan
+	// terpotong tajam pas garis air. Pakai teknik shrink-ke-akar yg sama
+	// spt edge_fade di atas (aman digabung, tinggal dikali lagi).
+	float wf = island_water_factor(world_pos.xz);
+	float island_fade = 1.0 - smoothstep(0.0, 0.3, wf);
+	VERTEX *= island_fade;
 
 	// Tekukan injak: cuma dihitung (termasuk inverse(MODEL_MATRIX) yg agak
 	// mahal) utk helai yg BENAR2 dekat pemain — dibungkus if supaya ribuan

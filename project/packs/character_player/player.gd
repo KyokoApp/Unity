@@ -42,6 +42,7 @@ signal nearest_interactable_changed(meta)
 signal health_changed(current: float, maximum: float)
 
 const Materials := preload("res://packs/shaders_materials/materials.gd")
+const IslandShape := preload("res://packs/world_terrain/island_shape.gd")
 const SHOOT_SFX := "res://packs/audio_sfx/fire_shoot.wav"
 const ARCANE_BOLT := preload("res://packs/character_player/arcane_bolt.gd")
 const MANNEQUIN_SCENE := preload("res://packs/character_player/mannequin/UAL1_Standard.glb")
@@ -277,6 +278,7 @@ func _move(delta: float) -> void:
 		var dash_velocity := _dash_dir * DASH_SPEED * dash_factor
 		velocity = Vector3(dash_velocity.x, -global_position.y / maxf(delta, 0.001), dash_velocity.z)
 		move_and_slide()
+		_clamp_to_island()
 		_facing = _dash_dir
 		_speed01 = lerpf(_speed01, dash_factor, 1.0 - exp(-12.0 * delta))
 		_advance_footsteps(DASH_SPEED * dash_factor, delta)
@@ -300,10 +302,35 @@ func _move(delta: float) -> void:
 		hv = Vector3.ZERO
 	velocity = Vector3(hv.x, -global_position.y / maxf(delta, 0.001), hv.z)
 	move_and_slide()
+	_clamp_to_island()
 	if hv.length() > 0.1:
 		_facing = hv.normalized()
 	_speed01 = lerpf(_speed01, clampf(hv.length() / MAX_SPEED, 0.0, 1.0), 1.0 - exp(-8.0 * delta))
 	_advance_footsteps(hv.length(), delta)
+
+## Batas pulau ~12km (bag. C lanjutan, permintaan user): dunia dulu papan
+## tak berujung yg ikut pemain (WorldBoundaryShape3D, tak ada tepi sama
+## sekali) — skrg pulau BERBATAS dgn laut di sekelilingnya. Drpd bikin mesh
+## collision 3D yg cocok persis dgn garis pantai berombak (rumit & berat
+## utk mobile), cukup "dorong lembut" posisi pemain balik ke dalam kalau
+## melewati COAST_MARGIN sblm garis air — dari sudut pandang pemain terasa
+## spt nabrak air/pantai, padahal implementasinya cuma clamp radial simpel.
+func _clamp_to_island() -> void:
+	var x := global_position.x
+	var z := global_position.z
+	var theta := atan2(z, x)
+	var r := sqrt(x * x + z * z)
+	var max_r := IslandShape.radius_at(theta) - IslandShape.COAST_MARGIN
+	if r > max_r and r > 0.001:
+		var scale := max_r / r
+		global_position.x = x * scale
+		global_position.z = z * scale
+		# redam komponen kecepatan yg mengarah keluar pulau (biar tak
+		# "menekan" terus2an ke batas, terasa spt kena tahanan air/pasir)
+		var out_dir := Vector3(x, 0.0, z).normalized()
+		var outward := velocity.dot(out_dir)
+		if outward > 0.0:
+			velocity -= out_dir * outward
 
 ## Debu jejak kaki disederhanakan jadi berbasis JARAK TEMPUH (bukan lagi
 ## fase gait per-tulang manual — animasi kaki kini datang dari mocap asli,

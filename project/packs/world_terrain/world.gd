@@ -1,19 +1,26 @@
 extends Node3D
-## World: DUNIA DATAR TANPA BATAS bergaya sihir open-world (ronde-46, pivot
-## balik dari game tank ke tema penyihir anime). Bidang datar tak berujung
-## (visual mengikuti pemain + collider bidang WorldBoundaryShape3D — POLA
-## SEDERHANA, bukan trimesh ⇒ is_on_floor() engine selalu benar). Reruntuhan/
-## dinding batu destructible acak (wall_system.gd) dipertahankan sebagai
-## rintangan & pemandangan dunia terbuka.
+## World: PULAU DATAR ~12km bergaya sihir open-world (ronde-46, pivot balik
+## dari game tank ke tema penyihir anime). Visual tanah TETAP satu bidang
+## datar (PlaneMesh 1600m) yg mengikuti pemain scr visual (collider bidang
+## WorldBoundaryShape3D tetap tak berujung scr FISIK — POLA SEDERHANA, bukan
+## trimesh ⇒ is_on_floor() engine selalu benar) — TAPI skrg dunia scr LOGIS
+## dibatasi jadi pulau (lihat island_shape.gd: garis pantai "alami" dari
+## harmonik sinus, BUKAN lingkaran/kotak) dgn laut mengelilinginya, dirender
+## oleh shader tanah yg SAMA (_make_ground_material, blend darat->pasir->air
+## berdasar posisi dunia absolut) & pemain didorong lembut balik kalau
+## melewati garis pantai (player.gd _clamp_to_island). Tiang/reruntuhan batu
+## (wall_system.gd) SUDAH DIHAPUS dr spawn (permintaan user, dianggap tak
+## cocok tema) — skrip lama tetap ada di repo, tak lagi dipanggil.
 ##
 ## Bag. C (permintaan pengguna): tanah rumput lebat (tekstur + tumpuk rumput
-## 3D MultiMesh dekat pemain, lihat _build_grass), kabut "batas pandang"
-## HANYA di kejauhan (FOG_MODE_DEPTH, lihat _setup_environment — dekat pemain
-## SELALU jernih), dan dunia dikunci MALAM PERMANEN dgn langit berbintang +
-## bulan (siklus siang-malam lama, SKY_PRESETS, & slider debug "Mode Edit"
-## tetap dipertahankan kodenya, cuma tak lagi auto-berjalan — lihat
-## _tick_daynight). Mantra andalan yang dipoles (bag. B) menyusul. API
-## platform tetap lengkap agar HUD/pemain/game_root tidak perlu berubah.
+## 3D MultiMesh dekat pemain, lihat _build_grass, TAK tumbuh di laut/pasir),
+## kabut "batas pandang" HANYA di kejauhan (FOG_MODE_DEPTH, lihat
+## _setup_environment — dekat pemain SELALU jernih), dan dunia dikunci
+## MALAM PERMANEN dgn langit berbintang + bulan (siklus siang-malam lama,
+## SKY_PRESETS, & slider debug "Mode Edit" tetap dipertahankan kodenya, cuma
+## tak lagi auto-berjalan — lihat _tick_daynight). Mantra andalan yang
+## dipoles (bag. B) menyusul. API platform tetap lengkap agar HUD/pemain/
+## game_root tidak perlu berubah.
 
 signal gen_progress(p: float, t: String)
 
@@ -131,6 +138,15 @@ func _make_flat_ground() -> void:
 ## di tempat walau bidang menyentak mengikuti pemain; ditambah noise petak
 ## skala-besar (2 corak hijau) biar tak terasa monoton berulang, lalu diberi
 ## shading toon 2-tingkat senada dgn gaya seluruh game.
+##
+## BAG. C LANJUTAN (permintaan user: "pulau 12km, bukan bulat bukan kotak,
+## dikelilingi laut"): shader yg SAMA ini (mesh tanah tetap SATU bidang
+## datar 1600m yg ikut pemain, TAK PERLU mesh laut terpisah!) sekarang JUGA
+## menggambar laut — berdasar water_factor(world_x,world_z) dari
+## island_shape.gd (rumus disalin manual ke GLSL di sini, lihat komentar
+## "IslandShape" di island_shape.gd kalau perlu ubah radius/garis pantai).
+## Krn baik darat maupun laut sama2 rata (y=0), satu bidang yg sama cukup
+## utk keduanya, tinggal warnanya yg beda tergantung posisi dunia absolut.
 func _make_ground_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	var sh := Shader.new()
@@ -144,6 +160,10 @@ uniform float tex_scale = 0.35;    // kerapatan ulang tekstur foto (per meter)
 uniform float patch_scale = 0.02;  // skala noise petak corak besar
 uniform float shadow_tint : hint_range(0.0, 1.0) = 0.50;
 uniform float mid_tint : hint_range(0.0, 1.0) = 0.82;
+// --- Pulau/laut (IslandShape, disalin manual dr island_shape.gd) ---
+uniform vec3 sand_color : source_color = vec3(0.62, 0.56, 0.38);
+uniform vec3 water_shallow : source_color = vec3(0.10, 0.28, 0.34);
+uniform vec3 water_deep : source_color = vec3(0.03, 0.10, 0.16);
 varying vec3 wp;
 
 float gh(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
@@ -158,15 +178,46 @@ float gnoise(vec2 p) {
 	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
+// island_shape.gd IslandShape.radius_at() -- HARUS SAMA PERSIS (lihat
+// komentar di island_shape.gd kalau ubah salah satu, ubah keduanya).
+const float ISLAND_RADIUS = 6000.0;
+const float BEACH_WIDTH = 55.0;
+float island_radius_at(float theta) {
+	return ISLAND_RADIUS * (1.0
+		+ 0.20 * sin(theta * 3.0 + 1.3)
+		+ 0.11 * sin(theta * 7.0 + 0.7)
+		+ 0.06 * sin(theta * 11.0 + 2.4));
+}
+// 0=darat, 1=laut penuh (dipita BEACH_WIDTH), spt IslandShape.water_factor()
+float water_factor(vec2 p) {
+	float theta = atan(p.y, p.x);
+	float r = length(p);
+	float coast = island_radius_at(theta);
+	return clamp((r - (coast - BEACH_WIDTH)) / BEACH_WIDTH, 0.0, 1.0);
+}
+
 void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 
 void fragment() {
 	vec3 tex = texture(grass_tex, wp.xz * tex_scale).rgb;
 	float patch = gnoise(wp.xz * patch_scale);
 	vec3 tint = mix(tint_a, tint_b, patch);
-	ALBEDO = tex * tint * 2.4;
-	ROUGHNESS = 0.95;
-	SPECULAR = 0.0;
+	vec3 land_col = tex * tint * 2.4;
+
+	float wf = water_factor(wp.xz);
+	// riak air sederhana & MURAH (2 lapis noise digeser TIME, bukan
+	// simulasi gelombang sungguhan) -- cukup utk kesan "air hidup" mobile.
+	float ripple = gnoise(wp.xz * 0.05 + vec2(TIME * 0.06, TIME * 0.04))
+		+ gnoise(wp.xz * 0.13 - vec2(TIME * 0.03, TIME * 0.05)) * 0.5;
+	vec3 water_col = mix(water_shallow, water_deep, smoothstep(0.0, 1.0, (wf - 0.35) / 0.65));
+	water_col += ripple * 0.03;
+
+	// darat -> pasir -> air, transisi mulus di pita BEACH_WIDTH
+	vec3 col = mix(land_col, sand_color, smoothstep(0.0, 0.5, wf));
+	col = mix(col, water_col, smoothstep(0.35, 1.0, wf));
+	ALBEDO = col;
+	ROUGHNESS = mix(0.95, 0.18, smoothstep(0.6, 1.0, wf));   // air lbh mengkilap
+	SPECULAR = mix(0.0, 0.5, smoothstep(0.6, 1.0, wf));
 }
 
 void light() {
