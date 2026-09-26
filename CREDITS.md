@@ -29,6 +29,12 @@
   Ronde-37.)
 - **Suara api `fire_loop.wav`** — disintesis prosedural oleh
   `tools/synth_fire.py` (gemuruh + desis + letupan). Karya orisinal.
+- **SFX tembak/ledak `fire_shoot.wav`, `fire_explode.wav`** — disintesis
+  prosedural oleh `tools/synth_fire.py` dari osilator dan noise, tanpa sampel
+  eksternal. Karya orisinal.
+- **Proyektil, ledakan, muzzle flash, shockwave, partikel, dan bekas gosong** —
+  visual prosedural karya orisinal di `project/packs/character_player/`
+  (`fire_bolt.gd`, `fire_explosion.gd`, `fire_fx.gd`, `shockwave.gdshader`).
 - **Bola api (shader inti & selubung, partikel)** — ditulis untuk proyek ini
   (`project/packs/character_player/fireball_*.gdshader`, `player.gd`).
 

@@ -170,7 +170,7 @@ func _build_settings() -> void:
 	s.add_child(inv)
 	# (pilihan "Karakter" dihapus: pemain kini bola api, tanpa skin)
 	# skala analog
-	s.add_child(_field_header("Ukuran analog"))
+	s.add_child(_field_header("Ukuran analog & tombol"))
 	var bs := HSlider.new()
 	bs.min_value = 0.8
 	bs.max_value = 1.5

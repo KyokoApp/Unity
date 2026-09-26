@@ -12,6 +12,7 @@ var _done_cb: Callable
 const TIPS := [
 	"Tip: geser analog di kiri layar untuk menggerakkan 🔥 bola api.",
 	"Tip: dorong analog setengah saja untuk melayang pelan.",
+	"Tip: tahan tombol 🔥 untuk menembakkan bola api beruntun.",
 	"Tip: usap sisi kanan layar untuk memutar kamera.",
 	"Tip: saat malam tiba, cahaya bola api menerangi sekitarnya.",
 	"Tip: tekan tombol Kembali (Back) untuk membuka menu.",
