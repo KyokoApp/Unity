@@ -168,33 +168,9 @@ func _build_settings() -> void:
 		if not _syncing and _settings:
 			_settings.set_value("invert_y", on))
 	s.add_child(inv)
-	# karakter (skin)
-	s.add_child(_field_header("Karakter"))
-	var opt_skin := OptionButton.new()
-	# NB (Ronde-36): sebelumnya label di sini ["Mannequin UAL (bawaan)",
-	# "PolyGirl", "Knight (KayKit)"] tak sinkron dgn _skin_ids yg cuma
-	# ["wizard"] (1 elemen) — pilih index 1/2 di dropdown = crash
-	# index-out-of-range (_skin_ids[ix]). Diperbaiki: label & id sekarang
-	# selalu berpasangan 1:1, sama persis kunci SKINS di player.gd.
-	var _skin_ids := ["mannequin", "wizard"]
-	for n in ["Mannequin (UAL, bawaan)", "Wizard (prosedural)"]:
-		opt_skin.add_item(n)
-	opt_skin.custom_minimum_size = Vector2(0, 56)
-	opt_skin.add_theme_font_size_override("font_size", 24)
-	var cur := -1
-	for i in range(_skin_ids.size()):
-		if _settings and str(_settings.char_skin) == _skin_ids[i]:
-			cur = i
-	opt_skin.selected = cur if cur >= 0 else 0
-	opt_skin.item_selected.connect(func(ix):
-		if not _syncing and _settings:
-			var id := _skin_ids[ix]
-			_settings.set_value("char_skin", id)
-			if _root and _root.get("player") and _root.player.has_method("set_skin"):
-				_root.player.set_skin(id))
-	s.add_child(opt_skin)
-	# skala tombol
-	s.add_child(_field_header("Ukuran tombol aksi"))
+	# (pilihan "Karakter" dihapus: pemain kini bola api, tanpa skin)
+	# skala analog
+	s.add_child(_field_header("Ukuran analog"))
 	var bs := HSlider.new()
 	bs.min_value = 0.8
 	bs.max_value = 1.5

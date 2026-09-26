@@ -150,9 +150,17 @@ func apply_lighting(d: Dictionary) -> void:
 	_dl_last = -1.0
 	_apply_daylight()
 
+var _q_fog := 1.0   # pengali kabut dari preset kualitas
+
 func apply_quality(p: Dictionary) -> void:
-	if world_env:
-		world_env.environment.fog_density = 0.0026 * float(p.get("fog", 1.0))
+	_q_fog = float(p.get("fog", 1.0))
+	if world_env and world_env.environment:
+		world_env.environment.glow_enabled = bool(p.get("glow", true))
+	if sun:
+		sun.shadow_enabled = bool(p.get("shadows", true))
+	_dl_last = -1.0
+	if world_env and sun:
+		_apply_daylight()
 
 func _setup_environment() -> void:
 	world_env = WorldEnvironment.new()
@@ -174,14 +182,15 @@ func _setup_environment() -> void:
 	env.fog_sky_affect = 0.3
 	# glow lembut utk pijar sihir (permintaan user) — SETINGAN HEMAT khusus
 	# mobile: radius kecil, tanpa level tinggi (post-process berat tetap no)
-	# glow DINONAKTIFKAN di fase reset total (tak ada objek berefek — hemat baterai;
-	# setingan siap pakai dibiarkan di bawah bila efek sihir kelak dipulihkan)
-	env.glow_enabled = false
+	# glow AKTIF lagi: bola api memakai warna HDR (>1.0) -> berpendar.
+	# Preset Rendah mematikannya (QualityManager -> apply_quality "glow").
+	env.glow_enabled = true
 	env.glow_normalized = true
-	env.glow_intensity = 0.55
+	env.glow_intensity = 0.8
 	env.glow_strength = 1.0
-	env.glow_bloom = 0.08
-	env.glow_hdr_threshold = 0.85
+	env.glow_bloom = 0.05
+	env.glow_hdr_threshold = 0.9
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
 	env.set("glow_levels/1", true)
 	env.set("glow_levels/2", false)
 	env.set("glow_levels/3", true)
@@ -267,7 +276,7 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("horizon_color", Color(0.10, 0.15, 0.22))
 		sky_mat.set_shader_parameter("ground_color", Color(0.07, 0.11, 0.16))
 		sky_mat.set_shader_parameter("sun_color", Color(0.62, 0.70, 0.85))
-	env.fog_density = 0.0026 * float(_lo.fog)
+	env.fog_density = 0.0026 * float(_lo.fog) * _q_fog
 	sun.light_energy *= float(_lo.sun)
 	env.ambient_light_energy *= float(_lo.ambient)
 	if int(_lo.sky) >= 0 and int(_lo.sky) < SKY_PRESETS.size():
