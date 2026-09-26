@@ -272,6 +272,11 @@ func _process(delta: float) -> void:
 	_move(delta)
 	_apply_camera(delta)
 	_animate_character(delta)
+	# Peliharaan elemental (permintaan user: "lidah apinya bakal gerak kalo
+	# kita jalan") -- kasih tahu kecepatan pemain skrg spy shell shadernya
+	# bisa "menyeret" nyala api ke belakang arah jalan (lihat fire_spirit.gd).
+	if is_instance_valid(_fire_spirit):
+		_fire_spirit.external_velocity = Vector3(velocity.x, 0.0, velocity.z)
 
 func _move(delta: float) -> void:
 	if _dash_left > 0.0:

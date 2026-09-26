@@ -155,8 +155,16 @@ func _make_ground_material() -> ShaderMaterial:
 shader_type spatial;
 render_mode cull_back, depth_draw_opaque;
 uniform sampler2D grass_tex : filter_linear_mipmap, repeat_enable;
-uniform vec3 tint_a : source_color = vec3(0.09, 0.20, 0.09);  // corak gelap
-uniform vec3 tint_b : source_color = vec3(0.15, 0.32, 0.14);  // corak terang
+// PERBAIKAN (laporan user: rumput 3D tuft di sekitar pemain kelihatan
+// terang normal, tapi begitu lewat GRASS_RADIUS jadi HITAM PEKAT kayak
+// jurang — bukan bug culling/posisi spt dikira sebelumnya, ternyata cuma
+// tanah DATAR ini (dipakai di LUAR area tuft 3D) albedo-nya jauh lebih
+// gelap drpd material rumput 3D (grass_blade.gdshader) di bawah pencahayaan
+// malam yg sama -> beda kecerahan ~3-4x, kelihatan spt tebing tajam di
+// batas GRASS_RADIUS. tint_a/tint_b & pengali dinaikkan supaya kecerahan
+// tanah datar SEPADAN dgn tuft 3D, jurang gelapnya hilang.
+uniform vec3 tint_a : source_color = vec3(0.17, 0.36, 0.16);  // corak gelap
+uniform vec3 tint_b : source_color = vec3(0.26, 0.48, 0.21);  // corak terang
 uniform float tex_scale = 0.35;    // kerapatan ulang tekstur foto (per meter)
 uniform float patch_scale = 0.02;  // skala noise petak corak besar
 uniform float shadow_tint : hint_range(0.0, 1.0) = 0.50;
@@ -203,7 +211,7 @@ void fragment() {
 	vec3 tex = texture(grass_tex, wp.xz * tex_scale).rgb;
 	float patch = gnoise(wp.xz * patch_scale);
 	vec3 tint = mix(tint_a, tint_b, patch);
-	vec3 land_col = tex * tint * 2.4;
+	vec3 land_col = tex * tint * 3.0;
 
 	float wf = water_factor(wp.xz);
 	// riak air sederhana & MURAH (2 lapis noise digeser TIME, bukan
@@ -493,8 +501,18 @@ func _process(delta: float) -> void:
 	if player and _ground:
 		_ground.position.x = player.global_position.x
 		_ground.position.z = player.global_position.z
-	# Rumput TAK ikut digeser (lihat catatan _build_grass) — cuma titik
-	# pusat "bungkus" di shader yg diberi tahu posisi pemain tiap frame.
+	# Rumput TAK ikut digeser scr VISUAL (posisi blade ttp dihitung via
+	# wrap_center di shader, lihat catatan _build_grass) -- TAPI node
+	# MultiMeshInstance3D-nya sendiri SKRG jg ikut ditaruh dekat pemain tiap
+	# frame (pengaman ganda bareng custom_aabb di _build_grass): shader
+	# menimpa TOTAL posisi akhir tiap blade dari wrap_center + offset lokal
+	# yg sudah dibungkus modulo, jadi memindah node TIDAK mengubah hasil
+	# akhir sama sekali (dibuktikan aljabar: rel = mod(inst_xz-wrap_center)
+	# tetap sama persis baik node diam di origin maupun ikut pemain) --
+	# cuma bikin Godot pasti tak pernah keliru meng-cull objek ini krn
+	# AABB-nya kini SELALU dekat kamera, bukan cuma bergantung custom_aabb.
+	if player and _grass_mmi:
+		_grass_mmi.position = Vector3(player.global_position.x, 0.0, player.global_position.z)
 	if player and _grass_mat:
 		_grass_mat.set_shader_parameter("wrap_center", Vector2(player.global_position.x, player.global_position.z))
 
