@@ -1,0 +1,334 @@
+name: apk-release
+## Bangun APK launcher + AIO di runner GitHub (akses internet penuh):
+## unduh Godot 4.5.2 editor + export templates resmi, siapkan SDK/JDK/keystore,
+## export kedua preset, lalu terbitkan aset ke GitHub Release $TAG.
+## Diagnostik build ditulis ke release notes agar terbaca via API.
+on:
+  # AUTO-UPDATE (permintaan user, kick-54): push apa pun yang menyentuh konten
+  # game di branch kerja/main LANGSUNG build — tak perlu kick manual lagi.
+  # Branch 'content' sengaja TAK didaftarkan → push hasil build ke content
+  # tidak memicu build ulang (anti-loop tak berujung).
+  push:
+    branches:
+      - main
+      - arena/01a0ba2f-unity
+    paths:
+      - "project/**"
+      - "tools/**"
+      - "server/**"
+      - "docs/**"
+      - "CREDITS.md"
+      - "DECISIONS.md"
+      - "BACA_INI.md"
+      - ".github/workflows/apk_release.yml"
+  workflow_dispatch:
+
+concurrency: apk-release
+
+permissions:
+  contents: write
+
+env:
+  GVER: 4.5.2
+  GDIR: export_templates/4.5.2.stable
+  TAG: apk-20260920-2302
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sinkron DB versi dari branch content (cegah bump tabrakan)
+        # versions.json di branch kerja cepat basi karena build menulis ke
+        # branch content; build BERBASIS DB basi pernah menimpa versi lama
+        # tanpa ganti nomor (insiden 1.0.22 tertimpa, kick-52/53). Selalu
+        # mulai dari DB content terbaru supaya bump versi tak pernah tabrakan.
+        run: |
+          git fetch origin content:refs/remotes/origin/content --depth 1 -q && \
+            git show origin/content:versions.json > server/versions.json && \
+            echo "versions.json disinkron dari content ✔" || \
+            echo "branch content belum ada — pakai versions.json milik repo"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Jaga-jaga — tolak marker konflik git di source
+        run: |
+          if grep -RInE '^(<<<<<<<|=======|>>>>>>>) ' project/ tools/ 2>/dev/null; then
+            echo "::error::ada marker konflik tersisa — merge/rebase belum bersih; build dibatalkan"
+            exit 1
+          fi
+          echo "bersih dari marker konflik"
+
+      - name: Lint GDScript (gdparse) — tolak parse error sebelum export
+        run: |
+          pip install -q gdtoolkit
+          FAIL=0
+          for f in $(find project -name "*.gd"); do
+            if ! out=$(gdparse "$f" 2>&1); then
+              echo "::error::GDScript parse error di $f :: $(echo "$out" | head -5 | tr '\n' ' ')"
+              FAIL=1
+            fi
+          done
+          [ "$FAIL" = 0 ] && echo "semua gd lolos parse" || exit 1
+          # kedalaman analyzer: duplikat var per scope, path preload/load/const hilang,
+          # rujukan scene .tscn rusak (kelas bug yang TAK terlihat gdparse — kasus
+          # v1.0.22 "blue screen": 'var total' ganda di world.gd lolos ekspor)
+          python3 tools/analyze_checks.py "$GITHUB_WORKSPACE" || exit 1
+
+      - name: Dependensi sistem untuk editor Godot
+        run: |
+          sudo apt-get update -qq || true
+          sudo apt-get install -y -qq --no-install-recommends \
+            libx11-6 libxkbcommon0 libxinerama1 libxcursor1 libxi6 \
+            libxrandr2 libxext6 libxrender1 libgl1 libegl1 libasound2 \
+            fontconfig libfontconfig1 unzip zip
+
+      - name: Unduh Godot editor + export templates resmi
+        run: |
+          set -e
+          curl -sL --fail -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GVER}-stable/Godot_v${GVER}-stable_linux.x86_64.zip"
+          curl -sL --fail -o templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GVER}-stable/Godot_v${GVER}-stable_export_templates.tpz"
+          unzip -qo godot.zip
+          mv Godot_v${GVER}-stable_linux.x86_64 godot && chmod +x godot
+          mkdir -p "$HOME/.local/share/godot/${GDIR}"
+          mkdir -p tpz
+          (cd tpz && unzip -q ../templates.tpz "templates/android_debug.apk" "templates/android_release.apk" "templates/version.txt")
+          cp tpz/templates/* "$HOME/.local/share/godot/${GDIR}/"
+          ls -la "$HOME/.local/share/godot/${GDIR}/"
+
+      - name: Keystore debug + editor settings (SDK/JDK runner)
+        run: |
+          mkdir -p "$HOME/.config/godot" exports/android
+          keytool -genkey -v -keystore "$GITHUB_WORKSPACE/exports/android/debug.keystore" \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" | tail -2
+          JAVA_DIR="$(dirname "$(dirname "$(readlink -f "$(which java)")")")"
+          echo "android-sdk = $ANDROID_SDK_ROOT"
+          echo "java = $JAVA_DIR"
+          ls "$ANDROID_SDK_ROOT/build-tools" | tail -3
+          cat > "$HOME/.config/godot/editor_settings-4.5.tres" <<SEOF
+          [gd_resource type="EditorSettings" format=1]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_SDK_ROOT"
+          export/android/java_sdk_path = "$JAVA_DIR"
+          export/android/debug_keystore = "$GITHUB_WORKSPACE/exports/android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          SEOF
+
+      - name: Import proyek (sekali)
+        run: |
+          RC=0; timeout 900 ./godot --headless --path project --import > "$GITHUB_WORKSPACE/import.log" 2>&1 || RC=$?
+          echo "import.rc=$RC"; tail -8 "$GITHUB_WORKSPACE/import.log"
+
+      - name: Bangun pack + manifest (delta sanity)
+        run: |
+          echo "::notice::checkout versions.json: $(head -c 90 server/versions.json | tr '\n' ' ')"
+          # kick-44: DULU tanpa set -e — build_packs exit!=0 tertelan pipe, publish
+          # tetap jalan → rsync --delete menghapus SEMUA pck live (insiden 06496a4).
+          # Kini: gagal keras + isinya masuk anotasi (karena log run sulit diunduh).
+          if ! python3 tools/build_packs.py --godot ./godot > /tmp/packs.log 2>&1; then
+            echo "::error file=tools/build_packs.py,title=BUILD PACK GAGAL::$(tail -c 1500 /tmp/packs.log | tr '\n' '|')"
+            tail -25 /tmp/packs.log
+            exit 1
+          fi
+          tail -10 /tmp/packs.log
+          PCKS=$(ls server/packs/*.pck 2>/dev/null | wc -l)
+          echo "::notice::jumlah pck terbangun: $PCKS"
+          if [ "$PCKS" -lt 5 ]; then
+            echo "::error title=PCK KURANG::hanya $PCKS pck terbangun — menolak publish agar rsync tidak menyapu live (insiden 06496a4)"
+            exit 1
+          fi
+          echo "::notice::manifest hasil: $(python3 -c 'import json; m=json.load(open("server/manifest.json")); print(m["game_version"]); print({k: v["version"] for k, v in list(m["packs"].items())[:3]})')"
+
+      - name: Publikasikan server konten -> branch "content" (raw)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          # GEMBOK TERAKHIR (insiden 06496a4): jangan pernah rsync kalau pck tidak ada
+          PCKS=$(ls "$GITHUB_WORKSPACE/server/packs/"*.pck 2>/dev/null | wc -l)
+          if [ "$PCKS" -lt 5 ]; then
+            echo "::error title=PUBLIKASI DITOLAK::hanya $PCKS pck di workspace — live dijaga tetap utuh"
+            exit 1
+          fi
+          DEST=/tmp/ct
+          if ! git clone --depth 1 --branch content               https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY.git $DEST 2>/dev/null; then
+            git clone --depth 1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY.git $DEST
+            (cd $DEST && git checkout --orphan content && rm -rf ./*)
+          fi
+          echo "::notice::ws manifest: $(grep -o '"game_version": *"[^"]*"' "$GITHUB_WORKSPACE/server/manifest.json" | head -1)"
+          rsync -a --delete --exclude=.git "$GITHUB_WORKSPACE/server/" "$DEST/"; echo "::notice::rsync rc=$?"
+          echo "::notice::dest manifest sesudah rsync: $(grep -o '"game_version": *"[^"]*"' "$DEST/manifest.json" | head -1)"
+          # Perbaikan deterministik: manifest+versions WAJIB identik dengan workspace
+          # (pernah 2x manifest di dest ketinggalan walau rsync rc=0 — race aneh runner).
+          for FN in manifest.json versions.json; do
+            if ! cmp -s "$GITHUB_WORKSPACE/server/$FN" "$DEST/$FN"; then
+              cp -f "$GITHUB_WORKSPACE/server/$FN" "$DEST/$FN"
+              echo "::notice::repair: $FN disalin paksa (dest ketinggalan)"
+            fi
+          done
+          echo "::notice::dest manifest pasca-repair: $(grep -o '"game_version": *"[^"]*"' "$DEST/manifest.json" | head -1)"
+          cd "$DEST"
+          git config user.name "arena-ci" && git config user.email "ci@example.invalid"
+          git add -A
+          echo "::notice::content push: $(grep -o '"game_version": *"[^"]*"' manifest.json | head -1) — staged $(git diff --cached --name-only | wc -l) file"
+          if git diff --cached --quiet; then
+            echo "konten tidak berubah — tidak ada push"
+          else
+            git commit -m "konten game $(date -u +%Y-%m-%d) @${GITHUB_SHA:0:7}" -q
+            git push origin content -q
+            echo "konten terbit: manifest $(grep -o '"game_version": *"[^"]*"' manifest.json | head -1)"
+          fi
+
+      - name: Export APK Launcher-MURNI (tanpa konten — update hanya lewat server pack)
+        run: |
+          export OUTDIR="$GITHUB_WORKSPACE/exports/android"
+          RC0=0; timeout 120 ./godot --headless --path project --quit > "$OUTDIR/quit.log" 2>&1 || RC0=$?
+          RC=0; timeout 900 ./godot --headless --verbose --path project --export-debug "Android Launcher" "$OUTDIR/ASekai.apk" > "$OUTDIR/export_launcher.log" 2>&1 || RC=$?
+          {
+            echo "## Diagnostik build $GITHUB_SHA"
+            echo "quit.rc=$RC0 export-launcher.rc=$RC"
+            echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+            ls "$ANDROID_SDK_ROOT/build-tools" 2>/dev/null | tail -2
+            echo '### import.log (akhir)'; tail -6 "$GITHUB_WORKSPACE/import.log"
+            echo '### export_launcher.log (penuh)'
+            sed 's/\x1b\[[0-9;]*m//g' "$OUTDIR/export_launcher.log"
+            echo '### preset head'
+            head -14 project/export_presets.cfg
+          } > "$OUTDIR/diag.txt" 2>&1
+          echo "[diag] bytes: $(wc -c < "$OUTDIR/diag.txt")"
+          ls -la "$OUTDIR/"
+
+      - name: Terbitkan/perbarui Release + unggah aset (retry)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          # 1) simpan diagnostik ke release notes (terbaca via API)
+          if gh release edit "$TAG" --notes-file "$GITHUB_WORKSPACE/exports/android/diag.txt"; then
+            echo "::notice::diagnostik tersimpan di release notes"
+          else
+            echo "::error::gh write ke release notes gagal (token?)"
+            exit 1
+          fi
+          OUTDIR="$GITHUB_WORKSPACE/exports/android"
+          if [ ! -s "$OUTDIR/ASekai.apk" ]; then
+            echo "::notice::APK belum tersedia — lihat diagnostik di release notes"
+            exit 0
+          fi
+          # 2) notes final + sha + upload aset dengan retry
+          cd "$OUTDIR" && sha256sum ASekai.apk > "$GITHUB_WORKSPACE/SHA256SUMS.txt" && cd "$GITHUB_WORKSPACE"
+          {
+            echo "## Pulau Toon — APK debug (CI)"
+            echo ""
+            echo "Commit: \`$GITHUB_SHA\` — dibangun oleh GitHub Actions (runner full-internet)."
+            echo ""
+            echo "**A-Sekai.apk** — PELUNCUR murni (kecil). Sekali instal, selamanya:"
+            echo "konten game tidak pernah ikut APK — selalu diunduh dari server pack saat"
+            echo "aplikasi dibuka, dan hanya pack yang BERUBAH yang diunduh ulang (delta)."
+            echo "Saat pertama kali dibuka, dia akan mengunduh konten (tampil progress)."
+            echo ""
+            echo "Install: unduh APK → izinkan sumber tak dikenal → buka (landscape)."
+            echo "Detail: README.md §5–§8; bukti uji: docs/BUKTI_UJI.md."
+            echo '### SHA-256'
+            echo '```'; cat SHA256SUMS.txt; echo '```'
+          } > notes.md
+          gh release edit "$TAG" --notes-file notes.md
+          for f in "$OUTDIR/ASekai.apk" "$GITHUB_WORKSPACE/SHA256SUMS.txt"; do
+            ok=0
+            for i in 1 2 3 4; do
+              if OUT2=$(gh release upload "$TAG" "$f" --clobber 2>&1); then ok=1; echo "upload OK: $(basename "$f")"; break; fi
+              echo "upload $(basename "$f") percobaan $i gagal: $(echo "$OUT2" | head -c 200)"; sleep 15
+            done
+            [ "$ok" = "1" ] || { echo "::error::gagal unggah $f — $(echo "$OUT2" | head -c 200)"; exit 1; }
+          done
+          # hapus aset legasi varian lama (bila masih menempel)
+          for a in PulauToon-aio.apk PulauToon-debug.apk PulauToon.apk; do
+            gh release delete-asset "$TAG" "$a" --yes 2>/dev/null && echo "aset legasi $a dihapus" || true
+          done
+
+# rerun-kick 1
+
+# rerun-kick 2
+
+# rerun-kick 3 (restyle turquoise)
+
+# rerun-kick 4 (fix seed manifest bundel AIO)
+
+# rerun-kick 5 (branding A-Sekai + ikon pengguna)
+# rerun-kick 6 (fix marker konflik dari upload — jalankan pengecekan guard)
+
+# rerun-kick 7 (kalibrasi cahaya: matangkan warna pastel)
+# rerun-kick 8 (server konten publik + URL default launcher)
+
+# rerun-kick 9 (versi konten persisten — delta update antar-bangun aktif)
+# rerun-kick 10 (debug manifest CI)
+# rerun-kick 11 (debug rsync publish)
+# rerun-kick 12 (kalibrasi palet soft-tengah: air gelap, foam tepi, jade pekat, spawn membumi, trace anim)
+
+# rerun-kick 13 (fix anim loop + analog terbalik + terrain cull-disabled anti-NaN + jejak statistik mesh + tekstur detail painted)
+
+# rerun-kick 14 (palet tanah = referensi pengguna: olive painted + pasir hangat, detail dual-warna)
+
+# rerun-kick 15 (hotfix: komentar bergaya // di island.gd = parse error -> layar biru; CI kini wajib lolos gdparse)
+
+# rerun-kick 17 (HUD RPG: joystick melayang + tombol bulat ber-icon; menu geser kiri; Mode Edit sculpt/jalur/cahaya; dunia 800m)
+
+# rerun-kick 18 (perbaikan deterministik publish konten: manifest+versions disalin paksa bila dest beda)
+
+# rerun-kick 19 (tata letak klaster ala referensi: lingkaran gelap translusen + glyph putih; attack besar, dash kanan-bawahnya, lompat pojok kanan bawah)
+
+# rerun-kick 20 (gaya low-poly faceted toggleable + fix semver max game_version)
+
+# rerun-kick 21 (hotfix jatuh-tembus: offset chunk GRID/2 konsisten dengan terrain_chunk)
+
+# rerun-kick 22 (skin PolyGirl bawaan + pilih karakter di pengaturan)
+
+# rerun-kick 23 (aset jadi KayKit + rumput reaktif + mood sore + tanah hijau)
+
+# rerun-kick 24 (dunia 268m datar bergelombang + Godot4 dibersihkan)
+
+# rerun-kick 25 (mode world statis Gravity Falls: world+karakter disesuaikan, outline tipis)
+
+# rerun-kick 26 (hardening loader world statis + docs BUGFIXES)
+
+# rerun-kick 27 (blue screen fix total: Gravity Falls async + swap pasca-playable)
+
+# rerun-kick 28 (BISEKSI: back to konfigurasi 1.0.12, tanpa kode statis & tanpa GLB di pack)
+
+# rerun-kick 29 (Gravity Falls satu-satunya world; world procedural dihapus total + fallback bidang darurat)
+
+# rerun-kick 30 (4 fix blue screen: barycentric dot-product + kubah geometris + dasar lantai + swim guard + fallback collision)
+# rerun-kick 31 (APK kembali Launcher-murni tanpa konten; watchdog boot + log; world yield anti-freeze)
+# rerun-kick 32 (penyebab macet SEGITIGA GDScript dihapus; intersect_ray native; collision khusus mesh solid)
+# rerun-kick 33 (skin bawaan Mannequin UAL — 43 animasi, upload user CC0)
+# rerun-kick 34 (fix T-pose: resolver anim 3-tahap + fallback idle; trace resolusi on-device)
+# rerun-kick 35 (fix macet walk+attack: reset flag air/swim di set_move)
+# rerun-kick 36 (terbitkan perbaikan anim dari USER: self-transition+force_restart, IMMEDIATE utk aksi, serangan selang-seling, dash=Roll)
+# rerun-kick 37 (fix crouch-nyangkut layout+ikon digambar; release-off-bounds)
+# rerun-kick 38 (spawn depan rumah + probe animasi on-device)
+# rerun-kick 39 (near-floor ray: hilangkan pose jump_fall saat jalan + lompat mati di rumput; probe pindah ke label HUD permanen anim_debug)
+# rerun-kick 40 (fix: paksa ui 1.0.10 — pck 1.0.9 yg tersebar konten LAMA; folder_hash deterministik antar-mesin)
+# rerun-kick 41 (DARURAT rollback player+ui ke isi kick-38 yg terbukti jalan; failsafe get_script()==null di game_root)
+# rerun-kick 42 (kosmetik: ground_color langit per fase — basmi langit marun saat senja di bawah cakrawala)
+# rerun-kick 43 (CICILAN1 genre baru: dunia datar tak berbatas + penyihir prosedural top-down — hapus semua karakter/world GLB; orb sihir proyektil)
+# rerun-kick 44 (guard anti-rsync-wipe: set-e+annot di build, gembok jumlah pck di publish; jalankan ulang cicilan1 pasca insiden 06496a4)
+# rerun-kick 45 (perbaiki versions.json yg terpotong kosong; load_db tahan file rusak)
+# rerun-kick 46 (umpan balik user: kembalikan mannequin UAL beranimasi + aksesori penyihir; tanah jadi warna polos rata)
+# rerun-kick 47 (revert persis ke cicilan #1: penyihir primitif + tanah pola — perintah user)
+# rerun-kick 48 (penyihir terbang: jubah bergelombang+topi besar+tanpa tongkat; serangan sihir partikel+lampu+cincin+hangus; glow mobile-hemat)
+# rerun-kick 49 (RESET TOTAL permintaan user: semua karakter/efek dihapus — tinggal dunia datar grid putih 1m + kontrol)
+# rerun-kick 50 (UI minimal permintaan user: hanya joystick+pause — sembunyikan semua tombol/label lain; ikon pause palang ramping)
+# rerun-kick 51 (bersih-bersih: hapus UAL 61MB + gravity_falls.txt 9MB + pack animations yg tak terpakai; netralkan rujukan)
+# rerun-kick 52 (user upload: mannequin Quaternius + 86 anim UAL1/UAL2 ke character_player — picu build)
+# rerun-kick 53 (fix bump-tabrakan 1.0.22: paksa export ulang character_player jadi 1.0.23)

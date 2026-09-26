@@ -1,0 +1,18 @@
+# Godot
+.godot/
+*.import
+*.translation
+# Build output
+*.pck
+*.apk
+*.aab
+*.keystore
+server/packs/
+artifacts/
+# Tools / scratch
+__pycache__/
+assets_src/
+*.log
+.DS_Store
+dev_probe/
+!project/dev_probe/visual_proof.gd
