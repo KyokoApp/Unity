@@ -349,7 +349,32 @@ func _setup_environment() -> void:
 	env.set("glow_levels/5", true)
 	env.set("glow_levels/6", false)
 	env.set("glow_levels/7", false)
+	# Sedikit koreksi warna (terinspirasi rekomendasi "Instant Realistic
+	# Light" — TAPI kita TIDAK pasang plugin itu apa adanya: sebagian besar
+	# fiturnya, sdfgi_enabled/volumetric_fog_enabled/ssao_enabled, cuma
+	# jalan di renderer Forward+, sedangkan proyek ini renderer "mobile"
+	# (wajib utk export Android) — bagian2 itu diam saja alias percuma.
+	# Yang diambil hanya bagian yg memang jalan+berguna di Mobile: sedikit
+	# saturasi ekstra biar warna tak pucat.
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 1.12
+	env.adjustment_contrast = 1.03
 	world_env.environment = env
+	# Auto-exposure (CameraAttributesPractical) — kamera "membiasakan mata"
+	# spt mata sungguhan: area gelap malam otomatis sedikit terangkat,
+	# area terang (dkt bola api/ledakan) tak over-expose. Ini yg benar2
+	# relevan dari ide plugin tsb (fitur ini JALAN normal di Mobile,
+	# beda dari SDFGI/Volumetric Fog/SSAO di atas). DOF bawaan plugin itu
+	# SENGAJA tidak diambil (settingannya blur dari jarak 0.01m -> bikin
+	# game aksi ini buram terus, tak cocok utk gameplay tarung).
+	var cam_attr := CameraAttributesPractical.new()
+	cam_attr.exposure_multiplier = 1.15
+	cam_attr.auto_exposure_enabled = true
+	cam_attr.auto_exposure_scale = 0.32
+	cam_attr.auto_exposure_speed = 0.6
+	cam_attr.auto_exposure_min_sensitivity = 60.0
+	cam_attr.auto_exposure_max_sensitivity = 800.0
+	world_env.camera_attributes = cam_attr
 	add_child(world_env)
 
 	sun = DirectionalLight3D.new()
