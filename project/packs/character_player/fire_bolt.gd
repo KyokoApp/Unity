@@ -9,7 +9,11 @@ const SHELL_SHADER := preload("res://packs/character_player/fireball_shell.gdsha
 var vel := Vector3.ZERO
 var fx := 1.0
 var exclude_rids: Array[RID] = []
-var shake_target: Node
+# WAJIB Node3D (bukan Node): analizer Godot 4.5 tidak bisa meng-infer tipe
+# `var distance := shake_target.global_position…` bila statis bertipe Node
+# ("Node has no global_position") → parse error keras → player.gd ikut gagal
+# compile (insiden Ronde-38: tombol serang diam di perangkat).
+var shake_target: Node3D
 
 var _age := 0.0
 var _dead := false

@@ -12,6 +12,7 @@ on:
     branches:
       - main
       - arena/01a0ba2f-unity
+      - arena/01a0dc65-unity
     paths:
       - "project/**"
       - "tools/**"
@@ -128,6 +129,21 @@ jobs:
         run: |
           RC=0; timeout 900 ./godot --headless --path project --import > "$GITHUB_WORKSPACE/import.log" 2>&1 || RC=$?
           echo "import.rc=$RC"; tail -8 "$GITHUB_WORKSPACE/import.log"
+
+      # UJI SERANGAN (insiden Ronde-38): pack character_player 1.0.26 sempat
+      # terbit dengan parse error — player.gd mati, tombol serang tak menembak.
+      # Godot --export-pack exit 0 walau ada SCRIPT ERROR, jadi jalur export
+      # sendiri TIDAK cukup. Probe ini memuat SEMUA skrip pack (parse error =
+      # langsung gagal), lalu benar-benar menembak dan menghitung bola api.
+      - name: Uji asap serangan (skrip compile + bola api keluar)
+        run: |
+          RC=0; timeout 300 ./godot --headless --path project --script dev_probe/fire_attack_check.gd > "$GITHUB_WORKSPACE/firecheck.log" 2>&1 || RC=$?
+          tail -30 "$GITHUB_WORKSPACE/firecheck.log"
+          if [ "$RC" != "0" ]; then
+            echo "::error file=project/dev_probe/fire_attack_check.gd,title=UJI SERANGAN GAGAL::rc=$RC — skrip tidak sehat/tembakan tidak keluar; konten TIDAK diterbitkan"
+            exit 1
+          fi
+          echo "uji serangan lulus ✔"
 
       - name: Bangun pack + manifest (delta sanity)
         run: |

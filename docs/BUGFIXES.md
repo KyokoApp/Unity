@@ -126,3 +126,43 @@ source importer Godot 4.5.2 (`resource_importer_scene.cpp`).
 | `tools/pck_list.py` selalu "0 file" | tak paham PCK v3 (direktori di akhir file) | dukung v3 |
 
 Belum diuji di perangkat (sandbox tanpa Godot/GPU); lolos gdparse + analyze_checks.
+
+---
+
+## 6) TOMBOL SERANG TIDAK MENEMBAK (Ronde-38/39, karakter bola api)
+
+### Gejala
+Tombol 🔥 SERANG ditekan di perangkat → tidak ada proyektil. Pemain juga tidak
+bisa digerakkan/kamera mati (semuanya satu skrip: player.gd). Dunia dan HUD
+tetap tampil normal — kegagalan terjadi diam-diam.
+
+### Akar masalah
+`fire_bolt.gd:183`: `var distance := shake_target.global_position.distance_to(at)`
+dengan `var shake_target: Node`. Node tidak punya `global_position` → RHS
+Variant → analyzer 4.5 tidak bisa infer tipe `:=` → **parse error keras** →
+fire_bolt.gd gagal compile → player.gd (preload) ikut gagal → pack
+character_player 1.0.26 terbit dengan pemain tanpa logika. **CI tidak
+menangkapnya** karena: gdparse hanya cek sintaks (bukan inferensi tipe), dan
+`godot --export-pack` exit 0 walau mencetak SCRIPT ERROR — publish tetap jalan.
+
+### Perbaikan + pencegahan
+| Lapis | Apa | Efek |
+|---|---|---|
+| fix | `shake_target: Node` → `Node3D` | `global_position` jadi Vector3 statis; infer `:=` sah |
+| 1 | `project/dev_probe/fire_attack_check.gd` (SceneTree script, dijalankan CI SEBELUM build pack): load semua .gd pack + scene inti, tanam pemain+HUD, tahan serang 0,8 dtk, hitung bola api | parse error APAPUN di pack → CI gagal; juga membuktikan tembakan benar keluar lewat jalur tombol |
+| 2 | `tools/build_packs.py` memindai output export untuk `SCRIPT ERROR`/`Failed to load script`/`Parse Error`/`Compile Error` → exit 4 sebelum manifest/publish | pack rusak tak akan pernah diterbitkan lagi, walau Godot exit 0 |
+| 3 | `tools/analyze_checks.py` cek baru: properti Node3D diakses pada var bertipe `Node`, khususnya di baris `:=` | kelas bug ini tertangkap statis, bahkan di sandbox tanpa Godot |
+
+### Pelajaran (untuk sesi berikutnya)
+- `var x := obj.prop` dengan `obj` bertipe kelas yang TIDAK punya `prop` =
+  parse error keras di Godot 4.5, bukan sekadar akses dinamis. Ketik variabel
+  dengan kelas paling spesifik yang dipakai (Node3D kalau sentuh transform).
+- BUKTI dari log: baris `[error]` di `build_log.json` branch content adalah
+  sumber kebenaran — insiden ini terlihat jelas di `packs/character_player
+  1.0.26` jauh sebelum user melapor.
+- Urutan hidup SceneTree script (dipakai dev_probe, diverifikasi source 4.5.2):
+  `_initialize()` jalan SEBELUM root masuk tree; node yang ditambahkan di
+  sana menerima _ready saat initialize selesai; `await process_frame` /
+  `create_timer().timeout` lanjut pada iterasi pertama; tanpa override
+  `_process` loop terus jalan sampai `quit(kode)`.
+

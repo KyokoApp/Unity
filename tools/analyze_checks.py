@@ -89,6 +89,47 @@ for path in sorted(gd_files):
         if not os.path.exists(tgt):
             problems.append(f"{rel}: load path tidak ditemukan: {p}")
     # --- cek 4: string konstanta path tsd (yang di-load di file lain) ---
+    # --- cek 4b: inferensi `:=` dari properti Node3D pada var bertipe Node ---
+    # INSIDEN RONDE-38: `var d := x.global_position.distance_to(y)` dengan
+    # x bertipe Node → analyzer Godot 4.5: "Cannot infer the type of d …"
+    # → PARSE ERROR KERAS → skrip gagal compile → pack terbit dengan pemain
+    # mati (tombol serang diam). gdparse TIDAK menangkap kelas ini; cek ini ya.
+    prop_pat = (r"\.(global_position|position|rotation|scale|"
+                r"global_transform|transform|basis|quaternion|distance_to|to_local|to_global|look_at)\b")
+    # (a) variabel KELAS bertipe Node: terlihat di seluruh file
+    class_node_vars = set()
+    for m in re.finditer(r"^var\s+(\w+)\s*:\s*Node(?!\w)", src, re.M):
+        class_node_vars.add(m.group(1))
+    # (b) PARAMETER func bertipe Node: hanya dalam badan func-nya
+    func_starts = [(i, ln) for i, ln in enumerate(lines) if re.match(r"^\s*(?:static\s+)?func\s", ln)]
+    param_node_vars = {}  # varname -> list of (awal, akhir) badan fungsi
+    for fi, (i, ln) in enumerate(func_starts):
+        end = func_starts[fi + 1][0] if fi + 1 < len(func_starts) else len(lines)
+        for pm in re.finditer(r"[(,]\s*(\w+)\s*:\s*Node(?!\w)", ln):
+            param_node_vars.setdefault(pm.group(1), []).append((i, end))
+
+    def _flag(varname: str, i: int, code: str) -> None:
+        hit = re.search(r"\b" + re.escape(varname) + prop_pat, code)
+        if hit is None:
+            return
+        if ":=" in code:
+            problems.append(
+                f"{rel}:{i + 1}: '{varname}' bertipe Node dipakai untuk '.{hit.group(1)}' "
+                f"di baris `:=` — analyzer tidak bisa infer tipe → parse error keras. "
+                f"Ketik var sebagai Node3D (atau beri tipe eksplisit).")
+        else:
+            warns.append(
+                f"{rel}:{i + 1}: akses dinamis '.{hit.group(1)}' pada '{varname}' bertipe Node "
+                f"(jalan di runtime, tapi tak diperiksa — pertimbangkan Node3D).")
+
+    for varname in sorted(class_node_vars):
+        for i, ln in enumerate(lines):
+            _flag(varname, i, ln.split("#", 1)[0])
+    for varname, ranges in sorted(param_node_vars.items()):
+        for i, ln in enumerate(lines):
+            if any(a <= i < b for a, b in ranges):
+                _flag(varname, i, ln.split("#", 1)[0])
+
 # cek global: konstanta *_PATH/*_SCENE di semua file
 scene_refs = re.findall(r'"(res://[^"]+)"', "")
 const_paths = set()
