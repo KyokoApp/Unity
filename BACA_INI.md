@@ -1,43 +1,29 @@
-# Cara pasang paket ini ke repo (via web GitHub, HP saja)
+# BACA INI — Ronde-37: pemain jadi BOLA API
 
-## File BARU (upload via "Add file → Upload files", bikin folder dulu kalau belum ada)
+## Yang berubah
+- Mannequin + semua animasi (UAL1/UAL2) + skin **dihapus**.
+- Layar kini cuma: **tanah datar (grid)** + **analog** kiri bawah.
+  (Tombol pause di layar ikut disembunyikan — menu tetap terbuka lewat tombol
+  **Back** Android / ESC. Mau munculkan lagi: `SHOW_PAUSE_BUTTON = true` di
+  `project/packs/ui/hud.gd`.)
+- Pemain = **bola api** realistis (shader plasma + selubung api + partikel
+  lidah api/asap/bara + cahaya berkedip + suara api), digerakkan analog
+  dengan percepatan/perlambatan halus dan ekor api yang mengikuti arah gerak.
+
+## File baru
+- `project/packs/character_player/fireball_core.gdshader`
+- `project/packs/character_player/fireball_shell.gdshader`
+- `project/packs/audio_sfx/fire_loop.wav` (dibuat ulang: `python3 tools/synth_fire.py`)
+- `tools/synth_fire.py`
+
+## File dihapus
 - `project/packs/character_player/anim_controller.gd`
-- `project/packs/character_player/assets/mannequin_f.glb`
-- `project/packs/character_player/assets/ual1_standard.glb`
-- `project/packs/character_player/assets/ual2_standard.glb`
+- `project/packs/character_player/assets/*.glb` (≈16,5 MB — pack jauh lebih kecil)
+- SFX lama tak terpakai: ocean_loop, footstep_1/2, jump, land, pickup, splash, emote, whoosh
 
-## File yang DIGANTI ISINYA (timpa/replace file yang sudah ada di repo)
-- `project/packs/character_player/player.gd`
-- `project/packs/ui/pause_menu.gd`
-- `project/packs/core_scripts/game_settings.gd`
-- `CREDITS.md`
-- `DECISIONS.md`
-- `docs/CARA_UPDATE.md`
+## Supaya masuk ke HP
+Merge branch ini ke `main` → workflow **apk-release** otomatis build & terbitkan
+pack baru ke branch `content` → game di HP update sendiri saat dibuka.
 
-## Setelah semua ter-upload → WAJIB picu pipeline (tidak otomatis)
-Buka repo → tab **Actions** → workflow **"apk-release"** → **Run workflow**
-→ pilih branch → tombol hijau **Run workflow**. Tunggu ~2 menit.
-
-## Ringkas yang berubah
-- Karakter kini punya model: mesh **Mannequin** (Quaternius) + gabungan
-  **86 animasi** dari 2 paket (UAL1 = lokomosi dasar, UAL2 = aksi/kombat).
-  Semua CC0 (bebas pakai, termasuk komersial).
-- Tersambung ke kontrol: jalan/lari/sprint/jongkok/lompat/renang, dash
-  (roll), interact (pickup), landing, **emote** & **serang** (dua tombol
-  ini sebelumnya mati sejak reset lama — sekarang hidup lagi, serang =
-  kombo pedang 1 klip ~3 detik).
-- Sisa ~80 animasi (berkebun, perisai, ninja-jump, zombie, dst) BELUM
-  disambung ke tombol apa pun — tapi sudah siap dipanggil kapan saja
-  lewat kode kalau mau dipakai buat fitur baru nanti.
-- Perbaikan tambahan yang ketemu di jalan: menu Karakter di Pause dulu
-  ada bug laten (dropdown nunjukin 3 pilihan tapi listnya cuma 1 —
-  pilih opsi ke-2/3 bisa crash). Sudah dibetulkan sekaligus.
-
-## ⚠️ Yang BELUM diverifikasi
-Aku tidak punya editor Godot/GPU di sandbox ini, jadi build & tampilan
-di perangkat asli BELUM pernah dicoba. Bagian paling berisiko: mesh
-mannequin "ditumpangkan" ke skeleton dari file UAL1 (nama 65 joint
-sudah kucek identik persis di ketiga file, jadi harusnya aman) — kalau
-setelah build karakter tampak pose aneh/hancur, itu titik pertama yang
-perlu di-screenshot & dikirim balik biar cepat kebetulin. Ukuran pack
-`character_player` naik dari ~29KB jadi ~16,5MB (wajar, sekali unduh).
+**BELUM DIUJI DI PERANGKAT** (sandbox tak bisa menjalankan Godot). Yang
+sudah dicek: sintaks semua skrip (gdparse) + `tools/analyze_checks.py`.

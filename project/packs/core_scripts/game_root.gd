@@ -154,7 +154,6 @@ func _boot_world(progress_cb: Callable) -> void:
 		_fatal("Scene pemain hilang:\n" + PLAYER_SCENE)
 		return
 	player = pp.instantiate()
-	player.set("char_skin", settings.char_skin)  # skin dari pengaturan (dipakai _ready)
 	add_child(player)
 	# FAILSAFE kick-41: bila script pack gagal menempel (token tidak cocok /
 	# pck rusak), instantiate() tetap mengembalikan node dan boot "sukses" —
@@ -165,7 +164,7 @@ func _boot_world(progress_cb: Callable) -> void:
 	player.global_position = spawn + Vector3(0, 0.12, 0)
 	player.call("set_world", world)
 	player.call("set_settings", settings)
-	quality.blob_shadow = player
+	quality.player_ref = player
 	quality.apply_all()  # shadow sudah terdaftar
 	await get_tree().process_frame
 	var hp = load(HUD_SCENE)
@@ -188,9 +187,9 @@ func _boot_world(progress_cb: Callable) -> void:
 	progress_cb.call(1.0, "Selesai")
 	_boot_ok = true
 	_trace("boot: HUD ✔ — selamat bermain")
-	# jejak boot bertahan 20 dtk (dulu 3): probe animasi on-device butuh waktu
-	# sampai user mulai berjalan; setelah itu jalan playa bersihkan diri sendiri
-	get_tree().create_timer(20.0).timeout.connect(func():
+	# jejak boot bertahan 4 dtk (probe animasi 20 dtk tak diperlukan lagi:
+	# mannequin/animasi sudah dihapus, pemain kini bola api)
+	get_tree().create_timer(4.0).timeout.connect(func():
 		if is_instance_valid(_trail):
 			_trail.get_parent().queue_free()
 			_trail = null

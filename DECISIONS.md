@@ -698,3 +698,41 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
 - Anti-tabrakan versi: langkah baru menyinkron `server/versions.json` dari
   branch `content` SEBELUM build (akar insiden 1.0.22 tertimpa di kick-52 —
   DB lokal basi bikin bump memakai nomor yang sudah rilis).
+
+## Ronde-37 — rombak: mannequin/animasi dihapus, pemain = BOLA API (2026-09-26)
+
+- Permintaan user: "hapus seluruh manequin dan animasi, hilangin semua kecuali
+  tanah datarnya dan analognya, tambahin bola api realistis yang bisa
+  digerakan analog dengan animasi yang smooth".
+- **Dihapus:** `anim_controller.gd`, 3×`.glb` Quaternius (~16,5 MB), skin
+  (dropdown "Karakter" di menu jeda), lompat/renang/emote/dash/serang, blob
+  shadow, SFX langkah dll, ambien ombak (AudioDirector). Tombol pause di layar
+  disembunyikan (`SHOW_PAUSE_BUTTON` di hud.gd); menu via Back/ESC.
+- **Bola api tanpa aset eksternal** (semua prosedural, hemat ukuran pack):
+  1. Inti: `fireball_core.gdshader` — unshaded, fbm value-noise 3D 4 oktaf,
+     ramp warna berbasis fresnel (tengah putih-kuning → tepi merah), ALBEDO
+     HDR (>1) agar ditangkap glow; permukaan bergolak via displacement.
+  2. Selubung aditif: `fireball_shell.gdshader` — lidah api menjilat ke atas
+     + ekor yang memanjang berlawanan arah gerak (uniform `trail`).
+  3. GPUParticles3D: lidah api (aditif, turbulence), asap (alpha), bara
+     (aditif, turbulence kuat); `local_coords=false` → jejak tertinggal di
+     dunia saat bergerak. Jumlah partikel diskalakan preset (`fx` 0,5/0,8/1).
+  4. OmniLight berkedip (campuran 3 sinus, tanpa shadow) + halo billboard +
+     bidang cahaya aditif di tanah (tetap "menyala" walau glow mati).
+  5. Suara api loop (`fire_loop.wav`, `tools/synth_fire.py`), volume & pitch
+     naik mengikuti kecepatan.
+- **Kehalusan:** gerak & kamera dihitung di `_process` (per frame render,
+  bukan tick fisika 60 Hz → tak ada judder beat-frequency), semua transisi
+  pakai lerp eksponensial `1-exp(-k·dt)` (independen FPS): akselerasi 5/s,
+  deselerasi 3/s (meluncur berhenti), ekor/kamera/intensitas diperhalus.
+  `move_and_slide()` aman dipanggil di `_process` (Godot memakai
+  process-delta bila bukan physics frame). Body terkunci y=0, MOTION_MODE
+  FLOATING, collider bola di ketinggian 1,15 m.
+- Kamera top-level mengikuti dengan lag lembut (pitch −34°, jarak 8,5 m,
+  mundur +1,3 m saat melaju); usap kanan layar tetap memutar kamera.
+- Glow environment diaktifkan lagi (threshold 0,9); preset Rendah mematikan.
+- Kontrak API lama dipertahankan (set_joy, add_look_px, press_* no-op,
+  sinyal kompat) → HUD/game_root tak perlu dirombak.
+- **BELUM DIVERIFIKASI DI PERANGKAT.** Titik cek pertama bila tampilan aneh:
+  kompilasi shader (bola tak terlihat/pink) dan kecerahan di renderer Mobile
+  (rentang HDR terbatas → atur `intensity` di material).

@@ -10,11 +10,11 @@ var _fade_nodes: Array = []
 var _bar_target := 0.0
 var _done_cb: Callable
 const TIPS := [
-	"Tip: kumpulkan 🌼 bunga dan 🥥 kelapa di sepanjang pantai.",
-	"Tip: dua jari di sisi kanan layar untuk memutar kamera.",
-	"Tip: Tahan tombol » untuk berlari lebih kencang.",
-	"Tip: saat malam tiba, cari mercusuar untuk berorientasi.",
-	"Tip: tekan ▼ untuk berjongkok dan menyelinap pelan.",
+	"Tip: geser analog di kiri layar untuk menggerakkan 🔥 bola api.",
+	"Tip: dorong analog setengah saja untuk melayang pelan.",
+	"Tip: usap sisi kanan layar untuk memutar kamera.",
+	"Tip: saat malam tiba, cahaya bola api menerangi sekitarnya.",
+	"Tip: tekan tombol Kembali (Back) untuk membuka menu.",
 ]
 
 func _ready() -> void:

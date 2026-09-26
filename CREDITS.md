@@ -2,26 +2,9 @@
 
 ## Aset pihak ketiga (disertakan)
 
-### Karakter & Animasi: Female Mannequin + Universal Animation Library 1 & 2 (Quaternius)
-- **Pembuat:** Quaternius — https://quaternius.com
-- **File:**
-  - `project/packs/character_player/assets/mannequin_f.glb` — mesh + skeleton
-    (Female Mannequin, 65 joint, tanpa animasi bawaan)
-  - `project/packs/character_player/assets/ual1_standard.glb` — 43 animasi
-    lokomosi/aksi dasar (idle/walk/jog/sprint/crouch/jump/swim/roll/interact/
-    dance/pistol/spell/punch/dst)
-  - `project/packs/character_player/assets/ual2_standard.glb` — 43 animasi
-    aksi/kombat (kombo pedang, perisai, berkebun, ninja-jump, slide, zombie,
-    memanjat, dst)
-  - Digabung runtime jadi satu AnimationPlayer via
-    `project/packs/character_player/anim_controller.gd` (namespace `ual1/*`
-    dan `ual2/*`) — lihat DECISIONS.md Ronde-36.
-- **Sumber:** diunggah pengguna langsung (paket resmi Quaternius, berisi
-  License.txt + README.txt asli); varian yang dipakai: Standard (root motion
-  off — gerak dikendalikan CharacterBody3D).
-- **Lisensi:** Creative Commons Zero (CC0 1.0) — domain publik
-  (teks lisensi: https://creativecommons.org/publicdomain/zero/1.0/).
-- **Ringkasan lisensi:** bebas dipakai/dimodifikasi untuk apa pun, termasuk komersial.
+### (Dihapus) Female Mannequin + Universal Animation Library 1 & 2 (Quaternius, CC0)
+- Dipakai Ronde-36, **dihapus Ronde-37** (pemain kini bola api prosedural —
+  lihat DECISIONS.md Ronde-37). File `.glb` tidak lagi disertakan.
 
 ### Karakter: Knight — "KayKit Character Pack: Adventures" (v1.0)
 - **Pembuat:** Kay Lousberg — https://kaylousberg.itch.io
@@ -41,8 +24,13 @@
   ditulis untuk proyek ini (`project/packs/shaders_materials/*`).
 - **Musik & SFX** — disintesis secara prosedural dari gelombang dasar
   (osilator sinus/square/noise) oleh `tools/synth_audio.py`:
-  `day_marimba.wav`, `beach_calm.wav`, `ocean_loop.wav`, footstep/jump/land/
-  pickup/splash/emote/ui_click/whoosh. Hukumnya karya orisinal proyek ini.
+  `day_marimba.wav`, `beach_calm.wav`, `ui_click.wav`. Hukumnya karya orisinal
+  proyek ini. (ocean/footstep/jump/land/pickup/splash/emote/whoosh dihapus
+  Ronde-37.)
+- **Suara api `fire_loop.wav`** — disintesis prosedural oleh
+  `tools/synth_fire.py` (gemuruh + desis + letupan). Karya orisinal.
+- **Bola api (shader inti & selubung, partikel)** — ditulis untuk proyek ini
+  (`project/packs/character_player/fireball_*.gdshader`, `player.gd`).
 
 ## Engine & tooling
 

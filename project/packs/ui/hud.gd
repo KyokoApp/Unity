@@ -325,6 +325,10 @@ func _build_layout() -> void:
 	bpause.pressed.connect(func():
 		if root_node and root_node.has_method("toggle_pause"):
 			root_node.toggle_pause())
+	# Rombak bola api: layar hanya tanah + analog. Menu tetap bisa dibuka
+	# lewat tombol BACK Android / ESC. Ubah SHOW_PAUSE_BUTTON = true untuk
+	# memunculkan tombol pause di pojok kiri atas lagi.
+	bpause.visible = SHOW_PAUSE_BUTTON
 
 	# --- indikator atas: jam + fps ---
 	label_clock = Label.new()
@@ -572,6 +576,7 @@ var _edit_tool_btns := {}
 const EDIT_ACTION_NAMES := ["BtnJump", "BtnAtk", "BtnDash", "BtnSprint", "BtnCrouch", "BtnAction", "BtnEmote"]
 ## Tombol yang sengaja disembunyikan (UI minimal). Hapus nama dari daftar ini
 ## untuk memunculkan tombol itu lagi — satu tempat saja.
+const SHOW_PAUSE_BUTTON := false
 const HIDDEN_BUTTONS := ["BtnJump", "BtnAtk", "BtnDash", "BtnCrouch", "BtnSprint", "BtnEmote", "BtnAction"]
 
 func set_edit_mode(on: bool) -> void:
