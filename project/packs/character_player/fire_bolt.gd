@@ -1,5 +1,5 @@
 extends Node3D
-## Proyektil bola api berbalistik, dengan ekor persisten dan ledakan prosedural.
+## Proyektil mana biru kecil, dengan ekor persisten dan ledakan prosedural.
 
 const FX := preload("res://packs/character_player/fire_fx.gd")
 const EXPLOSION := preload("res://packs/character_player/fire_explosion.gd")
@@ -14,6 +14,7 @@ var exclude_rids: Array[RID] = []
 # ("Node has no global_position") → parse error keras → player.gd ikut gagal
 # compile (insiden Ronde-38: tombol serang diam di perangkat).
 var shake_target: Node3D
+var damage := 35.0
 
 var _age := 0.0
 var _dead := false
@@ -41,7 +42,7 @@ func _process(delta: float) -> void:
 		if collider and collider.has_meta("monster"):
 			var target = collider.get_meta("monster")
 			if is_instance_valid(target) and target.has_method("take_damage"):
-				target.take_damage(35.0)
+				target.take_damage(damage)
 		_explode(hit.get("position", to), "impact")
 		return
 	if to.y <= 0.0:
@@ -53,7 +54,7 @@ func _process(delta: float) -> void:
 	_trail = _trail.lerp((-vel * 0.05).limit_length(0.9), 1.0 - exp(-13.0 * delta))
 	_shell_mat.set_shader_parameter("trail", _trail)
 	_shell_mat.set_shader_parameter("flow_offset", _flow)
-	_light.light_energy = 2.2 * (0.9 + 0.08 * sin(_age * 31.0) + 0.05 * sin(_age * 53.0))
+	_light.light_energy = 1.5 * (0.9 + 0.08 * sin(_age * 31.0) + 0.05 * sin(_age * 53.0))
 	if _age >= 3.0:
 		_explode(global_position, "air")
 
@@ -71,20 +72,20 @@ func _build_visual() -> void:
 
 	var core := MeshInstance3D.new()
 	var core_mesh := SphereMesh.new()
-	core_mesh.radius = 0.16
-	core_mesh.height = 0.32
-	core_mesh.radial_segments = 20
-	core_mesh.rings = 10
+	core_mesh.radius = 0.09
+	core_mesh.height = 0.18
+	core_mesh.radial_segments = 18
+	core_mesh.rings = 9
 	core.mesh = core_mesh
-	var core_key := "bolt_core_mat"
+	var core_key := "mana_core_mat"
 	var core_mat: ShaderMaterial
 	if FX.has(core_key):
 		core_mat = FX.get_res(core_key)
 	else:
 		core_mat = ShaderMaterial.new()
 		core_mat.shader = CORE_SHADER
-		core_mat.set_shader_parameter("intensity", 3.4)
-		core_mat.set_shader_parameter("turbulence", 1.6)
+		core_mat.set_shader_parameter("intensity", 3.2)
+		core_mat.set_shader_parameter("turbulence", 1.4)
 		FX.put(core_key, core_mat)
 	core.material_override = core_mat
 	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -92,43 +93,43 @@ func _build_visual() -> void:
 
 	var shell := MeshInstance3D.new()
 	var shell_mesh := SphereMesh.new()
-	shell_mesh.radius = 0.27
-	shell_mesh.height = 0.54
-	shell_mesh.radial_segments = 24
-	shell_mesh.rings = 12
+	shell_mesh.radius = 0.15
+	shell_mesh.height = 0.30
+	shell_mesh.radial_segments = 22
+	shell_mesh.rings = 11
 	shell.mesh = shell_mesh
 	_shell_mat = ShaderMaterial.new()
 	_shell_mat.shader = SHELL_SHADER
-	_shell_mat.set_shader_parameter("intensity", 2.0)
-	_shell_mat.set_shader_parameter("rise", 0.12)
+	_shell_mat.set_shader_parameter("intensity", 1.8)
+	_shell_mat.set_shader_parameter("rise", 0.08)
 	shell.material_override = _shell_mat
 	shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	shell.extra_cull_margin = 2.0
 	_visual.add_child(shell)
 
 	var halo := MeshInstance3D.new()
-	halo.mesh = FX.quad(Vector2(1.3, 1.3), FX.fx_mat(FX.soft_tex(0.12), true, Color(1, 0.35, 0.04, 0.55), BaseMaterial3D.BILLBOARD_ENABLED))
+	halo.mesh = FX.quad(Vector2(0.65, 0.65), FX.fx_mat(FX.soft_tex(0.12), true, Color(0.35, 0.65, 1.0, 0.55), BaseMaterial3D.BILLBOARD_ENABLED))
 	halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_visual.add_child(halo)
 
 	_light = OmniLight3D.new()
-	_light.light_color = Color(1.0, 0.48, 0.14)
-	_light.light_energy = 2.2
-	_light.omni_range = 6.0
+	_light.light_color = Color(0.35, 0.55, 1.0)
+	_light.light_energy = 1.5
+	_light.omni_range = 4.5
 	_light.shadow_enabled = false
 	_visual.add_child(_light)
 
-	_build_tail("FlameTongues", 60, 0.38, "flame")
-	_build_tail("Sparks", 20, 0.8, "spark")
-	_build_tail("ThinSmoke", 14, 1.25, "smoke")
+	_build_tail("ManaWisps", 32, 0.32, "flame")
+	_build_tail("Sparks", 12, 0.6, "spark")
+	_build_tail("ThinMist", 8, 0.9, "smoke")
 
 func _tail_mat(style: String) -> ParticleProcessMaterial:
-	var key := "bolt_tail_pm_" + style
+	var key := "mana_tail_pm_" + style
 	if FX.has(key):
 		return FX.get_res(key)
 	var m := ParticleProcessMaterial.new()
 	m.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	m.emission_sphere_radius = 0.14
+	m.emission_sphere_radius = 0.08
 	m.direction = Vector3.ZERO
 	m.spread = 180.0
 	m.angle_min = -180.0
@@ -136,30 +137,30 @@ func _tail_mat(style: String) -> ParticleProcessMaterial:
 	match style:
 		"flame":
 			m.initial_velocity_min = 0.1
-			m.initial_velocity_max = 0.8
-			m.gravity = Vector3(0, 1.8, 0)
+			m.initial_velocity_max = 0.6
+			m.gravity = Vector3(0, 0.8, 0)
 			m.damping_min = 1.0
 			m.damping_max = 2.5
-			m.scale_min = 0.5
-			m.scale_max = 1.0
+			m.scale_min = 0.4
+			m.scale_max = 0.85
 			m.scale_curve = FX.curve([Vector2(0, 0.3), Vector2(0.25, 1), Vector2(1, 0)], 1.0)
-			m.color_ramp = FX.ramp([0.0, 0.2, 0.65, 1.0], [Color(3.2, 2.3, 1.2), Color(2.3, 0.8, 0.16), Color(1, 0.12, 0.01, 0.5), Color(0.2, 0, 0, 0)])
+			m.color_ramp = FX.ramp([0.0, 0.2, 0.65, 1.0], [Color(1.6, 2.0, 3.2), Color(0.5, 1.1, 2.3), Color(0.08, 0.35, 1.0, 0.5), Color(0.0, 0.05, 0.2, 0.0)])
 		"spark":
-			m.initial_velocity_min = 0.8
-			m.initial_velocity_max = 3.2
-			m.gravity = Vector3(0, -4, 0)
+			m.initial_velocity_min = 0.5
+			m.initial_velocity_max = 2.0
+			m.gravity = Vector3(0, -2.5, 0)
 			m.scale_curve = FX.curve([Vector2(0, 1), Vector2(1, 0)], 1.0)
-			m.color_ramp = FX.ramp([0.0, 0.6, 1.0], [Color(3, 2, 0.6), Color(1, 0.25, 0.02), Color(0.4, 0.01, 0, 0)])
+			m.color_ramp = FX.ramp([0.0, 0.6, 1.0], [Color(2.0, 2.4, 3.0), Color(0.3, 0.6, 1.0), Color(0.02, 0.1, 0.4, 0.0)])
 		"smoke":
-			m.initial_velocity_min = 0.1
-			m.initial_velocity_max = 0.7
-			m.gravity = Vector3(0, 0.8, 0)
+			m.initial_velocity_min = 0.08
+			m.initial_velocity_max = 0.45
+			m.gravity = Vector3(0, 0.5, 0)
 			m.damping_min = 0.5
 			m.damping_max = 1.2
-			m.scale_min = 0.45
-			m.scale_max = 0.9
+			m.scale_min = 0.35
+			m.scale_max = 0.7
 			m.scale_curve = FX.curve([Vector2(0, 0.3), Vector2(1, 1.4)], 1.5)
-			m.color_ramp = FX.ramp([0.0, 0.25, 1.0], [Color(0.2, 0.14, 0.1, 0), Color(0.22, 0.16, 0.12, 0.28), Color(0.3, 0.28, 0.26, 0)])
+			m.color_ramp = FX.ramp([0.0, 0.25, 1.0], [Color(0.55, 0.75, 1.0, 0), Color(0.55, 0.75, 1.0, 0.22), Color(0.7, 0.85, 1.0, 0)])
 	return FX.put(key, m)
 
 func _build_tail(pname: String, amount: int, lifetime: float, style: String) -> void:
@@ -168,12 +169,12 @@ func _build_tail(pname: String, amount: int, lifetime: float, style: String) -> 
 	p.interpolate = true
 	p.randomness = 0.4
 	p.process_material = _tail_mat(style)
-	var size := Vector2(0.4, 0.4)
+	var size := Vector2(0.22, 0.22)
 	var additive := style != "smoke"
 	if style == "spark":
-		size = Vector2(0.045, 0.16)
+		size = Vector2(0.03, 0.09)
 	elif style == "smoke":
-		size = Vector2(0.5, 0.5)
+		size = Vector2(0.28, 0.28)
 	p.draw_pass_1 = FX.quad(size, FX.fx_mat(FX.soft_tex(0.12), additive, Color.WHITE))
 	add_child(p)
 
@@ -190,7 +191,7 @@ func _explode(at: Vector3, explosion_kind: String) -> void:
 		boom.global_position = at + (Vector3(0, 0.025, 0) if explosion_kind == "impact" else Vector3.ZERO)
 	if shake_target and shake_target.has_method("add_shake"):
 		var distance := shake_target.global_position.distance_to(at)
-		shake_target.add_shake(0.55 * clampf(1.0 - distance / 32.0, 0.15, 1.0))
+		shake_target.add_shake(0.35 * clampf(1.0 - distance / 32.0, 0.15, 1.0))
 	_visual.visible = false
 	_light.visible = false
 	for child in get_children():

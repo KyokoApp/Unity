@@ -1,10 +1,16 @@
 extends CharacterBody3D
 ## Pemain = satu balok kotak sederhana di atas tanah.
 ## Balok berputar ke kiri/kanan mengikuti arah gerak, punya outline gelap,
-## dan meninggalkan trail ekor tipis. Percikan lama sudah dihapus.
+## dan meninggalkan trail ekor tipis.
 ##
 ## Kamera tetap third-person versi awal: hanya mengikuti posisi pemain dan
-## berubah karena swipe. Saat menembak, kamera boleh mengarah langsung ke target.
+## berubah karena swipe. TIDAK ada auto-aim/auto-kamera lagi — kamera murni
+## mengikuti input pemain.
+##
+## Serangan: tap cepat = tembakan mana biru kecil. Tahan tombol serang selama
+## 5 detik memunculkan mantra "ZOLTRAAK" di depan karakter (tumbuh dari pudar
+## ke lengkap); melepas tombol langsung menembakkan gelombang Zoltraak besar
+## searah hadap karakter saat itu.
 
 signal stats_changed(kind: String, count: int)
 signal nearest_interactable_changed(meta)
@@ -13,11 +19,16 @@ signal health_changed(current: float, maximum: float)
 const SHOOT_SFX := "res://packs/audio_sfx/fire_shoot.wav"
 const FIRE_BOLT := preload("res://packs/character_player/fire_bolt.gd")
 const FIRE_EXPLOSION := preload("res://packs/character_player/fire_explosion.gd")
+const ZOLTRAAK_BOLT := preload("res://packs/character_player/zoltraak_bolt.gd")
+const ZOLTRAAK_CHARGE := preload("res://packs/character_player/zoltraak_charge.gd")
 const FIRE_COOLDOWN := 0.26
 const BOLT_SPEED := 20.0
 const BOLT_LIFT := 2.0
-const AUTO_AIM_RANGE := 30.0
-const AUTO_AIM_BEHIND_RANGE := 10.0
+
+# --- mantra Zoltraak: tahan tombol serang untuk mengisi, lepas untuk tembak ---
+const CHARGE_START_DELAY := 0.16
+const CHARGE_FULL_TIME := 5.0
+const ZOLTRAAK_COOLDOWN := 0.55
 
 # --- gerak ---
 const MAX_SPEED := 10.5
@@ -63,6 +74,10 @@ var _cam_extra := 0.0
 var _cam_snapped := false
 var _facing := Vector3.ZERO
 var _attack_held := false
+var _was_holding := false
+var _charge_active := false
+var _charge_time := 0.0
+var _charge_node: Node3D
 var _fire_cooldown := 0.0
 var _shake := 0.0
 var _fx := 1.0
@@ -122,8 +137,6 @@ func press_attack() -> void:
 
 func set_attack_held(down: bool) -> void:
 	_attack_held = down
-	if down:
-		_try_fire()
 
 func press_dash() -> void:
 	if not is_ready or _dash_cooldown > 0.0 or _dash_left > 0.0:
@@ -157,11 +170,31 @@ func _process(delta: float) -> void:
 	_t += delta
 	_fire_cooldown = maxf(0.0, _fire_cooldown - delta)
 	_dash_cooldown = maxf(0.0, _dash_cooldown - delta)
-	if _attack_held or Input.is_key_pressed(KEY_SPACE) or Input.is_key_pressed(KEY_F):
-		_try_fire()
+	_update_attack_hold(delta)
 	_move(delta)
 	_apply_camera(delta)
 	_animate_cube(delta)
+
+func _update_attack_hold(delta: float) -> void:
+	var holding_now := _attack_held or Input.is_key_pressed(KEY_SPACE) or Input.is_key_pressed(KEY_F)
+	if holding_now and not _was_holding:
+		_charge_time = 0.0
+		_charge_active = false
+	if holding_now:
+		_charge_time += delta
+		if not _charge_active and _charge_time >= CHARGE_START_DELAY:
+			_charge_active = true
+			_spawn_charge_visual()
+		if _charge_active:
+			_update_charge_visual(delta)
+	elif _was_holding and not holding_now:
+		if _charge_active:
+			_release_charge()
+		else:
+			_try_fire()
+		_charge_time = 0.0
+		_charge_active = false
+	_was_holding = holding_now
 
 func _move(delta: float) -> void:
 	if _dash_left > 0.0:
@@ -230,76 +263,24 @@ func _animate_cube(delta: float) -> void:
 	else:
 		_trail_particles.position = Vector3(0.0, -HOVER + 0.12, 0.0)
 
-# =============== Auto aim + serangan ===============
+# =============== Serangan ===============
 
 func _shoot_direction() -> Vector3:
 	if _facing.length_squared() > 0.01:
 		return _facing.normalized()
 	return (Basis(Vector3.UP, yaw) * Vector3(0, 0, -1)).normalized()
 
-func _select_auto_target() -> Node3D:
-	var cam := get_viewport().get_camera_3d()
-	if cam == null:
-		return null
-	var viewport_size := get_viewport().get_visible_rect().size
-	var screen_center := viewport_size * 0.5
-	var best: Node3D = null
-	var best_score := INF
-	for candidate in get_tree().get_nodes_in_group("enemies"):
-		if not candidate is Node3D or not is_instance_valid(candidate):
-			continue
-		var enemy: Node3D = candidate
-		var target_pos := enemy.global_position + Vector3.UP * 0.30
-		var distance := global_position.distance_to(enemy.global_position)
-		if distance > AUTO_AIM_RANGE:
-			continue
-		var behind := cam.is_position_behind(target_pos)
-		var visible_on_screen := false
-		if not behind:
-			var screen_pos := cam.unproject_position(target_pos)
-			visible_on_screen = Rect2(Vector2.ZERO, viewport_size).has_point(screen_pos)
-		if not visible_on_screen and (not behind or distance > AUTO_AIM_BEHIND_RANGE):
-			continue
-		var score := distance
-		if visible_on_screen:
-			var screen_distance := cam.unproject_position(target_pos).distance_to(screen_center)
-			score += screen_distance / maxf(viewport_size.length(), 1.0) * 8.0
-		else:
-			# Musuh di belakang boleh dipilih bila dekat, sesuai prioritas HP.
-			score = distance * 0.62 + 0.5
-		if score < best_score:
-			best_score = score
-			best = enemy
-	return best
-
-func _aim_camera_at(target_pos: Vector3) -> void:
-	var flat := target_pos - global_position
-	flat.y = 0.0
-	if flat.length_squared() > 0.01:
-		yaw = atan2(-flat.x, -flat.z)
-	var to_target := target_pos - (global_position + Vector3.UP * HOVER)
-	var horizontal := Vector2(to_target.x, to_target.z).length()
-	pitch = clampf(atan2(to_target.y, maxf(horizontal, 0.001)), PITCH_MIN, PITCH_MAX)
-
 func _try_fire() -> void:
 	if not is_ready or _fire_cooldown > 0.0:
 		return
 	_fire_cooldown = FIRE_COOLDOWN
-	var target := _select_auto_target()
 	var direction := _shoot_direction()
-	var auto_targeted := target != null
-	if auto_targeted:
-		var target_pos := target.global_position + Vector3.UP * 0.30
-		direction = (target_pos - _visual.global_position).normalized()
-		_aim_camera_at(target_pos)
 	var origin := _visual.global_position + direction * 0.58
 	var host: Node = world if is_instance_valid(world) and world.is_inside_tree() else get_parent()
 	if host == null:
 		return
 	var bolt := FIRE_BOLT.new()
-	bolt.vel = direction * BOLT_SPEED + Vector3(velocity.x, 0, velocity.z) * 0.6
-	if not auto_targeted:
-		bolt.vel += Vector3.UP * BOLT_LIFT
+	bolt.vel = direction * BOLT_SPEED + Vector3(velocity.x, 0, velocity.z) * 0.6 + Vector3.UP * BOLT_LIFT
 	bolt.fx = _fx
 	bolt.exclude_rids.append(get_rid())
 	bolt.shake_target = self
@@ -312,6 +293,56 @@ func _try_fire() -> void:
 	host.add_child(muzzle)
 	muzzle.global_position = origin
 	_shake = minf(_shake + 0.12, 0.8)
+	_play_shoot_sound()
+
+# =============== Mantra Zoltraak (charge + release) ===============
+
+func _spawn_charge_visual() -> void:
+	if _charge_node and is_instance_valid(_charge_node):
+		_charge_node.queue_free()
+	_charge_node = ZOLTRAAK_CHARGE.new()
+	add_child(_charge_node)
+	_position_charge_node()
+
+func _position_charge_node() -> void:
+	if _charge_node == null or not is_instance_valid(_charge_node):
+		return
+	var direction := _shoot_direction()
+	_charge_node.global_position = _visual.global_position + Vector3.UP * 0.05 + direction * 0.95
+
+func _update_charge_visual(delta: float) -> void:
+	if _charge_node == null or not is_instance_valid(_charge_node):
+		return
+	_position_charge_node()
+	var progress := clampf((_charge_time - CHARGE_START_DELAY) / (CHARGE_FULL_TIME - CHARGE_START_DELAY), 0.0, 1.0)
+	_charge_node.update_progress(progress, delta)
+	var cam: Camera3D = $CameraPivot/CamArm/Cam
+	_charge_node.face_camera(cam)
+
+func _release_charge() -> void:
+	var progress := clampf((_charge_time - CHARGE_START_DELAY) / (CHARGE_FULL_TIME - CHARGE_START_DELAY), 0.0, 1.0)
+	var direction := _shoot_direction()
+	if _charge_node and is_instance_valid(_charge_node):
+		var node := _charge_node
+		_charge_node = null
+		node.dissolve_and_free()
+	_fire_zoltraak(direction, progress)
+
+func _fire_zoltraak(direction: Vector3, charge_fraction: float) -> void:
+	if not is_ready:
+		return
+	var host: Node = world if is_instance_valid(world) and world.is_inside_tree() else get_parent()
+	if host == null:
+		return
+	var bolt := ZOLTRAAK_BOLT.new()
+	bolt.fx = _fx
+	bolt.exclude_rids.append(get_rid())
+	bolt.shake_target = self
+	bolt.setup(direction, charge_fraction)
+	host.add_child(bolt)
+	bolt.global_position = _visual.global_position + direction * 0.7 + Vector3.UP * 0.05
+	_shake = minf(_shake + 0.30 + 0.30 * charge_fraction, 0.9)
+	_fire_cooldown = maxf(_fire_cooldown, ZOLTRAAK_COOLDOWN)
 	_play_shoot_sound()
 
 func _play_shoot_sound() -> void:

@@ -1,70 +1,100 @@
-# BACA INI — Ronde-42: rotasi balok, outline, trail, dash, auto-aim
+# BACA INI — Ronde-43: hapus auto-lock, tembakan mana biru kecil, mantra Zoltraak
 
 ## Alur repository
 
-- Remote `origin` dicek sebelum ronde ini. Tidak ada branch remote
-  `arena/*-unity` lain dengan pekerjaan yang perlu di-merge.
+- Remote `origin` dicek sebelum ronde ini; hanya `arena/01a0dca7-unity` yang
+  ditemukan, tidak ada branch sesi lain untuk di-merge.
 - Branch sesi tetap `arena/01a0dca7-unity`.
 - Tidak merge ke `main` dan tidak menutup PR.
-- Workflow `.github/workflows/apk_release.yml` tetap mendaftarkan branch sesi
-  pada `on.push.branches`, sehingga push konten menjalankan build dan publish
-  delta ke branch `content`.
+- `.github/workflows/apk_release.yml` tetap mendaftarkan branch sesi pada
+  `on.push.branches`.
 
 ## Perubahan ronde ini
 
-### Balok pemain
+### Auto-aim & auto-kamera DIHAPUS
 
-- Balok tetap satu kubus sederhana, sekarang berputar halus ke kiri/kanan
-  mengikuti `_facing` atau arah gerak/dash.
-- Ditambahkan outline inverted-hull gelap (`PlayerOutline`) di sekeliling balok
-  supaya silhouette tetap terbaca di layar HP.
-- Percikan `GroundFrictionSparks` dihapus total.
-- Diganti `CubeTrail`: ekor partikel pendek/transparan yang tertinggal di
-  belakang balok selama bergerak. Trail mengikuti arah berlawanan gerak dan
-  berhenti ketika pemain diam.
+- Seluruh logic `_select_auto_target()` dan `_aim_camera_at()` di
+  `player.gd` dihapus total sesuai permintaan user ("auto lock nya jelek,
+  hapus ajh").
+- Tembakan kembali memakai arah hadap karakter (`_facing`)/arah kamera saat
+  diam, seperti sebelum ronde-42.
+- Kamera benar-benar tidak lagi berputar otomatis ke arah musuh; kamera hanya
+  merespons swipe dan mengikuti posisi pemain (perilaku dari ronde-41).
+- Grup `enemies` yang tadinya dipakai auto-aim juga dibuang dari
+  `monster.gd` karena sudah tidak dipakai.
 
-### Dash
+### Tembakan biasa jadi mana biru kecil
 
-- Tombol dash sekarang terlihat di HUD dan memanggil `press_dash()`.
-- Dash memiliki burst cepat lalu ease-out hingga lambat, bukan gerak beruntun
-  dengan kecepatan konstan.
-- Cooldown dash 1,15 detik mencegah dash dipicu tanpa jeda.
-- Setiap dash meninggalkan satu `DashAfterimage` berbentuk balok di posisi awal;
-  bayangan membesar sedikit lalu memudar selama 0,62 detik.
+- `fireball_core.gdshader` dan `fireball_shell.gdshader` direvisi total dari
+  palet oranye/merah (api) menjadi palet biru-putih (mana): biru tua → biru
+  terang → putih di tengah.
+- `fire_bolt.gd`: ukuran inti/selubung/halo diperkecil (radius inti
+  0.16→0.09, selubung 0.27→0.15, halo 1.3→0.65), cahaya jadi biru, partikel
+  ekor direcolor biru-putih dan jumlahnya dikurangi supaya kesan "kecil".
+- `fire_explosion.gd`: cahaya, bola ledakan, semburan partikel (fire/sparks/
+  embers/smoke), percikan muzzle, dan cincin dampak semua direcolor biru-putih
+  serta diperkecil skalanya. Bekas hangus (scorch mark) coklat dihapus,
+  diganti cincin cahaya biru saja supaya terasa seperti mana, bukan api.
+- Nama file/skrip (`fire_bolt.gd`, `fire_explosion.gd`, `fireball_*.gdshader`)
+  sengaja TIDAK diganti agar tidak merusak preload/referensi lain; hanya isi
+  visualnya yang direvisi.
 
-### Auto-aim tembakan
+### Mantra Zoltraak (skill tahan-lepas baru)
 
-- Saat menembak, pemain mencari node group `enemies` dalam jarak 30 m.
-- Target normal dipilih dari musuh yang benar-benar berada di layar, dengan
-  prioritas tambahan untuk yang dekat dengan tengah layar.
-- Musuh di belakang kamera tetap bisa dipilih bila jaraknya maksimal 10 m;
-  target dekat seperti itu mendapat skor prioritas lebih tinggi.
-- Kamera langsung diarahkan ke target terpilih.
-- Fire bolt diarahkan langsung ke posisi target tanpa lift balistik tambahan;
-  tembakan tanpa target tetap memakai arah balok/kamera lama.
-- Semua kubus monster sekarang mendaftarkan diri ke group `enemies`.
+- Tap cepat tombol serang (ditahan < 0,16 detik) = satu tembakan mana biru
+  kecil seperti biasa (`fire_bolt.gd`), TIDAK ADA LAGI tembakan beruntun
+  selama tombol ditahan (autofire lama dihapus sesuai desain baru).
+- Menahan tombol serang ≥ 0,16 detik memicu mode mantra: lingkaran sihir
+  "ZOLTRAAK" (`zoltraak_charge.gd`) muncul melayang di depan karakter,
+  tumbuh dari pudar (alpha/skala kecil) ke lengkap selama 5 detik
+  (`CHARGE_FULL_TIME`), lengkap dengan 8 huruf "Z O L T R A A K" tersusun di
+  sekeliling cincin yang berputar pelan. Lingkaran selalu menghadap kamera
+  (look_at manual tiap frame) supaya hurufnya tetap terbaca dari sudut
+  manapun.
+- Melepas tombol kapan pun setelah mode mantra aktif langsung menembakkan
+  gelombang besar Zoltraak (`zoltraak_bolt.gd`) searah hadap karakter saat
+  itu. Kekuatan/ukurannya sebanding progres pengisian (0,16 detik = lemah,
+  5 detik penuh = maksimal); menahan lebih dari 5 detik cukup mempertahankan
+  status penuh sampai dilepas.
+- Visual Zoltraak: untaian 7 segmen kapsul yang meliuk mengikuti fungsi sinus
+  tegak lurus arah gerak (mensimulasikan gelombang air mengalir), warna putih
+  di kepala bercampur biru tipis ke buntut, ditambah partikel kabut mana yang
+  mengikuti arah gerak dengan turbulensi supaya terasa "mengalir".
+- Zoltraak menembus (pierce) beberapa musuh sekaligus di jalur lintasannya,
+  bukan meledak sekali kena — cocok untuk tembakan besar/ultimate. Saat
+  mengenai medan atau habis jangkauan/waktu hidup, ia larut dengan percikan
+  cincin cahaya biru-putih lembut (bukan ledakan api).
 
-### HUD
+### Uji asap CI diperbarui
 
-- Tombol serang dan dash dibuat terlihat lagi agar fitur auto-aim dan dash bisa
-  dites langsung di HP. Tombol aksi lain tetap tersembunyi.
+- `project/dev_probe/fire_attack_check.gd` sebelumnya mengasumsikan menahan
+  tombol serang = autofire berulang (≥2 `fire_bolt.gd` dalam 0,8 detik).
+  Asumsi itu sudah tidak berlaku sejak mekanik charge baru ditambahkan.
+- Probe kini menguji dua jalur secara eksplisit:
+  - Fase 2a & 3: TAP cepat → harus menghasilkan `fire_bolt.gd`.
+  - Fase 2b: TAHAN lalu LEPAS → harus menghasilkan `zoltraak_bolt.gd`.
+- Jeda antar fase diperpanjang di atas `ZOLTRAAK_COOLDOWN` (0,55 detik) agar
+  cooldown tidak menelan pengujian fase berikutnya.
 
 ## Verifikasi
 
-- Semua 18 file GDScript lolos `gdparse` lokal.
+- Semua 20 file GDScript di `project/packs` lolos `gdparse` lokal, plus
+  `project/dev_probe/fire_attack_check.gd` diperiksa terpisah.
 - `python3 tools/analyze_checks.py /home/user/Unity` → `BERSIH ✓`.
 - `git diff --check` → bersih.
-- Build APK/PCK final akan diverifikasi GitHub Actions setelah push karena Godot
-  tidak tersedia lokal di sandbox.
+- Uji tembak-menembak penuh (fase 2a/2b/3 probe) tervalidasi lewat GitHub
+  Actions setelah push karena Godot tidak tersedia secara lokal di sandbox.
 
 ## Cara test di HP
 
-1. Tutup game sepenuhnya lalu buka lagi agar delta terbaru masuk.
-2. Gerakkan balok ke kanan/kiri; rotasi balok dan outline harus mengikuti arah.
-3. Pastikan tidak ada percikan lama; yang terlihat adalah ekor trail di belakang.
-4. Tekan dash sekali: balok melesat cepat lalu melambat, dan satu bayangan
-   tertinggal di posisi awal. Tekan lagi sebelum cooldown selesai: tidak boleh
-   dash kedua.
-5. Tekan serang saat musuh ada di layar. Tembakan harus membelok ke kubus
-   musuh dan kamera langsung ikut mengarah ke target. Musuh dekat di belakang
-   juga boleh dipilih otomatis.
+1. Tutup game sepenuhnya lalu buka lagi agar delta terbaru terunduh.
+2. Gerak dan tembak sekali (tap): pastikan warna tembakan sekarang biru dan
+   ukurannya kecil, bukan bola api oranye besar.
+3. Arahkan kamera manual (swipe) ke musuh, lalu tahan tombol serang: lihat
+   lingkaran mantra "ZOLTRAAK" tumbuh di depan karakter selama 5 detik dengan
+   huruf berputar. Kamera TIDAK boleh berputar sendiri ke arah musuh.
+4. Lepas tombol serang: pastikan keluar gelombang besar putih-biru yang
+   meliuk seperti air mengalir, searah hadap karakter (bukan otomatis ke
+   musuh manapun).
+5. Coba lepas lebih awal (sebelum 5 detik penuh): Zoltraak tetap keluar tapi
+   lebih kecil/lemah dibanding yang ditahan penuh.

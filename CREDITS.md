@@ -71,6 +71,17 @@
 - Mata merah monster dan percikan gesekan tanah dibuat procedural dengan
   material/partikel Godot.
 
+## Ronde-43: tembakan mana biru + mantra Zoltraak
+
+- `fireball_core.gdshader`, `fireball_shell.gdshader`, `fire_bolt.gd`, dan
+  `fire_explosion.gd` direvisi dari palet api oranye ke palet mana biru-putih
+  dan diperkecil ukurannya; semua tetap prosedural karya proyek ini, tanpa
+  aset/tekstur eksternal baru.
+- `zoltraak_charge.gd` (lingkaran mantra) dan `zoltraak_bolt.gd` (gelombang
+  besar) adalah skrip baru, seluruhnya prosedural (mesh primitive, partikel,
+  dan `Label3D` bawaan Godot untuk huruf mantra) — tidak ada aset pihak
+  ketiga yang ditambahkan.
+
 *Terakhir diperbarui: 2026-09-26*
 
 ## Ronde-8: Aset Desa & Alam — KayKit Medieval Hexagon Pack (CC0)

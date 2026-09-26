@@ -9,15 +9,27 @@ extends SceneTree
 ## ada SCRIPT ERROR, jadi jalur export saja tidak cukup — probe inilah yang
 ## gagal keras sebelum konten sempat diterbitkan.
 ##
+## RONDE-43: semantik serangan berubah total (permintaan user: hapus autofire
+## saat ditahan). Sekarang:
+##   - TAP cepat (ditahan < CHARGE_START_DELAY di player.gd) = satu tembakan
+##     mana biru kecil (fire_bolt.gd), TIDAK ADA lagi tembakan beruntun selama
+##     tombol ditahan.
+##   - TAHAN lama (>= CHARGE_START_DELAY) = mantra "ZOLTRAAK" tumbuh di depan
+##     karakter; MELEPAS tombol men-trigger satu tembakan besar
+##     (zoltraak_bolt.gd), bukan fire_bolt.gd.
+## Probe ini diperbarui supaya menguji KEDUA jalur itu, bukan lagi
+## "ditahan 0.8 dtk → autofire >= 2 bola" (perilaku lama yang sudah dihapus
+## dengan sengaja).
+##
 ## Jalankan (CI & lokal):
 ##   godot --headless --path project --script dev_probe/fire_attack_check.gd
 ## Exit 0 = LULUS; exit != 0 = build konten WAJIB berhenti.
 ##
 ## Fase 1 : semua .gd di packs/ + semua scene inti WAJIB termuat & valid.
-## Fase 2 : pemain menembak via set_attack_held → bola api HARUS muncul;
-##          ditahan 0.8 dtk → autofire minimal 2 bola.
-## Fase 3 : HUD ditanam, handler tombol serang (_on_attack) dipanggil →
-##          bola api HARUS muncul (jalur persis tombol 🔥 di layar).
+## Fase 2a: TAP cepat via set_attack_held → satu fire_bolt.gd HARUS muncul.
+## Fase 2b: TAHAN lalu lepas → satu zoltraak_bolt.gd HARUS muncul (mantra).
+## Fase 3 : HUD ditanam, handler tombol serang (_on_attack) TAP cepat →
+##          fire_bolt.gd HARUS muncul (jalur persis tombol 🔥 di layar).
 ##
 ## Catatan urutan engine (diverifikasi dari source Godot 4.5.2):
 ## _initialize() dipanggil SEBELUM root masuk tree — node yang ditambahkan di
@@ -35,8 +47,8 @@ const SCENES := [
 	"res://packs/ui/loading_screen.tscn",
 	"res://packs/ui/pause_menu.tscn",
 ]
-const HOLD_SEC := 0.8
-const MIN_BOLTS := 2
+const CHARGE_HOLD_SEC := 0.8   # > CHARGE_START_DELAY (0.16) di player.gd -> pasti masuk mode mantra
+const COOLDOWN_WAIT_SEC := 0.7 # > ZOLTRAAK_COOLDOWN (0.55) supaya fase berikut tak tertelan cooldown
 
 var _exit_code := 0
 
@@ -99,7 +111,7 @@ func _run() -> void:
 	player.call("set_settings", null)
 	hud.call("bind_player", player)
 
-	# ---------- Fase 2: pemain menembak ----------
+	# ---------- Fase 2a: TAP cepat → fire_bolt.gd ----------
 	await process_frame          # tree hidup; _ready pemain+HUD pasti sudah jalan
 	if not bool(player.get("is_ready")):
 		_fail("pemain tidak siap setelah 1 frame (is_ready=false)")
@@ -109,41 +121,58 @@ func _run() -> void:
 		_fail("player.set_attack_held tidak ada (skrip pemain versi lama?)")
 		_finish()
 		return
-	print("[fire-check] fase 2: tahan serang ", HOLD_SEC, " dtk…")
+	print("[fire-check] fase 2a: TAP cepat…")
+	var before_tap := _count_by_suffix(world, "fire_bolt.gd")
 	player.call("set_attack_held", true)
-	await create_timer(HOLD_SEC).timeout
+	await process_frame          # < CHARGE_START_DELAY (0.16s) -> tetap dianggap tap
 	player.call("set_attack_held", false)
-	var bolts := _count_bolts(world)
-	if bolts >= MIN_BOLTS:
-		print("[fire-check] fase 2 ✔ ", bolts, " bola api (tekan + autofire)")
+	await process_frame
+	var after_tap := _count_by_suffix(world, "fire_bolt.gd")
+	if after_tap > before_tap:
+		print("[fire-check] fase 2a ✔ tap → ", after_tap - before_tap, " fire_bolt.gd")
 	else:
-		_fail("fase 2: cuma %d bola api (harusnya >= %d) — tekan serang tidak menembak" % [bolts, MIN_BOLTS])
+		_fail("fase 2a: tap cepat tidak menghasilkan fire_bolt.gd — tombol serang mati")
 
-	# ---------- Fase 3: jalur tombol HUD ----------
+	# ---------- Fase 2b: TAHAN lalu lepas → mantra Zoltraak ----------
+	await create_timer(COOLDOWN_WAIT_SEC).timeout
+	print("[fire-check] fase 2b: tahan ", CHARGE_HOLD_SEC, " dtk lalu lepas…")
+	var before_zolt := _count_by_suffix(world, "zoltraak_bolt.gd")
+	player.call("set_attack_held", true)
+	await create_timer(CHARGE_HOLD_SEC).timeout
+	player.call("set_attack_held", false)
+	await process_frame
+	var after_zolt := _count_by_suffix(world, "zoltraak_bolt.gd")
+	if after_zolt > before_zolt:
+		print("[fire-check] fase 2b ✔ tahan+lepas → ", after_zolt - before_zolt, " zoltraak_bolt.gd")
+	else:
+		_fail("fase 2b: tahan lalu lepas tidak menghasilkan zoltraak_bolt.gd — mantra mati")
+
+	# ---------- Fase 3: jalur tombol HUD (TAP cepat) ----------
 	if not hud.has_method("_on_attack"):
 		_fail("handler tombol serang HUD (_on_attack) tidak ada")
 		_finish()
 		return
-	# jeda melewati sisa cooldown fase 2 (FIRE_COOLDOWN 0.26 dtk) supaya
-	# penekanan HUD diuji jujur, bukan tertelan cooldown tembakan terakhir
-	await create_timer(0.4).timeout
-	print("[fire-check] fase 3: tekan tombol serang via HUD…")
-	var before := _count_bolts(world)
+	# jeda melewati sisa cooldown Zoltraak (fase 2b) supaya penekanan HUD diuji
+	# jujur, bukan tertelan cooldown tembakan terakhir
+	await create_timer(COOLDOWN_WAIT_SEC).timeout
+	print("[fire-check] fase 3: tekan tombol serang via HUD (tap cepat)…")
+	var before := _count_by_suffix(world, "fire_bolt.gd")
 	hud.call("_on_attack", true)
-	await process_frame
+	await process_frame          # 1 frame ~16ms, masih di bawah CHARGE_START_DELAY
 	hud.call("_on_attack", false)
-	var after := _count_bolts(world)
+	await process_frame
+	var after := _count_by_suffix(world, "fire_bolt.gd")
 	if after > before:
 		print("[fire-check] fase 3 ✔ tombol HUD → ", after - before, " bola api baru")
 	else:
 		_fail("fase 3: tombol serang HUD tidak menghasilkan tembakan")
 	_finish()
 
-func _count_bolts(world: Node) -> int:
+func _count_by_suffix(world: Node, suffix: String) -> int:
 	var n := 0
 	for c in world.get_children():
 		var sp := c.get_script() as GDScript
-		if sp != null and sp.resource_path.ends_with("fire_bolt.gd"):
+		if sp != null and sp.resource_path.ends_with(suffix):
 			n += 1
 	return n
 

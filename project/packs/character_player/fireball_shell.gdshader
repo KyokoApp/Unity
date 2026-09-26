@@ -1,7 +1,7 @@
 shader_type spatial;
 render_mode blend_add, unshaded, cull_back, depth_draw_never, shadows_disabled;
-// SELUBUNG API (aditif) di sekitar inti:
-// - lidah api selalu menjilat ke ATAS (api naik),
+// SELUBUNG mana (aditif) di sekitar inti:
+// - untaian energi selalu menjilat ke ATAS (mengambang ringan),
 // - saat bergerak, sisi belakang memanjang jadi EKOR (uniform `trail`,
 //   diperhalus di skrip -> transisi diam/jalan mulus),
 // - tepi siluet memudar lembut, pola noise mengalir ke atas & ke belakang.
@@ -9,7 +9,7 @@ render_mode blend_add, unshaded, cull_back, depth_draw_never, shadows_disabled;
 uniform float intensity = 1.6;
 uniform vec3 trail = vec3(0.0);        // vektor ekor (node visual tidak diputar -> ruang lokal = dunia)
 uniform vec3 flow_offset = vec3(0.0);
-uniform float rise = 0.55;             // tinggi jilatan api ke atas
+uniform float rise = 0.55;             // tinggi jilatan energi ke atas
 uniform float alpha_scale = 1.0;
 
 varying vec3 obj_p;
@@ -74,7 +74,7 @@ void fragment() {
 	float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	float edge = smoothstep(0.0, 0.65, facing);
 	float flame = smoothstep(0.30, 0.75, n + (n2 - 0.47) * 0.6 + facing * 0.25 - tail_w * 0.25);
-	vec3 c = mix(vec3(0.9, 0.18, 0.02), vec3(1.0, 0.62, 0.15), flame);
+	vec3 c = mix(vec3(0.05, 0.30, 0.85), vec3(0.55, 0.85, 1.0), flame);
 	ALBEDO = c * intensity;
 	ALPHA = clamp(edge * flame * (1.0 - tail_w * 0.45) * alpha_scale, 0.0, 1.0);
 }

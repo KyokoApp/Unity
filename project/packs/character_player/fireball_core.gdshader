@@ -1,7 +1,7 @@
 shader_type spatial;
 render_mode unshaded, cull_back, shadows_disabled, depth_draw_opaque;
-// INTI bola api: plasma bergolak (fbm 3D prosedural, tanpa tekstur).
-// Tengah (menghadap kamera) = putih-kuning panas, tepi = oranye -> merah tua.
+// INTI proyektil mana: energi biru bergolak (fbm 3D prosedural, tanpa tekstur).
+// Tengah (menghadap kamera) = putih terang, tepi = biru terang -> biru tua.
 // Nilai ALBEDO > 1.0 (HDR) supaya ditangkap glow environment.
 
 uniform float intensity = 2.6;
@@ -60,9 +60,9 @@ void fragment() {
 	float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	float heat = facing * 1.15 + (n1 - 0.47) * 1.1 + (n2 - 0.47) * 0.45 - 0.1;
 	heat = clamp(heat, 0.0, 1.0);
-	vec3 c = mix(vec3(0.55, 0.05, 0.0), vec3(1.0, 0.36, 0.03), smoothstep(0.05, 0.40, heat));
-	c = mix(c, vec3(1.0, 0.78, 0.30), smoothstep(0.40, 0.72, heat));
-	c = mix(c, vec3(1.0, 0.97, 0.85), smoothstep(0.72, 0.95, heat));
+	vec3 c = mix(vec3(0.03, 0.08, 0.35), vec3(0.10, 0.30, 0.95), smoothstep(0.05, 0.40, heat));
+	c = mix(c, vec3(0.45, 0.75, 1.0), smoothstep(0.40, 0.72, heat));
+	c = mix(c, vec3(0.90, 0.97, 1.0), smoothstep(0.72, 0.95, heat));
 	float flicker = 0.92 + 0.08 * sin(TIME * 23.0 + n1 * 6.0);
 	ALBEDO = c * intensity * (0.55 + 0.65 * heat) * flicker;
 }
