@@ -13,8 +13,8 @@
    "version": "1.0.3"
   },
   "character_player": {
-   "content_hash": "c31a885939582d6ebb132fd9fc7c25254782bbecf72532181806cfca52f2f7f4",
-   "version": "1.0.30"
+   "content_hash": "2e4519d923786ecdc10253df68330aa8261f6cac630a00dc830e33532928e69c",
+   "version": "1.0.31"
   },
   "core_scripts": {
    "content_hash": "051a44cb55be45d8cb5058fba62b2b36d53e6334782cd2c1ad9fda21af597a9d",
@@ -25,8 +25,8 @@
    "version": "1.0.9"
   },
   "ui": {
-   "content_hash": "3a85c21fa03d39e3f826f1fd2c85f8d0f7bb6010fc05956df4d5c418f53b3c11",
-   "version": "1.0.18"
+   "content_hash": "77c28b9f4545e8a7fb05fd675be028bf36dd0c6f0cba34668ae358311bc60437",
+   "version": "1.0.19"
   },
   "world_props_beach": {
    "content_hash": "1c0bc74cb8af4b3153fc1b1223da8d1d0570e47e03e2fdbde488ce538d63bb45",
@@ -37,8 +37,8 @@
    "version": "1.0.4"
   },
   "world_terrain": {
-   "content_hash": "bdead38b9e4bde68d1a03126505d4f71d086a0e89dfecd4c6d633bb382b90400",
-   "version": "1.0.37"
+   "content_hash": "8c36368b25732d1868be5a697551f64a672d859cea8d11ab9a80e2aee966fd93",
+   "version": "1.0.38"
   }
  }
 }
