@@ -143,6 +143,70 @@ lari lebih detail. Perbaikan (`player.gd` saja, tidak ada file lain diubah):
 - Idle tetap punya animasi terpisah (napas halus, ayun ringan) — tidak
   memakai sistem gait yang sama supaya tidak "berjalan di tempat" saat diam.
 
+## Ronde-46 bag. A3: pivot ke stickman ungu literal + animasi biomekanik
+
+Pengguna mengirim gambar referensi (ikon stick figure universal: kepala
+bulat + garis lurus torso/lengan/kaki) dan minta karakter dibuat betulan
+menyerupai itu (warna ungu dipertahankan), plus minta animasi jalan/lari/
+dash yang benar berdasarkan riset, bukan tebakan. Perubahan (`player.gd` +
+`player.tscn` saja):
+
+### Bentuk tubuh — literal stickman
+
+- SEMUA elemen "berdaging" dari bag. A/A2 dihapus: tunik/jubah, cape,
+  bantalan bahu, manset lengan, sepatu bot, rambut (poni/jambul/kuncir),
+  topi penyihir, mata (sclera/iris/kilau), pipi merona.
+- Diganti: kepala bulat polos (`SphereMesh`, tanpa wajah) + garis tunggal
+  seragam (`CapsuleMesh` radius `LIMB_RADIUS=0.065` konstan) untuk torso,
+  lengan atas+bawah, paha+betis — semua 1 warna ungu (`STICK_COLOR`).
+  Skeleton/pivot sendi (`HipPivot*`, `ShinPivot`, `ArmPivot*`,
+  `ForearmPivot`) dari bag. A2 **dipertahankan apa adanya** supaya tetap
+  bisa menekuk saat animasi — hanya "daging" di sekitarnya yang dilucuti.
+- `_hips` (Node3D baru) memisahkan kelompok kaki dari `_upper` (torso+
+  lengan+kepala) supaya keduanya bisa berotasi Y independen (twist
+  pinggul vs counter-twist bahu, lihat di bawah).
+- `player.tscn`: collision `CapsuleShape3D` diperkecil (radius 0.32→0.24)
+  mengikuti badan yang jauh lebih ramping dari versi berjubah.
+
+### Animasi — DIRISET, bukan ditebak
+
+Dicari lewat web search (bukan asumsi): biomekanik lari/jalan manusia dari
+jurnal "The biomechanics of running" (Gait and Posture 1998), artikel
+"Swing phase running biomechanics", "Biomechanics of running: overview on
+gait cycle" (IJPEFS), "Assessment of Gait", serta prinsip animasi walk/run
+cycle (pose contact/recoil/passing/high-point, ayunan kontralateral).
+Angka konkret yang diambil & dipakai persis di kode:
+
+| Parameter | Jalan | Lari | Sprint/Dash |
+|---|---|---|---|
+| Tekuk lutut maks (swing) | ~60° | ~90° | ~105-110° |
+| Condong badan ke depan | ~2-3° | ~5-7.5° | (dilebihkan ~17° demi kesan "meledak") |
+| Amplitudo ayun lengan & tekuk siku | kecil | sedang-besar | besar |
+
+Prinsip lain yang diimplementasikan:
+- **Lengan KONTRALATERAL**: lengan kanan mengayun SAMA fasa dengan kaki
+  KIRI (berlawanan dengan kaki kanan) — bukan lengan+kaki di sisi yang
+  sama bergerak searah. Ini pola gerak manusia asli, sering salah ditebak.
+- **Fase gait berbasis jarak tempuh** (`_advance_gait`, fase maju
+  sebanding `kecepatan × delta`), bukan `sin(waktu)` murni — supaya
+  panjang & frekuensi langkah otomatis mengikuti kecepatan asli (riset:
+  "stride length & stride rate naik bersama kecepatan").
+- **Twist pinggul/bahu** halus (beberapa derajat saja, `HIP_TWIST_MAX`/
+  `SHOULDER_TWIST_MAX`) — riset menyebut rotasi ini harus KECIL pada lari
+  efisien, jadi sengaja tidak dibesar-besarkan.
+- **Blend kontinu jalan→lari** berdasar `_speed01` (0=jalan pelan,
+  1=lari penuh), lalu **overlay dash** (`_dash_anim`, di-lerp masuk/keluar
+  supaya tidak "pop") mendorong lebih jauh ke nilai sprint yang lebih
+  ekstrem — dash terasa beda dari lari biasa, bukan sekadar versi cepat.
+- Debu jejak kaki (bag. A2) dipertahankan, posisi disesuaikan proporsi
+  kaki yang lebih ramping (offset 0.115→0.09).
+
+### Yang TIDAK berubah
+
+- Aura partikel ungu-biru (efek idle) dipertahankan.
+- Arsitektur gerak/kamera third-person, serangan (`arcane_bolt.gd`), dan
+  semua file selain `player.gd`/`player.tscn` tidak disentuh di bag. A3.
+
 ## Yang BELUM dikerjakan (menyusul di bagian berikutnya)
 
 - **Bagian B**: mantra andalan (gaya Zoltraak) dipoles jauh lebih

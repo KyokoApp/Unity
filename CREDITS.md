@@ -143,7 +143,46 @@
   **dipertahankan** (hanya komentar diperbarui), direframe sebagai
   reruntuhan kuno dunia sihir, bukan cover medan tempur tank.
 
+## Ronde-46 (bag. A3): stickman ungu + animasi jalan/lari/dash biomekanik
+
+- Permintaan pengguna (dengan gambar referensi stick figure): ganti bentuk
+  karakter jadi STICKMAN literal (kepala bulat + garis lurus untuk
+  torso/lengan/kaki, tanpa wajah/rambut/pakaian), warna ungu dipertahankan,
+  dan minta riset dulu cara kerja animasi jalan/lari/dash yang benar.
+- Riset biomekanik (bukan asumsi) via web search, sumber: jurnal "The
+  biomechanics of running" (Gait and Posture, 1998), "Swing phase running
+  biomechanics" (auptimo.com), "Biomechanics of running: An overview on
+  gait cycle" (IJPEFS), "Assessment of Gait" (musculoskeletalkey.com), serta
+  prinsip animasi walk/run-cycle (contact/recoil/passing/high-point poses,
+  kontralateral arm-leg swing) dari beberapa tutorial animasi karakter.
+  Angka yang diambil & dipakai di `player.gd`:
+  - Tekuk lutut maksimum saat mengayun: ~60° jalan normal, ~90° lari,
+    ~105-110° sprint terlatih (dipakai persis: `KNEE_BEND_WALK/RUN/DASH`).
+  - Condong badan ke depan: ~2-3° jalan, ~5-7.5° lari (dipakai persis;
+    nilai dash dilebih-lebihkan ke ~17° demi keterbacaan visual game).
+  - Lengan berayun KONTRALATERAL (berlawanan fasa dengan kaki di sisi
+    SEBERANG, bukan searah) — pola gerak manusia asli, bukan asumsi.
+  - Siku makin tertekuk & amplitudo ayun makin besar seiring kecepatan.
+  - Rotasi pinggul/bahu (transverse plane) ada tapi harus KECIL pada lari
+    efisien — dipakai sebagai detail halus (`HIP_TWIST_MAX`/
+    `SHOULDER_TWIST_MAX`, beberapa derajat saja).
+  - Panjang & frekuensi langkah naik bersama kecepatan — diimplementasikan
+    dengan fase gait yang maju sebanding JARAK TEMPUH (`_advance_gait`),
+    bukan `sin(waktu)` murni.
+- `player.gd`: seluruh mesh "berdaging" dari bag. A/A2 (tunik, cape,
+  bantalan bahu, manset, sepatu bot, rambut, topi, mata, pipi merona)
+  **dihapus**; diganti garis seragam (`CapsuleMesh` radius `LIMB_RADIUS`
+  konstan) untuk torso/lengan/kaki + `SphereMesh` polos untuk kepala, semua
+  1 warna ungu (`STICK_COLOR`) — 100% prosedural, tanpa tekstur/model
+  eksternal. Skeleton pivot (paha/betis, lengan-atas/siku) dari bag. A2
+  dipertahankan agar tetap bisa menekuk saat animasi.
+- `player.tscn`: collision `CapsuleShape3D` diperkecil (radius 0.32→0.24)
+  mengikuti badan yang jauh lebih ramping.
+- Aura partikel ungu-biru & debu jejak kaki (bag. A2) **dipertahankan** —
+  bukan bagian bentuk tubuh, tetap relevan untuk kesan "banyak efek".
+
 *Terakhir diperbarui: 2026-09-26*
+
 
 ## Ronde-8: Aset Desa & Alam — KayKit Medieval Hexagon Pack (CC0)
 
