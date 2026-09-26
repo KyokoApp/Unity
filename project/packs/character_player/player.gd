@@ -1,29 +1,34 @@
 extends CharacterBody3D
-## Pemain = STICKMAN ungu prosedural (ronde-46 bag. A3). Setelah bag. A/A2
-## (penyihir chibi-anime berjubah) dinilai pengguna masih "kayak stickman"
-## dari sudut kamera, pengguna minta pivot EKSPLISIT: karakter dibuat betulan
-## menyerupai gambar referensi stickman universal (kepala bulat + garis lurus
-## untuk torso/lengan/kaki, tanpa wajah/rambut/pakaian), warna ungu, dan
-## animasi jalan/lari/dash yang benar secara biomekanik.
+## Pemain = penyihir ungu berbadan manusia (ronde-46 bag. A4). Bagian A/A2/A3
+## sebelumnya 100% prosedural (CapsuleMesh) — dinilai pengguna masih "kayak
+## stickman" dari sudut kamera manapun, walau gait-nya sudah biomekanik.
+## Pengguna lalu mengirim aset nyata (bukan cuma tautan/screenshot): paket
+## animasi mocap Quaternius "Universal Animation Library" (CC0), diunggah
+## LANGSUNG ke commit branch lewat uploader web GitHub (bukan lampiran
+## chat) — jalur ini terbukti berhasil membawa file biner utuh ke sandbox,
+## setelah semua jalur unduh URL/lampiran-chat gagal di ronde-ronde
+## sebelumnya (lihat CREDITS.md).
 ##
-## 100% PROSEDURAL (CapsuleMesh/SphereMesh tipis seragam + shader toon
-## `toon.gdshader` yang sudah ada di project) — TIDAK ADA file model
-## eksternal (sandbox ini tak bisa mengunduh file biner, sudah diverifikasi
-## gagal berulang kali di ronde-ronde sebelumnya).
+## Model: project/packs/character_player/mannequin/UAL1_Standard.glb
+##   - 1 mesh berskin "Mannequin" (2 material, tanpa tekstur) + 43 klip
+##     animasi full-body siap pakai (mocap asli, bukan buatan tangan).
+##   - Tinggi bind-pose asli ~1.83 m; skala 1:1 (meter), tak perlu koreksi.
+##   - CC0 1.0 Universal oleh Quaternius — lihat CREDITS.md utk atribusi.
 ##
-## RISET BIOMEKANIK (dipakai sbg dasar angka animasi, lihat CREDITS.md utk
-## sumber lengkap):
-## - Tekuk lutut maks saat mengayun: ~60° jalan normal, ~90° lari, ~105-110°
-##   sprint/dash (rentang gerak makin besar seiring kecepatan).
-## - Condong badan ke depan: ~2-3° jalan, ~5-7.5° lari, lebih besar lagi saat
-##   akselerasi/dash (dilebih-lebihkan dikit di sini demi keterbacaan game).
-## - Lengan BERLAWANAN FASA dengan kaki di sisi SEBERANG (kontralateral,
-##   bukan searah) — lengan kanan maju saat kaki kiri maju, dst. Siku makin
-##   tertekuk & ayunan makin lebar seiring kecepatan.
-## - Rotasi pinggul/bahu (transverse) ada tapi KECIL pada lari efisien —
-##   dipakai di sini sbg detail halus (beberapa derajat), bukan dominan.
-## - Panjang & frekuensi langkah naik bersama kecepatan -> fase gait di sini
-##   dimajukan sebanding JARAK TEMPUH (bukan waktu murni).
+## Bagian A4 ini FOKUS pada lokomosi (diam/jalan/jog/sprint) + dash, sesuai
+## permintaan eksplisit pengguna ("fokus ke animasi lari & jalan dulu").
+## Klip serang (`Spell_Simple_Shoot`/`Spell_Simple_Idle_Loop`) SENGAJA belum
+## dipasang di bagian ini — kandidat kuat utk lapisan animasi serang nanti.
+##
+## Node internal model (AnimationPlayer/MeshInstance3D) DICARI SECARA
+## REKURSIF via find_child()/find_children() — path node persis hasil
+## import glTF Godot tak bisa dipastikan tanpa editor lokal, jadi TIDAK ADA
+## path node yang di-hardcode di sini.
+##
+## Warna: mesh asli (M_Main oranye, M_Joints sudah ungu) di-override total
+## dgn shader toon.gdshader ungu (2 corak: badan utama + aksen sendi) supaya
+## tetap sesuai mandat "karakter warna ungu". Kedua material asli TANPA
+## tekstur -> override surface aman, tak ada UV/tekstur yg hilang.
 ##
 ## Kamera & gerak: arsitektur sama seperti ronde-ronde sebelumnya (third-
 ## person murni ikut swipe, gerak bebas 8-arah relatif kamera) — terbukti
@@ -39,46 +44,47 @@ signal health_changed(current: float, maximum: float)
 const Materials := preload("res://packs/shaders_materials/materials.gd")
 const SHOOT_SFX := "res://packs/audio_sfx/fire_shoot.wav"
 const ARCANE_BOLT := preload("res://packs/character_player/arcane_bolt.gd")
+const MANNEQUIN_SCENE := preload("res://packs/character_player/mannequin/UAL1_Standard.glb")
 const FIRE_COOLDOWN := 0.3
 const BOLT_SPEED := 21.0
 const BOLT_LIFT := 1.8
-const STICK_COLOR := Color(0.46, 0.24, 0.88)   # ungu tunggal — seluruh tubuh 1 warna, sesuai referensi
+
+# Dua corak ungu: badan utama (permukaan besar) + aksen sendi (kontras
+# lebih gelap, mempertahankan "color-blocking" asli model sumber).
+const BODY_COLOR := Color(0.50, 0.26, 0.92)
+const JOINT_COLOR := Color(0.22, 0.10, 0.44)
 
 # --- gerak (ringan, lincah — penyihir jalan kaki, bukan kendaraan) ---
 const MAX_SPEED := 9.0
 const ACCEL_RATE := 7.5
 const DECEL_RATE := 4.5
-const HOVER := 0.03          # cuma sedikit angkat dari y=0 (hindari z-fight kaki/tanah)
+const HOVER := 0.0           # model sudah berakar tepat di telapak kaki (Y=0 bind-pose)
 
-# --- proporsi stickman (kepala bulat + garis seragam, seperti referensi) ---
-const HEAD_RADIUS := 0.20
-const HIP_Y := 0.55            # titik cabang kaki
-const SHOULDER_Y := 0.98       # titik cabang lengan (= ujung atas garis torso)
-const LIMB_RADIUS := 0.065     # tebal SEMUA garis (torso/lengan/kaki) — seragam spt gambar
-const LEG_THIGH_LEN := 0.27
-const LEG_SHIN_LEN := 0.26
-const ARM_UPPER_LEN := 0.19
-const ARM_FORE_LEN := 0.16
+# --- proporsi model nyata (Quaternius mannequin, ~1.83 m bind-pose) ---
+const MODEL_HEIGHT := 1.83
+const CAST_HEIGHT := 1.32     # perkiraan tinggi tangan/dada utk titik lontar peluru
+const MODEL_YAW_OFFSET := 0.0 # putar 180° (PI) di sini kalau ternyata model tampak
+                               # jalan mundur di layar — tak bisa dipastikan tanpa
+                               # render lokal, lihat catatan CREDITS.md.
 
-# --- animasi gait, angka dikalibrasi dari riset biomekanik jalan/lari/sprint ---
-const STRIDE_FREQ := 1.9       # radian fase per meter tempuh (independen dari framerate)
-const LEG_SWING_WALK := deg_to_rad(24.0)
-const LEG_SWING_RUN := deg_to_rad(42.0)
-const LEG_SWING_DASH := deg_to_rad(50.0)
-const KNEE_BEND_WALK := deg_to_rad(55.0)   # riset: ~60° jalan normal
-const KNEE_BEND_RUN := deg_to_rad(90.0)    # riset: ~90° lari
-const KNEE_BEND_DASH := deg_to_rad(106.0)  # riset: ~105-110° sprint terlatih
-const ARM_SWING_WALK := deg_to_rad(20.0)
-const ARM_SWING_RUN := deg_to_rad(38.0)
-const ARM_SWING_DASH := deg_to_rad(48.0)
-const ELBOW_BEND_BASE := deg_to_rad(8.0)
-const ELBOW_BEND_RUN_EXTRA := deg_to_rad(34.0)
-const ELBOW_BEND_DASH_EXTRA := deg_to_rad(54.0)
-const TORSO_LEAN_WALK := deg_to_rad(2.5)   # riset: ~2-3°
-const TORSO_LEAN_RUN := deg_to_rad(7.0)    # riset: ~5-7.5°
-const TORSO_LEAN_DASH := deg_to_rad(17.0)  # dilebihkan dikit demi rasa "meledak maju" saat dash
-const HIP_TWIST_MAX := deg_to_rad(4.0)     # rotasi pinggul halus (riset: harus kecil, bukan dominan)
-const SHOULDER_TWIST_MAX := deg_to_rad(5.0)
+# --- nama klip animasi (persis dari glTF, lihat CREDITS.md utk daftar lengkap) ---
+const ANIM_IDLE := "Idle_Loop"
+const ANIM_WALK := "Walk_Loop"
+const ANIM_JOG := "Jog_Fwd_Loop"
+const ANIM_SPRINT := "Sprint_Loop"
+const ANIM_ROLL := "Roll"
+
+# Ambang speed01 (0..1) utk pindah state, dgn histeresis (naik/turun beda
+# ambang) supaya tak "flicker" bolak-balik dekat batas.
+const WALK_ON := 0.06
+const WALK_OFF := 0.03
+const JOG_ON := 0.40
+const JOG_OFF := 0.30
+const SPRINT_ON := 0.82
+const SPRINT_OFF := 0.70
+const ANIM_BLEND := 0.18
+const ROLL_DURATION_SRC := 1.467   # durasi asli klip Roll (dtk), diukur dari glTF
+const ROLL_ANIM_SPEED := ROLL_DURATION_SRC / 0.42  # percepat spy pas dgn durasi dash
 
 # --- kamera third-person (murni ikut swipe, arsitektur tak berubah) ---
 const PITCH_MIN := deg_to_rad(-72.0)
@@ -107,18 +113,10 @@ var max_health := 100.0
 var health := 100.0
 
 var _visual: Node3D
-var _hips: Node3D             # kelompok kaki — bisa berotasi Y independen (twist pinggul)
-var _upper: Node3D            # torso+kepala+lengan — bisa condong (lean) & counter-twist
-var _torso_mesh: MeshInstance3D
-var _head: Node3D
-var _arm_l: Node3D
-var _arm_r: Node3D
-var _fore_l: Node3D
-var _fore_r: Node3D
-var _hip_l: Node3D
-var _hip_r: Node3D
-var _shin_l: Node3D
-var _shin_r: Node3D
+var _model: Node3D
+var _anim: AnimationPlayer
+var _anim_state := ""
+var _dash_anim_triggered := false
 var _aura_particles: GPUParticles3D
 var _aura_material: ParticleProcessMaterial
 var _base_amounts := {}
@@ -133,10 +131,8 @@ var _fx := 1.0
 var _dash_left := 0.0
 var _dash_cooldown := 0.0
 var _dash_dir := Vector3.ZERO
-var _dash_anim := 0.0
-var _gait_phase := 0.0
-var _prev_leg_l_sin := 0.0
-var _prev_leg_r_sin := 0.0
+var _dust_dist_accum := 0.0
+var _dust_side := 1.0
 
 func set_world(w: Node) -> void:
 	world = w
@@ -150,7 +146,8 @@ func _ready() -> void:
 	cam_arm = $CameraPivot/CamArm
 	cam_pivot.top_level = true
 	cam_arm.add_excluded_object(get_rid())
-	_build_stickman()
+	_build_character()
+	_build_aura()
 	is_ready = true
 	health_changed.emit(health, max_health)
 
@@ -230,7 +227,7 @@ func _process(delta: float) -> void:
 	_dash_cooldown = maxf(0.0, _dash_cooldown - delta)
 	_move(delta)
 	_apply_camera(delta)
-	_animate_stickman(delta)
+	_animate_character(delta)
 
 func _move(delta: float) -> void:
 	if _dash_left > 0.0:
@@ -242,10 +239,8 @@ func _move(delta: float) -> void:
 		move_and_slide()
 		_facing = _dash_dir
 		_speed01 = lerpf(_speed01, dash_factor, 1.0 - exp(-12.0 * delta))
-		_dash_anim = lerpf(_dash_anim, 1.0, 1.0 - exp(-10.0 * delta))
-		_advance_gait(DASH_SPEED * dash_factor, delta)
+		_advance_footsteps(DASH_SPEED * dash_factor, delta)
 		return
-	_dash_anim = lerpf(_dash_anim, 0.0, 1.0 - exp(-6.0 * delta))
 
 	var wish := joy
 	if wish == Vector2.ZERO:
@@ -264,14 +259,21 @@ func _move(delta: float) -> void:
 	if hv.length() > 0.1:
 		_facing = hv.normalized()
 	_speed01 = lerpf(_speed01, clampf(hv.length() / MAX_SPEED, 0.0, 1.0), 1.0 - exp(-8.0 * delta))
-	_advance_gait(hv.length(), delta)
+	_advance_footsteps(hv.length(), delta)
 
-## Fase gait maju sebanding JARAK TEMPUH (bukan cuma delta*konstan) supaya
-## panjang & frekuensi langkah otomatis mengikuti kecepatan asli — sesuai
-## riset ("stride length & stride rate naik bersama kecepatan").
-func _advance_gait(speed: float, delta: float) -> void:
-	if speed > 0.05:
-		_gait_phase = fmod(_gait_phase + speed * delta * STRIDE_FREQ, TAU)
+## Debu jejak kaki disederhanakan jadi berbasis JARAK TEMPUH (bukan lagi
+## fase gait per-tulang manual — animasi kaki kini datang dari mocap asli,
+## bukan dihitung tangan), tetap "banyak efek" saat bergerak cepat.
+func _advance_footsteps(speed: float, delta: float) -> void:
+	if speed <= 0.15:
+		_dust_dist_accum = 0.0
+		return
+	_dust_dist_accum += speed * delta
+	var stride := 0.75 if speed < MAX_SPEED * 0.45 else 0.55
+	if _dust_dist_accum >= stride:
+		_dust_dist_accum = fmod(_dust_dist_accum, stride)
+		_dust_side = -_dust_side
+		_spawn_footstep_dust(_dust_side)
 
 func _apply_camera(delta: float) -> void:
 	var sens := 1.0
@@ -296,74 +298,54 @@ func _apply_camera(delta: float) -> void:
 	cam.h_offset = (sin(_t * 43.0) * 0.72 + sin(_t * 67.0 + 0.8) * 0.28) * shake_power
 	cam.v_offset = (sin(_t * 51.0 + 1.7) * 0.7 + sin(_t * 79.0) * 0.3) * shake_power
 
-func _animate_stickman(delta: float) -> void:
-	var moving := _speed01 > 0.035 and _facing.length_squared() > 0.01
+## Putar model menghadap arah gerak, lalu pilih & mainkan klip mocap yang
+## cocok dgn kecepatan/dash saat ini via AnimationPlayer (bukan lagi rotasi
+## tulang manual per-frame).
+func _animate_character(delta: float) -> void:
 	if _facing.length_squared() > 0.01:
-		var facing_yaw := atan2(-_facing.x, -_facing.z)
+		var facing_yaw := atan2(-_facing.x, -_facing.z) + MODEL_YAW_OFFSET
 		_visual.rotation.y = lerp_angle(_visual.rotation.y, facing_yaw, 1.0 - exp(-14.0 * delta))
 
-	# ---------- blend kontinu jalan->lari (speed01) + overlay dash ----------
-	var run_mix := clampf(_speed01, 0.0, 1.0)
-	var leg_swing := lerpf(LEG_SWING_WALK, LEG_SWING_RUN, run_mix)
-	var knee_bend := lerpf(KNEE_BEND_WALK, KNEE_BEND_RUN, run_mix)
-	var arm_swing := lerpf(ARM_SWING_WALK, ARM_SWING_RUN, run_mix)
-	var elbow_extra := lerpf(0.0, ELBOW_BEND_RUN_EXTRA, run_mix)
-	var torso_lean := lerpf(TORSO_LEAN_WALK, TORSO_LEAN_RUN, run_mix)
-	leg_swing = lerpf(leg_swing, LEG_SWING_DASH, _dash_anim)
-	knee_bend = lerpf(knee_bend, KNEE_BEND_DASH, _dash_anim)
-	arm_swing = lerpf(arm_swing, ARM_SWING_DASH, _dash_anim)
-	elbow_extra = lerpf(elbow_extra, ELBOW_BEND_DASH_EXTRA, _dash_anim)
-	torso_lean = lerpf(torso_lean, TORSO_LEAN_DASH, _dash_anim)
+	if _anim == null:
+		return
 
-	var amt := clampf(_speed01 * 1.3 + _dash_anim, 0.0, 1.0)
-	var leg_l_sin := sin(_gait_phase)
-	var leg_r_sin := sin(_gait_phase + PI)
-	var bob := 0.0
+	if _dash_left > 0.0:
+		if not _dash_anim_triggered:
+			_anim.play(ANIM_ROLL, 0.08, ROLL_ANIM_SPEED)
+			_anim_state = ANIM_ROLL
+			_dash_anim_triggered = true
+		return
+	_dash_anim_triggered = false
 
-	if moving:
-		# ---------- kaki: paha berayun, betis menekuk saat mengayun maju (riset: knee flexion swing) ----------
-		_hip_l.rotation.x = leg_l_sin * leg_swing
-		_hip_r.rotation.x = leg_r_sin * leg_swing
-		_shin_l.rotation.x = maxf(0.0, leg_l_sin) * knee_bend
-		_shin_r.rotation.x = maxf(0.0, leg_r_sin) * knee_bend
-		# ---------- lengan: KONTRALATERAL — berlawanan fasa dgn kaki SEBERANG ----------
-		_arm_l.rotation.x = leg_r_sin * arm_swing
-		_arm_r.rotation.x = leg_l_sin * arm_swing
-		_fore_l.rotation.x = ELBOW_BEND_BASE + maxf(0.0, -leg_r_sin) * elbow_extra
-		_fore_r.rotation.x = ELBOW_BEND_BASE + maxf(0.0, -leg_l_sin) * elbow_extra
-		# ---------- badan condong ke depan (riset: makin cepat makin condong) ----------
-		_upper.rotation.x = lerp_angle(_upper.rotation.x, -torso_lean, 1.0 - exp(-8.0 * delta))
-		# ---------- twist pinggul/bahu halus (riset: harus kecil, bukan dominan) ----------
-		_hips.rotation.y = lerp_angle(_hips.rotation.y, leg_l_sin * HIP_TWIST_MAX * amt, 1.0 - exp(-10.0 * delta))
-		_upper.rotation.y = lerp_angle(_upper.rotation.y, -leg_l_sin * SHOULDER_TWIST_MAX * amt, 1.0 - exp(-10.0 * delta))
-		bob = absf(sin(_gait_phase)) * 0.05 * amt
-		# ---------- debu jejak kaki: picu saat kaki mendarat (sin lewat 0 turun) ----------
-		if _prev_leg_l_sin > 0.0 and leg_l_sin <= 0.0 and amt > 0.2:
-			_spawn_footstep_dust(-1.0)
-		if _prev_leg_r_sin > 0.0 and leg_r_sin <= 0.0 and amt > 0.2:
-			_spawn_footstep_dust(1.0)
-	else:
-		# ---------- idle: napas halus + ayun ringan ----------
-		var idle_sway := sin(_t * 1.4) * 0.04
-		_hip_l.rotation.x = lerp_angle(_hip_l.rotation.x, 0.0, 1.0 - exp(-6.0 * delta))
-		_hip_r.rotation.x = lerp_angle(_hip_r.rotation.x, 0.0, 1.0 - exp(-6.0 * delta))
-		_shin_l.rotation.x = lerp_angle(_shin_l.rotation.x, 0.0, 1.0 - exp(-6.0 * delta))
-		_shin_r.rotation.x = lerp_angle(_shin_r.rotation.x, 0.0, 1.0 - exp(-6.0 * delta))
-		_arm_l.rotation.x = lerp_angle(_arm_l.rotation.x, idle_sway, 1.0 - exp(-6.0 * delta))
-		_arm_r.rotation.x = lerp_angle(_arm_r.rotation.x, -idle_sway, 1.0 - exp(-6.0 * delta))
-		_fore_l.rotation.x = lerp_angle(_fore_l.rotation.x, ELBOW_BEND_BASE, 1.0 - exp(-6.0 * delta))
-		_fore_r.rotation.x = lerp_angle(_fore_r.rotation.x, ELBOW_BEND_BASE, 1.0 - exp(-6.0 * delta))
-		_upper.rotation.x = lerp_angle(_upper.rotation.x, 0.0, 1.0 - exp(-6.0 * delta))
-		_hips.rotation.y = lerp_angle(_hips.rotation.y, 0.0, 1.0 - exp(-6.0 * delta))
-		_upper.rotation.y = lerp_angle(_upper.rotation.y, 0.0, 1.0 - exp(-6.0 * delta))
-		bob = sin(_t * 1.7) * 0.012
-	_prev_leg_l_sin = leg_l_sin
-	_prev_leg_r_sin = leg_r_sin
+	# Histeresis: state saat ini menentukan ambang MASUK vs KELUAR, supaya
+	# tak lompat-lompat pas speed01 pas di garis batas.
+	var target := _anim_state
+	match _anim_state:
+		ANIM_SPRINT:
+			if _speed01 < SPRINT_OFF:
+				target = ANIM_JOG
+		ANIM_JOG:
+			if _speed01 >= SPRINT_ON:
+				target = ANIM_SPRINT
+			elif _speed01 < JOG_OFF:
+				target = ANIM_WALK
+		ANIM_WALK:
+			if _speed01 >= JOG_ON:
+				target = ANIM_JOG
+			elif _speed01 < WALK_OFF:
+				target = ANIM_IDLE
+		_:
+			target = ANIM_IDLE
+			if _speed01 >= WALK_ON:
+				target = ANIM_WALK
+			if _speed01 >= JOG_ON:
+				target = ANIM_JOG
+			if _speed01 >= SPRINT_ON:
+				target = ANIM_SPRINT
 
-	var head_bob := sin(_t * (7.5 if moving else 2.2)) * (0.018 if moving else 0.010)
-	_head.position.y = (SHOULDER_Y - HIP_Y) + HEAD_RADIUS * 0.95 + head_bob
-	_visual.position = Vector3(0.0, HOVER + bob, 0.0)
-	_aura_particles.position = Vector3(0.0, HIP_Y + (SHOULDER_Y - HIP_Y) * 0.5, 0.0)
+	if target != _anim_state or not _anim.is_playing():
+		_anim.play(target, ANIM_BLEND)
+		_anim_state = target
 
 # =============== Serangan ===============
 
@@ -373,7 +355,7 @@ func _shoot_direction() -> Vector3:
 	return (Basis(Vector3.UP, yaw) * Vector3(0, 0, -1)).normalized()
 
 func _hand_position(direction: Vector3) -> Vector3:
-	return _visual.global_position + Vector3.UP * (SHOULDER_Y * 0.82) + direction * 0.5
+	return _visual.global_position + Vector3.UP * CAST_HEIGHT + direction * 0.5
 
 func _try_fire() -> void:
 	if not is_ready or _fire_cooldown > 0.0:
@@ -405,154 +387,42 @@ func _play_shoot_sound() -> void:
 	add_child(sound)
 	sound.play()
 
-# =============== Rakitan visual: stickman ungu (kepala bulat + garis) ===============
+# =============== Rakitan visual: mannequin Quaternius, dicat ungu ===============
 
-func _build_stickman() -> void:
+func _build_character() -> void:
 	_visual = Node3D.new()
-	_visual.name = "Stickman"
+	_visual.name = "Visual"
 	_visual.position = Vector3(0.0, HOVER, 0.0)
 	add_child(_visual)
 
-	_hips = Node3D.new()
-	_hips.name = "Hips"
-	_hips.position = Vector3(0.0, HIP_Y, 0.0)
-	_visual.add_child(_hips)
+	_model = MANNEQUIN_SCENE.instantiate()
+	_model.name = "Mannequin"
+	_visual.add_child(_model)
 
-	_upper = Node3D.new()
-	_upper.name = "Upper"
-	_upper.position = Vector3(0.0, HIP_Y, 0.0)
-	_visual.add_child(_upper)
+	_anim = _model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _anim != null:
+		_anim.playback_default_blend_time = ANIM_BLEND
+		if _anim.has_animation(ANIM_IDLE):
+			_anim.play(ANIM_IDLE)
+			_anim_state = ANIM_IDLE
 
-	_build_legs()
-	_build_torso()
-	_build_arms()
-	_build_head()
-	_build_aura()
+	_paint_purple()
 
-func _stick_mat() -> Material:
-	return Materials.toon(STICK_COLOR, true, 0.014, 0.55)
-
-# ---------- kaki: 2 segmen (paha+betis) garis tunggal, sesuai referensi ----------
-
-func _build_legs() -> void:
-	var mat := _stick_mat()
-	_hip_l = _make_leg(mat, -1.0)
-	_hip_r = _make_leg(mat, 1.0)
-
-func _make_leg(mat: Material, side: float) -> Node3D:
-	var hip := Node3D.new()
-	hip.name = "HipPivot" + ("L" if side < 0 else "R")
-	hip.position = Vector3(side * 0.09, 0.0, 0.0)
-	_hips.add_child(hip)
-
-	var thigh := MeshInstance3D.new()
-	var thigh_mesh := CapsuleMesh.new()
-	thigh_mesh.radius = LIMB_RADIUS
-	thigh_mesh.height = LEG_THIGH_LEN
-	thigh.mesh = thigh_mesh
-	thigh.position = Vector3(0.0, -LEG_THIGH_LEN * 0.5, 0.0)
-	thigh.material_override = mat
-	hip.add_child(thigh)
-
-	var shin := Node3D.new()
-	shin.name = "ShinPivot"
-	shin.position = Vector3(0.0, -LEG_THIGH_LEN, 0.0)
-	hip.add_child(shin)
-	if side < 0.0:
-		_shin_l = shin
-	else:
-		_shin_r = shin
-
-	var shin_mesh_inst := MeshInstance3D.new()
-	var shin_mesh := CapsuleMesh.new()
-	shin_mesh.radius = LIMB_RADIUS
-	shin_mesh.height = LEG_SHIN_LEN
-	shin_mesh_inst.mesh = shin_mesh
-	shin_mesh_inst.position = Vector3(0.0, -LEG_SHIN_LEN * 0.5, 0.0)
-	shin_mesh_inst.material_override = mat
-	shin.add_child(shin_mesh_inst)
-	return hip
-
-# ---------- torso: satu garis lurus tunggal dari pinggul ke bahu ----------
-
-func _build_torso() -> void:
-	var torso_h := SHOULDER_Y - HIP_Y
-	_torso_mesh = MeshInstance3D.new()
-	_torso_mesh.name = "Torso"
-	var mesh := CapsuleMesh.new()
-	mesh.radius = LIMB_RADIUS
-	mesh.height = torso_h
-	_torso_mesh.mesh = mesh
-	_torso_mesh.position = Vector3(0.0, torso_h * 0.5, 0.0)
-	_torso_mesh.material_override = _stick_mat()
-	_upper.add_child(_torso_mesh)
-
-# ---------- lengan: 2 segmen (atas+bawah), garis tunggal dari bahu ----------
-
-func _build_arms() -> void:
-	var mat := _stick_mat()
-	var shoulder_local_y := SHOULDER_Y - HIP_Y
-	_make_arm(mat, -1.0, shoulder_local_y)
-	_make_arm(mat, 1.0, shoulder_local_y)
-
-func _make_arm(mat: Material, side: float, shoulder_y: float) -> void:
-	var pivot := Node3D.new()
-	pivot.name = "ArmPivot" + ("L" if side < 0 else "R")
-	pivot.position = Vector3(side * (LIMB_RADIUS * 1.4), shoulder_y - LIMB_RADIUS * 0.5, 0.0)
-	_upper.add_child(pivot)
-	if side < 0.0:
-		_arm_l = pivot
-	else:
-		_arm_r = pivot
-
-	var upper_arm := MeshInstance3D.new()
-	var upper_mesh := CapsuleMesh.new()
-	upper_mesh.radius = LIMB_RADIUS
-	upper_mesh.height = ARM_UPPER_LEN
-	upper_arm.mesh = upper_mesh
-	upper_arm.position = Vector3(0.0, -ARM_UPPER_LEN * 0.5, 0.0)
-	upper_arm.material_override = mat
-	pivot.add_child(upper_arm)
-
-	var forearm_pivot := Node3D.new()
-	forearm_pivot.name = "ForearmPivot"
-	forearm_pivot.position = Vector3(0.0, -ARM_UPPER_LEN, 0.0)
-	pivot.add_child(forearm_pivot)
-	if side < 0.0:
-		_fore_l = forearm_pivot
-	else:
-		_fore_r = forearm_pivot
-
-	var forearm := MeshInstance3D.new()
-	var fore_mesh := CapsuleMesh.new()
-	fore_mesh.radius = LIMB_RADIUS
-	fore_mesh.height = ARM_FORE_LEN
-	forearm.mesh = fore_mesh
-	forearm.position = Vector3(0.0, -ARM_FORE_LEN * 0.5, 0.0)
-	forearm.material_override = mat
-	forearm_pivot.add_child(forearm)
-
-# ---------- kepala: bulat polos, tanpa wajah (sesuai gambar referensi) ----------
-
-func _build_head() -> void:
-	_head = Node3D.new()
-	_head.name = "Head"
-	_head.position = Vector3(0.0, (SHOULDER_Y - HIP_Y) + HEAD_RADIUS * 0.95, 0.0)
-	_upper.add_child(_head)
-
-	var face := MeshInstance3D.new()
-	var face_mesh := SphereMesh.new()
-	face_mesh.radius = HEAD_RADIUS
-	face_mesh.height = HEAD_RADIUS * 2.0
-	face_mesh.radial_segments = 20
-	face_mesh.rings = 12
-	face.mesh = face_mesh
-	face.material_override = _stick_mat()
-	_head.add_child(face)
+## Kedua material sumber (M_Main oranye, M_Joints ungu) TANPA tekstur ->
+## override total aman, tak kehilangan detail UV apa pun.
+func _paint_purple() -> void:
+	var mats := [Materials.toon(BODY_COLOR, true, 0.012, 0.55), Materials.toon(JOINT_COLOR, false, 0.0, 0.35)]
+	for mi in _model.find_children("*", "MeshInstance3D", true, false):
+		var mesh_inst := mi as MeshInstance3D
+		if mesh_inst == null or mesh_inst.mesh == null:
+			continue
+		var surfaces := mesh_inst.mesh.get_surface_count()
+		for i in range(surfaces):
+			mesh_inst.set_surface_override_material(i, mats[i % mats.size()])
 
 ## Aura sihir ungu-biru yang melayang terus-menerus di sekitar karakter —
 ## permintaan pengguna "banyak efek" berlaku juga saat idle, bukan cuma saat
-## menyerang. Dipertahankan lintas-ronde walau bentuk badan kini stickman.
+## menyerang. Dipertahankan lintas-ronde walau badan kini model mannequin.
 func _build_aura() -> void:
 	_aura_particles = GPUParticles3D.new()
 	_aura_particles.name = "ArcaneAura"
@@ -603,9 +473,9 @@ func _spawn_dash_shimmer() -> void:
 	var shimmer := MeshInstance3D.new()
 	shimmer.name = "DashShimmer"
 	var mesh := CylinderMesh.new()
-	mesh.top_radius = LIMB_RADIUS * 4.5
-	mesh.bottom_radius = LIMB_RADIUS * 5.5
-	mesh.height = SHOULDER_Y - HIP_Y
+	mesh.top_radius = 0.30
+	mesh.bottom_radius = 0.36
+	mesh.height = MODEL_HEIGHT * 0.5
 	shimmer.mesh = mesh
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -614,7 +484,7 @@ func _spawn_dash_shimmer() -> void:
 	mat.cull_mode = BaseMaterial3D.CULL_BACK
 	shimmer.material_override = mat
 	parent.add_child(shimmer)
-	shimmer.global_position = global_position + Vector3.UP * (HOVER + HIP_Y + (SHOULDER_Y - HIP_Y) * 0.5)
+	shimmer.global_position = global_position + Vector3.UP * (HOVER + MODEL_HEIGHT * 0.5)
 	shimmer.rotation.y = _visual.global_rotation.y
 	var tween := create_tween()
 	tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -622,14 +492,15 @@ func _spawn_dash_shimmer() -> void:
 	tween.parallel().tween_property(shimmer, "scale", Vector3(1.3, 0.4, 1.3), 0.55)
 	tween.tween_callback(shimmer.queue_free)
 
-## Debu jejak kaki — burst kecil sekali-pakai setiap kaki mendarat saat
-## berjalan/berlari.
+## Debu jejak kaki — burst kecil sekali-pakai, dipicu berkala berdasar jarak
+## tempuh (lihat _advance_footsteps). Ditaruh dekat kaki dgn offset kiri/
+## kanan bergantian, cukup dekat tanah tanpa perlu lacak tulang kaki persis.
 func _spawn_footstep_dust(side: float) -> void:
 	var parent := get_parent()
 	if parent == null:
 		return
-	var foot_local := Vector3(side * 0.09, 0.0, 0.0)
-	var world_pos := _visual.to_global(foot_local)
+	var right := (Basis(Vector3.UP, _visual.rotation.y) * Vector3.RIGHT)
+	var world_pos := global_position + right * (side * 0.10)
 	world_pos.y = global_position.y + 0.02
 
 	var p := GPUParticles3D.new()

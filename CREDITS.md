@@ -181,6 +181,57 @@
 - Aura partikel ungu-biru & debu jejak kaki (bag. A2) **dipertahankan** —
   bukan bagian bentuk tubuh, tetap relevan untuk kesan "banyak efek".
 
+## Ronde-46 (bag. A4): mannequin Quaternius + mocap asli, dicat ungu
+
+- Pengguna menilai stickman bag. A3 (garis/kapsul prosedural) masih terlihat
+  seperti "stickman" dari sudut kamera manapun, meski gait-nya sudah
+  biomekanik. Pengguna lalu mengirim **file aset nyata**: paket animasi
+  mocap Quaternius, dengan cara mengunggahnya **langsung ke commit branch**
+  lewat uploader web GitHub (bukan lampiran chat) — jalur ini terbukti
+  berhasil membawa file biner besar utuh ke sandbox, setelah semua jalur
+  unduh URL/lampiran-chat terverifikasi gagal di ronde-ronde sebelumnya.
+- **Aset:** *Universal Animation Library [Standard]* oleh **Quaternius**
+  (https://www.patreon.com/quaternius) — **CC0 1.0 Universal**
+  (https://creativecommons.org/publicdomain/zero/1.0/), domain publik,
+  bebas dipakai/dimodifikasi termasuk komersial, tanpa wajib kredit (kredit
+  di sini tetap diberikan sbg praktik baik).
+  - Hanya varian `Unreal-Godot/UAL1_Standard.glb` yang disertakan
+    (`project/packs/character_player/mannequin/UAL1_Standard.glb`); varian
+    `_RM` (root-motion-baked) dan file `.fbx` khusus Unity dari paket asli
+    **tidak** disertakan (tidak dipakai — gerak karakter dikendalikan
+    kode, bukan root motion).
+  - Isi: 1 mesh berskin "Mannequin" (65 tulang, ~1.83 m tinggi bind-pose,
+    2 material `M_Main`/`M_Joints` TANPA tekstur — di-override total jadi
+    ungu lewat `toon.gdshader`) + 43 klip animasi mocap penuh-tubuh.
+  - Klip yang dipakai bag. A4 (lokomosi saja, sesuai fokus pengguna):
+    `Idle_Loop`, `Walk_Loop`, `Jog_Fwd_Loop`, `Sprint_Loop` (dipilih
+    otomatis berdasar kecepatan dgn histeresis), dan `Roll` (dipakai
+    ulang utk animasi dash — dipercepat via `custom_speed` supaya durasi
+    visualnya kira-kira pas dgn `DASH_DURATION`).
+  - Klip `Spell_Simple_Shoot`/`Spell_Simple_Idle_Loop` (paket sama)
+    **belum dipasang** — kandidat kuat utk animasi serang di bagian
+    berikutnya, sengaja di luar cakupan bag. A4.
+- `player.gd`: seluruh rakitan `CapsuleMesh`/`SphereMesh` prosedural bag.
+  A3 (torso/lengan/kaki/kepala garis tunggal) dan `_animate_stickman()`
+  (rotasi tulang manual per-frame) **dihapus total**, diganti: instance
+  `UAL1_Standard.glb` sbg child `_visual`, cari `AnimationPlayer` +
+  seluruh `MeshInstance3D` **secara rekursif** (`find_child`/
+  `find_children`, path node hasil import glTF tak di-hardcode), override
+  2 material dgn `Materials.toon()` ungu (badan utama + aksen sendi lebih
+  gelap), lalu `AnimationPlayer.play()` memilih klip berdasar kecepatan.
+- `player.tscn`: collision `CapsuleShape3D` disesuaikan ke skala manusia
+  nyata (radius 0.24→0.30, tinggi 1.3→1.65) mengikuti tinggi mannequin
+  ~1.83 m (sebelumnya dikalibrasi utk badan stickman yang jauh lebih kecil).
+- Debu jejak kaki disederhanakan dari pelacakan fase gait per-tulang manual
+  jadi berbasis **jarak tempuh** (gerak kaki kini datang dari mocap asli,
+  bukan dihitung tangan per-frame) — efek visual dipertahankan, hanya
+  pemicunya yang berubah.
+- Aura partikel ungu-biru (bag. A2) **dipertahankan** — tidak disentuh.
+- **Belum diverifikasi visual** (arah hadap model / kecocokan skala persis)
+  karena sandbox ini tanpa GPU/Godot lokal — lihat `MODEL_YAW_OFFSET` di
+  `player.gd` (default `0.0`, siap dibalik ke `PI` jika CI/pengujian
+  pengguna menunjukkan model tampak jalan mundur).
+
 *Terakhir diperbarui: 2026-09-26*
 
 

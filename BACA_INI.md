@@ -207,6 +207,66 @@ Prinsip lain yang diimplementasikan:
 - Arsitektur gerak/kamera third-person, serangan (`arcane_bolt.gd`), dan
   semua file selain `player.gd`/`player.tscn` tidak disentuh di bag. A3.
 
+## Ronde-46 bag. A4: mannequin Quaternius asli + mocap, dicat ungu
+
+Pengguna menilai bag. A3 (stickman kapsul prosedural) masih terlihat
+"seperti stickman" dari sudut kamera manapun. Kali ini pengguna mengirim
+**file aset nyata** dengan cara mengunggahnya **langsung ke commit branch**
+lewat uploader web GitHub (bukan lampiran chat) — jalur baru yang terbukti
+berhasil membawa file biner besar (~7.6 MB `.glb`) utuh ke sandbox ini,
+setelah semua jalur unduh URL/lampiran-chat gagal di ronde-ronde
+sebelumnya (`git fetch`/`git merge --ff-only` mengambil commit tsb byte-
+demi-byte, git tidak diblok firewall sandbox meski unduhan HTTP biasa
+diblok).
+
+### Aset: Quaternius "Universal Animation Library" (CC0)
+
+- File yang disertakan: `project/packs/character_player/mannequin/UAL1_Standard.glb`
+  (varian `Unreal-Godot`, tanpa root motion — gerak tetap dikendalikan kode).
+- 1 mesh berskin "Mannequin" (~1.83 m tinggi bind-pose, 65 tulang, 2
+  material TANPA tekstur) + 43 klip animasi mocap penuh-tubuh siap pakai.
+- Lisensi CC0 1.0 Universal — lihat `CREDITS.md` untuk detail & atribusi
+  lengkap (file License.txt/README.txt asli dari paket tidak disertakan
+  di repo, hanya `.glb`-nya sendiri, tapi ringkasan lisensinya dicatat).
+
+### `player.gd` — dari prosedural ke mocap asli
+
+- Seluruh rakitan `CapsuleMesh`/`SphereMesh` stickman bag. A3 dan
+  `_animate_stickman()` (rotasi tulang manual tiap frame, berdasar riset
+  biomekanik bag. A3) **dihapus total**.
+- Diganti: instance `UAL1_Standard.glb` sbg child `_visual`; `AnimationPlayer`
+  dan semua `MeshInstance3D` dicari **secara rekursif**
+  (`find_child`/`find_children`) — path node hasil import glTF Godot tidak
+  bisa dipastikan tanpa editor lokal, jadi sengaja tidak di-hardcode.
+- Kedua material asli (`M_Main` oranye, `M_Joints` sudah ungu), sama-sama
+  TANPA tekstur, di-override total dgn `Materials.toon()` — 2 corak ungu
+  (badan utama + aksen sendi lebih gelap) supaya tetap sesuai mandat warna
+  ungu, sekaligus mempertahankan sedikit "color-blocking" model sumber.
+- Lokomosi kini murni `AnimationPlayer.play(nama_klip, blend)` dipilih
+  berdasar `_speed01` dengan histeresis (naik/turun beda ambang, cegah
+  flicker di batas): `Idle_Loop` → `Walk_Loop` → `Jog_Fwd_Loop` →
+  `Sprint_Loop`. Dash memakai klip `Roll` (dipercepat via `custom_speed`
+  spy durasi visualnya kira-kira pas dgn `DASH_DURATION` fisik 0.3 dtk).
+- **Sengaja di luar cakupan bag. A4** (fokus pengguna: "animasi lari &
+  jalan dulu"): klip serang (`Spell_Simple_Shoot`) belum dipasang;
+  serangan tap-fire (`arcane_bolt.gd`) tidak berubah dan tidak memicu
+  animasi tubuh baru di pass ini.
+- `player.tscn`: collision `CapsuleShape3D` disesuaikan ke skala manusia
+  nyata (radius 0.24→0.30, tinggi 1.3→1.65) mengikuti tinggi mannequin
+  asli ~1.83 m.
+- Debu jejak kaki disederhanakan jadi berbasis jarak tempuh (bukan lagi
+  fase gait per-tulang, karena gerak kaki kini datang dari mocap asli).
+  Aura partikel ungu-biru **tidak disentuh**.
+
+### Belum bisa diverifikasi tanpa render lokal
+
+- Arah hadap model (apakah tampak jalan maju atau justru mundur) —
+  disiapkan konstanta `MODEL_YAW_OFFSET` (`player.gd`, default `0.0`,
+  tinggal dibalik ke `PI` bila perlu) tapi belum bisa dipastikan tanpa
+  GPU/Godot lokal atau umpan balik render sungguhan.
+- Kecocokan skala collision capsule vs mesh sebenarnya (angka di atas
+  perkiraan dari tinggi bind-pose glTF, belum diverifikasi visual).
+
 ## Yang BELUM dikerjakan (menyusul di bagian berikutnya)
 
 - **Bagian B**: mantra andalan (gaya Zoltraak) dipoles jauh lebih
