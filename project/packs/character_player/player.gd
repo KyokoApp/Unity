@@ -1,12 +1,25 @@
 extends CharacterBody3D
-## Pemain = penyihir bergaya ANIME (ronde-46, pivot dari tank ke sihir lagi
-## dengan visual jauh lebih hidup). Seluruhnya PROSEDURAL (primitive Godot +
-## shader cel-shading `toon.gdshader` yang sudah ada di project) — TIDAK ada
-## file model eksternal, karena sandbox pengerjaan ini tidak bisa mengunduh
-## file biner (.vrm/.glb) dari internet (sudah dicoba & terverifikasi gagal).
+## Pemain = penyihir bergaya ANIME (ronde-46), 100% PROSEDURAL (primitive
+## Godot + shader cel-shading `toon.gdshader` yang sudah ada di project) —
+## TIDAK ada file model eksternal, karena sandbox pengerjaan ini tidak bisa
+## mengunduh file biner (.vrm/.glb) dari internet (sudah dicoba & terverifikasi
+## gagal).
+##
+## Ronde-46 bag. A2: siluet & animasi dirombak supaya TIDAK terlihat seperti
+## "stickman" (masukan pengguna setelah bag. A). Perubahan inti:
+## - Kaki & sepatu bot kini TERLIHAT (2 segmen: paha + betis, bukan disembunyikan
+##   jubah panjang sampai tanah) dengan tekuk lutut prosedural.
+## - Jubah dipendekkan jadi tunik ber-flare (bahu lebih sempit -> pinggul lebih
+##   lebar) supaya ada bentuk badan, bukan kerucut polos.
+##   Bahu diberi bantalan bulat + lengan lebih tebal + manset di pergelangan.
+## - Cape kecil 3-segmen di punggung yang berkibar mengikuti gerak/kecepatan.
+## - Siklus jalan/lari (gait) kini berbasis JARAK TEMPUH (bukan waktu murni)
+##   supaya frekuensi langkah menyesuaikan kecepatan asli: kaki berlawanan
+##   fasa dengan lengan seberang (gaya jalan manusia alami), badan condong ke
+##   depan saat berlari, dan ada DEBU JEJAK KAKI setiap kali kaki mendarat.
 ##
 ## Gaya "chibi anime": kepala besar, mata besar bulat dengan kilau, rambut
-## runcing bergaya, topi penyihir, jubah — semua dirakit dari primitive
+## runcing bergaya, topi penyihir — semua dirakit dari primitive
 ## (sphere/cone/cylinder/capsule) dan shader toon 3-band + outline
 ## inverted-hull (`Materials.toon(color, outline=true)`), TANPA tekstur wajah
 ## (menghindari risiko UV salah wrap yang tak bisa saya pratinjau visual di
@@ -35,11 +48,27 @@ const BOLT_LIFT := 1.8
 const MAX_SPEED := 9.0
 const ACCEL_RATE := 7.5
 const DECEL_RATE := 4.5
-const HOVER := 0.03          # cuma sedikit angkat dari y=0 (hindari z-fight jubah/tanah)
-const ROBE_HEIGHT := 0.72
-const ROBE_TOP_R := 0.15
-const ROBE_BOTTOM_R := 0.30
+const HOVER := 0.03          # cuma sedikit angkat dari y=0 (hindari z-fight kaki/tanah)
+
+# --- proporsi tubuh (chibi-anime: kepala besar, kaki & sepatu bot terlihat) ---
 const HEAD_RADIUS := 0.20
+const HIP_Y := 0.55           # sendi pinggul (kaki menggantung dari sini ke tanah)
+const SHOULDER_Y := 0.98       # sendi bahu (tunik & lengan menggantung dari sini)
+const TUNIC_TOP_R := 0.185     # radius tunik di bahu (sempit)
+const TUNIC_BOTTOM_R := 0.29   # radius tunik di pinggul (melebar -> siluet "A-line")
+const LEG_THIGH_LEN := 0.27
+const LEG_SHIN_LEN := 0.26
+const ARM_UPPER_LEN := 0.19
+const ARM_FORE_LEN := 0.16
+
+# --- animasi gait (berbasis jarak tempuh, bukan waktu murni) ---
+const STRIDE_FREQ := 1.9       # radian fase per meter tempuh
+const LEG_SWING_MAX := deg_to_rad(36.0)
+const KNEE_BEND_MAX := deg_to_rad(58.0)
+const ARM_SWING_MAX := deg_to_rad(42.0)
+const ELBOW_BEND_BASE := deg_to_rad(10.0)
+const ELBOW_BEND_MAX := deg_to_rad(24.0)
+const TORSO_LEAN_MAX := deg_to_rad(9.0)
 
 # --- kamera third-person (murni ikut swipe, arsitektur tak berubah) ---
 const PITCH_MIN := deg_to_rad(-72.0)
@@ -68,11 +97,18 @@ var max_health := 100.0
 var health := 100.0
 
 var _visual: Node3D
+var _upper: Node3D            # torso+kepala+lengan+cape — bisa condong (lean)
 var _head: Node3D
 var _arm_l: Node3D
 var _arm_r: Node3D
+var _fore_l: Node3D
+var _fore_r: Node3D
+var _hip_l: Node3D
+var _hip_r: Node3D
+var _shin_l: Node3D
+var _shin_r: Node3D
 var _hair_group: Node3D
-var _robe_mesh: MeshInstance3D
+var _cape_segs: Array[Node3D] = []
 var _aura_particles: GPUParticles3D
 var _aura_material: ParticleProcessMaterial
 var _base_amounts := {}
@@ -87,6 +123,9 @@ var _fx := 1.0
 var _dash_left := 0.0
 var _dash_cooldown := 0.0
 var _dash_dir := Vector3.ZERO
+var _gait_phase := 0.0
+var _prev_leg_l_sin := 0.0
+var _prev_leg_r_sin := 0.0
 
 func set_world(w: Node) -> void:
 	world = w
@@ -192,6 +231,7 @@ func _move(delta: float) -> void:
 		move_and_slide()
 		_facing = _dash_dir
 		_speed01 = lerpf(_speed01, dash_factor, 1.0 - exp(-12.0 * delta))
+		_advance_gait(DASH_SPEED * dash_factor, delta)
 		return
 
 	var wish := joy
@@ -211,6 +251,15 @@ func _move(delta: float) -> void:
 	if hv.length() > 0.1:
 		_facing = hv.normalized()
 	_speed01 = lerpf(_speed01, clampf(hv.length() / MAX_SPEED, 0.0, 1.0), 1.0 - exp(-8.0 * delta))
+	_advance_gait(hv.length(), delta)
+
+## Fase gait maju sebanding JARAK TEMPUH (bukan cuma delta*konstan) supaya
+## panjang langkah terasa konsisten di berbagai kecepatan — lebih "detail"
+## & alami dibanding sinus berbasis waktu murni.
+func _advance_gait(speed: float, delta: float) -> void:
+	if speed > 0.05:
+		_gait_phase = fmod(_gait_phase + speed * delta * STRIDE_FREQ, TAU)
+	# saat diam, fase gait dibekukan (idle punya animasi terpisah di _animate_witch)
 
 func _apply_camera(delta: float) -> void:
 	var sens := 1.0
@@ -241,16 +290,62 @@ func _animate_witch(delta: float) -> void:
 	if _facing.length_squared() > 0.01:
 		var facing_yaw := atan2(-_facing.x, -_facing.z)
 		_visual.rotation.y = lerp_angle(_visual.rotation.y, facing_yaw, 1.0 - exp(-14.0 * delta))
-	# Idle bob + ayunan lengan/rambut prosedural (tanpa skeleton/AnimationPlayer).
-	var bob := sin(_t * (7.5 if moving else 2.2)) * (0.028 if moving else 0.014) * (0.4 + 0.6 * _speed01 if moving else 1.0)
-	_head.position.y = ROBE_HEIGHT + HEAD_RADIUS * 0.95 + bob
-	var swing := sin(_t * 9.5) * (0.55 * clampf(_speed01, 0.15, 1.0)) if moving else sin(_t * 1.6) * 0.05
-	_arm_l.rotation.x = swing
-	_arm_r.rotation.x = -swing
-	_hair_group.rotation.z = sin(_t * 2.6) * 0.05 + (-_facing.x * 0.12 if moving else 0.0)
-	if _robe_mesh:
-		_robe_mesh.scale = Vector3(1.0, 1.0 + sin(_t * 6.0) * 0.008 * (1.0 if moving else 0.4), 1.0)
-	_aura_particles.position = Vector3(0.0, ROBE_HEIGHT * 0.55, 0.0)
+
+	var amt := clampf(_speed01 * 1.3, 0.0, 1.0)
+	var leg_l_sin := sin(_gait_phase)
+	var leg_r_sin := sin(_gait_phase + PI)
+
+	if moving:
+		# ---------- kaki: paha berayun, betis menekuk saat mengayun maju ----------
+		_hip_l.rotation.x = leg_l_sin * LEG_SWING_MAX * amt
+		_hip_r.rotation.x = leg_r_sin * LEG_SWING_MAX * amt
+		_shin_l.rotation.x = maxf(0.0, leg_l_sin) * KNEE_BEND_MAX * amt
+		_shin_r.rotation.x = maxf(0.0, leg_r_sin) * KNEE_BEND_MAX * amt
+		# ---------- lengan: berlawanan fasa dgn kaki seberang (gaya jalan alami) ----------
+		_arm_l.rotation.x = leg_r_sin * ARM_SWING_MAX * amt * 0.85
+		_arm_r.rotation.x = leg_l_sin * ARM_SWING_MAX * amt * 0.85
+		_fore_l.rotation.x = ELBOW_BEND_BASE + maxf(0.0, -leg_r_sin) * ELBOW_BEND_MAX * amt
+		_fore_r.rotation.x = ELBOW_BEND_BASE + maxf(0.0, -leg_l_sin) * ELBOW_BEND_MAX * amt
+		# ---------- badan condong ke depan saat berlari + bob per langkah ----------
+		_upper.rotation.x = lerp_angle(_upper.rotation.x, -TORSO_LEAN_MAX * amt, 1.0 - exp(-8.0 * delta))
+		var bob := absf(sin(_gait_phase)) * 0.05 * amt
+		_upper.position.y = HIP_Y + bob
+		_hair_group.rotation.z = -_facing.x * 0.14 * amt if is_instance_valid(_hair_group) else 0.0
+		# ---------- debu jejak kaki: picu saat kaki mendarat (sin lewat 0 turun) ----------
+		if _prev_leg_l_sin > 0.0 and leg_l_sin <= 0.0 and amt > 0.2:
+			_spawn_footstep_dust(-1.0)
+		if _prev_leg_r_sin > 0.0 and leg_r_sin <= 0.0 and amt > 0.2:
+			_spawn_footstep_dust(1.0)
+	else:
+		# ---------- idle: napas halus + ayun ringan ----------
+		var idle_sway := sin(_t * 1.4) * 0.04
+		_hip_l.rotation.x = lerp_angle(_hip_l.rotation.x, 0.0, 1.0 - exp(-6.0 * delta))
+		_hip_r.rotation.x = lerp_angle(_hip_r.rotation.x, 0.0, 1.0 - exp(-6.0 * delta))
+		_shin_l.rotation.x = lerp_angle(_shin_l.rotation.x, 0.0, 1.0 - exp(-6.0 * delta))
+		_shin_r.rotation.x = lerp_angle(_shin_r.rotation.x, 0.0, 1.0 - exp(-6.0 * delta))
+		_arm_l.rotation.x = lerp_angle(_arm_l.rotation.x, idle_sway, 1.0 - exp(-6.0 * delta))
+		_arm_r.rotation.x = lerp_angle(_arm_r.rotation.x, -idle_sway, 1.0 - exp(-6.0 * delta))
+		_fore_l.rotation.x = lerp_angle(_fore_l.rotation.x, ELBOW_BEND_BASE, 1.0 - exp(-6.0 * delta))
+		_fore_r.rotation.x = lerp_angle(_fore_r.rotation.x, ELBOW_BEND_BASE, 1.0 - exp(-6.0 * delta))
+		_upper.rotation.x = lerp_angle(_upper.rotation.x, 0.0, 1.0 - exp(-6.0 * delta))
+		_upper.position.y = HIP_Y + sin(_t * 1.7) * 0.012
+		_hair_group.rotation.z = sin(_t * 2.6) * 0.05
+	_prev_leg_l_sin = leg_l_sin
+	_prev_leg_r_sin = leg_r_sin
+
+	var head_bob := sin(_t * (7.5 if moving else 2.2)) * (0.018 if moving else 0.010)
+	_head.position.y = (SHOULDER_Y - HIP_Y) + HEAD_RADIUS * 0.95 + head_bob
+
+	# ---------- cape: 3 segmen berkibar, makin melebar saat lari ----------
+	var blow := clampf(_speed01, 0.0, 1.0)
+	for i in _cape_segs.size():
+		var seg := _cape_segs[i]
+		var phase := _t * 3.2 - float(i) * 0.9
+		var target_x := deg_to_rad(18.0 + 34.0 * blow) + sin(phase) * deg_to_rad(6.0 + 10.0 * (1.0 - blow))
+		seg.rotation.x = lerp_angle(seg.rotation.x, target_x, 1.0 - exp(-(5.0 - float(i) * 0.8) * delta))
+		seg.rotation.z = lerp_angle(seg.rotation.z, sin(phase * 0.7) * deg_to_rad(8.0), 1.0 - exp(-4.0 * delta))
+
+	_aura_particles.position = Vector3(0.0, HIP_Y + (SHOULDER_Y - HIP_Y) * 0.5, 0.0)
 
 # =============== Serangan ===============
 
@@ -260,7 +355,7 @@ func _shoot_direction() -> Vector3:
 	return (Basis(Vector3.UP, yaw) * Vector3(0, 0, -1)).normalized()
 
 func _hand_position(direction: Vector3) -> Vector3:
-	return _visual.global_position + Vector3.UP * (ROBE_HEIGHT * 0.72) + direction * 0.5
+	return _visual.global_position + Vector3.UP * (SHOULDER_Y * 0.82) + direction * 0.5
 
 func _try_fire() -> void:
 	if not is_ready or _fire_cooldown > 0.0:
@@ -300,69 +395,185 @@ func _build_witch() -> void:
 	_visual.position = Vector3(0.0, HOVER, 0.0)
 	add_child(_visual)
 
-	_build_robe()
+	_build_legs()
+
+	_upper = Node3D.new()
+	_upper.name = "Upper"
+	_upper.position = Vector3(0.0, HIP_Y, 0.0)
+	_visual.add_child(_upper)
+
+	_build_tunic()
 	_build_arms()
 	_build_head_group()
+	_build_cape()
 	_build_aura()
 
-func _build_robe() -> void:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = ROBE_TOP_R
-	mesh.bottom_radius = ROBE_BOTTOM_R
-	mesh.height = ROBE_HEIGHT
-	mesh.radial_segments = 14
-	_robe_mesh = MeshInstance3D.new()
-	_robe_mesh.name = "Robe"
-	_robe_mesh.mesh = mesh
-	_robe_mesh.position = Vector3(0.0, ROBE_HEIGHT * 0.5, 0.0)
-	_robe_mesh.material_override = Materials.toon(Color(0.30, 0.16, 0.52), true, 0.014)
-	_visual.add_child(_robe_mesh)
+# ---------- kaki (2 segmen: paha + betis, dengan sepatu bot) ----------
 
-	# Aksen sabuk supaya siluet jubah tak polos.
+func _build_legs() -> void:
+	var boot_mat := Materials.toon(Color(0.17, 0.11, 0.24), true, 0.012)
+	_hip_l = _make_leg(boot_mat, -1.0)
+	_hip_r = _make_leg(boot_mat, 1.0)
+
+func _make_leg(mat: Material, side: float) -> Node3D:
+	var hip := Node3D.new()
+	hip.name = "HipPivot" + ("L" if side < 0 else "R")
+	hip.position = Vector3(side * 0.115, HIP_Y, 0.0)
+	_visual.add_child(hip)
+
+	var thigh := MeshInstance3D.new()
+	var thigh_mesh := CapsuleMesh.new()
+	thigh_mesh.radius = 0.082
+	thigh_mesh.height = LEG_THIGH_LEN
+	thigh.mesh = thigh_mesh
+	thigh.position = Vector3(0.0, -LEG_THIGH_LEN * 0.5, 0.0)
+	thigh.material_override = mat
+	hip.add_child(thigh)
+
+	var shin := Node3D.new()
+	shin.name = "ShinPivot"
+	shin.position = Vector3(0.0, -LEG_THIGH_LEN, 0.0)
+	hip.add_child(shin)
+	if side < 0.0:
+		_shin_l = shin
+	else:
+		_shin_r = shin
+
+	var shin_mesh_inst := MeshInstance3D.new()
+	var shin_mesh := CapsuleMesh.new()
+	shin_mesh.radius = 0.068
+	shin_mesh.height = LEG_SHIN_LEN
+	shin_mesh_inst.mesh = shin_mesh
+	shin_mesh_inst.position = Vector3(0.0, -LEG_SHIN_LEN * 0.5, 0.0)
+	shin_mesh_inst.material_override = mat
+	shin.add_child(shin_mesh_inst)
+
+	var boot := MeshInstance3D.new()
+	var boot_mesh := BoxMesh.new()
+	boot_mesh.size = Vector3(0.13, 0.09, 0.20)
+	boot.mesh = boot_mesh
+	boot.position = Vector3(0.0, -LEG_SHIN_LEN - 0.02, 0.035)
+	boot.material_override = Materials.toon(Color(0.12, 0.08, 0.18), false)
+	shin.add_child(boot)
+	return hip
+
+# ---------- tunik ber-flare (bahu sempit -> pinggul lebar) ----------
+
+func _build_tunic() -> void:
+	var tunic_h := SHOULDER_Y - HIP_Y
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = TUNIC_TOP_R
+	mesh.bottom_radius = TUNIC_BOTTOM_R
+	mesh.height = tunic_h
+	mesh.radial_segments = 16
+	var tunic := MeshInstance3D.new()
+	tunic.name = "Tunic"
+	tunic.mesh = mesh
+	tunic.position = Vector3(0.0, tunic_h * 0.5, 0.0)
+	tunic.material_override = Materials.toon(Color(0.30, 0.16, 0.52), true, 0.014)
+	_upper.add_child(tunic)
+
+	# Sabuk di pinggang (2/3 tinggi tunik dari bawah).
 	var belt := MeshInstance3D.new()
 	var belt_mesh := TorusMesh.new()
-	belt_mesh.inner_radius = ROBE_TOP_R * 0.55
-	belt_mesh.outer_radius = ROBE_TOP_R * 1.05
+	belt_mesh.inner_radius = lerpf(TUNIC_BOTTOM_R, TUNIC_TOP_R, 0.35) * 0.92
+	belt_mesh.outer_radius = lerpf(TUNIC_BOTTOM_R, TUNIC_TOP_R, 0.35) * 1.08
 	belt.mesh = belt_mesh
-	belt.position = Vector3(0.0, ROBE_HEIGHT * 0.86, 0.0)
+	belt.position = Vector3(0.0, tunic_h * 0.32, 0.0)
 	belt.material_override = Materials.toon(Color(0.86, 0.72, 0.20), false)
-	_visual.add_child(belt)
+	_upper.add_child(belt)
+
+	# Kerah/kolar kecil di leher supaya transisi ke kepala tidak polos.
+	var collar := MeshInstance3D.new()
+	var collar_mesh := TorusMesh.new()
+	collar_mesh.inner_radius = TUNIC_TOP_R * 0.7
+	collar_mesh.outer_radius = TUNIC_TOP_R * 0.95
+	collar.mesh = collar_mesh
+	collar.position = Vector3(0.0, tunic_h + 0.01, 0.0)
+	collar.material_override = Materials.toon(Color(0.20, 0.10, 0.36), false)
+	_upper.add_child(collar)
+
+# ---------- lengan (2 segmen: lengan atas + lengan bawah, manset & bantalan bahu) ----------
 
 func _build_arms() -> void:
-	var mat := Materials.toon(Color(0.30, 0.16, 0.52), true, 0.012)
-	var shoulder_y := ROBE_HEIGHT * 0.92
-	_arm_l = _make_arm(mat, -1.0, shoulder_y)
-	_arm_r = _make_arm(mat, 1.0, shoulder_y)
+	var robe_mat := Materials.toon(Color(0.30, 0.16, 0.52), true, 0.012)
+	var shoulder_local_y := SHOULDER_Y - HIP_Y
+	_make_arm(robe_mat, -1.0, shoulder_local_y)
+	_make_arm(robe_mat, 1.0, shoulder_local_y)
 
-func _make_arm(mat: Material, side: float, shoulder_y: float) -> Node3D:
+func _make_arm(mat: Material, side: float, shoulder_y: float) -> void:
+	var shoulder_pos := Vector3(side * (TUNIC_TOP_R * 1.05 + 0.05), shoulder_y - 0.03, 0.0)
 	var pivot := Node3D.new()
 	pivot.name = "ArmPivot" + ("L" if side < 0 else "R")
-	pivot.position = Vector3(side * ROBE_TOP_R * 1.15, shoulder_y, 0.0)
-	_visual.add_child(pivot)
-	var arm := MeshInstance3D.new()
-	var cap := CapsuleMesh.new()
-	cap.radius = 0.05
-	cap.height = 0.34
-	arm.mesh = cap
-	arm.position = Vector3(0.0, -0.17, 0.0)
-	arm.material_override = mat
-	pivot.add_child(arm)
-	# tangan bulat kecil di ujung, sedikit warna kulit
+	pivot.position = shoulder_pos
+	_upper.add_child(pivot)
+	if side < 0.0:
+		_arm_l = pivot
+	else:
+		_arm_r = pivot
+
+	# Bantalan bahu bulat — menutup sendi & melebarkan siluet bahu.
+	var pad := MeshInstance3D.new()
+	var pad_mesh := SphereMesh.new()
+	pad_mesh.radius = 0.085
+	pad_mesh.height = 0.17
+	pad.mesh = pad_mesh
+	pad.scale = Vector3(1.0, 0.85, 1.0)
+	pad.material_override = mat
+	pivot.add_child(pad)
+
+	var upper_arm := MeshInstance3D.new()
+	var upper_mesh := CapsuleMesh.new()
+	upper_mesh.radius = 0.075
+	upper_mesh.height = ARM_UPPER_LEN
+	upper_arm.mesh = upper_mesh
+	upper_arm.position = Vector3(0.0, -ARM_UPPER_LEN * 0.5, 0.0)
+	upper_arm.material_override = mat
+	pivot.add_child(upper_arm)
+
+	var forearm_pivot := Node3D.new()
+	forearm_pivot.name = "ForearmPivot"
+	forearm_pivot.position = Vector3(0.0, -ARM_UPPER_LEN, 0.0)
+	pivot.add_child(forearm_pivot)
+	if side < 0.0:
+		_fore_l = forearm_pivot
+	else:
+		_fore_r = forearm_pivot
+
+	var forearm := MeshInstance3D.new()
+	var fore_mesh := CapsuleMesh.new()
+	fore_mesh.radius = 0.062
+	fore_mesh.height = ARM_FORE_LEN
+	forearm.mesh = fore_mesh
+	forearm.position = Vector3(0.0, -ARM_FORE_LEN * 0.5, 0.0)
+	forearm.material_override = mat
+	forearm_pivot.add_child(forearm)
+
+	# Manset lengan bergaya jubah, di dekat pergelangan.
+	var cuff := MeshInstance3D.new()
+	var cuff_mesh := CylinderMesh.new()
+	cuff_mesh.top_radius = 0.065
+	cuff_mesh.bottom_radius = 0.10
+	cuff_mesh.height = 0.09
+	cuff.mesh = cuff_mesh
+	cuff.position = Vector3(0.0, -ARM_FORE_LEN * 0.72, 0.0)
+	cuff.material_override = mat
+	forearm_pivot.add_child(cuff)
+
 	var hand := MeshInstance3D.new()
 	var hand_mesh := SphereMesh.new()
-	hand_mesh.radius = 0.06
-	hand_mesh.height = 0.12
+	hand_mesh.radius = 0.058
+	hand_mesh.height = 0.116
 	hand.mesh = hand_mesh
-	hand.position = Vector3(0.0, -0.34, 0.0)
+	hand.position = Vector3(0.0, -ARM_FORE_LEN - 0.02, 0.0)
 	hand.material_override = Materials.toon(Color(0.96, 0.82, 0.70), false)
-	pivot.add_child(hand)
-	return pivot
+	forearm_pivot.add_child(hand)
 
 func _build_head_group() -> void:
 	_head = Node3D.new()
 	_head.name = "Head"
-	_head.position = Vector3(0.0, ROBE_HEIGHT + HEAD_RADIUS * 0.95, 0.0)
-	_visual.add_child(_head)
+	_head.position = Vector3(0.0, (SHOULDER_Y - HIP_Y) + HEAD_RADIUS * 0.95, 0.0)
+	_upper.add_child(_head)
 
 	var skin := Materials.toon(Color(0.97, 0.84, 0.73), true, 0.013)
 	var face := MeshInstance3D.new()
@@ -502,6 +713,32 @@ func _build_hat() -> void:
 	band.material_override = Materials.toon(Color(0.90, 0.75, 0.25), false)
 	_head.add_child(band)
 
+## Cape kecil 3-segmen di punggung — berkibar mengikuti kecepatan gerak,
+## sekaligus memecah siluet polos dari belakang (sudut kamera utama).
+func _build_cape() -> void:
+	var cape_mat := Materials.toon(Color(0.20, 0.08, 0.38), true, 0.014)
+	var seg_h := 0.20
+	var attach_y := (SHOULDER_Y - HIP_Y) - 0.06
+	var parent: Node3D = _upper
+	var width := 0.30
+	for i in 3:
+		var seg := Node3D.new()
+		seg.name = "CapeSeg%d" % i
+		seg.position = Vector3(0.0, 0.0 if i == 0 else -seg_h, 0.05 if i == 0 else 0.0)
+		if i == 0:
+			seg.position = Vector3(0.0, attach_y, TUNIC_TOP_R * 0.9)
+		parent.add_child(seg)
+		var mesh_inst := MeshInstance3D.new()
+		var plane := BoxMesh.new()
+		plane.size = Vector3(width, seg_h, 0.02)
+		mesh_inst.mesh = plane
+		mesh_inst.position = Vector3(0.0, -seg_h * 0.5, 0.0)
+		mesh_inst.material_override = cape_mat
+		seg.add_child(mesh_inst)
+		_cape_segs.append(seg)
+		parent = seg
+		width *= 0.92
+
 ## Aura sihir ungu-biru yang melayang terus-menerus di sekitar karakter —
 ## permintaan pengguna "banyak efek" berlaku juga saat idle, bukan cuma saat
 ## menyerang.
@@ -555,9 +792,9 @@ func _spawn_dash_shimmer() -> void:
 	var shimmer := MeshInstance3D.new()
 	shimmer.name = "DashShimmer"
 	var mesh := CylinderMesh.new()
-	mesh.top_radius = ROBE_TOP_R * 1.1
-	mesh.bottom_radius = ROBE_BOTTOM_R * 1.1
-	mesh.height = ROBE_HEIGHT
+	mesh.top_radius = TUNIC_TOP_R * 1.3
+	mesh.bottom_radius = TUNIC_BOTTOM_R * 1.2
+	mesh.height = SHOULDER_Y - HIP_Y
 	shimmer.mesh = mesh
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -566,13 +803,54 @@ func _spawn_dash_shimmer() -> void:
 	mat.cull_mode = BaseMaterial3D.CULL_BACK
 	shimmer.material_override = mat
 	parent.add_child(shimmer)
-	shimmer.global_position = global_position + Vector3.UP * (HOVER + ROBE_HEIGHT * 0.5)
+	shimmer.global_position = global_position + Vector3.UP * (HOVER + HIP_Y + (SHOULDER_Y - HIP_Y) * 0.5)
 	shimmer.rotation.y = _visual.global_rotation.y
 	var tween := create_tween()
 	tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(mat, "albedo_color", Color(0.3, 0.15, 0.5, 0.0), 0.55)
 	tween.parallel().tween_property(shimmer, "scale", Vector3(1.3, 0.4, 1.3), 0.55)
 	tween.tween_callback(shimmer.queue_free)
+
+## Debu jejak kaki — burst kecil sekali-pakai setiap kaki mendarat saat
+## berjalan/berlari (permintaan "animasi lari lebih detail").
+func _spawn_footstep_dust(side: float) -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var foot_local := Vector3(side * 0.115, 0.0, 0.0)
+	var world_pos := _visual.to_global(foot_local)
+	world_pos.y = global_position.y + 0.02
+
+	var p := GPUParticles3D.new()
+	p.name = "FootDust"
+	p.amount = maxi(3, int(round(7 * _fx)))
+	p.lifetime = 0.5
+	p.one_shot = true
+	p.explosiveness = 0.95
+	p.randomness = 0.5
+	p.local_coords = false
+	p.fixed_fps = 60
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	pm.emission_sphere_radius = 0.05
+	pm.direction = Vector3.UP
+	pm.spread = 60.0
+	pm.initial_velocity_min = 0.3
+	pm.initial_velocity_max = 0.9
+	pm.gravity = Vector3(0, 0.4, 0)
+	pm.damping_min = 1.0
+	pm.damping_max = 2.0
+	pm.scale_min = 0.5
+	pm.scale_max = 1.0
+	pm.scale_curve = _curve([Vector2(0, 0.3), Vector2(0.4, 1.0), Vector2(1, 1.6)], 1.6)
+	pm.color_ramp = _ramp([0.0, 0.3, 1.0], [Color(0.55, 0.48, 0.42, 0.0), Color(0.6, 0.54, 0.48, 0.35), Color(0.65, 0.6, 0.55, 0.0)])
+	p.process_material = pm
+	p.draw_pass_1 = _quad(Vector2(0.14, 0.14), _fx_mat(_soft_tex(0.1), false, Color.WHITE))
+	parent.add_child(p)
+	p.global_position = world_pos
+	p.emitting = true
+	get_tree().create_timer(p.lifetime + 0.3).timeout.connect(p.queue_free)
 
 # =============== helper FX kecil (gradient/quad/material) ===============
 

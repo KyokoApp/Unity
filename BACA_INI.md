@@ -112,6 +112,37 @@ Dash (burst cepat) dipertahankan dengan efek kilau ungu saat dipakai.
 penuh `arcane_bolt.gd` (jatuh bebas + delay `queue_free()` 1 dtk) dihitung
 ulang dan masih di bawah 3 detik.
 
+## Ronde-46 bag. A2: perbaikan siluet "stickman" + animasi lari detail
+
+Setelah bag. A terbit, pengguna menilai karakternya "kayak stickman" (lengan
+tipis + kaki tak terlihat karena tertutup jubah panjang) dan minta animasi
+lari lebih detail. Perbaikan (`player.gd` saja, tidak ada file lain diubah):
+
+- **Kaki kini terlihat**: 2 segmen per kaki (paha `HipPivot*`+ betis
+  `ShinPivot*`) dengan sepatu bot gelap di ujung, bukan disembunyikan jubah
+  sampai tanah.
+- **Tunik dipendekkan & di-flare**: dari bahu (`SHOULDER_Y=0.98`, radius
+  sempit `TUNIC_TOP_R=0.185`) melebar ke pinggul (`HIP_Y=0.55`, radius
+  `TUNIC_BOTTOM_R=0.29`) — siluet "A-line", bukan kerucut polos menyentuh
+  tanah. Ditambah kerah kecil di leher.
+- **Lengan 2 segmen** (lengan atas + lengan bawah/siku) + bantalan bahu bulat
+  + manset di pergelangan — lebih tebal & bervolume, tidak lagi seperti
+  tongkat.
+- **Cape 3-segmen** di punggung yang berkibar mengikuti kecepatan gerak
+  (`_cape_segs`) — memecah siluet polos dari belakang (sudut kamera utama).
+- **Gait berbasis jarak tempuh** (`_gait_phase` maju sebanding `speed*delta`,
+  bukan `sin(waktu)` murni) supaya frekuensi langkah menyesuaikan kecepatan
+  asli. Kaki kiri/kanan berlawanan fasa; lengan berlawanan fasa dengan kaki
+  SEBERANG (gaya jalan kontralateral manusia asli); betis menekuk saat kaki
+  mengayun maju (ilusi lutut sederhana, tanpa IK); siku menekuk dinamis;
+  badan (`_upper`) condong ke depan saat berlari (`TORSO_LEAN_MAX=9°`) +
+  bob per langkah.
+- **Debu jejak kaki**: burst partikel kecil sekali-pakai dipicu setiap kaki
+  mendarat (`_spawn_footstep_dust`, dideteksi dari perubahan tanda
+  `sin(gait_phase)` positif→negatif per kaki).
+- Idle tetap punya animasi terpisah (napas halus, ayun ringan) — tidak
+  memakai sistem gait yang sama supaya tidak "berjalan di tempat" saat diam.
+
 ## Yang BELUM dikerjakan (menyusul di bagian berikutnya)
 
 - **Bagian B**: mantra andalan (gaya Zoltraak) dipoles jauh lebih
