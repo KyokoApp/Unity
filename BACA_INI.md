@@ -75,6 +75,30 @@
   - Fase 2b: TAHAN lalu LEPAS → harus menghasilkan `zoltraak_bolt.gd`.
 - Jeda antar fase diperpanjang di atas `ZOLTRAAK_COOLDOWN` (0,55 detik) agar
   cooldown tidak menelan pengujian fase berikutnya.
+- **Insiden ronde-43 (dua bug berbeda, keduanya sudah diperbaiki):**
+  1. `zoltraak_bolt.gd` sempat memakai `var id := target.get_instance_id()`
+     — `target` berasal dari `get_meta()` (Variant/tanpa tipe statis), jadi
+     compiler Godot 4.5 gagal keras: "Cannot infer the type of "id" variable
+     because the value doesn't have a set type." Perbaikan: pakai tipe
+     eksplisit `var id: int = ...`. **Pelajaran untuk ronde depan:** JANGAN
+     pernah pakai `var x := nilai_variant.method()` bila `nilai_variant`
+     tidak bertipe statis (mis. hasil `get_meta()`/`get()` generik) —
+     `gdparse` lokal TIDAK mendeteksi kelas bug ini sama sekali, hanya
+     type-checker Godot asli yang menangkapnya.
+  2. Probe sempat memakai `await process_frame` tunggal untuk mensimulasikan
+     tap cepat (tekan→1 frame→lepas). Ini race kondisi nyata: urutan resolusi
+     sinyal `process_frame` relatif terhadap kapan `_process()` node pemain
+     benar-benar berjalan TIDAK selalu konsisten, apalagi setelah didahului
+     `await create_timer(...).timeout`. Kadang status "tahan" tidak pernah
+     sempat "terlihat" oleh `_process()` sebelum keburu dilepas lagi, jadi
+     tap dianggap tidak pernah terjadi. Perbaikan: ganti seluruh simulasi
+     tekan-lepas di probe supaya memakai jeda **waktu-nyata** kecil
+     (`await create_timer(0.05).timeout` untuk tahan, `create_timer(0.15)`
+     untuk jeda settle setelah lepas) alih-alih menghitung frame secara
+     presisi. **Pelajaran untuk ronde depan:** saat menyimulasikan input
+     tekan/lepas di probe headless, JANGAN andalkan `await process_frame`
+     tunggal untuk memberi jeda ke `_process()` — pakai jeda waktu-nyata
+     kecil yang jelas melebihi satu siklus frame.
 
 ## Verifikasi
 
@@ -82,8 +106,9 @@
   `project/dev_probe/fire_attack_check.gd` diperiksa terpisah.
 - `python3 tools/analyze_checks.py /home/user/Unity` → `BERSIH ✓`.
 - `git diff --check` → bersih.
-- Uji tembak-menembak penuh (fase 2a/2b/3 probe) tervalidasi lewat GitHub
-  Actions setelah push karena Godot tidak tersedia secara lokal di sandbox.
+- Uji tembak-menembak penuh (fase 1/2a/2b/3 probe) LULUS di GitHub Actions
+  (build-apk sukses) dan konten sudah ter-publish ke branch `content`, versi
+  `game_version` naik dari `1.0.38` → `1.0.39`.
 
 ## Cara test di HP
 
