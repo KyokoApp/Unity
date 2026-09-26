@@ -5,28 +5,28 @@
    "version": "1.0.7"
   },
   "audio_music": {
-   "content_hash": "af1f821c9d55f8e6e7ef25d8dfab42b8560bfb2df13c9ec21954ad67bfa3cef7",
-   "version": "1.0.1"
+   "content_hash": "8529663eabca2f32ab7919a93c953cd8c82d1ca7afc564c90feaa4bbe3dd0800",
+   "version": "1.0.2"
   },
   "audio_sfx": {
-   "content_hash": "d43e8a08337984778388db77c8084ac7dadda641018bcfde5a2e3ec10ed29c91",
-   "version": "1.0.1"
+   "content_hash": "1942045a5b2455898fa0b7c4fbf0767692f992086c6400be72bb07d72b2d7759",
+   "version": "1.0.2"
   },
   "character_player": {
-   "content_hash": "2f940ca379af8749f93615e66e6b6f45c98e9325fdcc38fce0d5c0e3c5eebb12",
-   "version": "1.0.24"
+   "content_hash": "e52497e9029908adcd04ad153bbde6e0303e3110e8ebe5a21671a4d7871f058e",
+   "version": "1.0.25"
   },
   "core_scripts": {
-   "content_hash": "57e1567fb1c461d4c12f5dceac2f99be3e30efc4c628bfac2dfd455bfd810576",
-   "version": "1.0.12"
+   "content_hash": "051a44cb55be45d8cb5058fba62b2b36d53e6334782cd2c1ad9fda21af597a9d",
+   "version": "1.0.13"
   },
   "shaders_materials": {
    "content_hash": "fed0f185f9dc4ebb89ebb50afd7a882d4706aa9441732235212cc9be44545684",
    "version": "1.0.9"
   },
   "ui": {
-   "content_hash": "288430109bfab88a79032f0e2fe220bc50d8bd73abb2f199e167862ef0638626",
-   "version": "1.0.14"
+   "content_hash": "993b2db1ab4345287e07370c6e6f18098be3df9b97a61fad073fca2d5093f506",
+   "version": "1.0.15"
   },
   "world_props_beach": {
    "content_hash": "1c0bc74cb8af4b3153fc1b1223da8d1d0570e47e03e2fdbde488ce538d63bb45",
@@ -37,8 +37,8 @@
    "version": "1.0.4"
   },
   "world_terrain": {
-   "content_hash": "14b51e8bf7935cf5991ab23b5c296d6c9330d22f00f9617d5ec372a30801ee46",
-   "version": "1.0.34"
+   "content_hash": "b89ff26071f974773cc687098c9f14d6d804d086edb22ee69d43709c1d96c98d",
+   "version": "1.0.35"
   }
  }
 }

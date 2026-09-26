@@ -1,7 +1,7 @@
 [
  {
   "pack": "core_scripts",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "returncode": 0,
   "duration_s": 3.6,
   "messages": [
@@ -19,7 +19,7 @@
  },
  {
   "pack": "world_terrain",
-  "version": "1.0.34",
+  "version": "1.0.35",
   "returncode": 0,
   "duration_s": 3.6,
   "messages": [
@@ -28,44 +28,34 @@
  },
  {
   "pack": "character_player",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "returncode": 0,
   "duration_s": 3.6,
   "messages": [
-   "SCRIPT ERROR: Parse Error: Cannot infer the type of \"n_anims\" variable because the value doesn't have a set type.",
-   "          at: GDScript::reload (res://packs/character_player/player.gd:128)",
-   "ERROR: Failed to load script \"res://packs/character_player/player.gd\" with error \"Parse error\".",
-   "   at: load (modules/gdscript/gdscript.cpp:3041)",
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
  },
  {
   "pack": "ui",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "returncode": 0,
   "duration_s": 3.6,
   "messages": [
-   "SCRIPT ERROR: Parse Error: Cannot infer the type of \"id\" variable because the value doesn't have a set type.",
-   "          at: GDScript::reload (res://packs/ui/pause_menu.gd:191)",
-   "ERROR: Failed to load script \"res://packs/ui/pause_menu.gd\" with error \"Parse error\".",
-   "   at: load (modules/gdscript/gdscript.cpp:3041)",
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
  },
  {
   "pack": "audio_sfx",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "returncode": 0,
-  "duration_s": 3.6,
-  "messages": [
-   "cannot connect to daemon at tcp:5037: Connection refused"
-  ]
+  "duration_s": 4.5,
+  "messages": []
  },
  {
   "pack": "audio_music",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "returncode": 0,
-  "duration_s": 3.6,
+  "duration_s": 3.5,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
