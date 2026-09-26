@@ -13,8 +13,8 @@
    "version": "1.0.3"
   },
   "character_player": {
-   "content_hash": "61bb2528524e952c60bd9275632f101b2b5795ba55aefa2df70b9a7adfd3bcf7",
-   "version": "1.0.27"
+   "content_hash": "c285b2472f650ee1e0107cb7d848759f0503fe425cca8aa43aacd5656afc3acc",
+   "version": "1.0.28"
   },
   "core_scripts": {
    "content_hash": "051a44cb55be45d8cb5058fba62b2b36d53e6334782cd2c1ad9fda21af597a9d",
@@ -25,8 +25,8 @@
    "version": "1.0.9"
   },
   "ui": {
-   "content_hash": "fda371b5f320d9a237f7e7381c33105c50e9560a37f307f016ace58e9b880326",
-   "version": "1.0.16"
+   "content_hash": "4f067b7763b3033a28de7fefb6d3ff386bf052708ab57654103314d60470042f",
+   "version": "1.0.17"
   },
   "world_props_beach": {
    "content_hash": "1c0bc74cb8af4b3153fc1b1223da8d1d0570e47e03e2fdbde488ce538d63bb45",
