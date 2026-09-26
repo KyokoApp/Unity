@@ -156,12 +156,19 @@ func _run() -> void:
 	# jujur, bukan tertelan cooldown tembakan terakhir
 	await create_timer(COOLDOWN_WAIT_SEC).timeout
 	print("[fire-check] fase 3: tekan tombol serang via HUD (tap cepat)…")
+	print("[debug] pre: cooldown=", player.get("_fire_cooldown"), " charge_active=", player.get("_charge_active"), " was_holding=", player.get("_was_holding"), " attack_held=", player.get("_attack_held"))
 	var before := _count_by_suffix(world, "fire_bolt.gd")
+	var before_z := _count_by_suffix(world, "zoltraak_bolt.gd")
 	hud.call("_on_attack", true)
+	print("[debug] after true: cooldown=", player.get("_fire_cooldown"), " charge_active=", player.get("_charge_active"), " was_holding=", player.get("_was_holding"), " attack_held=", player.get("_attack_held"), " charge_time=", player.get("_charge_time"))
 	await process_frame          # 1 frame ~16ms, masih di bawah CHARGE_START_DELAY
+	print("[debug] after frame1: cooldown=", player.get("_fire_cooldown"), " charge_active=", player.get("_charge_active"), " was_holding=", player.get("_was_holding"), " attack_held=", player.get("_attack_held"), " charge_time=", player.get("_charge_time"))
 	hud.call("_on_attack", false)
+	print("[debug] after false: cooldown=", player.get("_fire_cooldown"), " charge_active=", player.get("_charge_active"), " was_holding=", player.get("_was_holding"), " attack_held=", player.get("_attack_held"))
 	await process_frame
 	var after := _count_by_suffix(world, "fire_bolt.gd")
+	var after_z := _count_by_suffix(world, "zoltraak_bolt.gd")
+	print("[debug] post: fire_bolt ", before, "->", after, " zoltraak_bolt ", before_z, "->", after_z)
 	if after > before:
 		print("[fire-check] fase 3 ✔ tombol HUD → ", after - before, " bola api baru")
 	else:
