@@ -11,6 +11,7 @@ signal gen_progress(p: float, t: String)
 
 const Materials := preload("res://packs/shaders_materials/materials.gd")
 const SKY_SHADER := preload("res://packs/shaders_materials/sky.gdshader")
+const MONSTER_SYSTEM := preload("res://packs/world_terrain/monster_system.gd")
 
 var player: Node3D
 var quality_ref
@@ -22,6 +23,7 @@ var time_of_day := 16.4       # sore adem (cicilan ini boleh jalan terus)
 
 var _root: Node
 var _ground: MeshInstance3D   # bidang raksasa yang menyentak mengikuti pemain
+var monster_system: Node3D
 const GROUND_SIZE := 1600.0
 var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 
@@ -45,8 +47,11 @@ func generate_async(p_root: Node) -> void:
 	await get_tree().process_frame
 	_report(0.5, "Membentangkan tanah datar…")
 	_make_flat_ground()
+	monster_system = MONSTER_SYSTEM.new()
+	monster_system.name = "MonsterSystem"
+	add_child(monster_system)
 	await get_tree().process_frame
-	_report(1.0, "Dunia datar siap (tanpa batas)")
+	_report(1.0, "Dunia datar siap — roster monster aktif")
 
 ## Bidang datar tak berbatas: SATU collider WorldBoundary (bidang y=0, normal
 ## atas) — tak ada tepi, tak ada trimesh, is_on_floor() engine selalu konstan.
@@ -107,6 +112,8 @@ func find_spawn_point() -> Vector3:
 
 func set_player(p: Node3D) -> void:
 	player = p
+	if monster_system and monster_system.has_method("set_player"):
+		monster_system.set_player(p)
 
 func register_interactable(meta: Dictionary) -> void:
 	interactables.append(meta)
@@ -154,6 +161,8 @@ var _q_fog := 1.0   # pengali kabut dari preset kualitas
 
 func apply_quality(p: Dictionary) -> void:
 	_q_fog = float(p.get("fog", 1.0))
+	if monster_system and monster_system.has_method("apply_quality"):
+		monster_system.apply_quality(p)
 	if world_env and world_env.environment:
 		world_env.environment.glow_enabled = bool(p.get("glow", true))
 	if sun:

@@ -52,7 +52,19 @@
   — lisensi bebas pakai (komersial diizinkan, redistribusi/penjualan aset dilarang);
   dipakai sebagai skin bawaan pemain (`packs/character_player/polygirl.glb`).
 
-*Terakhir diperbarui: 2026-09-20*
+## Ronde-40: Monster 3D low-poly + pemain kubus
+
+- **Quaternius LowPoly Animated Monsters** — kandidat sumber aset eksternal
+  yang ditelusuri untuk ronde lanjutan; 50 monster beranimasi, CC0:
+  https://quaternius.itch.io/lowpoly-animated-monsters
+- **Monster roster saat ini** — delapan bentuk 3D (slime, golem, bat, mushroom,
+  crawler), material, animasi bob/jalan/serang, dan percikan pemain dibuat
+  procedural memakai primitive/partikel Godot; bebas lisensi dan tidak membawa
+  binary eksternal sebelum arsip CC0 diverifikasi dan diintegrasikan.
+- **Pemain kubus** — BoxMesh, visor, kaki, aura, ground glow, dan TravelSparks
+  dirakit di `packs/character_player/player.gd`.
+
+*Terakhir diperbarui: 2026-09-26*
 
 ## Ronde-8: Aset Desa & Alam — KayKit Medieval Hexagon Pack (CC0)
 

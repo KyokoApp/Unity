@@ -37,6 +37,11 @@ func _process(delta: float) -> void:
 	var to := from + vel * delta
 	var hit := get_world_3d().direct_space_state.intersect_ray(_ray(from, to))
 	if not hit.is_empty():
+		var collider = hit.get("collider")
+		if collider and collider.has_meta("monster"):
+			var target = collider.get_meta("monster")
+			if is_instance_valid(target) and target.has_method("take_damage"):
+				target.take_damage(35.0)
 		_explode(hit.get("position", to), "impact")
 		return
 	if to.y <= 0.0:

@@ -13,6 +13,7 @@ on:
       - main
       - arena/01a0ba2f-unity
       - arena/01a0dc65-unity
+      - arena/01a0dca7-unity
     paths:
       - "project/**"
       - "tools/**"

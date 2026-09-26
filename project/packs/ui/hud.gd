@@ -169,6 +169,9 @@ var label_prompt: Label
 var label_stats: Label
 var label_fps: Label
 var label_clock: Label
+var health_panel: Panel
+var health_bar: ProgressBar
+var health_label: Label
 var toast_label: Label
 var _toast_timer := 0.0
 var _fps_acc := 0.0
@@ -181,6 +184,9 @@ func bind_player(p: Node) -> void:
 		player.nearest_interactable_changed.connect(_on_near_changed)
 	if player and player.has_signal("stats_changed"):
 		player.stats_changed.connect(_on_stats)
+	if player and player.has_signal("health_changed"):
+		player.health_changed.connect(_on_health_changed)
+		_on_health_changed(float(player.get("health")), float(player.get("max_health")))
 
 func bind_root(r: Node) -> void:
 	root_node = r
@@ -260,6 +266,70 @@ func _make_action_button(name: String, txt: String, emoji_color: Color, edge: Co
 	_btn_colors[name] = emoji_color
 	return b
 
+func _build_health_bar(root: Control, left: float, top: float) -> void:
+	health_panel = Panel.new()
+	health_panel.name = "PlayerHealthPanel"
+	health_panel.position = Vector2(left, top)
+	health_panel.size = Vector2(306, 48)
+	health_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_panel.add_theme_stylebox_override("panel", _make_panel_col(Color(0.04, 0.07, 0.10, 0.84), 12))
+	root.add_child(health_panel)
+
+	health_bar = ProgressBar.new()
+	health_bar.name = "PlayerHealthBar"
+	health_bar.position = Vector2(7, 7)
+	health_bar.size = Vector2(292, 34)
+	health_bar.min_value = 0.0
+	health_bar.max_value = 100.0
+	health_bar.value = 100.0
+	health_bar.show_percentage = false
+	health_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var back := StyleBoxFlat.new()
+	back.bg_color = Color(0.12, 0.15, 0.18, 0.94)
+	back.corner_radius_top_left = 10
+	back.corner_radius_top_right = 10
+	back.corner_radius_bottom_left = 10
+	back.corner_radius_bottom_right = 10
+	health_bar.add_theme_stylebox_override("background", back)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.82, 0.18, 0.14, 0.96)
+	fill.corner_radius_top_left = 10
+	fill.corner_radius_top_right = 10
+	fill.corner_radius_bottom_left = 10
+	fill.corner_radius_bottom_right = 10
+	health_bar.add_theme_stylebox_override("fill", fill)
+	health_panel.add_child(health_bar)
+
+	health_label = Label.new()
+	health_label.name = "PlayerHealthText"
+	health_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	health_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	health_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	health_label.text = "HP  100 / 100"
+	health_label.add_theme_font_size_override("font_size", 18)
+	health_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.96))
+	health_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.75))
+	health_label.add_theme_constant_override("shadow_offset_x", 1)
+	health_label.add_theme_constant_override("shadow_offset_y", 1)
+	health_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_bar.add_child(health_label)
+
+func _on_health_changed(current: float, maximum: float) -> void:
+	if health_bar == null:
+		return
+	health_bar.max_value = maxf(1.0, maximum)
+	health_bar.value = clampf(current, 0.0, health_bar.max_value)
+	if health_label:
+		health_label.text = "HP  %d / %d" % [int(round(current)), int(round(maximum))]
+	var ratio := clampf(current / maxf(maximum, 1.0), 0.0, 1.0)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.18 + 0.72 * (1.0 - ratio), 0.82 * ratio + 0.08, 0.14, 0.96)
+	fill.corner_radius_top_left = 10
+	fill.corner_radius_top_right = 10
+	fill.corner_radius_bottom_left = 10
+	fill.corner_radius_bottom_right = 10
+	health_bar.add_theme_stylebox_override("fill", fill)
+
 func _build_layout() -> void:
 	var sa := DisplayServer.get_display_safe_area()
 	var root := Control.new()
@@ -335,6 +405,9 @@ func _build_layout() -> void:
 	# memunculkan tombol pause di pojok kiri atas lagi.
 	bpause.visible = SHOW_PAUSE_BUTTON
 
+	# --- bar darah pemain: pojok kiri atas, tepat di bawah pause ---
+	_build_health_bar(root, ml, mt + 72.0)
+
 	# --- indikator atas: jam + fps ---
 	label_clock = Label.new()
 	label_clock.position = Vector2(ml + 100, mt + 6)
@@ -385,6 +458,7 @@ func _build_layout() -> void:
 	# --- toast tengah atas ---
 	toast_label = Label.new()
 	toast_label.add_theme_font_size_override("font_size", 30)
+	toast_label.add_theme_color_override("font_color", Colerride("font_size", 30)
 	toast_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
 	toast_label.add_theme_color_override("font_shadow", Color(0, 0, 0, 0.6))
 	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -796,6 +870,24 @@ func _build_edit_bar() -> void:
 	done.custom_minimum_size = Vector2(0, 64)
 	done.add_theme_font_size_override("font_size", 24)
 	done.add_theme_color_override("font_color", Color(0.8, 1.0, 0.85))
+	done.pressed.connect(func(): _exit_edit())
+	v.add_child(done)
+
+func _pick_sky(ix: int) -> void:
+	if _world:
+		_world.apply_lighting({"sky": ix})
+	if settings:
+		settings.set_value("light_sky", ix)
+	toast("Gradien langit " + (str(ix) if ix >= 0 else "otomatis"))
+
+func _select_tool(m: String) -> void:
+	edit_tool = m
+	_update_tool_visual()
+
+func _update_tool_visual() -> void:
+	for m in _edit_tool_btns:
+		_edit_tool_btns[m].button_pressed = m == edit_tool
+font_color", Color(0.8, 1.0, 0.85))
 	done.pressed.connect(func(): _exit_edit())
 	v.add_child(done)
 
