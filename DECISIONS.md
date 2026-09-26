@@ -736,3 +736,19 @@ Deteksi tak lagi "tebakan": bukti = screenshot watchdog user.
 - **BELUM DIVERIFIKASI DI PERANGKAT.** Titik cek pertama bila tampilan aneh:
   kompilasi shader (bola tak terlihat/pink) dan kecerahan di renderer Mobile
   (rentang HDR terbatas → atur `intensity` di material).
+
+## Ronde-38 — tombol SERANG + rentetan proyektil api (2026-09-26)
+
+- Tombol api kembali tampil di HUD dan dapat ditahan untuk menembakkan bola api
+  setiap 0,26 detik; sentuhan tombol tidak lagi ikut memulai usap kamera.
+- Proyektil prosedural memakai inti/shell shader, halo, cahaya berkedip, tiga
+  jejak partikel, gravitasi, raycast, dan batas umur tiga detik. Arah mengikuti
+  gerak terakhir atau arah kamera sebelum pemain bergerak.
+- Impact membuat kilat, bola api mengembang, empat burst partikel, shockwave,
+  glow dan bekas gosong; ledakan udara tanpa bekas tanah, muzzle memakai efek
+  singkat searah tembakan. Resource efek berulang di-cache untuk rentetan.
+- Ditambahkan recoil visual, camera shake berbasis jarak, serta SFX tembak dan
+  ledak yang disintesis prosedural. Seed tiap suara dipisah; `fire_loop.wav`
+  Ronde-37 tetap identik byte-per-byte.
+- Skala FX mengikuti preset kualitas. Implementasi ditargetkan untuk renderer
+  Mobile Godot 4.5.2 dan **belum diverifikasi di perangkat**.

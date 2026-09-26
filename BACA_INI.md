@@ -1,29 +1,32 @@
-# BACA INI — Ronde-37: pemain jadi BOLA API
+# BACA INI — Ronde-38: SERANG dengan bola api
 
 ## Yang berubah
-- Mannequin + semua animasi (UAL1/UAL2) + skin **dihapus**.
-- Layar kini cuma: **tanah datar (grid)** + **analog** kiri bawah.
-  (Tombol pause di layar ikut disembunyikan — menu tetap terbuka lewat tombol
-  **Back** Android / ESC. Mau munculkan lagi: `SHOW_PAUSE_BUTTON = true` di
-  `project/packs/ui/hud.gd`.)
-- Pemain = **bola api** realistis (shader plasma + selubung api + partikel
-  lidah api/asap/bara + cahaya berkedip + suara api), digerakkan analog
-  dengan percepatan/perlambatan halus dan ekor api yang mengikuti arah gerak.
+- Tombol **🔥 SERANG** tampil di kanan layar. Ketuk untuk satu tembakan atau
+  tahan untuk menembakkan bola api beruntun setiap 0,26 detik.
+- Proyektil memiliki inti plasma, selubung/ekor api, halo, cahaya dan partikel.
+  Saat mengenai tanah/objek, proyektil menghasilkan ledakan, shockwave, bekas
+  gosong, kilat, asap, bara, percikan, camera shake, dan suara prosedural.
+- Arah tembakan mengikuti arah gerak terakhir; sebelum bergerak, arah kamera.
+  SPASI atau F dapat dipakai untuk menembak saat pengujian desktop.
+- Pengaturan “Ukuran analog” kini mengatur **analog & tombol**. Bug sentuhan
+  tombol yang sekaligus memulai usap kamera juga telah diperbaiki.
 
-## File baru
-- `project/packs/character_player/fireball_core.gdshader`
-- `project/packs/character_player/fireball_shell.gdshader`
-- `project/packs/audio_sfx/fire_loop.wav` (dibuat ulang: `python3 tools/synth_fire.py`)
-- `tools/synth_fire.py`
+## File efek baru
+- `project/packs/character_player/fire_bolt.gd`
+- `project/packs/character_player/fire_explosion.gd`
+- `project/packs/character_player/fire_fx.gd`
+- `project/packs/character_player/shockwave.gdshader`
+- `project/packs/audio_sfx/fire_shoot.wav`
+- `project/packs/audio_sfx/fire_explode.wav`
 
-## File dihapus
-- `project/packs/character_player/anim_controller.gd`
-- `project/packs/character_player/assets/*.glb` (≈16,5 MB — pack jauh lebih kecil)
-- SFX lama tak terpakai: ocean_loop, footstep_1/2, jump, land, pickup, splash, emote, whoosh
+Semua visual dan audio baru dibuat prosedural tanpa aset eksternal. Audio dapat
+regenerasi dengan `python3 tools/synth_fire.py`; hasil `fire_loop.wav` lama tetap
+identik byte-per-byte karena setiap suara memakai seed terpisah.
 
 ## Supaya masuk ke HP
-Merge branch ini ke `main` → workflow **apk-release** otomatis build & terbitkan
-pack baru ke branch `content` → game di HP update sendiri saat dibuka.
+Merge ke `main` memicu workflow **apk-release**, membangun pack baru, lalu
+menerbitkannya ke branch `content`. Tutup game sampai benar-benar mati, lalu
+buka lagi agar update pack terunduh.
 
-**BELUM DIUJI DI PERANGKAT** (sandbox tak bisa menjalankan Godot). Yang
-sudah dicek: sintaks semua skrip (gdparse) + `tools/analyze_checks.py`.
+**BELUM DIUJI DI PERANGKAT.** Sandbox tidak dapat menjalankan Godot; pemeriksaan
+yang dilakukan adalah parse GDScript, cek semantik ringan, dan review API 4.5.

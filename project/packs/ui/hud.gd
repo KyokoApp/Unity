@@ -88,15 +88,20 @@ class RpgButton:
 		var w := Color(1, 1, 1, 0.94)
 		var r := radius * 0.62
 		match icon:
-			"sword":
-				var a := c + Vector2(-0.42, 0.42) * r      # pangkal gagang
-				var b := c + Vector2(0.52, -0.52) * r      # ujung pedang
-				var dir := (b - a).normalized()
-				var perp := Vector2(-dir.y, dir.x)
-				draw_line(a, b, w, 6.0, true)
-				draw_line(a + perp * r * 0.16 - dir * r * 0.18,
-					a - perp * r * 0.16 - dir * r * 0.18, w, 5.0, true)  # guard
-				draw_line(a, a - dir * r * 0.3, w, 5.0, true)              # gagang
+			"flame":
+				var outer := PackedVector2Array([
+					c + Vector2(0.02, -0.62) * r, c + Vector2(0.32, -0.22) * r,
+					c + Vector2(0.24, 0.04) * r, c + Vector2(0.48, 0.25) * r,
+					c + Vector2(0.28, 0.58) * r, c + Vector2(-0.18, 0.62) * r,
+					c + Vector2(-0.48, 0.30) * r, c + Vector2(-0.31, -0.08) * r,
+					c + Vector2(-0.10, 0.10) * r, c + Vector2(0.02, -0.62) * r])
+				draw_polyline(outer, w, 4.0, true)
+				var inner_color := Color(1, 0.62, 0.22) if (_down or active) else Color(1, 1, 1, 0.72)
+				var inner := PackedVector2Array([
+					c + Vector2(0.05, -0.15) * r, c + Vector2(0.27, 0.18) * r,
+					c + Vector2(0.16, 0.49) * r, c + Vector2(-0.13, 0.50) * r,
+					c + Vector2(-0.28, 0.25) * r])
+				draw_colored_polygon(inner, inner_color)
 			"jump":
 				draw_arc(c + Vector2(0, -0.5) * r, r * 0.15, 0.0, TAU, 16, w, 3.0, true)
 				draw_line(c + Vector2(0, -0.34) * r, c + Vector2(0, 0.06) * r, w, 3.5, true)
@@ -294,7 +299,7 @@ func _build_layout() -> void:
 	# --- tombol aksi bulat gaya RPG (klaster kanan ala referensi) ---
 	# attack besar kanan-tengah-bawah; dash di bawah-kanannya; lompat pojok kanan bawah
 	var att_c := Vector2(vsz.x - mr - 156.0, vsz.y - mb - 234.0)
-	_add_rpg(root, "BtnAtk", "sword", 58.0, att_c - Vector2(58.0, 58.0))
+	_add_rpg(root, "BtnAtk", "flame", 58.0, att_c - Vector2(58.0, 58.0))
 	_add_rpg(root, "BtnDash", "dash", 40.0, att_c + Vector2(96.0, 116.0) - Vector2(40.0, 40.0))
 	_add_rpg(root, "BtnJump", "jump", 50.0, Vector2(vsz.x - mr - 100.0, vsz.y - mb - 100.0) - Vector2(50.0, 50.0))
 	_add_rpg(root, "BtnAction", "hand", 36.0, att_c + Vector2(-132.0, -70.0) - Vector2(36.0, 36.0))
@@ -305,7 +310,7 @@ func _build_layout() -> void:
 	_connect_rpg("BtnSprint", Callable(self, "_on_sprint"), true)
 	_connect_rpg("BtnCrouch", Callable(self, "_on_crouch_toggle"), false)
 	_connect_rpg("BtnAction", Callable(self, "_on_action"), false)
-	_connect_rpg("BtnAtk", Callable(self, "_on_attack"), false)
+	_connect_rpg("BtnAtk", Callable(self, "_on_attack"), true)
 	_connect_rpg("BtnDash", Callable(self, "_on_dash"), false)
 	_connect_rpg("BtnEmote", Callable(self, "_on_emote"), false)
 	_buttons["BtnAction"].visible = false
@@ -429,8 +434,12 @@ func _on_action(down: bool) -> void:
 		player.press_interact()
 
 func _on_attack(down: bool) -> void:
-	if down and player:
-		player.press_attack()
+	if player:
+		if player.has_method("set_attack_held"):
+			player.set_attack_held(down)
+		elif down:
+			player.press_attack()
+	_buttons["BtnAtk"].set_active(down)
 
 func _on_dash(down: bool) -> void:
 	if down and player and player.has_method("press_dash"):
@@ -459,6 +468,9 @@ func _handle_touch(e: InputEventScreenTouch) -> void:
 			_edit_paint = -1
 		return
 	if e.pressed:
+		# _input dipanggil sebelum GUI: jangan anggap sentuhan tombol sebagai usap kamera.
+		if _over_button(e.position):
+			return
 		var vsz := get_viewport().get_visible_rect().size
 		# joystick melayang: sentuh area kiri-tengah → joystick muncul di titik itu
 		if _joy_touch == -1 and e.position.x < vsz.x * 0.58 and e.position.y > vsz.y * 0.22:
@@ -477,6 +489,12 @@ func _handle_touch(e: InputEventScreenTouch) -> void:
 			_set_joy(Vector2.ZERO)
 		elif e.index == _look_touch:
 			_look_touch = -1
+
+func _over_button(pos: Vector2) -> bool:
+	for button in _buttons.values():
+		if button.visible and button.get_global_rect().has_point(pos):
+			return true
+	return false
 
 func _handle_drag(e: InputEventScreenDrag) -> void:
 	if edit_mode:
@@ -577,7 +595,7 @@ const EDIT_ACTION_NAMES := ["BtnJump", "BtnAtk", "BtnDash", "BtnSprint", "BtnCro
 ## Tombol yang sengaja disembunyikan (UI minimal). Hapus nama dari daftar ini
 ## untuk memunculkan tombol itu lagi — satu tempat saja.
 const SHOW_PAUSE_BUTTON := false
-const HIDDEN_BUTTONS := ["BtnJump", "BtnAtk", "BtnDash", "BtnCrouch", "BtnSprint", "BtnEmote", "BtnAction"]
+const HIDDEN_BUTTONS := ["BtnJump", "BtnDash", "BtnCrouch", "BtnSprint", "BtnEmote", "BtnAction"]
 
 func set_edit_mode(on: bool) -> void:
 	edit_mode = on

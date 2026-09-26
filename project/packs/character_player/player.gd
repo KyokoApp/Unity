@@ -23,6 +23,12 @@ signal nearest_interactable_changed(meta)          # kompat HUD (tidak dipakai)
 const CORE_SHADER := preload("res://packs/character_player/fireball_core.gdshader")
 const SHELL_SHADER := preload("res://packs/character_player/fireball_shell.gdshader")
 const FIRE_SFX := "res://packs/audio_sfx/fire_loop.wav"
+const SHOOT_SFX := "res://packs/audio_sfx/fire_shoot.wav"
+const FIRE_BOLT := preload("res://packs/character_player/fire_bolt.gd")
+const FIRE_EXPLOSION := preload("res://packs/character_player/fire_explosion.gd")
+const FIRE_COOLDOWN := 0.26
+const BOLT_SPEED := 20.0
+const BOLT_LIFT := 2.0
 
 # --- gerak ---
 const MAX_SPEED := 7.5       # m/s saat analog didorong penuh
@@ -67,6 +73,12 @@ var _trail := Vector3.ZERO    # vektor ekor yang diperhalus
 var _speed01 := 0.0           # 0..1 kecepatan (diperhalus) untuk intensitas/suara
 var _cam_extra := 0.0
 var _cam_snapped := false
+var _facing := Vector3.ZERO
+var _attack_held := false
+var _fire_cooldown := 0.0
+var _recoil := 0.0
+var _shake := 0.0
+var _fx := 1.0
 
 func set_world(w: Node) -> void:
 	world = w
@@ -104,14 +116,20 @@ func press_interact() -> void:
 	pass
 
 func press_attack() -> void:
-	pass
+	_try_fire()
+
+func set_attack_held(down: bool) -> void:
+	_attack_held = down
+	if down:
+		_try_fire()
 
 func press_emote() -> void:
 	pass
 
 ## Dipanggil QualityManager: kurangi jumlah partikel di HP lemah.
 func apply_quality(p: Dictionary) -> void:
-	var k := clampf(float(p.get("fx", 1.0)), 0.2, 1.0)
+	_fx = clampf(float(p.get("fx", 1.0)), 0.2, 1.0)
+	var k := _fx
 	for n in _base_amounts:
 		if is_instance_valid(n):
 			n.amount = maxi(4, int(round(float(_base_amounts[n]) * k)))
@@ -123,6 +141,10 @@ func _process(delta: float) -> void:
 		return
 	delta = minf(delta, 0.1)             # cegah lompatan setelah jeda/hitch
 	_t += delta
+	_fire_cooldown = maxf(0.0, _fire_cooldown - delta)
+	_recoil = maxf(0.0, _recoil - 6.0 * delta)
+	if _attack_held or Input.is_key_pressed(KEY_SPACE) or Input.is_key_pressed(KEY_F):
+		_try_fire()
 	_move(delta)
 	_apply_camera(delta)
 	_animate_fire(delta)
@@ -145,6 +167,8 @@ func _move(delta: float) -> void:
 	# kunci badan di y=0 (bola melayang; tidak ada gravitasi/lompat)
 	velocity = Vector3(hv.x, -global_position.y / maxf(delta, 0.001), hv.z)
 	move_and_slide()
+	if hv.length() > 1.0:
+		_facing = hv.normalized()
 	_speed01 = lerpf(_speed01, clampf(hv.length() / MAX_SPEED, 0.0, 1.0), 1.0 - exp(-6.0 * delta))
 
 func _apply_camera(delta: float) -> void:
@@ -165,12 +189,18 @@ func _apply_camera(delta: float) -> void:
 	# sedikit mundur saat melaju -> terasa cepat tanpa kehilangan bola
 	_cam_extra = lerpf(_cam_extra, _speed01 * 1.3, 1.0 - exp(-3.0 * delta))
 	cam_arm.spring_length = CAM_DIST + _cam_extra
+	_shake = maxf(0.0, _shake - 1.6 * delta)
+	var shake_power := _shake * _shake * 0.35
+	var cam: Camera3D = $CameraPivot/CamArm/Cam
+	cam.h_offset = (sin(_t * 43.0) * 0.72 + sin(_t * 67.0 + 0.8) * 0.28) * shake_power
+	cam.v_offset = (sin(_t * 51.0 + 1.7) * 0.7 + sin(_t * 79.0) * 0.3) * shake_power
 
 func _animate_fire(delta: float) -> void:
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
 	# bob melayang (lebih tenang saat melaju)
 	var bob := sin(_t * 2.1) * 0.07 + sin(_t * 3.7 + 1.1) * 0.025
-	_visual.position = Vector3(0.0, HOVER + bob * (1.0 - 0.6 * _speed01), 0.0)
+	var recoil_dir := _shoot_direction()
+	_visual.position = Vector3(0.0, HOVER + bob * (1.0 - 0.6 * _speed01), 0.0) - recoil_dir * (0.22 * _recoil * _recoil)
 	# ekor: berlawanan arah gerak, diperhalus (tidak patah saat belok/berhenti)
 	var want_trail := (-hv * 0.12).limit_length(1.2)
 	_trail = _trail.lerp(want_trail, 1.0 - exp(-5.0 * delta))
@@ -178,7 +208,7 @@ func _animate_fire(delta: float) -> void:
 	if absf(_flow.x) > 2048.0 or absf(_flow.z) > 2048.0:
 		_flow = Vector3(fposmod(_flow.x, 64.0), 0.0, fposmod(_flow.z, 64.0))
 	_core_mat.set_shader_parameter("flow_offset", _flow)
-	_core_mat.set_shader_parameter("intensity", 2.6 + 0.7 * _speed01)
+	_core_mat.set_shader_parameter("intensity", 2.6 + 0.7 * _speed01 + 1.4 * _recoil)
 	_core_mat.set_shader_parameter("turbulence", 1.0 + 0.6 * _speed01)
 	_shell_mat.set_shader_parameter("flow_offset", _flow)
 	_shell_mat.set_shader_parameter("trail", _trail)
@@ -197,6 +227,53 @@ func _animate_fire(delta: float) -> void:
 	if _sfx:
 		_sfx.volume_db = lerpf(-15.0, -6.0, _speed01)
 		_sfx.pitch_scale = 0.95 + 0.15 * _speed01
+
+# =============== Serangan ===============
+
+func _shoot_direction() -> Vector3:
+	if _facing.length_squared() > 0.01:
+		return _facing.normalized()
+	return (Basis(Vector3.UP, yaw) * Vector3(0, 0, -1)).normalized()
+
+func _try_fire() -> void:
+	if not is_ready or _fire_cooldown > 0.0:
+		return
+	_fire_cooldown = FIRE_COOLDOWN
+	var direction := _shoot_direction()
+	var origin := _visual.global_position + direction * (BALL_R + 0.2)
+	var host: Node = world if is_instance_valid(world) and world.is_inside_tree() else get_parent()
+	if host == null:
+		return
+	var bolt := FIRE_BOLT.new()
+	bolt.vel = direction * BOLT_SPEED + Vector3(velocity.x, 0, velocity.z) * 0.6 + Vector3.UP * BOLT_LIFT
+	bolt.fx = _fx
+	bolt.exclude_rids.append(get_rid())
+	bolt.shake_target = self
+	host.add_child(bolt)
+	bolt.global_position = origin
+	var muzzle := FIRE_EXPLOSION.new()
+	muzzle.kind = "muzzle"
+	muzzle.fx = _fx
+	muzzle.dir = direction
+	host.add_child(muzzle)
+	muzzle.global_position = origin
+	_recoil = 1.0
+	add_shake(0.12)
+	_play_shoot_sound()
+
+func add_shake(amount: float) -> void:
+	_shake = minf(_shake + amount, 0.8)
+
+func _play_shoot_sound() -> void:
+	if not ResourceLoader.exists(SHOOT_SFX):
+		return
+	var sound := AudioStreamPlayer.new()
+	sound.stream = load(SHOOT_SFX)
+	sound.bus = "SFX"
+	sound.pitch_scale = randf_range(0.94, 1.08)
+	sound.finished.connect(sound.queue_free)
+	add_child(sound)
+	sound.play()
 
 # =============== Bangun visual ===============
 
