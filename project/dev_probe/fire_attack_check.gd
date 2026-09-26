@@ -158,13 +158,18 @@ func _run() -> void:
 	# jujur, bukan tertelan cooldown tembakan terakhir
 	await create_timer(COOLDOWN_WAIT_SEC).timeout
 	print("[fire-check] fase 3: tekan tombol serang via HUD (tap cepat)…")
+	print("[dbg-frames] pre frame=", Engine.get_process_frames())
 	var before := _count_by_suffix(world, "fire_bolt.gd")
 	hud.call("_on_attack", true)
+	print("[dbg-frames] after-true frame=", Engine.get_process_frames(), " attack_held=", player.get("_attack_held"))
 	await process_frame          # < CHARGE_START_DELAY (0.16s) -> tetap dianggap tap
+	print("[dbg-frames] post-await1 frame=", Engine.get_process_frames(), " attack_held=", player.get("_attack_held"), " was_holding=", player.get("_was_holding"))
 	hud.call("_on_attack", false)
+	print("[dbg-frames] after-false frame=", Engine.get_process_frames(), " attack_held=", player.get("_attack_held"))
 	# beberapa frame margin: hindari race deteksi "lepas" pas di batas frame
 	for _i in range(4):
 		await process_frame
+		print("[dbg-frames] margin frame=", Engine.get_process_frames(), " was_holding=", player.get("_was_holding"))
 	var after := _count_by_suffix(world, "fire_bolt.gd")
 	if after > before:
 		print("[fire-check] fase 3 ✔ tombol HUD → ", after - before, " bola api baru")
