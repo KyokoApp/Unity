@@ -507,6 +507,7 @@ func _on_action(down: bool) -> void:
 		player.press_interact()
 
 func _on_attack(down: bool) -> void:
+	print("[dbg-hud] _on_attack(", down, ") player=", player, " has_method=", (player.has_method("set_attack_held") if player else "no-player"))
 	if player:
 		if player.has_method("set_attack_held"):
 			player.set_attack_held(down)
