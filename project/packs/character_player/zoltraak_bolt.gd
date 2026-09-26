@@ -112,7 +112,10 @@ func _build_visual() -> void:
 		mat.no_depth_test = false
 		seg.material_override = mat
 		# capsule Godot memanjang di sumbu Y lokal -> putar agar sejajar arah gerak.
-		seg.transform.basis = Basis(_right, _dir, _up)
+		# WAJIB assign Transform3D utuh (bukan chain "seg.transform.basis = ..."):
+		# insiden serupa Ronde-38 -> analyzer statis Godot 4.5 menolak beberapa
+		# pola chained-property-of-property pada Node; assignment penuh aman.
+		seg.transform = Transform3D(Basis(_right, _dir, _up), Vector3.ZERO)
 		add_child(seg)
 		_segments.append(seg)
 		_segment_mats.append(mat)
