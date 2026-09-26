@@ -160,6 +160,14 @@ var joy_vec := Vector2.ZERO
 var _joy_touch := -1
 var _look_touch := -1
 var _look_last := Vector2.ZERO
+# Pinch-to-zoom (permintaan user: kamera bs di-zoom out lalu balik smooth):
+# jari KEDUA yg nempel selagi jari "look" (_look_touch) sudah aktif dipakai
+# sbg jari cubit. Jarak antar 2 jari berubah -> player.add_zoom(). Kalau
+# salah satu jari lepas, gestur cubit dibatalkan (sederhana, aman).
+var _zoom_touch := -1
+var _zoom_last := Vector2.ZERO
+var _pinch_dist := 0.0
+const PINCH_ZOOM_SENSITIVITY := 0.018
 const JOY_RADIUS := 110.0
 const DEADZONE := 0.14
 
@@ -557,6 +565,12 @@ func _handle_touch(e: InputEventScreenTouch) -> void:
 		if _look_touch == -1:
 			_look_touch = e.index
 			_look_last = e.position
+		elif _zoom_touch == -1:
+			# jari kedua di area non-joystick selagi sudah ada jari "look"
+			# aktif -> jadi jari cubit (pinch) utk zoom kamera.
+			_zoom_touch = e.index
+			_zoom_last = e.position
+			_pinch_dist = _look_last.distance_to(_zoom_last)
 	else:
 		if e.index == _joy_touch:
 			_joy_touch = -1
@@ -564,6 +578,9 @@ func _handle_touch(e: InputEventScreenTouch) -> void:
 			_set_joy(Vector2.ZERO)
 		elif e.index == _look_touch:
 			_look_touch = -1
+			_zoom_touch = -1   # gestur cubit ikut batal kalau jari "look" lepas
+		elif e.index == _zoom_touch:
+			_zoom_touch = -1
 
 func _over_button(pos: Vector2) -> bool:
 	for button in _buttons.values():
@@ -581,8 +598,24 @@ func _handle_drag(e: InputEventScreenDrag) -> void:
 	elif e.index == _look_touch:
 		var d := e.position - _look_last
 		_look_last = e.position
-		if player:
+		if _zoom_touch != -1:
+			_update_pinch()   # 2 jari aktif -> ini bagian dr gestur cubit, bukan usap kamera
+		elif player:
 			player.add_look_px(d.x, d.y)
+	elif e.index == _zoom_touch:
+		_zoom_last = e.position
+		_update_pinch()
+
+## Jarak antar jari MEMBESAR (menjauh/"spread") -> zoom IN (kamera mendekat);
+## jarak MENGECIL ("pinch") -> zoom OUT (kamera menjauh) — konvensi umum
+## spt peta digital. Kembali ke jarak default ditangani otomatis di
+## player.gd (add_zoom cuma menggeser target, bukan set permanen).
+func _update_pinch() -> void:
+	var dist := _look_last.distance_to(_zoom_last)
+	var d := dist - _pinch_dist
+	_pinch_dist = dist
+	if player:
+		player.add_zoom(-d * PINCH_ZOOM_SENSITIVITY)
 
 func _update_joy(pos: Vector2) -> void:
 	var center := joy_base.global_position + Vector2(JOY_RADIUS, JOY_RADIUS)

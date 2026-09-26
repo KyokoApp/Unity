@@ -97,9 +97,13 @@ func generate_async(p_root: Node) -> void:
 	_make_flat_ground()
 	await get_tree().process_frame
 	_report(0.8, "Menegakkan dinding/bunker medan tempur…")
-	wall_system = WALL_SYSTEM.new()
-	wall_system.name = "WallSystem"
-	add_child(wall_system)
+	# DIHAPUS (permintaan user, screenshot: "itu tiang hapus") — tiang/
+	# reruntuhan batu kotak dr wall_system.gd dianggap tak cocok scr visual
+	# dgn tema dunia sihir/alam yg sedang dibangun. Skrip wall_system.gd &
+	# wall.gd SENGAJA TAK dihapus dr repo (cuma tak lagi di-spawn di sini)
+	# supaya gampang dikembalikan/dipakai ulang kalau suatu saat perlu
+	# rintangan destructible lagi.
+	wall_system = null
 	await get_tree().process_frame
 	_report(1.0, "Medan tempur siap")
 

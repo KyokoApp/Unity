@@ -21,7 +21,7 @@ top_level = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
 
 [node name="CamArm" type="SpringArm3D" parent="CameraPivot"]
-spring_length = 7.6
+spring_length = 5.6
 margin = 0.25
 collision_mask = 1
 

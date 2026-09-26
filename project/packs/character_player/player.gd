@@ -108,10 +108,17 @@ const AFTERIMAGE_COLOR := Color(0.62, 0.34, 1.0, 0.4)
 # --- kamera third-person (murni ikut swipe, arsitektur tak berubah) ---
 const PITCH_MIN := deg_to_rad(-72.0)
 const PITCH_MAX := deg_to_rad(-10.0)
-const CAM_DIST := 7.6
+# CAM_DIST didekatkan (permintaan user "kameranya agak deketin ke player"):
+# 7.6 -> 5.6. Zoom-out manual (pinch 2 jari, lihat hud.gd add_zoom) msh bisa
+# menjauhkan sampai CAM_ZOOM_MAX, tapi otomatis balik ke CAM_DIST ini lagi
+# scr smooth (lihat _cam_zoom di _process) begitu jalan lagi / diam sebentar.
+const CAM_DIST := 5.6
 const CAM_FOLLOW := 7.0
 const LOOK_K := 0.0036
 const CAM_FOCUS_HEIGHT := 1.05
+const CAM_ZOOM_MAX := 6.5          # tambahan jarak maks dr pinch zoom-out
+const CAM_ZOOM_RETURN_IDLE_S := 2.2 # diam brp detik (tanpa pinch baru) sblm auto-balik
+const CAM_ZOOM_RETURN_RATE := 2.4   # laju easing balik (lbh besar = lbh cepat)
 
 # --- dash: burst cepat lalu melambat ---
 const DASH_SPEED := 22.0
@@ -143,6 +150,12 @@ var _base_amounts := {}
 var _t := 0.0
 var _speed01 := 0.0
 var _cam_extra := 0.0
+# Zoom manual dr pinch 2 jari (hud.gd add_zoom) — 0=jarak default (CAM_DIST),
+# makin besar = makin menjauh (max CAM_ZOOM_MAX). Auto-balik ke 0 scr smooth
+# saat pemain jalan lagi ATAU diam tanpa pinch baru sekian detik (lihat
+# _process — CAM_ZOOM_RETURN_IDLE_S/RATE).
+var _cam_zoom := 0.0
+var _cam_zoom_idle_t := 999.0
 var _cam_snapped := false
 var _facing := Vector3.ZERO
 var _fire_cooldown := 0.0
@@ -179,6 +192,13 @@ func set_joy(v: Vector2) -> void:
 func add_look_px(dx: float, dy: float) -> void:
 	_look_vel.x += dx * 60.0
 	_look_vel.y += dy * 60.0
+
+## Zoom kamera manual (dipanggil hud.gd saat gestur cubit 2 jari). positif =
+## menjauh, negatif = mendekat. Auto-balik ke 0 (CAM_DIST) ditangani di
+## _process, bukan di sini — di sini cuma menggeser target & reset idle-timer.
+func add_zoom(delta_dist: float) -> void:
+	_cam_zoom = clampf(_cam_zoom + delta_dist, 0.0, CAM_ZOOM_MAX)
+	_cam_zoom_idle_t = 0.0
 
 func take_damage(amount: float) -> void:
 	var before := health
@@ -315,7 +335,14 @@ func _apply_camera(delta: float) -> void:
 		cam_pivot.global_position = cam_pivot.global_position.lerp(focus, 1.0 - exp(-CAM_FOLLOW * delta))
 	cam_pivot.rotation = Vector3(pitch, yaw, 0.0)
 	_cam_extra = lerpf(_cam_extra, _speed01 * 1.2, 1.0 - exp(-3.0 * delta))
-	cam_arm.spring_length = maxf(2.0, CAM_DIST + _cam_extra)
+	# Auto-balik zoom manual (permintaan user): begitu pemain JALAN LAGI
+	# (_speed01 dr gerak fisik nyata, bukan cuma input mentah) ATAU sudah
+	# DIAM tanpa pinch baru selama CAM_ZOOM_RETURN_IDLE_S detik, _cam_zoom
+	# di-ease balik ke 0 (= CAM_DIST) scr smooth (exponential, bukan lompat).
+	_cam_zoom_idle_t += delta
+	if _speed01 > 0.05 or _cam_zoom_idle_t > CAM_ZOOM_RETURN_IDLE_S:
+		_cam_zoom = lerpf(_cam_zoom, 0.0, 1.0 - exp(-CAM_ZOOM_RETURN_RATE * delta))
+	cam_arm.spring_length = maxf(2.0, CAM_DIST + _cam_extra + _cam_zoom)
 	_shake = maxf(0.0, _shake - 1.6 * delta)
 	var shake_power := _shake * _shake * 0.35
 	var cam: Camera3D = $CameraPivot/CamArm/Cam
