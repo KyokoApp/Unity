@@ -9,12 +9,12 @@
    "version": "1.0.2"
   },
   "audio_sfx": {
-   "content_hash": "1942045a5b2455898fa0b7c4fbf0767692f992086c6400be72bb07d72b2d7759",
-   "version": "1.0.2"
+   "content_hash": "290d66d1d5042580dc2883aea314a58138eac149ded7568eda6101a8af3c2f5f",
+   "version": "1.0.3"
   },
   "character_player": {
-   "content_hash": "e52497e9029908adcd04ad153bbde6e0303e3110e8ebe5a21671a4d7871f058e",
-   "version": "1.0.25"
+   "content_hash": "9db3e18dfd300ee603dd50f5053e15052956328cf96b606fc0b4a6c579fc600c",
+   "version": "1.0.26"
   },
   "core_scripts": {
    "content_hash": "051a44cb55be45d8cb5058fba62b2b36d53e6334782cd2c1ad9fda21af597a9d",
@@ -25,8 +25,8 @@
    "version": "1.0.9"
   },
   "ui": {
-   "content_hash": "993b2db1ab4345287e07370c6e6f18098be3df9b97a61fad073fca2d5093f506",
-   "version": "1.0.15"
+   "content_hash": "fda371b5f320d9a237f7e7381c33105c50e9560a37f307f016ace58e9b880326",
+   "version": "1.0.16"
   },
   "world_props_beach": {
    "content_hash": "1c0bc74cb8af4b3153fc1b1223da8d1d0570e47e03e2fdbde488ce538d63bb45",
