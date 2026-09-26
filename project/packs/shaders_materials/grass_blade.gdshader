@@ -11,6 +11,15 @@ uniform vec3 base_color : source_color = vec3(0.09, 0.22, 0.08);  // dekat akar
 uniform vec3 tip_color : source_color = vec3(0.42, 0.62, 0.20);   // dekat ujung
 uniform float shadow_tint : hint_range(0.0, 1.0) = 0.48;
 uniform float mid_tint : hint_range(0.0, 1.0) = 0.85;
+// "Pembungkus" posisi (ronde-46 bag. C perbaikan): world.gd TAK PERNAH
+// menggeser node MultiMesh ini lagi (dulu bikin rumput terlihat ikut
+// menyeret bareng pemain spt aura, laporan user "jalan aneh"). Sebagai
+// gantinya tiap instance dibungkus (wrap) ke petak wrap_size di sekitar
+// wrap_center (posisi pemain, diperbarui tiap frame) -> helai TERLIHAT
+// DIAM terpaku di tanah selagi jalan, cuma yg pas di tepi terjauh yg
+// "lompat" ke sisi berlawanan (disamarkan kabut jauh).
+uniform vec2 wrap_center = vec2(0.0, 0.0);
+uniform float wrap_size = 84.0;
 
 varying float height_w;   // 0=akar, 1=ujung (dibaca dari COLOR.a mesh)
 varying float variant;    // keacakan warna per-instance (INSTANCE_CUSTOM.x)
@@ -18,6 +27,13 @@ varying float variant;    // keacakan warna per-instance (INSTANCE_CUSTOM.x)
 void vertex() {
 	height_w = COLOR.a;
 	variant = INSTANCE_CUSTOM.x;
+	// posisi asli instance (kolom translasi MODEL_MATRIX) dibungkus ke petak
+	// wrap_size terdekat dari pemain, lalu MODEL_MATRIX ditimpa langsung —
+	// rotasi/skala per-helai (kolom lain) tak tersentuh, cuma translasinya.
+	vec2 inst_xz = MODEL_MATRIX[3].xz;
+	vec2 rel = inst_xz - wrap_center;
+	rel = mod(rel + vec2(wrap_size * 0.5), vec2(wrap_size)) - vec2(wrap_size * 0.5);
+	MODEL_MATRIX[3].xz = wrap_center + rel;
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	float phase = INSTANCE_CUSTOM.y * TAU;
 	float sway = sin(TIME * wind_speed + world_pos.x * 0.6 + world_pos.z * 0.6 + phase);
@@ -26,6 +42,7 @@ void vertex() {
 	// normal "palsu" dicondongkan ke atas biar cahaya tak terlihat pipih-datar
 	NORMAL = normalize(mix(NORMAL, vec3(0.0, 1.0, 0.0), 0.55));
 }
+
 
 void fragment() {
 	vec3 col = mix(base_color, tip_color, height_w);

@@ -43,13 +43,24 @@ var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 # ---------------- rumput lebat dekat pemain (ronde-46 bag. C) ----------------
 # Rumput 3D penuh sejauh 1600m tak mungkin (hemat mobile) — jadi HANYA area
 # dekat pemain dipenuhi tumpuk rumput (MultiMesh, satu draw call), sisanya
-# memakai tekstur rumput datar di material tanah. Radius sengaja SEDIKIT
-# LEBIH KECIL dari titik mulai kabut (fog_depth_begin) supaya tepi rumput
-# "disamarkan" oleh kabut yang baru mulai muncul, bukan terlihat sbg batas
-# tajam di udara jernih.
+# memakai tekstur rumput datar di material tanah.
+#
+# PERBAIKAN (laporan user: "rumputnya ikut karakter jalan aneh"): versi awal
+# menempelkan posisi NODE MultiMesh persis ke pemain tiap frame (spt _ground)
+# — utk tekstur tanah itu aman (UV dihitung di ruang-dunia di shader), tapi
+# utk instance rumput DISKRIT itu bikin seluruh petak rumput ikut MENYERET
+# bersama pemain (nempel spt aura), bukan diam terpaku di tanah. Sekarang
+# posisi tiap helai DIKUNCI PERMANEN (dibuat sekali, node TAK PERNAH digeser)
+# dan grass_blade.gdshader sendiri yang "membungkus" (wrap) posisi tiap
+# instance ke petak selebar GRASS_RADIUS*2 di sekitar pemain (uniform
+# wrap_center, diperbarui tiap frame lewat _grass_mat). Efeknya: rumput
+# terlihat terpaku di tanah spt sungguhan, cuma helai yg pas di TEPI TERJAUH
+# yg "lompat" ke sisi berlawanan — disamarkan krn radiusnya sengaja SEDIKIT
+# LEBIH KECIL dari titik mulai kabut jauh (fog_depth_begin).
 const GRASS_RADIUS := 42.0
 const GRASS_COUNT := 9000
 var _grass_mmi: MultiMeshInstance3D
+var _grass_mat: ShaderMaterial   # wrap_center-nya diperbarui tiap frame (lihat _process)
 
 func _ready() -> void:
 	name = "World"
@@ -157,8 +168,10 @@ void light() {
 ## permintaan user: tekstur datar saja terasa rata, tumpuk rumput kecil ini
 ## memberi kedalaman/volume. Setiap instance = tuft 3 helai bersilang (murah,
 ## 9 verts/3 tri) diputar+diskalakan acak, dgn goyangan angin & varian warna
-## per-instance di grass_blade.gdshader. Posisi mengikuti pemain persis
-## seperti _ground (lihat _process) supaya selalu "penuh" di sekitar kaki.
+## per-instance di grass_blade.gdshader. Posisi NODE ini sendiri TAK PERNAH
+## digeser (diam di titik asal) — yang "mengejar" pemain adalah uniform
+## wrap_center di shader (lihat _process), bukan transform node ini, supaya
+## tiap helai tetap terpaku di tanahnya (lihat catatan GRASS_RADIUS di atas).
 func _build_grass() -> void:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -167,14 +180,11 @@ func _build_grass() -> void:
 	mm.instance_count = GRASS_COUNT
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20460301
-	# koordinat polar (bukan tolak-sampel kotak->lingkaran) — satu for loop
-	# sederhana & pasti berhenti tepat GRASS_COUNT kali; sqrt(randf()) dipakai
-	# supaya sebaran radius MERATA di cakram (bukan menumpuk padat di tengah).
+	# Domain KOTAK (bukan cakram) -1..+1 * GRASS_RADIUS: wrap di shader
+	# butuh petak persegi supaya nyambung mulus tanpa celah saat dibungkus.
 	for i in range(GRASS_COUNT):
-		var ang := rng.randf_range(0.0, TAU)
-		var r := sqrt(rng.randf()) * GRASS_RADIUS
-		var x := cos(ang) * r
-		var z := sin(ang) * r
+		var x := rng.randf_range(-GRASS_RADIUS, GRASS_RADIUS)
+		var z := rng.randf_range(-GRASS_RADIUS, GRASS_RADIUS)
 		var s := rng.randf_range(0.75, 1.35)
 		var blade_basis := Basis(Vector3.UP, rng.randf_range(0.0, TAU))
 		blade_basis = blade_basis.scaled(Vector3(s, s * rng.randf_range(0.8, 1.3), s))
@@ -183,11 +193,13 @@ func _build_grass() -> void:
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "GrassBlades"
 	mmi.multimesh = mm
-	mmi.material_override = _grass_material()
+	_grass_mat = _grass_material()
+	mmi.material_override = _grass_mat
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mmi.extra_cull_margin = GRASS_RADIUS
 	add_child(mmi)
 	_grass_mmi = mmi
+
 
 ## Mesh 1 tuft rumput: 3 helai (segitiga) tersusun bersilang membentuk bintang
 ## dari atas, tiap helai punya sedikit "condong" di ujung biar tak kaku lurus.
@@ -217,6 +229,8 @@ func _build_grass_blade_mesh() -> ArrayMesh:
 func _grass_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	mat.shader = GRASS_SHADER
+	mat.set_shader_parameter("wrap_size", GRASS_RADIUS * 2.0)
+	mat.set_shader_parameter("wrap_center", Vector2.ZERO)
 	return mat
 
 # ---------------- API kompatibel ----------------
@@ -361,9 +375,10 @@ func _process(delta: float) -> void:
 	if player and _ground:
 		_ground.position.x = player.global_position.x
 		_ground.position.z = player.global_position.z
-	if player and _grass_mmi:
-		_grass_mmi.position.x = player.global_position.x
-		_grass_mmi.position.z = player.global_position.z
+	# Rumput TAK ikut digeser (lihat catatan _build_grass) — cuma titik
+	# pusat "bungkus" di shader yg diberi tahu posisi pemain tiap frame.
+	if player and _grass_mat:
+		_grass_mat.set_shader_parameter("wrap_center", Vector2(player.global_position.x, player.global_position.z))
 
 func _tick_daynight(_delta: float) -> void:
 	# Ronde-46 bag. C (permintaan pengguna): dunia SELALU malam sekarang —
@@ -381,10 +396,11 @@ func _apply_daylight() -> void:
 	_dl_last = time_of_day
 	var t := time_of_day
 	var dayf := sin((t - 6.0) / 12.0 * PI)
-	# Lantai elevasi dinaikkan 14->30 (bag. C: dunia SELALU malam sekarang,
-	# jadi lantai ini SELALU yang dipakai) supaya bulan tergantung lebih
-	# tinggi & jelas terlihat, bukan nempel rendah di cakrawala.
-	var elev := maxf(dayf * 62.0, 30.0)
+	# Lantai elevasi 20° (bag. C: dunia SELALU malam sekarang, jadi lantai
+	# ini SELALU yang dipakai) — cukup tinggi drpd nempel horizon, tapi tetap
+	# masuk area pandang kamera (kamera selalu agak menunduk, lihat
+	# player.gd PITCH_MAX) supaya cakram bulan+halo-nya kelihatan jelas.
+	var elev := maxf(dayf * 62.0, 20.0)
 	var azim := (t - 12.0) / 12.0 * 140.0
 	sun.rotation_degrees = Vector3(-elev, azim - 90.0, 0)
 	var env := world_env.environment
@@ -423,24 +439,29 @@ func _apply_daylight() -> void:
 		# MALAM (bag. C: satu-satunya cabang yg dipakai sekarang krn dunia
 		# dikunci malam permanen) — DirectionalLight jadi "cahaya bulan" pucat
 		# biru, cakram sky yg sama dipakai sbg BULAN (dibesarkan+dihalo lebih
-		# lembut drpd matahari), langit gelap dgn bintang bertaburan & berkelap.
-		sun.light_color = Color(0.55, 0.65, 0.90)
-		sun.light_energy = 0.34
-		env.ambient_light_color = Color(0.30, 0.38, 0.46)
-		env.ambient_light_energy = 0.62
-		env.fog_light_color = Color(0.14, 0.19, 0.26)
-		sky_mat.set_shader_parameter("zenith_color", Color(0.05, 0.09, 0.16))
-		sky_mat.set_shader_parameter("horizon_color", Color(0.10, 0.15, 0.22))
-		sky_mat.set_shader_parameter("ground_color", Color(0.07, 0.11, 0.16))
-		sky_mat.set_shader_parameter("sun_color", Color(0.85, 0.88, 0.95))
+		# lembut drpd matahari), langit gelap dgn bintang bertaburan.
+		#
+		# PERBAIKAN (laporan user: "gelap banget gk ada pencahayaan malam
+		# kayak sebelum nya"): nilai awal terlalu redup — dinaikkan cukup
+		# besar di sini supaya malam terasa "menyala lembut" (moonlit),
+		# bukan gelap gulita, sambil tetap bernuansa biru dingin ala malam.
+		sun.light_color = Color(0.62, 0.72, 0.95)
+		sun.light_energy = 0.62
+		env.ambient_light_color = Color(0.36, 0.44, 0.58)
+		env.ambient_light_energy = 0.88
+		env.fog_light_color = Color(0.24, 0.30, 0.42)
+		sky_mat.set_shader_parameter("zenith_color", Color(0.08, 0.15, 0.25))
+		sky_mat.set_shader_parameter("horizon_color", Color(0.17, 0.23, 0.33))
+		sky_mat.set_shader_parameter("ground_color", Color(0.10, 0.15, 0.20))
+		sky_mat.set_shader_parameter("sun_color", Color(0.96, 0.97, 1.0))
 		sky_mat.set_shader_parameter("star_visibility", 1.0)
-		sky_mat.set_shader_parameter("sun_size", 0.07)
-		sky_mat.set_shader_parameter("halo", 0.30)
+		sky_mat.set_shader_parameter("sun_size", 0.06)
+		sky_mat.set_shader_parameter("halo", 0.32)
 	# Di FOG_MODE_DEPTH, fog_density BUKAN lagi koefisien eksponensial —
 	# artinya opasitas MAKSIMUM kabut tepat di fog_depth_end (0=tak
 	# kelihatan, 1=menutup total). _lo.fog/_q_fog tetap dipakai sbg pengali
 	# spt sebelumnya (slider debug & preset kualitas).
-	env.fog_density = clampf(0.92 * float(_lo.fog) * _q_fog, 0.0, 1.0)
+	env.fog_density = clampf(0.85 * float(_lo.fog) * _q_fog, 0.0, 1.0)
 	# jarak kabut menyusut sedikit di preset kualitas Rendah (_q_fog>1) —
 	# selain hemat gambar jauh, juga menyamarkan pop-in objek.
 	env.fog_depth_end = 160.0 / maxf(_q_fog, 0.4)
