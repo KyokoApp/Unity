@@ -105,6 +105,18 @@ func _run() -> void:
 		return
 	print("[fire-check] fase 1b ✔ semua scene inti termuat")
 
+	# ---------- Fase 1e: dunia nyata (rumput/kabut/malam, bag. C) ----------
+	# Ronde-46 bag. C: material tanah diganti total (rumput lebat), fog
+	# dipindah ke FOG_MODE_DEPTH (properti baru bagi codebase ini — risiko
+	# nyata nama enum/properti salah ketik), dan waktu dikunci malam permanen.
+	# Cek ini menjalankan World.generate_async() SUNGGUHAN (headless, tanpa
+	# GPU) supaya kesalahan run-time di jalur itu (bukan cuma parse error)
+	# tertangkap SEBELUM konten terbit, bukan baru ketahuan di perangkat.
+	await _check_world_ground_fog()
+	if _exit_code != 0:
+		_finish()
+		return
+
 	# ---------- Siapkan dunia uji ----------
 	var world := Node3D.new()
 	world.name = "TestWorld"
@@ -265,6 +277,52 @@ func _check_dash_effects(player: Node, world: Node) -> void:
 	print("[fire-check] fase 1d ✔ dash sprint-burst (speed_scale=", anim.speed_scale if anim else "?", ") + afterimage OK")
 	# tunggu dash+cooldown reda supaya tidak mengganggu fase 2/3 setelahnya
 	await create_timer(1.3).timeout
+
+## Jalankan World.generate_async() sungguhan (headless) lalu pastikan: kabut
+## "jauh saja" aktif dgn benar (FOG_MODE_DEPTH, begin < end, begin cukup jauh
+## dari pemain), dunia terkunci malam (star_visibility=1), dan tumpuk rumput
+## MultiMesh benar-benar terbentuk (instance_count > 0, material terpasang).
+func _check_world_ground_fog() -> void:
+	var ws: PackedScene = load("res://packs/world_terrain/world.tscn")
+	var world = ws.instantiate()
+	root.add_child(world)
+	if not world.has_method("generate_async"):
+		_fail("world: generate_async tidak ada (world.gd versi lama?)")
+		return
+	await world.generate_async(null)
+	await process_frame
+
+	var world_env: WorldEnvironment = world.get("world_env")
+	if world_env == null or world_env.environment == null:
+		_fail("world: world_env/Environment tidak terbentuk setelah generate_async")
+		world.queue_free()
+		return
+	var env: Environment = world_env.environment
+	if env.fog_mode != Environment.FOG_MODE_DEPTH:
+		_fail("world: fog_mode bukan FOG_MODE_DEPTH — kabut jarak-jauh tidak akan aktif")
+		world.queue_free()
+		return
+	if not (env.fog_depth_begin > 15.0 and env.fog_depth_begin < env.fog_depth_end):
+		_fail("world: fog_depth_begin/end tidak masuk akal (begin=%s end=%s) — cek risiko kabut nempel dekat pemain" % [env.fog_depth_begin, env.fog_depth_end])
+		world.queue_free()
+		return
+	var sky_mat: ShaderMaterial = world.get("sky_mat")
+	if sky_mat == null or float(sky_mat.get_shader_parameter("star_visibility")) < 0.99:
+		_fail("world: star_visibility bukan 1.0 — dunia seharusnya terkunci malam berbintang")
+		world.queue_free()
+		return
+	var grass := world.find_child("GrassBlades", true, false) as MultiMeshInstance3D
+	if grass == null or grass.multimesh == null or grass.multimesh.instance_count <= 0:
+		_fail("world: MultiMesh rumput (GrassBlades) tidak terbentuk / kosong")
+		world.queue_free()
+		return
+	if grass.material_override == null:
+		_fail("world: rumput tidak punya material (bakal tampil putih polos)")
+		world.queue_free()
+		return
+	print("[fire-check] fase 1e ✔ tanah rumput + kabut jauh (begin=%.0f end=%.0f) + malam berbintang OK (%d tuft rumput)" % [env.fog_depth_begin, env.fog_depth_end, grass.multimesh.instance_count])
+	world.queue_free()
+	await process_frame
 
 func _count_by_suffix(world: Node, suffix: String) -> int:
 	var n := 0
