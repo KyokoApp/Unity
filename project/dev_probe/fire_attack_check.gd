@@ -286,6 +286,15 @@ func _check_world_ground_fog() -> void:
 	var ws: PackedScene = load("res://packs/world_terrain/world.tscn")
 	var world = ws.instantiate()
 	root.add_child(world)
+	# PENTING: ini Fase PALING AWAL yg menyentuh pohon-adegan (belum ada
+	# `await` sama sekali sebelumnya di _run()) — catatan header file ini
+	# sendiri: node yg ditambah selagi _initialize() masih berjalan SINKRON
+	# baru menerima ENTER_TREE setelah giliran pertama `await` beres. Tanpa
+	# `await` di sini, world.generate_async() akan panggil get_tree() SAAT
+	# world belum punya tree (data.tree null) -> crash "Parameter data.tree
+	# is null" (insiden nyata: percobaan pertama fase 1e ini, keliru dikira
+	# bug MultiMesh rumput padahal akar masalahnya di sini).
+	await process_frame
 	if not world.has_method("generate_async"):
 		_fail("world: generate_async tidak ada (world.gd versi lama?)")
 		return
