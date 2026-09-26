@@ -43,6 +43,12 @@ func _process(delta: float) -> void:
 			var target = collider.get_meta("monster")
 			if is_instance_valid(target) and target.has_method("take_damage"):
 				target.take_damage(damage)
+		elif collider and collider.has_meta("wall"):
+			# Dinding tinggi (ronde-44): kena serang juga, bukan cuma
+			# penghenti proyektil biasa.
+			var wall = collider.get_meta("wall")
+			if is_instance_valid(wall) and wall.has_method("take_damage"):
+				wall.take_damage(damage)
 		_explode(hit.get("position", to), "impact")
 		return
 	if to.y <= 0.0:

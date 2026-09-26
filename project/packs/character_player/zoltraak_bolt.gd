@@ -36,6 +36,7 @@ var _beam_length := 6.0
 var _age := 0.0
 var _dead := false
 var _hit_monsters := {}
+var _hit_walls := {}
 var _core: MeshInstance3D
 var _aura: MeshInstance3D
 var _core_mat: ShaderMaterial
@@ -111,6 +112,10 @@ func _resolve_beam_and_damage() -> void:
 			_damage_monster(collider, pos)
 			cursor = pos + _dir * PIERCE_NUDGE
 			continue
+		if collider and collider.has_meta("wall"):
+			# Dinding tinggi (ronde-44) solid: laser BERHENTI di sana (bukan
+			# tembus, beda dari musuh) tapi tetap kena damage.
+			_damage_wall(collider, pos)
 		stop_dist = origin.distance_to(pos)
 		break
 	_beam_length = clampf(stop_dist, 1.2, MAX_RANGE)
@@ -129,6 +134,22 @@ func _resolve_beam_and_damage() -> void:
 		var collider = res.get("collider")
 		if collider and collider.has_meta("monster"):
 			_damage_monster(collider, collider.global_position if collider is Node3D else origin)
+		elif collider and collider.has_meta("wall"):
+			_damage_wall(collider, collider.global_position if collider is Node3D else origin)
+
+func _damage_wall(collider: Object, at: Vector3) -> void:
+	var wall = collider.get_meta("wall")
+	if not is_instance_valid(wall) or not wall.has_method("take_damage"):
+		return
+	# WAJIB tipe eksplisit (lihat komentar id di _damage_monster): `wall`
+	# bertipe Variant (hasil get_meta) -> analyzer Godot 4.5 gagal keras
+	# tanpa anotasi `int` di sini.
+	var id: int = wall.get_instance_id()
+	if _hit_walls.has(id):
+		return
+	_hit_walls[id] = true
+	wall.take_damage(_damage)
+	_spawn_hit_spark(at)
 
 func _damage_monster(collider: Object, at: Vector3) -> void:
 	var target = collider.get_meta("monster")

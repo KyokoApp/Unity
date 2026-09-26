@@ -12,6 +12,7 @@ signal gen_progress(p: float, t: String)
 const Materials := preload("res://packs/shaders_materials/materials.gd")
 const SKY_SHADER := preload("res://packs/shaders_materials/sky.gdshader")
 const MONSTER_SYSTEM := preload("res://packs/world_terrain/monster_system.gd")
+const WALL_SYSTEM := preload("res://packs/world_terrain/wall_system.gd")
 
 var player: Node3D
 var quality_ref
@@ -24,6 +25,7 @@ var time_of_day := 16.4       # sore adem (cicilan ini boleh jalan terus)
 var _root: Node
 var _ground: MeshInstance3D   # bidang raksasa yang menyentak mengikuti pemain
 var monster_system: Node3D
+var wall_system: Node3D
 const GROUND_SIZE := 1600.0
 var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 
@@ -51,7 +53,12 @@ func generate_async(p_root: Node) -> void:
 	monster_system.name = "MonsterSystem"
 	add_child(monster_system)
 	await get_tree().process_frame
-	_report(1.0, "Dunia datar siap — roster monster aktif")
+	_report(0.8, "Menegakkan dinding tinggi…")
+	wall_system = WALL_SYSTEM.new()
+	wall_system.name = "WallSystem"
+	add_child(wall_system)
+	await get_tree().process_frame
+	_report(1.0, "Dunia datar siap — roster monster & dinding aktif")
 
 ## Bidang datar tak berbatas: SATU collider WorldBoundary (bidang y=0, normal
 ## atas) — tak ada tepi, tak ada trimesh, is_on_floor() engine selalu konstan.
