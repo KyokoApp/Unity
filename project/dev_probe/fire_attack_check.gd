@@ -138,8 +138,18 @@ func _run() -> void:
 		_finish()
 		return
 
-	# ---------- DIAG SEMENTARA (ronde-46 bag. A4): cek struktur mannequin ----------
-	await _diag_mannequin(player)
+	# ---------- Fase 1c: mannequin (ronde-46 bag. A4) wajib beranimasi ----------
+	# Insiden yg mendasari cek ini: nama klip di const ANIM_* player.gd sempat
+	# tak cocok dgn nama HASIL IMPORT Godot (importer glTF memotong akhiran
+	# "_Loop" scr diam-diam) -> AnimationPlayer.play() gagal diam-diam ->
+	# karakter beku total di layar walau semua fase lain LULUS. Cek ini
+	# memverifikasi lewat konstanta skrip yg SAMA dipakai player.gd sendiri
+	# (bukan string literal ganda di sini) supaya tak ikut basi jika suatu
+	# saat nama klip berubah lagi.
+	await _check_mannequin_animates(player)
+	if _exit_code != 0:
+		_finish()
+		return
 
 	print("[fire-check] fase 2: TAP cepat…")
 	var before_tap := _count_by_suffix(world, "arcane_bolt.gd")
@@ -174,47 +184,48 @@ func _run() -> void:
 		_fail("fase 3: tombol serang HUD tidak menghasilkan tembakan")
 	_finish()
 
-## DIAG SEMENTARA (ronde-46 bag. A4): dump struktur node mannequin + status
-## AnimationPlayer, dan simulasikan gerak maju sesaat utk lihat apakah state
-## animasi benar-benar berubah dari Idle. Tidak menggagalkan probe (murni
-## print) — akan dibersihkan setelah bug jalan/lari diselesaikan.
-func _diag_mannequin(player: Node) -> void:
-	print("[fire-check] === DIAG mannequin mulai ===")
-	var visual: Node = player.get("_visual")
-	print("[fire-check] diag: _visual = ", visual)
-	if visual:
-		_dump_tree(visual, 0)
-	var anim = player.get("_anim")
-	print("[fire-check] diag: _anim = ", anim, " (null berarti find_child GAGAL)")
-	if anim:
-		print("[fire-check] diag: get_animation_list() = ", anim.get_animation_list())
-		print("[fire-check] diag: current_animation=", anim.current_animation, " is_playing=", anim.is_playing())
-		print("[fire-check] diag: has_animation(Idle_Loop)=", anim.has_animation("Idle_Loop"))
-		print("[fire-check] diag: has_animation(Walk_Loop)=", anim.has_animation("Walk_Loop"))
-	print("[fire-check] diag: _anim_state awal = ", player.get("_anim_state"))
-	# simulasikan analog didorong ke depan selama ~1 detik nyata
-	player.call("set_joy", Vector2(0, 1))
-	await create_timer(1.0).timeout
-	print("[fire-check] diag: setelah 1dtk gerak -> speed01=", player.get("_speed01"),
-		" facing=", player.get("_facing"), " anim_state=", player.get("_anim_state"),
-		" visual.rotation.y(deg)=", (rad_to_deg(visual.rotation.y) if visual else "?"))
-	if anim:
-		print("[fire-check] diag: current_animation setelah gerak=", anim.current_animation, " is_playing=", anim.is_playing())
-	player.call("set_joy", Vector2.ZERO)
-	await create_timer(0.3).timeout
-	print("[fire-check] === DIAG mannequin selesai ===")
-
-func _dump_tree(n: Node, depth: int) -> void:
-	var indent := "  ".repeat(depth)
-	var extra := ""
-	if n is MeshInstance3D:
-		var mi := n as MeshInstance3D
-		extra = " mesh=" + str(mi.mesh) + " surfaces=" + str(mi.mesh.get_surface_count() if mi.mesh else -1)
-	print("[fire-check] diag-tree: ", indent, n.name, " (", n.get_class(), ")", extra)
-	if depth > 6:
+## Verifikasi karakter (mannequin Quaternius, ronde-46 bag. A4) benar-benar
+## beranimasi: AnimationPlayer ditemukan, SEMUA klip lokomosi yg dipakai
+## player.gd ada persis dgn nama itu di AnimationPlayer, lalu simulasi dorong
+## analog maju harus membuat klip berganti & benar-benar berjalan
+## (is_playing=true). Baca nama klip dari konstanta skrip player.gd sendiri
+## (get_script_constant_map) — bukan string literal terpisah di sini — supaya
+## cek ini otomatis ikut benar kalau nama klip berubah lagi di masa depan.
+func _check_mannequin_animates(player: Node) -> void:
+	var consts: Dictionary = (player.get_script() as GDScript).get_script_constant_map()
+	var clip_names := ["ANIM_IDLE", "ANIM_WALK", "ANIM_JOG", "ANIM_SPRINT", "ANIM_ROLL"]
+	var anim: AnimationPlayer = player.get("_anim")
+	if anim == null:
+		_fail("mannequin: AnimationPlayer tidak ditemukan (_anim null) — model beku total")
 		return
-	for c in n.get_children():
-		_dump_tree(c, depth + 1)
+	var missing: Array = []
+	for key in clip_names:
+		if not consts.has(key):
+			missing.append(key + " (konstanta tak ada di player.gd)")
+			continue
+		var clip_name: String = consts[key]
+		if not anim.has_animation(clip_name):
+			missing.append("%s=\"%s\"" % [key, clip_name])
+	if not missing.is_empty():
+		_fail("mannequin: klip animasi tidak ada di AnimationPlayer hasil import: " + ", ".join(missing))
+		return
+	if not anim.is_playing():
+		_fail("mannequin: AnimationPlayer tidak memutar apa pun saat idle (is_playing=false)")
+		return
+	# simulasikan analog didorong penuh ke depan sesaat, klip HARUS berganti & berjalan
+	var before_clip := anim.current_animation
+	player.call("set_joy", Vector2(0, 1))
+	await create_timer(0.8).timeout
+	player.call("set_joy", Vector2.ZERO)
+	var after_clip := anim.current_animation
+	var after_playing := anim.is_playing()
+	if not after_playing:
+		_fail("mannequin: AnimationPlayer berhenti (is_playing=false) setelah simulasi gerak maju")
+		return
+	if after_clip == before_clip and before_clip == String(consts.get("ANIM_IDLE", "")):
+		_fail("mannequin: klip animasi tidak berganti dari Idle walau karakter disimulasikan bergerak penuh")
+		return
+	print("[fire-check] fase 1c ✔ mannequin beranimasi (idle→", after_clip, ", is_playing=", after_playing, ")")
 
 func _count_by_suffix(world: Node, suffix: String) -> int:
 	var n := 0

@@ -267,7 +267,54 @@ diblok).
 - Kecocokan skala collision capsule vs mesh sebenarnya (angka di atas
   perkiraan dari tinggi bind-pose glTF, belum diverifikasi visual).
 
+## Ronde-46 bag. A4 lanjutan: bug nyata dari pengguna, ditemukan via diag CI
+
+Pengguna coba di device dan melapor 2 hal konkret: (1) karakter meluncur
+kaku/diam total — animasi jalan/lari tidak muncul sama sekali, dan (2)
+karakter muter badan menghadap arah gerak tapi mukanya 180° terbalik.
+
+**Fix arah hadap:** `MODEL_YAW_OFFSET` diubah dari `0.0` ke `PI`.
+
+**Fix animasi beku (akar masalah asli, bukan cuma dugaan):** karena tak ada
+GPU/Godot lokal di sandbox ini utk melihat render, dan `gh run view --log`
+CI tak bisa diunduh (host blob-storage Actions diblok SNI oleh firewall
+sandbox — dikonfirmasi lewat `curl -v` yg berhenti tepat di TLS handshake),
+dipakai jalur lain yg TERBUKTI bisa diakses dari sandbox ini: menyisipkan
+diagnostik sementara (`_diag_mannequin()`) ke `dev_probe/fire_attack_check.gd`
+yang men-dump seluruh isi node model + status `AnimationPlayer`, lalu
+menyalurkan hasilnya ke **release notes GitHub** (`gh release edit
+--notes-file`, API `api.github.com` biasa — bukan blob-storage — jadi bisa
+dibaca via `gh release view` dari sandbox ini).
+
+Hasilnya membongkar akar masalah sesungguhnya: importer glTF Godot
+**memotong akhiran `_Loop`** dari nama klip animasi lalu memakainya utk
+men-set `loop_mode` klip tsb secara native — jadi nama asli di file
+`.glb` (`Idle_Loop`, `Walk_Loop`, `Jog_Fwd_Loop`, `Sprint_Loop`) berubah
+jadi (`Idle`, `Walk`, `Jog_Fwd`, `Sprint`) di `AnimationPlayer` hasil
+import Godot. Konstanta `ANIM_IDLE`/`ANIM_WALK`/`ANIM_JOG`/`ANIM_SPRINT`
+di `player.gd` masih memakai nama ASLI glTF yang SALAH → setiap panggilan
+`AnimationPlayer.play()` gagal diam-diam (nama tak ditemukan) → karakter
+tak pernah benar-benar beranimasi, persis gejala yang dilaporkan
+("meluncur kaku"). Klip `ANIM_ROLL` ("Roll") kebetulan tak berakhiran
+`_Loop` di sumber jadi tak terdampak.
+
+**Fix:** 4 konstanta nama klip diperbaiki ke nama hasil import yang benar.
+Dikonfirmasi ulang lewat diag yang sama: `current_animation=Idle
+is_playing=true` di awal, lalu berubah jadi `current_animation=Sprint
+is_playing=true` setelah simulasi dorong analog penuh 1 detik.
+
+**Pencegahan regresi permanen:** `dev_probe/fire_attack_check.gd` kini
+punya Fase 1c baru (`_check_mannequin_animates`) yang **menggagalkan CI**
+(bukan cuma print) kalau: `AnimationPlayer` tak ditemukan, salah satu dari
+5 klip lokomosi/dash tak ada dgn nama persis di konstanta `player.gd`
+(dibaca via `get_script_constant_map()`, bukan string literal ganda —
+jadi otomatis ikut benar kalau nama klip berubah lagi di re-import masa
+depan), atau klip tak benar-benar berganti & berjalan saat disimulasikan
+gerak. Diagnostik sementara (dump tree penuh + release-notes) sudah
+dibersihkan setelah tugasnya selesai.
+
 ## Yang BELUM dikerjakan (menyusul di bagian berikutnya)
+
 
 - **Bagian B**: mantra andalan (gaya Zoltraak) dipoles jauh lebih
   megah/detail partikelnya — masih memakai sistem tap-fire kecil

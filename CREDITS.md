@@ -227,10 +227,21 @@
   bukan dihitung tangan per-frame) — efek visual dipertahankan, hanya
   pemicunya yang berubah.
 - Aura partikel ungu-biru (bag. A2) **dipertahankan** — tidak disentuh.
-- **Belum diverifikasi visual** (arah hadap model / kecocokan skala persis)
-  karena sandbox ini tanpa GPU/Godot lokal — lihat `MODEL_YAW_OFFSET` di
-  `player.gd` (default `0.0`, siap dibalik ke `PI` jika CI/pengujian
-  pengguna menunjukkan model tampak jalan mundur).
+- **Update setelah uji pengguna di device:** dilaporkan (1) karakter tak
+  beranimasi sama sekali (beku/meluncur kaku) dan (2) menghadap 180°
+  terbalik dari arah gerak. (2) diperbaiki dengan `MODEL_YAW_OFFSET = PI`.
+  (1) ternyata bug nyata: importer glTF Godot memotong akhiran `_Loop`
+  dari nama klip dan memakainya utk `loop_mode` native, jadi nama asli
+  (`Idle_Loop` dkk, seperti tercatat di atas) berubah jadi (`Idle`,
+  `Walk`, `Jog_Fwd`, `Sprint`) di `AnimationPlayer` hasil import —
+  konstanta `player.gd` sempat memakai nama lama yg salah sehingga
+  `AnimationPlayer.play()` gagal diam-diam. Ditemukan via diagnostik
+  sementara yang disalurkan ke release notes GitHub (karena log CI
+  blob-storage tak bisa diunduh dari sandbox ini — firewall memblok SNI
+  host tsb, dikonfirmasi lewat `curl -v`), sudah diperbaiki & dijaga
+  permanen lewat pemeriksaan baru di `dev_probe/fire_attack_check.gd`
+  (`_check_mannequin_animates`, membaca nama klip dari konstanta skrip
+  `player.gd` sendiri via `get_script_constant_map()` agar tak ikut basi).
 
 *Terakhir diperbarui: 2026-09-26*
 

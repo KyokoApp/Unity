@@ -262,13 +262,6 @@ jobs:
             echo "Detail: README.md §5–§8; bukti uji: docs/BUKTI_UJI.md."
             echo '### SHA-256'
             echo '```'; cat SHA256SUMS.txt; echo '```'
-            # --- DIAG SEMENTARA ronde-46 bag. A4 (mannequin) — hapus setelah bug
-            # jalan/lari selesai. Blob-storage log CI tak bisa diunduh dari sandbox
-            # agen (SNI diblok firewall), tapi release notes via REST API bisa.
-            echo '### DIAG mannequin (sementara)'
-            echo '```'
-            grep -a 'fire-check' "$GITHUB_WORKSPACE/firecheck.log" | tail -c 3500
-            echo '```'
           } > notes.md
           gh release edit "$TAG" --notes-file notes.md
           for f in "$OUTDIR/ASekai.apk" "$GITHUB_WORKSPACE/SHA256SUMS.txt"; do
