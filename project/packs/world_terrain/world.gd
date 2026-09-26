@@ -20,6 +20,7 @@ signal gen_progress(p: float, t: String)
 const Materials := preload("res://packs/shaders_materials/materials.gd")
 const SKY_SHADER := preload("res://packs/shaders_materials/sky.gdshader")
 const GRASS_SHADER := preload("res://packs/shaders_materials/grass_blade.gdshader")
+const DETAIL_GRASS_TEX := preload("res://packs/shaders_materials/textures/detail_grass.jpg")
 const WALL_SYSTEM := preload("res://packs/world_terrain/wall_system.gd")
 
 var player: Node3D
@@ -149,7 +150,7 @@ void light() {
 }
 """
 	mat.shader = sh
-	mat.set_shader_parameter("grass_tex", Materials.TERRAIN_DETAIL_G)
+	mat.set_shader_parameter("grass_tex", DETAIL_GRASS_TEX)
 	return mat
 
 ## Tumpuk rumput 3D dekat pemain (MultiMesh, 1 draw call) — bag. "lebat" dari
@@ -166,24 +167,19 @@ func _build_grass() -> void:
 	mm.instance_count = GRASS_COUNT
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20460301
-	var placed := 0
-	var attempts := 0
-	while placed < GRASS_COUNT and attempts < GRASS_COUNT * 4:
-		attempts += 1
-		var x := rng.randf_range(-GRASS_RADIUS, GRASS_RADIUS)
-		var z := rng.randf_range(-GRASS_RADIUS, GRASS_RADIUS)
-		if Vector2(x, z).length() > GRASS_RADIUS:
-			continue
+	# koordinat polar (bukan tolak-sampel kotak->lingkaran) — satu for loop
+	# sederhana & pasti berhenti tepat GRASS_COUNT kali; sqrt(randf()) dipakai
+	# supaya sebaran radius MERATA di cakram (bukan menumpuk padat di tengah).
+	for i in range(GRASS_COUNT):
+		var ang := rng.randf_range(0.0, TAU)
+		var r := sqrt(rng.randf()) * GRASS_RADIUS
+		var x := cos(ang) * r
+		var z := sin(ang) * r
 		var s := rng.randf_range(0.75, 1.35)
-		var basis := Basis(Vector3.UP, rng.randf_range(0.0, TAU))
-		basis = basis.scaled(Vector3(s, s * rng.randf_range(0.8, 1.3), s))
-		mm.set_instance_transform(placed, Transform3D(basis, Vector3(x, 0.0, z)))
-		mm.set_instance_custom_data(placed, Color(rng.randf(), rng.randf(), 0.0, 0.0))
-		placed += 1
-	# sisa slot (kalau ada, jarang terjadi) ditumpuk di tengah biar tak nol-skala aneh
-	while placed < GRASS_COUNT:
-		mm.set_instance_transform(placed, Transform3D(Basis(), Vector3.ZERO))
-		placed += 1
+		var blade_basis := Basis(Vector3.UP, rng.randf_range(0.0, TAU))
+		blade_basis = blade_basis.scaled(Vector3(s, s * rng.randf_range(0.8, 1.3), s))
+		mm.set_instance_transform(i, Transform3D(blade_basis, Vector3(x, 0.0, z)))
+		mm.set_instance_custom_data(i, Color(rng.randf(), rng.randf(), 0.0, 0.0))
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "GrassBlades"
 	mmi.multimesh = mm

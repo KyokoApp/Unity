@@ -143,7 +143,15 @@ jobs:
           RC=0; timeout 300 ./godot --headless --path project --script "$GITHUB_WORKSPACE/project/dev_probe/fire_attack_check.gd" > "$GITHUB_WORKSPACE/firecheck.log" 2>&1 || RC=$?
           cat "$GITHUB_WORKSPACE/firecheck.log"
           if [ "$RC" != "0" ]; then
-            TAIL=$(tail -c 700 "$GITHUB_WORKSPACE/firecheck.log" | tr '\n' '|' | tr -d '\r')
+            # Sandbox agen kadang tak bisa unduh log blob-storage CI penuh —
+            # jadi diagnostik WAJIB muat lewat annotation (terbaca via API
+            # check-runs/annotations). Ambil baris ERROR/GAGAL SUNGGUHAN dgn
+            # konteks dulu (paling relevan utk akar masalah), baru fallback
+            # ke tail polos, gabungkan, potong ke ~3500 char (batas aman
+            # annotation GitHub, jauh lebih besar dari 700 lama).
+            ERRLINES=$(grep -n -B1 -A3 -E "ERROR:|SCRIPT ERROR|GAGAL|Invalid |Nonexistent " "$GITHUB_WORKSPACE/firecheck.log" | head -c 2500)
+            PLAINTAIL=$(tail -c 1200 "$GITHUB_WORKSPACE/firecheck.log")
+            TAIL=$(printf '%s\n---TAIL---\n%s' "$ERRLINES" "$PLAINTAIL" | head -c 3500 | tr '\n' '|' | tr -d '\r')
             echo "::error file=project/dev_probe/fire_attack_check.gd,title=UJI SERANGAN GAGAL (rc=$RC)::${TAIL}"
             exit 1
           fi

@@ -311,9 +311,22 @@ func _check_world_ground_fog() -> void:
 		_fail("world: star_visibility bukan 1.0 — dunia seharusnya terkunci malam berbintang")
 		world.queue_free()
 		return
+	var kids: Array = []
+	for c in world.get_children():
+		kids.append(String(c.name))
 	var grass := world.find_child("GrassBlades", true, false) as MultiMeshInstance3D
-	if grass == null or grass.multimesh == null or grass.multimesh.instance_count <= 0:
-		_fail("world: MultiMesh rumput (GrassBlades) tidak terbentuk / kosong")
+	if grass == null:
+		_fail("world: node GrassBlades tidak ditemukan sbg anak World. anak World skrg: [%s]" % ", ".join(kids))
+		world.queue_free()
+		return
+	if grass.multimesh == null:
+		_fail("world: GrassBlades.multimesh null")
+		world.queue_free()
+		return
+	print("[fire-check] diag rumput: instance_count=", grass.multimesh.instance_count,
+		" mesh_surfaces=", (grass.multimesh.mesh.get_surface_count() if grass.multimesh.mesh else -1))
+	if grass.multimesh.instance_count <= 0:
+		_fail("world: MultiMesh rumput (GrassBlades) instance_count<=0 (dpt %d)" % grass.multimesh.instance_count)
 		world.queue_free()
 		return
 	if grass.material_override == null:
