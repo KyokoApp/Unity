@@ -21,7 +21,7 @@
   "pack": "world_terrain",
   "version": "1.0.42",
   "returncode": 0,
-  "duration_s": 3.8,
+  "duration_s": 3.6,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
@@ -39,16 +39,14 @@
   "pack": "ui",
   "version": "1.0.19",
   "returncode": 0,
-  "duration_s": 3.6,
-  "messages": [
-   "cannot connect to daemon at tcp:5037: Connection refused"
-  ]
+  "duration_s": 4.1,
+  "messages": []
  },
  {
   "pack": "audio_sfx",
   "version": "1.0.3",
   "returncode": 0,
-  "duration_s": 3.6,
+  "duration_s": 3.7,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
