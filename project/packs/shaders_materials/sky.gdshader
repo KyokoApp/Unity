@@ -12,6 +12,16 @@ shader_type sky;
 uniform vec3 horizon_color : source_color = vec3(0.62, 0.88, 0.80);
 uniform vec3 zenith_color : source_color = vec3(0.30, 0.74, 0.69);
 uniform vec3 ground_color : source_color = vec3(0.36, 0.44, 0.44);
+// Titik gradasi ke-4 (ronde-46, ide diadaptasi dari plugin "day-and-night-
+// cycle" maetzemax — teknik "smooth color transitions" mrk pakai 4 titik:
+// atas/langit -> cakrawala -> dekat-tanah -> dasar. Kita TIDAK pakai plugin
+// itu apa adanya (isinya siklus siang-malam otomatis + ProceduralSkyMaterial
+// tanpa bintang/bulan, bentrok sama "malam permanen" yg baru dikunci) —
+// cuma teknik gradasi 4-titiknya yg diadaptasi ke shader custom kita sendiri
+// (tetap pertahankan bintang+bulan). world.gd biasanya isi ini dgn
+// ground_color.darkened(...), meniru cara mrk turunkan warna dasar dari
+// satu warna basis biar tetap harmonis.
+uniform vec3 ground_bottom_color : source_color = vec3(0.05, 0.07, 0.10);
 uniform vec3 sun_color : source_color = vec3(1.0, 0.92, 0.72);
 uniform float sun_size = 0.035;
 uniform float halo = 0.22;
@@ -27,9 +37,16 @@ float star_hash(vec2 p) {
 
 void sky() {
 	float y = EYEDIR.y;
-	vec3 base = mix(horizon_color, zenith_color, clamp(y * 1.6, 0.0, 1.0));
-	if (y < 0.0) {
-		base = mix(horizon_color, ground_color, clamp(-y * 3.0, 0.0, 1.0));
+	// Gradasi 4-titik dgn smoothstep (bukan clamp linear + cabang if/else
+	// spt sebelumnya) -> transisi lembut TANPA "seam"/kink yg kentara pas
+	// tepat di garis cakrawala (y=0), krn smoothstep landai (turunan nol)
+	// di kedua ujungnya, persis di titik sambung itu.
+	vec3 base;
+	if (y >= 0.0) {
+		base = mix(horizon_color, zenith_color, smoothstep(0.0, 0.65, y));
+	} else {
+		vec3 lower = mix(horizon_color, ground_color, smoothstep(0.0, -0.35, y));
+		base = mix(lower, ground_bottom_color, smoothstep(-0.35, -1.0, y));
 	}
 	COLOR = base;
 

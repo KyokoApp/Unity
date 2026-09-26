@@ -441,6 +441,11 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("zenith_color", Color(0.19, 0.42, 0.46))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.62, 0.80, 0.66))
 		sky_mat.set_shader_parameter("ground_color", Color(0.42, 0.55, 0.50))
+		# ground_bottom_color: titik gradasi ke-4 (lihat sky.gdshader) —
+		# diturunkan dari ground_color sendiri via darkened(), meniru cara
+		# plugin "day-and-night-cycle" (maetzemax) turunkan bbrp warna dari
+		# satu basis biar tetap harmonis (bukan warna acak baru).
+		sky_mat.set_shader_parameter("ground_bottom_color", Color(0.42, 0.55, 0.50).darkened(0.45))
 		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.90, 0.66))
 		sky_mat.set_shader_parameter("star_visibility", 0.0)
 		sky_mat.set_shader_parameter("sun_size", 0.035)
@@ -457,6 +462,7 @@ func _apply_daylight() -> void:
 		# bawah cakrawala JANGAN coklat-marun berlumpur (laporan foto 17:17):
 		# harmonis dgn senja — terracotta lembut, bukan abu-abu sisa siang
 		sky_mat.set_shader_parameter("ground_color", Color(0.55, 0.40, 0.34).lerp(Color(0.42, 0.55, 0.50), k2))
+		sky_mat.set_shader_parameter("ground_bottom_color", (Color(0.55, 0.40, 0.34).lerp(Color(0.42, 0.55, 0.50), k2)).darkened(0.45))
 		sky_mat.set_shader_parameter("star_visibility", 0.0)
 		sky_mat.set_shader_parameter("sun_size", 0.035)
 		sky_mat.set_shader_parameter("halo", 0.22)
@@ -478,6 +484,9 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("zenith_color", Color(0.08, 0.15, 0.25))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.17, 0.23, 0.33))
 		sky_mat.set_shader_parameter("ground_color", Color(0.10, 0.15, 0.20))
+		# malam: turunkan lebih dalam (0.55) drpd siang/senja (0.45) -> dasar
+		# langit malam nyaris hitam-kebiruan pekat, senada dgn nuansa malam.
+		sky_mat.set_shader_parameter("ground_bottom_color", Color(0.10, 0.15, 0.20).darkened(0.55))
 		sky_mat.set_shader_parameter("sun_color", Color(0.96, 0.97, 1.0))
 		sky_mat.set_shader_parameter("star_visibility", 1.0)
 		sky_mat.set_shader_parameter("sun_size", 0.06)
