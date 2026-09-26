@@ -72,12 +72,18 @@ const CAST_HEIGHT := 1.32     # perkiraan tinggi tangan/dada utk titik lontar pe
 ## bukan di rig (lebih aman & mudah diubah lagi kalau ternyata masih meleset).
 const MODEL_YAW_OFFSET := PI
 
-# --- nama klip animasi (persis dari glTF, lihat CREDITS.md utk daftar lengkap) ---
-const ANIM_IDLE := "Idle_Loop"
-const ANIM_WALK := "Walk_Loop"
-const ANIM_JOG := "Jog_Fwd_Loop"
-const ANIM_SPRINT := "Sprint_Loop"
-const ANIM_ROLL := "Roll"
+# --- nama klip animasi SETELAH import Godot (BUKAN nama asli di glTF!) ---
+# Dikonfirmasi via probe CI (dev_probe/fire_attack_check.gd _diag_mannequin):
+# importer glTF Godot MEMOTONG akhiran "_Loop" dari nama klip lalu memakainya
+# utk set loop_mode animasi itu sendiri secara native (mis. "Idle_Loop" (glTF)
+# -> "Idle" (AnimationPlayer, sudah loop_mode=LINEAR otomatis). Nama asli
+# ("Idle_Loop" dkk, lihat CREDITS.md) TIDAK ADA di AnimationPlayer — pakai
+# nama hasil import di bawah ini, bukan nama sumber.
+const ANIM_IDLE := "Idle"
+const ANIM_WALK := "Walk"
+const ANIM_JOG := "Jog_Fwd"
+const ANIM_SPRINT := "Sprint"
+const ANIM_ROLL := "Roll"   # tanpa akhiran _Loop di sumber -> nama tak berubah
 
 # Ambang speed01 (0..1) utk pindah state, dgn histeresis (naik/turun beda
 # ambang) supaya tak "flicker" bolak-balik dekat batas.
