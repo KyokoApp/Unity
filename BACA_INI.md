@@ -1,4 +1,4 @@
-# BACA INI — Ronde-43: hapus auto-lock, tembakan mana biru kecil, mantra Zoltraak
+# BACA INI — Ronde-45: pivot total ke game TANK (bag. A: hull+turret+meriam)
 
 ## Alur repository
 
@@ -9,117 +9,144 @@
 - `.github/workflows/apk_release.yml` tetap mendaftarkan branch sesi pada
   `on.push.branches`.
 
-## Perubahan ronde ini
+## Latar belakang pivot
 
-### Auto-aim & auto-kamera DIHAPUS
+Setelah ronde-44 bag. A (Zoltraak) & bag. B (dinding tinggi destructible)
+selesai dan lolos CI, pengguna menyimpulkan game ini "lebih cocok jadi game
+tank". Setelah dikonfirmasi eksplisit (lihat keputusan di bawah), seluruh
+pack mage (kubus mantra Zoltraak, mana biru, monster) **dihapus total** dan
+diganti murni game tank. Rencana grapple ala Attack on Titan (bag. C
+ronde-44, belum sempat dikerjakan) ikut dibatalkan bersama pivot ini.
 
-- Seluruh logic `_select_auto_target()` dan `_aim_camera_at()` di
-  `player.gd` dihapus total sesuai permintaan user ("auto lock nya jelek,
-  hapus ajh").
-- Tembakan kembali memakai arah hadap karakter (`_facing`)/arah kamera saat
-  diam, seperti sebelum ronde-42.
-- Kamera benar-benar tidak lagi berputar otomatis ke arah musuh; kamera hanya
-  merespons swipe dan mengikuti posisi pemain (perilaku dari ronde-41).
-- Grup `enemies` yang tadinya dipakai auto-aim juga dibuang dari
-  `monster.gd` karena sudah tidak dipakai.
+Keputusan eksplisit pengguna (lewat pertanyaan klarifikasi):
+1. Kamera/kontrol: **orang ketiga di belakang tank** (bukan top-down/isometrik).
+2. Inti permainan: **bertahan dari gelombang tank musuh** (wave survival) —
+   akan dikerjakan di Bagian B ronde-45 (belum ada di commit ini).
+3. Aset/kode mage-Zoltraak-monster-AoT: **dihapus total** dari project (bukan
+   sekadar diarsipkan) — sudah dieksekusi di Bagian A ini.
 
-### Tembakan biasa jadi mana biru kecil
+## Perubahan Bagian A (commit ini)
 
-- `fireball_core.gdshader` dan `fireball_shell.gdshader` direvisi total dari
-  palet oranye/merah (api) menjadi palet biru-putih (mana): biru tua → biru
-  terang → putih di tengah.
-- `fire_bolt.gd`: ukuran inti/selubung/halo diperkecil (radius inti
-  0.16→0.09, selubung 0.27→0.15, halo 1.3→0.65), cahaya jadi biru, partikel
-  ekor direcolor biru-putih dan jumlahnya dikurangi supaya kesan "kecil".
-- `fire_explosion.gd`: cahaya, bola ledakan, semburan partikel (fire/sparks/
-  embers/smoke), percikan muzzle, dan cincin dampak semua direcolor biru-putih
-  serta diperkecil skalanya. Bekas hangus (scorch mark) coklat dihapus,
-  diganti cincin cahaya biru saja supaya terasa seperti mana, bukan api.
-- Nama file/skrip (`fire_bolt.gd`, `fire_explosion.gd`, `fireball_*.gdshader`)
-  sengaja TIDAK diganti agar tidak merusak preload/referensi lain; hanya isi
-  visualnya yang direvisi.
+### Dihapus total
 
-### Mantra Zoltraak (skill tahan-lepas baru)
+- `player.gd` versi mage (kubus mantra + charge Zoltraak) — DITULIS ULANG
+  PENUH jadi tank (lihat bawah), bukan dihapus filenya (nama file & scene
+  `player.tscn` dipertahankan supaya `game_root.gd`/probe tidak perlu
+  berubah).
+- `fire_bolt.gd`, `zoltraak_bolt.gd`, `zoltraak_charge.gd`,
+  `zoltraak_aura.gdshader`, `zoltraak_core.gdshader` — dihapus.
+- `monster.gd`, `monster_system.gd` (roster monster tetap 8 ekor) — dihapus;
+  `world.gd` tidak lagi menginstansiasi sistem monster.
+- Rencana grapple ala Attack on Titan (belum ada kode-nya) dibatalkan; grup
+  `grapple_target` dan fungsi `grapple_anchor()` di `wall.gd` dihapus karena
+  tidak lagi relevan.
 
-- Tap cepat tombol serang (ditahan < 0,16 detik) = satu tembakan mana biru
-  kecil seperti biasa (`fire_bolt.gd`), TIDAK ADA LAGI tembakan beruntun
-  selama tombol ditahan (autofire lama dihapus sesuai desain baru).
-- Menahan tombol serang ≥ 0,16 detik memicu mode mantra: lingkaran sihir
-  "ZOLTRAAK" (`zoltraak_charge.gd`) muncul melayang di depan karakter,
-  tumbuh dari pudar (alpha/skala kecil) ke lengkap selama 7 detik
-  (`CHARGE_FULL_TIME`), lengkap dengan 8 huruf "Z O L T R A A K" tersusun di
-  sekeliling cincin yang berputar pelan. Lingkaran selalu menghadap kamera
-  (look_at manual tiap frame) supaya hurufnya tetap terbaca dari sudut
-  manapun.
-- Melepas tombol kapan pun setelah mode mantra aktif langsung menembakkan
-  gelombang besar Zoltraak (`zoltraak_bolt.gd`) searah hadap karakter saat
-  itu. Kekuatan/ukurannya sebanding progres pengisian (0,16 detik = lemah,
-  7 detik penuh = maksimal); menahan lebih dari 7 detik cukup mempertahankan
-  status penuh sampai dilepas.
-- Visual Zoltraak: untaian 7 segmen kapsul yang meliuk mengikuti fungsi sinus
-  tegak lurus arah gerak (mensimulasikan gelombang air mengalir), warna putih
-  di kepala bercampur biru tipis ke buntut, ditambah partikel kabut mana yang
-  mengikuti arah gerak dengan turbulensi supaya terasa "mengalir".
-- Zoltraak menembus (pierce) beberapa musuh sekaligus di jalur lintasannya,
-  bukan meledak sekali kena — cocok untuk tembakan besar/ultimate. Saat
-  mengenai medan atau habis jangkauan/waktu hidup, ia larut dengan percikan
-  cincin cahaya biru-putih lembut (bukan ledakan api).
+### Dipertahankan (reuse lintas-ronde)
 
-### Uji asap CI diperbarui
+- **Dinding/bunker destructible acak** (`wall.gd`/`wall_system.gd`, ronde-44
+  bag. B) TETAP ADA — kini berperan sebagai rintangan/cover medan tempur
+  tank yang bisa diratakan meriam. Tidak ada perubahan mekanik, hanya
+  komentar direvisi (bukan lagi target grapple).
+- `fire_fx.gd` (pustaka cache resource FX prosedural) dipakai apa adanya,
+  tidak mage-spesifik.
 
-- `project/dev_probe/fire_attack_check.gd` sebelumnya mengasumsikan menahan
-  tombol serang = autofire berulang (≥2 `fire_bolt.gd` dalam 0,8 detik).
-  Asumsi itu sudah tidak berlaku sejak mekanik charge baru ditambahkan.
-- Probe kini menguji dua jalur secara eksplisit:
-  - Fase 2a & 3: TAP cepat → harus menghasilkan `fire_bolt.gd`.
-  - Fase 2b: TAHAN lalu LEPAS → harus menghasilkan `zoltraak_bolt.gd`.
-- Jeda antar fase diperpanjang di atas `ZOLTRAAK_COOLDOWN` (0,55 detik) agar
-  cooldown tidak menelan pengujian fase berikutnya.
-- **Insiden ronde-43 (dua bug berbeda, keduanya sudah diperbaiki):**
-  1. `zoltraak_bolt.gd` sempat memakai `var id := target.get_instance_id()`
-     — `target` berasal dari `get_meta()` (Variant/tanpa tipe statis), jadi
-     compiler Godot 4.5 gagal keras: "Cannot infer the type of "id" variable
-     because the value doesn't have a set type." Perbaikan: pakai tipe
-     eksplisit `var id: int = ...`. **Pelajaran untuk ronde depan:** JANGAN
-     pernah pakai `var x := nilai_variant.method()` bila `nilai_variant`
-     tidak bertipe statis (mis. hasil `get_meta()`/`get()` generik) —
-     `gdparse` lokal TIDAK mendeteksi kelas bug ini sama sekali, hanya
-     type-checker Godot asli yang menangkapnya.
-  2. Probe sempat memakai `await process_frame` tunggal untuk mensimulasikan
-     tap cepat (tekan→1 frame→lepas). Ini race kondisi nyata: urutan resolusi
-     sinyal `process_frame` relatif terhadap kapan `_process()` node pemain
-     benar-benar berjalan TIDAK selalu konsisten, apalagi setelah didahului
-     `await create_timer(...).timeout`. Kadang status "tahan" tidak pernah
-     sempat "terlihat" oleh `_process()` sebelum keburu dilepas lagi, jadi
-     tap dianggap tidak pernah terjadi. Perbaikan: ganti seluruh simulasi
-     tekan-lepas di probe supaya memakai jeda **waktu-nyata** kecil
-     (`await create_timer(0.05).timeout` untuk tahan, `create_timer(0.15)`
-     untuk jeda settle setelah lepas) alih-alih menghitung frame secara
-     presisi. **Pelajaran untuk ronde depan:** saat menyimulasikan input
-     tekan/lepas di probe headless, JANGAN andalkan `await process_frame`
-     tunggal untuk memberi jeda ke `_process()` — pakai jeda waktu-nyata
-     kecil yang jelas melebihi satu siklus frame.
+### Player = tank (hull + turret independen + meriam)
+
+- `player.gd` ditulis ulang total: badan/hull (`BoxMesh`) berputar mengikuti
+  arah GERAK (seperti track tank berbelok, logika sama seperti kubus mage
+  dulu), sedangkan TURRET (menara + laras) adalah node terpisah yang
+  berputar independen mengikuti arah kamera/swipe (`yaw`) — persis seperti
+  tank sungguhan: badan boleh jalan ke satu arah, moncong meriam tetap
+  mengincar arah lain.
+- Kamera third-person tidak berubah perilakunya (murni ikut swipe,
+  tanpa auto-aim), tapi sekarang turret "menempel" pada arah kamera —
+  jadi kamera terasa seperti membidik lewat teleskop tank.
+- Serangan disederhanakan drastis dibanding mage: TAP tombol serang = SATU
+  tembakan meriam (`tank_shell.gd`), lalu reload `FIRE_COOLDOWN` (1.1 detik)
+  sebelum bisa menembak lagi. **TIDAK ADA lagi mode tahan-untuk-mengisi**
+  (mantra Zoltraak dihapus total, tidak digantikan skill serupa di bag. A
+  ini).
+- Tombol "Dash" HUD dipertahankan APA ADANYA (`press_dash()`, tidak ada
+  perubahan wiring HUD sama sekali di ronde ini) tapi kini berperan sebagai
+  "Boost" tank: ledakan kecepatan singkat (0,5 detik) lalu cooldown panjang
+  (3 detik) — cocok untuk manuver mendadak, bukan spam seperti dash mage.
+- Gerak tank sengaja dibuat lebih berat/lambat dari mage (`MAX_SPEED` 10,5
+  → 7,2; akselerasi lebih pelan) supaya terasa seperti kendaraan berat.
+- `max_health` dinaikkan 100 → 150 (kesan tank berlapis baja).
+- Kolisi pemain di `player.tscn` diganti dari `SphereShape3D` ke
+  `BoxShape3D` supaya lebih pas menutupi bentuk hull tank dan bertabrakan
+  lebih akurat dengan dinding/bunker kotak.
+
+### Peluru meriam (`tank_shell.gd`, ganti nama dari `fire_bolt.gd`)
+
+- Arsitektur proyektil (balistik: gravitasi + raycast per-frame) TIDAK
+  berubah dari mekanik lama — hanya nama file & tema visual/warna yang
+  berubah dari mana biru ke selongsong peluru berpijar oranye.
+- Damage dinaikkan 35 → 58 (sepadan dengan reload yang lebih lambat).
+- Sudah mendeteksi collider bermeta `"wall"` (dinding/bunker, ronde-44) DAN
+  `"enemy_tank"` (tank musuh, akan ada objeknya mulai Bagian B ronde-45 —
+  deteksinya ditambahkan sekarang secara forward-compatible, tidak
+  memengaruhi apa pun karena belum ada objek berlabel itu).
+- Getaran kamera saat ledakan kini benar-benar berfungsi: `tank_shell.gd`
+  memanggil `shake_target.add_shake(...)` dan `player.gd` sekarang punya
+  method `add_shake()` yang nyata (di mage lama method ini dipanggil tapi
+  TIDAK PERNAH ada di player.gd — dead code yang tidak pernah jalan).
+
+### Ledakan & shader direcolor (mana biru → api oranye)
+
+- `fireball_core.gdshader`, `fireball_shell.gdshader`, `fire_explosion.gd`:
+  seluruh palet warna dikembalikan dari biru-putih (ronde-43) ke oranye/
+  merah (ledakan meriam khas tank) — hanya konstanta warna yang berubah,
+  logika shader/partikel tetap sama persis.
+- `shockwave.gdshader` TIDAK perlu diubah — defaultnya sudah oranye; yang
+  berubah cuma parameter `tint` yang di-override dari skrip caller.
+
+### Uji asap CI disederhanakan
+
+- `project/dev_probe/fire_attack_check.gd`: fase pengujian mode
+  tahan-untuk-mantra (fase 2b lama, menguji `zoltraak_bolt.gd`) DIHAPUS
+  karena mekaniknya sudah tidak ada. Probe kini hanya menguji jalur TAP →
+  `tank_shell.gd` muncul (fase 2 & 3), sesuai semantik serangan tank yang
+  baru jauh lebih sederhana dari mage.
+
+## Belum dikerjakan (menyusul di bagian berikutnya ronde-45)
+
+- **Bagian B**: roster tank musuh + AI dasar (gerak + tembak) + mode
+  bertahan dari gelombang (wave survival) — dunia saat ini belum ada musuh
+  sama sekali setelah `monster_system.gd` dihapus.
+- **Bagian C (kemungkinan)**: polish HUD (ikon tombol serang, sembunyikan
+  tombol yang tidak relevan untuk tank seperti jump/crouch/emote), indikator
+  reload meriam, dan pertimbangan mengganti kubus prosedural dengan aset
+  tank 3D CC0 gratis (mis. paket "Tank" dari Quaternius — sudah dicek
+  tersedia, belum diunduh/diintegrasikan).
 
 ## Verifikasi
 
-- Semua 20 file GDScript di `project/packs` lolos `gdparse` lokal, plus
-  `project/dev_probe/fire_attack_check.gd` diperiksa terpisah.
+- Semua 18 file GDScript di `project/packs` (+ `dev_probe/fire_attack_check.gd`)
+  lolos `gdparse` lokal.
 - `python3 tools/analyze_checks.py /home/user/Unity` → `BERSIH ✓`.
-- `git diff --check` → bersih.
-- Uji tembak-menembak penuh (fase 1/2a/2b/3 probe) LULUS di GitHub Actions
-  (build-apk sukses) dan konten sudah ter-publish ke branch `content`, versi
-  `game_version` naik dari `1.0.38` → `1.0.39`.
+- `git diff --check` → bersih, tidak ada marker konflik.
+- Uji CI GitHub Actions: lihat commit message untuk run ID & hasil (diisi
+  setelah `gh run watch` selesai).
 
 ## Cara test di HP
 
 1. Tutup game sepenuhnya lalu buka lagi agar delta terbaru terunduh.
-2. Gerak dan tembak sekali (tap): pastikan warna tembakan sekarang biru dan
-   ukurannya kecil, bukan bola api oranye besar.
-3. Arahkan kamera manual (swipe) ke musuh, lalu tahan tombol serang: lihat
-   lingkaran mantra "ZOLTRAAK" tumbuh di depan karakter selama 7 detik dengan
-   huruf berputar. Kamera TIDAK boleh berputar sendiri ke arah musuh.
-4. Lepas tombol serang: pastikan keluar gelombang besar putih-biru yang
-   meliuk seperti air mengalir, searah hadap karakter (bukan otomatis ke
-   musuh manapun).
-5. Coba lepas lebih awal (sebelum 7 detik penuh): Zoltraak tetap keluar tapi
-   lebih kecil/lemah dibanding yang ditahan penuh.
+2. Pastikan karakter kini tampak seperti tank kotak (hull rendah + menara +
+   laras), bukan lagi kubus polos.
+3. Gerakkan joystick kiri: hull tank berputar mengikuti arah gerak (seperti
+   track berbelok).
+4. Swipe layar untuk memutar kamera: perhatikan MENARA & LARAS ikut berputar
+   mengincar arah kamera, independen dari arah gerak hull.
+5. Tap tombol serang: satu peluru oranye meluncur searah laras lalu meledak
+   (api oranye, bukan lagi ledakan biru). Tap lagi dengan cepat: HARUS ada
+   jeda reload (~1 detik) sebelum bisa menembak lagi.
+6. Tembak ke arah dinding tinggi (peninggalan ronde-44): dinding harus rusak
+   dan akhirnya runtuh jadi pecahan kotak berputar setelah beberapa kali
+   kena tembak.
+7. Tombol "Dash" sekarang jadi "Boost": tank meluncur cepat sesaat lalu
+   melambat, ada cooldown sebelum bisa dipakai lagi.
+8. Belum ada musuh di dunia (menyusul Bagian B) — ini BUKAN bug, memang
+   belum dikerjakan di bagian ini.
+
+*Terakhir diperbarui: 2026-09-26*

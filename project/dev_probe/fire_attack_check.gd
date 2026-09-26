@@ -1,35 +1,31 @@
 extends SceneTree
-## Uji asap SERANGAN headless (tanpa GPU) — penjaga insiden Ronde-38.
+## Uji asap SERANGAN headless (tanpa GPU) — penjaga insiden Ronde-38, terus
+## dipertahankan lewat pivot ronde-45 (mage -> tank).
 ##
-## Kronologi insiden: fire_bolt.gd memakai `var distance := shake_target.…`
-## dengan shake_target bertipe Node → analyzer Godot 4.5 melempar parse error
-## keras → fire_bolt.gd gagal compile → player.gd (preload-nya) ikut gagal →
-## pack character_player 1.0.26 TERBIT dengan pemain mati: tombol serang
-## ditekan di perangkat, TIDAK ADA tembakan. Godot --export-pack exit 0 walau
-## ada SCRIPT ERROR, jadi jalur export saja tidak cukup — probe inilah yang
-## gagal keras sebelum konten sempat diterbitkan.
+## Kronologi insiden asli: fire_bolt.gd memakai `var distance := shake_target…`
+## dengan shake_target bertipe Node -> analyzer Godot 4.5 melempar parse error
+## keras -> fire_bolt.gd gagal compile -> player.gd (preload-nya) ikut gagal ->
+## pack character_player TERBIT dengan pemain mati: tombol serang ditekan di
+## perangkat, TIDAK ADA tembakan. Godot --export-pack exit 0 walau ada SCRIPT
+## ERROR, jadi jalur export saja tidak cukup — probe inilah yang gagal keras
+## sebelum konten sempat diterbitkan.
 ##
-## RONDE-43: semantik serangan berubah total (permintaan user: hapus autofire
-## saat ditahan). Sekarang:
-##   - TAP cepat (ditahan < CHARGE_START_DELAY di player.gd) = satu tembakan
-##     mana biru kecil (fire_bolt.gd), TIDAK ADA lagi tembakan beruntun selama
-##     tombol ditahan.
-##   - TAHAN lama (>= CHARGE_START_DELAY) = mantra "ZOLTRAAK" tumbuh di depan
-##     karakter; MELEPAS tombol men-trigger satu tembakan besar
-##     (zoltraak_bolt.gd), bukan fire_bolt.gd.
-## Probe ini diperbarui supaya menguji KEDUA jalur itu, bukan lagi
-## "ditahan 0.8 dtk → autofire >= 2 bola" (perilaku lama yang sudah dihapus
-## dengan sengaja).
+## RONDE-45: pivot total dari mage (mana bolt + mantra Zoltraak tahan-lepas)
+## ke TANK (meriam tap-tembak). Semantik serangan sekarang jauh lebih
+## sederhana daripada ronde-43/44: TAP tombol serang = SATU tembakan meriam
+## (tank_shell.gd), lalu reload (FIRE_COOLDOWN di player.gd) sebelum bisa
+## menembak lagi. TIDAK ADA lagi mode tahan-untuk-mengisi (mantra Zoltraak
+## dihapus total bersama seluruh pack mage). Probe ini disederhanakan
+## mengikuti — hanya menguji jalur tap-tembak yang tersisa.
 ##
 ## Jalankan (CI & lokal):
 ##   godot --headless --path project --script dev_probe/fire_attack_check.gd
 ## Exit 0 = LULUS; exit != 0 = build konten WAJIB berhenti.
 ##
 ## Fase 1 : semua .gd di packs/ + semua scene inti WAJIB termuat & valid.
-## Fase 2a: TAP cepat via set_attack_held → satu fire_bolt.gd HARUS muncul.
-## Fase 2b: TAHAN lalu lepas → satu zoltraak_bolt.gd HARUS muncul (mantra).
+## Fase 2 : TAP cepat via set_attack_held → satu tank_shell.gd HARUS muncul.
 ## Fase 3 : HUD ditanam, handler tombol serang (_on_attack) TAP cepat →
-##          fire_bolt.gd HARUS muncul (jalur persis tombol 🔥 di layar).
+##          tank_shell.gd HARUS muncul (jalur persis tombol tembak di layar).
 ##
 ## Catatan urutan engine (diverifikasi dari source Godot 4.5.2):
 ## _initialize() dipanggil SEBELUM root masuk tree — node yang ditambahkan di
@@ -47,16 +43,14 @@ const SCENES := [
 	"res://packs/ui/loading_screen.tscn",
 	"res://packs/ui/pause_menu.tscn",
 ]
-const CHARGE_HOLD_SEC := 0.8   # > CHARGE_START_DELAY (0.16) di player.gd -> pasti masuk mode mantra
-const COOLDOWN_WAIT_SEC := 0.7 # > ZOLTRAAK_COOLDOWN (0.55) supaya fase berikut tak tertelan cooldown
+const COOLDOWN_WAIT_SEC := 1.3 # > FIRE_COOLDOWN (1.1) di player.gd supaya fase berikut tak tertelan reload
 # TAP_HOLD_SEC/RELEASE_SETTLE_SEC dipakai (bukan `await process_frame` tunggal)
 # supaya waktu-nyata yang berlalu dijamin cukup untuk beberapa siklus
 # _process() node pemain benar-benar berjalan sebelum/di antara aksi tekan-
 # lepas. Satu `await process_frame` saja pernah terbukti rentan race 1-frame
-# (kadang _process belum sempat "melihat" status tahan sebelum dilepas lagi,
-# tergantung persis di titik mana frame sebelumnya berhenti) — insiden ronde-43.
-const TAP_HOLD_SEC := 0.05        # << CHARGE_START_DELAY (0.16) -> tetap dianggap tap
-const RELEASE_SETTLE_SEC := 0.15  # jeda nyata setelah lepas sebelum menghitung hasil
+# (insiden ronde-43).
+const TAP_HOLD_SEC := 0.05
+const RELEASE_SETTLE_SEC := 0.15
 
 var _exit_code := 0
 
@@ -71,7 +65,7 @@ func _fail(msg: String) -> void:
 
 func _finish() -> void:
 	if _exit_code == 0:
-		print("[fire-check] LULUS ✔ (serangan bekerja)")
+		print("[fire-check] LULUS ✔ (serangan tank bekerja)")
 	else:
 		print("[fire-check] TIDAK LULUS ✘ — jangan terbitkan konten!")
 	quit(_exit_code)
@@ -119,7 +113,7 @@ func _run() -> void:
 	player.call("set_settings", null)
 	hud.call("bind_player", player)
 
-	# ---------- Fase 2a: TAP cepat → fire_bolt.gd ----------
+	# ---------- Fase 2: TAP cepat → tank_shell.gd ----------
 	await process_frame          # tree hidup; _ready pemain+HUD pasti sudah jalan
 	if not bool(player.get("is_ready")):
 		_fail("pemain tidak siap setelah 1 frame (is_ready=false)")
@@ -129,49 +123,35 @@ func _run() -> void:
 		_fail("player.set_attack_held tidak ada (skrip pemain versi lama?)")
 		_finish()
 		return
-	print("[fire-check] fase 2a: TAP cepat…")
-	var before_tap := _count_by_suffix(world, "fire_bolt.gd")
+	print("[fire-check] fase 2: TAP cepat…")
+	var before_tap := _count_by_suffix(world, "tank_shell.gd")
 	player.call("set_attack_held", true)
 	await create_timer(TAP_HOLD_SEC).timeout
 	player.call("set_attack_held", false)
 	await create_timer(RELEASE_SETTLE_SEC).timeout
-	var after_tap := _count_by_suffix(world, "fire_bolt.gd")
+	var after_tap := _count_by_suffix(world, "tank_shell.gd")
 	if after_tap > before_tap:
-		print("[fire-check] fase 2a ✔ tap → ", after_tap - before_tap, " fire_bolt.gd")
+		print("[fire-check] fase 2 ✔ tap → ", after_tap - before_tap, " tank_shell.gd")
 	else:
-		_fail("fase 2a: tap cepat tidak menghasilkan fire_bolt.gd — tombol serang mati")
-
-	# ---------- Fase 2b: TAHAN lalu lepas → mantra Zoltraak ----------
-	await create_timer(COOLDOWN_WAIT_SEC).timeout
-	print("[fire-check] fase 2b: tahan ", CHARGE_HOLD_SEC, " dtk lalu lepas…")
-	var before_zolt := _count_by_suffix(world, "zoltraak_bolt.gd")
-	player.call("set_attack_held", true)
-	await create_timer(CHARGE_HOLD_SEC).timeout
-	player.call("set_attack_held", false)
-	await create_timer(RELEASE_SETTLE_SEC).timeout
-	var after_zolt := _count_by_suffix(world, "zoltraak_bolt.gd")
-	if after_zolt > before_zolt:
-		print("[fire-check] fase 2b ✔ tahan+lepas → ", after_zolt - before_zolt, " zoltraak_bolt.gd")
-	else:
-		_fail("fase 2b: tahan lalu lepas tidak menghasilkan zoltraak_bolt.gd — mantra mati")
+		_fail("fase 2: tap cepat tidak menghasilkan tank_shell.gd — tombol serang mati")
 
 	# ---------- Fase 3: jalur tombol HUD (TAP cepat) ----------
 	if not hud.has_method("_on_attack"):
 		_fail("handler tombol serang HUD (_on_attack) tidak ada")
 		_finish()
 		return
-	# jeda melewati sisa cooldown Zoltraak (fase 2b) supaya penekanan HUD diuji
+	# jeda melewati sisa reload meriam (fase 2) supaya penekanan HUD diuji
 	# jujur, bukan tertelan cooldown tembakan terakhir
 	await create_timer(COOLDOWN_WAIT_SEC).timeout
 	print("[fire-check] fase 3: tekan tombol serang via HUD (tap cepat)…")
-	var before := _count_by_suffix(world, "fire_bolt.gd")
+	var before := _count_by_suffix(world, "tank_shell.gd")
 	hud.call("_on_attack", true)
 	await create_timer(TAP_HOLD_SEC).timeout
 	hud.call("_on_attack", false)
 	await create_timer(RELEASE_SETTLE_SEC).timeout
-	var after := _count_by_suffix(world, "fire_bolt.gd")
+	var after := _count_by_suffix(world, "tank_shell.gd")
 	if after > before:
-		print("[fire-check] fase 3 ✔ tombol HUD → ", after - before, " bola api baru")
+		print("[fire-check] fase 3 ✔ tombol HUD → ", after - before, " peluru meriam baru")
 	else:
 		_fail("fase 3: tombol serang HUD tidak menghasilkan tembakan")
 	_finish()

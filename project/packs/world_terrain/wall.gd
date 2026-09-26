@@ -1,9 +1,9 @@
 extends Node3D
-## Dinding tinggi acak (ronde-44): solid (menghalangi jalan pemain & kamera
-## lewat collision_layer yang sama dengan lantai), jadi target rayap tali
-## (grapple) ala Attack on Titan, dan berkeping-keping jadi kotak yang
-## berputar (RigidBody3D) saat hancur kena serangan cukup besar — "kayak
-## block pada umumnya kalo kelempar kan mutar" (permintaan user).
+## Dinding/bunker tinggi acak (ronde-44, dipertahankan sebagai rintangan
+## medan tempur tank di ronde-45): solid (menghalangi jalan tank & kamera
+## lewat collision_layer yang sama dengan lantai) dan berkeping-keping jadi
+## kotak yang berputar (RigidBody3D) saat hancur kena tembakan meriam cukup
+## besar — cocok jadi cover/bunker yang bisa diratakan tank.
 
 const HEALTH_PER_SEGMENT := 42.0
 const DEBRIS_LIFETIME := 3.2
@@ -28,7 +28,6 @@ func setup(spec: Dictionary) -> void:
 	health = max_health
 
 func _ready() -> void:
-	add_to_group("grapple_target")
 	_build()
 
 func _build() -> void:
@@ -60,13 +59,6 @@ func _build() -> void:
 	_body.add_child(col)
 	add_child(_body)
 
-## Titik jangkar untuk tali grapple (ala Attack on Titan): sedikit di bawah
-## puncak supaya kail tampak "menancap" ke badan dinding, bukan melayang di
-## atasnya.
-func grapple_anchor() -> Vector3:
-	var h := seg_size * float(segments)
-	return global_position + Vector3(0.0, h * 0.82, 0.0)
-
 func take_damage(amount: float) -> void:
 	if _dead:
 		return
@@ -78,7 +70,6 @@ func _collapse() -> void:
 	if _dead:
 		return
 	_dead = true
-	remove_from_group("grapple_target")
 	var host := get_parent()
 	var base := global_position
 	if host:

@@ -82,6 +82,26 @@
   dan `Label3D` bawaan Godot untuk huruf mantra) — tidak ada aset pihak
   ketiga yang ditambahkan.
 
+## Ronde-45: pivot total ke game TANK (mage/monster/Zoltraak dihapus)
+
+- Permintaan pengguna: seluruh pack mage (`player.gd` kubus mantra, mana biru,
+  Zoltraak) dan roster monster (`monster.gd`/`monster_system.gd`) **dihapus
+  total**, diganti murni game tank (hull+turret independen, meriam, dinding/
+  bunker destructible ronde-44 dipertahankan sebagai rintangan medan tempur).
+  Rencana grapple ala Attack on Titan (belum sempat dikerjakan di ronde-44)
+  ikut dibatalkan.
+- `player.gd` ditulis ulang penuh: BoxMesh hull + turret + laras, seluruhnya
+  prosedural (karya proyek ini), tanpa aset pihak ketiga.
+- `fire_bolt.gd` diganti nama & isi jadi `tank_shell.gd` (proyektil meriam);
+  `fireball_core.gdshader`, `fireball_shell.gdshader`, dan `fire_explosion.gd`
+  direvisi PALETNYA KEMBALI dari mana biru-putih (ronde-43) ke palet api
+  oranye/merah (ledakan meriam) — tetap prosedural, tanpa tekstur eksternal.
+- Sempat dicek ketersediaan aset tank 3D CC0 gratis (mis. paket "Tank" dari
+  Quaternius, quaternius.com, lisensi CC0/Public Domain) sebagai kandidat
+  peningkatan visual di masa depan; ronde ini TETAP memakai kubus prosedural
+  (konsisten dengan gaya visual proyek sejauh ini) — belum ada aset biner
+  eksternal yang diunduh/dibundel.
+
 *Terakhir diperbarui: 2026-09-26*
 
 ## Ronde-8: Aset Desa & Alam — KayKit Medieval Hexagon Pack (CC0)

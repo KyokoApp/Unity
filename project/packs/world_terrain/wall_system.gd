@@ -1,9 +1,10 @@
 extends Node3D
-## Spawner dinding tinggi ACAK (ronde-44) yang solid, bisa dihancurkan, dan
-## jadi target rayap tali (grapple) ala Attack on Titan. Posisi slot tetap
-## (deterministik, mudah diuji), tapi tinggi/lebar/warna tiap dinding acak
-## lewat RNG berseed tetap supaya tata letak konsisten antar sesi permainan
-## tanpa perlu menyimpan state manapun.
+## Spawner dinding/bunker tinggi ACAK (ronde-44), dipertahankan di ronde-45
+## sebagai rintangan/cover medan tempur tank — solid dan bisa dihancurkan
+## kena tembakan meriam. Posisi slot tetap (deterministik, mudah diuji),
+## tapi tinggi/lebar/warna tiap dinding acak lewat RNG berseed tetap supaya
+## tata letak konsisten antar sesi permainan tanpa perlu menyimpan state
+## manapun.
 
 const WALL_SCRIPT := preload("res://packs/world_terrain/wall.gd")
 

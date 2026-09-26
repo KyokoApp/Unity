@@ -1,17 +1,17 @@
 extends Node3D
-## World: DUNIA DATAR TANPA BATAS (permintaan user — cicilan #1 genre baru).
-## Gravity Falls diorama + dunia procedural lama DIHAPUS. Yang tersisa:
-## bidang datar tak berujung (visual mengikuti pemain + collider bidang
-## WorldBoundaryShape3D — POLA SEDERHANA, bukan trimesh ⇒ is_on_floor()
-## engine kini SELALU benar; bug jongkok/jump-fall mati sumbernya),
-## langit kartun + siklus siang-malam yang dipertahankan utuh.
-## API platform tetap lengkap agar HUD/pemain/game_root tidak perlu berubah.
+## World: DUNIA DATAR TANPA BATAS — medan tempur tank (ronde-45, pivot dari
+## game mage/monster). Bidang datar tak berujung (visual mengikuti pemain +
+## collider bidang WorldBoundaryShape3D — POLA SEDERHANA, bukan trimesh ⇒
+## is_on_floor() engine selalu benar), langit kartun + siklus siang-malam
+## dipertahankan utuh. Rintangan medan tempur: dinding/bunker destructible
+## acak (wall_system.gd). Roster tank musuh (wave survival) menyusul di
+## Bagian B ronde-45. API platform tetap lengkap agar HUD/pemain/game_root
+## tidak perlu berubah.
 
 signal gen_progress(p: float, t: String)
 
 const Materials := preload("res://packs/shaders_materials/materials.gd")
 const SKY_SHADER := preload("res://packs/shaders_materials/sky.gdshader")
-const MONSTER_SYSTEM := preload("res://packs/world_terrain/monster_system.gd")
 const WALL_SYSTEM := preload("res://packs/world_terrain/wall_system.gd")
 
 var player: Node3D
@@ -24,8 +24,7 @@ var time_of_day := 16.4       # sore adem (cicilan ini boleh jalan terus)
 
 var _root: Node
 var _ground: MeshInstance3D   # bidang raksasa yang menyentak mengikuti pemain
-var monster_system: Node3D
-var wall_system: Node3D
+var wall_system: Node3D       # dinding/bunker destructible — rintangan medan tempur tank
 const GROUND_SIZE := 1600.0
 var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 
@@ -49,16 +48,13 @@ func generate_async(p_root: Node) -> void:
 	await get_tree().process_frame
 	_report(0.5, "Membentangkan tanah datar…")
 	_make_flat_ground()
-	monster_system = MONSTER_SYSTEM.new()
-	monster_system.name = "MonsterSystem"
-	add_child(monster_system)
 	await get_tree().process_frame
-	_report(0.8, "Menegakkan dinding tinggi…")
+	_report(0.8, "Menegakkan dinding/bunker medan tempur…")
 	wall_system = WALL_SYSTEM.new()
 	wall_system.name = "WallSystem"
 	add_child(wall_system)
 	await get_tree().process_frame
-	_report(1.0, "Dunia datar siap — roster monster & dinding aktif")
+	_report(1.0, "Medan tempur siap")
 
 ## Bidang datar tak berbatas: SATU collider WorldBoundary (bidang y=0, normal
 ## atas) — tak ada tepi, tak ada trimesh, is_on_floor() engine selalu konstan.
@@ -119,8 +115,6 @@ func find_spawn_point() -> Vector3:
 
 func set_player(p: Node3D) -> void:
 	player = p
-	if monster_system and monster_system.has_method("set_player"):
-		monster_system.set_player(p)
 
 func register_interactable(meta: Dictionary) -> void:
 	interactables.append(meta)
@@ -168,8 +162,8 @@ var _q_fog := 1.0   # pengali kabut dari preset kualitas
 
 func apply_quality(p: Dictionary) -> void:
 	_q_fog = float(p.get("fog", 1.0))
-	if monster_system and monster_system.has_method("apply_quality"):
-		monster_system.apply_quality(p)
+	if wall_system and wall_system.has_method("apply_quality"):
+		wall_system.apply_quality(p)
 	if world_env and world_env.environment:
 		world_env.environment.glow_enabled = bool(p.get("glow", true))
 	if sun:
