@@ -63,9 +63,14 @@ const HOVER := 0.0           # model sudah berakar tepat di telapak kaki (Y=0 bi
 # --- proporsi model nyata (Quaternius mannequin, ~1.83 m bind-pose) ---
 const MODEL_HEIGHT := 1.83
 const CAST_HEIGHT := 1.32     # perkiraan tinggi tangan/dada utk titik lontar peluru
-const MODEL_YAW_OFFSET := 0.0 # putar 180° (PI) di sini kalau ternyata model tampak
-                               # jalan mundur di layar — tak bisa dipastikan tanpa
-                               # render lokal, lihat catatan CREDITS.md.
+## Dikonfirmasi pengguna lgsg di device (ronde-46 bag. A4 lanjutan): model
+## menghadap 180° TERBALIK dari arah gerak (mukanya ke belakang saat jalan
+## maju) — makanya PI di sini, bukan 0.0 lagi. Rig sumber (Quaternius/UE4
+## mannequin) menghadap -Z di bind-pose sama seperti konvensi Godot, tapi
+## root bone punya koreksi rotasi -90° sumbu X (Blender Z-up->Y-up) yang
+## rupanya membalik sumbu depan juga -> kompensasi di sini, di level visual,
+## bukan di rig (lebih aman & mudah diubah lagi kalau ternyata masih meleset).
+const MODEL_YAW_OFFSET := PI
 
 # --- nama klip animasi (persis dari glTF, lihat CREDITS.md utk daftar lengkap) ---
 const ANIM_IDLE := "Idle_Loop"

@@ -137,6 +137,10 @@ func _run() -> void:
 		_fail("player.set_attack_held tidak ada (skrip pemain versi lama?)")
 		_finish()
 		return
+
+	# ---------- DIAG SEMENTARA (ronde-46 bag. A4): cek struktur mannequin ----------
+	await _diag_mannequin(player)
+
 	print("[fire-check] fase 2: TAP cepat…")
 	var before_tap := _count_by_suffix(world, "arcane_bolt.gd")
 	player.call("set_attack_held", true)
@@ -169,6 +173,48 @@ func _run() -> void:
 	else:
 		_fail("fase 3: tombol serang HUD tidak menghasilkan tembakan")
 	_finish()
+
+## DIAG SEMENTARA (ronde-46 bag. A4): dump struktur node mannequin + status
+## AnimationPlayer, dan simulasikan gerak maju sesaat utk lihat apakah state
+## animasi benar-benar berubah dari Idle. Tidak menggagalkan probe (murni
+## print) — akan dibersihkan setelah bug jalan/lari diselesaikan.
+func _diag_mannequin(player: Node) -> void:
+	print("[fire-check] === DIAG mannequin mulai ===")
+	var visual: Node = player.get("_visual")
+	print("[fire-check] diag: _visual = ", visual)
+	if visual:
+		_dump_tree(visual, 0)
+	var anim = player.get("_anim")
+	print("[fire-check] diag: _anim = ", anim, " (null berarti find_child GAGAL)")
+	if anim:
+		print("[fire-check] diag: get_animation_list() = ", anim.get_animation_list())
+		print("[fire-check] diag: current_animation=", anim.current_animation, " is_playing=", anim.is_playing())
+		print("[fire-check] diag: has_animation(Idle_Loop)=", anim.has_animation("Idle_Loop"))
+		print("[fire-check] diag: has_animation(Walk_Loop)=", anim.has_animation("Walk_Loop"))
+	print("[fire-check] diag: _anim_state awal = ", player.get("_anim_state"))
+	# simulasikan analog didorong ke depan selama ~1 detik nyata
+	player.call("set_joy", Vector2(0, 1))
+	await create_timer(1.0).timeout
+	print("[fire-check] diag: setelah 1dtk gerak -> speed01=", player.get("_speed01"),
+		" facing=", player.get("_facing"), " anim_state=", player.get("_anim_state"),
+		" visual.rotation.y(deg)=", (rad_to_deg(visual.rotation.y) if visual else "?"))
+	if anim:
+		print("[fire-check] diag: current_animation setelah gerak=", anim.current_animation, " is_playing=", anim.is_playing())
+	player.call("set_joy", Vector2.ZERO)
+	await create_timer(0.3).timeout
+	print("[fire-check] === DIAG mannequin selesai ===")
+
+func _dump_tree(n: Node, depth: int) -> void:
+	var indent := "  ".repeat(depth)
+	var extra := ""
+	if n is MeshInstance3D:
+		var mi := n as MeshInstance3D
+		extra = " mesh=" + str(mi.mesh) + " surfaces=" + str(mi.mesh.get_surface_count() if mi.mesh else -1)
+	print("[fire-check] diag-tree: ", indent, n.name, " (", n.get_class(), ")", extra)
+	if depth > 6:
+		return
+	for c in n.get_children():
+		_dump_tree(c, depth + 1)
 
 func _count_by_suffix(world: Node, suffix: String) -> int:
 	var n := 0
