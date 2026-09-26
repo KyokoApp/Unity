@@ -1,6 +1,6 @@
 {
  "game_version": "1.0.42",
- "generated_at": "2026-09-26T11:58:47Z",
+ "generated_at": "2026-09-26T12:43:42Z",
  "pack_order": [
   "core_scripts",
   "shaders_materials",
@@ -13,54 +13,54 @@
  "packs": {
   "core_scripts": {
    "version": "1.0.13",
-   "size": 325188,
-   "sha256": "951857edb6de06829586da7575dc32cbf3e4f6d5bda305b8ddf15c8810e24b9d",
+   "size": 325252,
+   "sha256": "914516d9bb6bbab3778b0a93e5f63cab8e64b133c5de5ca8b439fa3dd7284b8b",
    "url": "packs/core_scripts-1.0.13.pck",
    "deps": []
   },
   "shaders_materials": {
    "version": "1.0.9",
-   "size": 751656,
-   "sha256": "f3c24411795f1eb208147f06cd48b16ff2e985498d701c3e85725decd619b590",
+   "size": 751720,
+   "sha256": "009dd5ef40778fc133783b4659507b460d4c39b67c536ef3c896d8f7bd65eb87",
    "url": "packs/shaders_materials-1.0.9.pck",
    "deps": []
   },
   "world_terrain": {
    "version": "1.0.42",
-   "size": 325600,
-   "sha256": "dcfe945141ff755980ba562eed3aa7af1c983a5d01477b6efef377ce91008ca5",
+   "size": 325664,
+   "sha256": "9802c00ec6a2bd130558e43fdee003f1e1d26789693e4665712ab77bc6e8d701",
    "url": "packs/world_terrain-1.0.42.pck",
    "deps": [
     "shaders_materials"
    ]
   },
   "character_player": {
-   "version": "1.0.38",
-   "size": 357796,
-   "sha256": "c5b0fa888071e394a5c47071356f470b005f01184c3627f84f2b6c725a656190",
-   "url": "packs/character_player-1.0.38.pck",
+   "version": "1.0.39",
+   "size": 1371512,
+   "sha256": "c3d895352e4dab659ecdc5f971f87a5d5e080c5bea709de487997d4afc0a4c3e",
+   "url": "packs/character_player-1.0.39.pck",
    "deps": [
     "shaders_materials"
    ]
   },
   "ui": {
    "version": "1.0.19",
-   "size": 353292,
-   "sha256": "6c6439fc5f7bc030ac1b319371cf10de4ba1260de4f899ba5f839f8738a2160e",
+   "size": 353356,
+   "sha256": "0eaed4399b428971f1adba97c55eb9ec532bb4a1f06659264f5ba76e2f33de34",
    "url": "packs/ui-1.0.19.pck",
    "deps": []
   },
   "audio_sfx": {
    "version": "1.0.3",
-   "size": 388452,
-   "sha256": "f727ebe4e919f2a91b9795a5d862113847611d0ef0c9e575b011ec82ac1019f4",
+   "size": 388516,
+   "sha256": "3e932c843e098ce4bd8a64e2bb962cf30968b9f787ee74c35fd8094c98357f58",
    "url": "packs/audio_sfx-1.0.3.pck",
    "deps": []
   },
   "audio_music": {
    "version": "1.0.2",
-   "size": 1641952,
-   "sha256": "a85fbce6163bb73275e07788cd2d1f097d02647526ea8f7f8234db604545e8e7",
+   "size": 1642016,
+   "sha256": "4f53c5cfaacce931d550a91d914094bbe0b1afe3fb2a8d3aeaf69949e5bb5b08",
    "url": "packs/audio_music-1.0.2.pck",
    "deps": []
   }
