@@ -1,6 +1,6 @@
 shader_type spatial;
 render_mode blend_add, unshaded, cull_back, depth_draw_never, shadows_disabled;
-// SELUBUNG panas (aditif) di sekitar inti selongsong peluru:
+// SELUBUNG energi arcane (aditif) di sekitar inti peluru sihir:
 // - untaian energi selalu menjilat ke ATAS (mengambang ringan),
 // - saat bergerak, sisi belakang memanjang jadi EKOR (uniform `trail`,
 //   diperhalus di skrip -> transisi diam/jalan mulus),
@@ -74,7 +74,7 @@ void fragment() {
 	float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	float edge = smoothstep(0.0, 0.65, facing);
 	float flame = smoothstep(0.30, 0.75, n + (n2 - 0.47) * 0.6 + facing * 0.25 - tail_w * 0.25);
-	vec3 c = mix(vec3(0.55, 0.12, 0.02), vec3(1.0, 0.55, 0.15), flame);
+	vec3 c = mix(vec3(0.28, 0.06, 0.55), vec3(0.62, 0.38, 1.0), flame);
 	ALBEDO = c * intensity;
 	ALPHA = clamp(edge * flame * (1.0 - tail_w * 0.45) * alpha_scale, 0.0, 1.0);
 }

@@ -1,6 +1,9 @@
 extends Node3D
-## Ledakan prosedural api & asap untuk dentuman peluru meriam tank: impact,
-## ledakan di udara, dan kilatan moncong meriam (muzzle flash).
+## Ledakan prosedural energi arcane (ungu-biru) untuk dentuman peluru sihir
+## kecil: impact di tanah/dinding, ledakan di udara, dan kilatan saat
+## menembak (muzzle flash). Nama file "fire_*" adalah warisan generik lintas-
+## ronde (helper FX yang sama dipakai ulang & direcolor beberapa kali:
+## mana biru → api tank → arcane ungu-biru) — isinya sudah 100% bertema sihir.
 
 const FX := preload("res://packs/character_player/fire_fx.gd")
 const SHELL_SHADER := preload("res://packs/character_player/fireball_shell.gdshader")
@@ -14,16 +17,16 @@ var dir := Vector3.FORWARD
 func _ready() -> void:
 	fx = clampf(fx, 0.2, 1.0)
 	if kind == "muzzle":
-		_build_flash(3.0, 2.2, 0.12)
+		_build_flash(2.6, 1.8, 0.12)
 		_build_muzzle()
 		get_tree().create_timer(1.0).timeout.connect(queue_free)
 		return
-	_build_flash(8.0, 6.0, 0.4)
-	_build_fireball()
-	_build_burst("Fire", 22, 0.9, "fire")
+	_build_flash(6.5, 4.5, 0.4)
+	_build_orb()
+	_build_burst("Mana", 22, 0.9, "mana")
 	_build_burst("Sparks", 26, 1.05, "sparks")
-	_build_burst("Embers", 12, 1.8, "embers")
-	_build_burst("Smoke", 8, 2.6, "smoke")
+	_build_burst("Motes", 12, 1.8, "motes")
+	_build_burst("Mist", 8, 2.6, "mist")
 	if kind == "impact":
 		_build_impact_marks()
 	_play_sound()
@@ -31,7 +34,7 @@ func _ready() -> void:
 
 func _build_flash(light_range: float, energy: float, duration: float) -> void:
 	var light := OmniLight3D.new()
-	light.light_color = Color(1.0, 0.55, 0.15)
+	light.light_color = Color(0.55, 0.35, 1.0)
 	light.omni_range = light_range
 	light.light_energy = energy
 	light.shadow_enabled = false
@@ -41,7 +44,7 @@ func _build_flash(light_range: float, energy: float, duration: float) -> void:
 	tw.tween_property(light, "light_energy", 0.0, duration)
 	tw.tween_callback(light.queue_free)
 
-func _build_fireball() -> void:
+func _build_orb() -> void:
 	var ball := MeshInstance3D.new()
 	ball.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var sphere := SphereMesh.new()
@@ -52,22 +55,22 @@ func _build_fireball() -> void:
 	ball.mesh = sphere
 	var mat := ShaderMaterial.new()
 	mat.shader = SHELL_SHADER
-	mat.set_shader_parameter("intensity", 2.4)
+	mat.set_shader_parameter("intensity", 2.2)
 	mat.set_shader_parameter("rise", 0.45)
 	mat.set_shader_parameter("alpha_scale", 1.0)
 	ball.material_override = mat
-	ball.scale = Vector3.ONE * 0.35
+	ball.scale = Vector3.ONE * 0.32
 	ball.extra_cull_margin = 3.0
 	add_child(ball)
 	var tw := create_tween().set_parallel(true)
 	tw.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	tw.tween_property(ball, "scale", Vector3.ONE * 2.0, 0.32)
+	tw.tween_property(ball, "scale", Vector3.ONE * 1.8, 0.32)
 	tw.tween_property(ball, "position:y", 0.55, 0.45)
 	tw.tween_property(mat, "shader_parameter/alpha_scale", 0.0, 0.45)
 	tw.chain().tween_callback(ball.queue_free)
 
 func _process_mat(style: String) -> ParticleProcessMaterial:
-	var key := "shell_explosion_pm_" + style
+	var key := "bolt_explosion_pm_" + style
 	if FX.has(key):
 		return FX.get_res(key)
 	var m := ParticleProcessMaterial.new()
@@ -78,7 +81,7 @@ func _process_mat(style: String) -> ParticleProcessMaterial:
 	m.angular_velocity_min = -110.0
 	m.angular_velocity_max = 110.0
 	match style:
-		"fire":
+		"mana":
 			m.direction = Vector3.UP
 			m.spread = 85.0
 			m.initial_velocity_min = 2.2
@@ -88,18 +91,18 @@ func _process_mat(style: String) -> ParticleProcessMaterial:
 			m.scale_min = 0.5
 			m.scale_max = 0.95
 			m.scale_curve = FX.curve([Vector2(0, 0.35), Vector2(0.2, 1), Vector2(1, 0)], 1.0)
-			m.color_ramp = FX.ramp([0.0, 0.08, 0.28, 0.65, 1.0], [Color.WHITE, Color(1.0, 0.85, 0.5), Color(1.0, 0.45, 0.1), Color(0.35, 0.08, 0.02), Color(0.05, 0.02, 0.0, 0)])
+			m.color_ramp = FX.ramp([0.0, 0.08, 0.28, 0.65, 1.0], [Color.WHITE, Color(0.8, 0.65, 1.0), Color(0.55, 0.25, 1.0), Color(0.18, 0.06, 0.4), Color(0.05, 0.02, 0.1, 0)])
 		"sparks":
 			m.direction = Vector3.UP
 			m.spread = 88.0
 			m.initial_velocity_min = 4.5
 			m.initial_velocity_max = 9.5
-			m.gravity = Vector3(0, -10, 0)
+			m.gravity = Vector3(0, -8, 0)
 			m.scale_min = 0.4
 			m.scale_max = 1.05
 			m.scale_curve = FX.curve([Vector2(0, 1), Vector2(1, 0)], 1.0)
-			m.color_ramp = FX.ramp([0.0, 0.45, 1.0], [Color(3.0, 2.4, 1.2), Color(1.0, 0.5, 0.1), Color(0.3, 0.08, 0.0, 0)])
-		"embers":
+			m.color_ramp = FX.ramp([0.0, 0.45, 1.0], [Color(2.2, 1.8, 3.2), Color(0.6, 0.35, 1.0), Color(0.15, 0.06, 0.35, 0)])
+		"motes":
 			m.direction = Vector3.UP
 			m.spread = 90.0
 			m.initial_velocity_min = 0.8
@@ -113,8 +116,8 @@ func _process_mat(style: String) -> ParticleProcessMaterial:
 			m.turbulence_influence_min = 0.2
 			m.turbulence_influence_max = 0.55
 			m.scale_curve = FX.curve([Vector2(0, 1), Vector2(1, 0)], 1.0)
-			m.color_ramp = FX.ramp([0.0, 0.65, 1.0], [Color(2.4, 1.8, 0.9), Color(1.0, 0.4, 0.08), Color(0.2, 0.05, 0.0, 0)])
-		"smoke":
+			m.color_ramp = FX.ramp([0.0, 0.65, 1.0], [Color(1.6, 1.2, 2.4), Color(0.5, 0.3, 0.9), Color(0.1, 0.05, 0.2, 0)])
+		"mist":
 			m.direction = Vector3.UP
 			m.spread = 70.0
 			m.initial_velocity_min = 0.6
@@ -125,7 +128,7 @@ func _process_mat(style: String) -> ParticleProcessMaterial:
 			m.scale_min = 0.6
 			m.scale_max = 1.1
 			m.scale_curve = FX.curve([Vector2(0, 0.25), Vector2(0.35, 1), Vector2(1, 2.0)], 2.0)
-			m.color_ramp = FX.ramp([0.0, 0.18, 0.7, 1.0], [Color(0.25, 0.24, 0.22, 0), Color(0.28, 0.27, 0.25, 0.34), Color(0.35, 0.33, 0.30, 0.16), Color(0.5, 0.48, 0.45, 0)])
+			m.color_ramp = FX.ramp([0.0, 0.18, 0.7, 1.0], [Color(0.30, 0.24, 0.42, 0), Color(0.34, 0.28, 0.48, 0.30), Color(0.38, 0.32, 0.52, 0.14), Color(0.5, 0.45, 0.6, 0)])
 	return FX.put(key, m)
 
 func _build_burst(pname: String, amount: int, lifetime: float, style: String) -> void:
@@ -134,13 +137,13 @@ func _build_burst(pname: String, amount: int, lifetime: float, style: String) ->
 	p.explosiveness = 0.92
 	p.randomness = 0.45
 	p.process_material = _process_mat(style)
-	var additive := style != "smoke"
+	var additive := style != "mist"
 	var size := Vector2(0.42, 0.42)
 	if style == "sparks":
 		size = Vector2(0.045, 0.2)
-	elif style == "embers":
+	elif style == "motes":
 		size = Vector2(0.06, 0.06)
-	elif style == "smoke":
+	elif style == "mist":
 		size = Vector2(0.7, 0.7)
 	p.draw_pass_1 = FX.quad(size, FX.fx_mat(FX.soft_tex(0.12), additive, Color.WHITE))
 	add_child(p)
@@ -158,7 +161,7 @@ func _build_muzzle() -> void:
 	m.damping_min = 5.0
 	m.damping_max = 9.0
 	m.scale_curve = FX.curve([Vector2(0, 1), Vector2(1, 0)], 1.0)
-	m.color_ramp = FX.ramp([0.0, 0.5, 1.0], [Color(3.0, 2.4, 1.2), Color(1.0, 0.5, 0.12), Color(0.3, 0.08, 0.0, 0)])
+	m.color_ramp = FX.ramp([0.0, 0.5, 1.0], [Color(2.2, 1.8, 3.2), Color(0.6, 0.35, 1.0), Color(0.15, 0.06, 0.35, 0)])
 	p.process_material = m
 	p.draw_pass_1 = FX.quad(Vector2(0.05, 0.18), FX.fx_mat(FX.soft_tex(0.2), true, Color.WHITE))
 	add_child(p)
@@ -175,8 +178,8 @@ func _build_impact_marks() -> void:
 	var ring_mat := ShaderMaterial.new()
 	ring_mat.shader = SHOCK_SHADER
 	ring_mat.set_shader_parameter("progress", 0.0)
-	ring_mat.set_shader_parameter("tint", Color(1.0, 0.45, 0.12, 1.0))
-	ring_mat.set_shader_parameter("energy", 2.2)
+	ring_mat.set_shader_parameter("tint", Color(0.55, 0.30, 1.0, 1.0))
+	ring_mat.set_shader_parameter("energy", 2.0)
 	ring.material_override = ring_mat
 	add_child(ring)
 	var ring_tw := create_tween()
@@ -189,7 +192,7 @@ func _build_impact_marks() -> void:
 	glow.mesh = glow_plane
 	glow.position.y = 0.025
 	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	glow.material_override = FX.fx_mat(FX.soft_tex(0.05), true, Color(1.0, 0.5, 0.15, 0.55), BaseMaterial3D.BILLBOARD_DISABLED)
+	glow.material_override = FX.fx_mat(FX.soft_tex(0.05), true, Color(0.55, 0.35, 1.0, 0.5), BaseMaterial3D.BILLBOARD_DISABLED)
 	add_child(glow)
 	var glow_tw := create_tween()
 	glow_tw.tween_property(glow, "transparency", 1.0, 1.4)

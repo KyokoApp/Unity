@@ -2,7 +2,7 @@ shader_type spatial;
 render_mode blend_add, unshaded, cull_disabled, depth_draw_never, shadows_disabled;
 
 uniform float progress : hint_range(0.0, 1.0) = 0.0;
-uniform vec4 tint : source_color = vec4(1.0, 0.35, 0.04, 1.0);
+uniform vec4 tint : source_color = vec4(0.55, 0.30, 1.0, 1.0);
 uniform float energy = 2.0;
 
 void fragment() {

@@ -102,6 +102,47 @@
   (konsisten dengan gaya visual proyek sejauh ini) — belum ada aset biner
   eksternal yang diunduh/dibundel.
 
+## Ronde-46 (bag. A): pivot balik dari TANK ke penyihir anime prosedural
+
+- Permintaan pengguna: hasil visual tank dinilai "kurang/jelek"; pivot balik
+  ke karakter penyihir bergaya anime dengan banyak efek, dunia lebih hidup.
+- **Riset aset karakter anime eksternal (VRM/GLB) dilakukan tapi TERBUKTI
+  tidak feasible di sandbox ini** — dicoba nyata, bukan asumsi:
+  - `poly.pizza/m/jWS1CLA0RO` (Quaternius Tank, CC0) — dari riset ronde-45,
+    tidak relevan lagi.
+  - `quaternius.itch.io/universal-animation-library` (CC0, 120+ animasi
+    humanoid kompatibel Godot/Mixamo) — tidak bisa diunduh (blocker di bawah).
+  - `github.com/ToxSam/open-source-avatars` (registry avatar VRM CC0,
+    `opensourceavatars.com`) dan `github.com/MJMoonbow/VRMavatars` (VRM CC0
+    tema fantasy) — ditemukan lewat riset, tidak diunduh (blocker sama).
+  - Link Google Drive milik pengguna sendiri (file glTF/GLB valid berisi
+    mesh+skin+animasi, dikonfirmasi dari magic header `glTF` yang terbaca)
+    — TIDAK BISA ditransfer utuh: `fetch_page` mengonversi hasil jadi
+    teks/markdown yang merusak byte biner (karakter pengganti `�` muncul
+    di awal file). Pengguna juga tidak bisa melampirkan file secara
+    langsung sebagai lampiran chat saat ditawarkan.
+  - Kesimpulan: **TIDAK ADA aset 3D biner eksternal (.vrm/.glb/.fbx) yang
+    diunduh atau dibundel** di ronde ini maupun rencana ronde berikutnya
+    selama keterbatasan sandbox ini berlaku. Karakter dibangun 100%
+    prosedural (primitive mesh Godot + shader cel-shading yang sudah ada
+    di project, `shaders_materials/toon.gdshader` + `outline.gdshader`
+    lewat helper `Materials.toon()`) — karya proyek ini, bukan aset pihak
+    ketiga.
+- `player.gd` ditulis ulang penuh jadi karakter penyihir chibi-anime
+  (kepala besar, mata besar+kilau, pipi merona, rambut runcing, topi
+  penyihir, jubah, lengan beranimasi prosedural, aura partikel) — lihat
+  `BACA_INI.md` untuk detail lengkap.
+- `tank_shell.gd` diganti nama jadi `arcane_bolt.gd`; palet proyektil &
+  ledakan (`fireball_core.gdshader`, `fireball_shell.gdshader`,
+  `shockwave.gdshader`, `fire_explosion.gd`) direvisi dari api-oranye
+  (tank) jadi arcane ungu-biru-lavender — tetap prosedural, tanpa tekstur
+  eksternal.
+- `player.tscn`: collision `BoxShape3D` (tank) → `CapsuleShape3D`
+  (humanoid).
+- Dinding/reruntuhan destructible ronde-44 (`wall.gd`/`wall_system.gd`)
+  **dipertahankan** (hanya komentar diperbarui), direframe sebagai
+  reruntuhan kuno dunia sihir, bukan cover medan tempur tank.
+
 *Terakhir diperbarui: 2026-09-26*
 
 ## Ronde-8: Aset Desa & Alam — KayKit Medieval Hexagon Pack (CC0)

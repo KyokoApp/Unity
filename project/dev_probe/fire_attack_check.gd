@@ -1,6 +1,7 @@
 extends SceneTree
 ## Uji asap SERANGAN headless (tanpa GPU) — penjaga insiden Ronde-38, terus
-## dipertahankan lewat pivot ronde-45 (mage -> tank).
+## dipertahankan lewat pivot ronde-45 (mage -> tank) dan ronde-46 (tank ->
+## kembali ke penyihir anime).
 ##
 ## Kronologi insiden asli: fire_bolt.gd memakai `var distance := shake_target…`
 ## dengan shake_target bertipe Node -> analyzer Godot 4.5 melempar parse error
@@ -10,22 +11,21 @@ extends SceneTree
 ## ERROR, jadi jalur export saja tidak cukup — probe inilah yang gagal keras
 ## sebelum konten sempat diterbitkan.
 ##
-## RONDE-45: pivot total dari mage (mana bolt + mantra Zoltraak tahan-lepas)
-## ke TANK (meriam tap-tembak). Semantik serangan sekarang jauh lebih
-## sederhana daripada ronde-43/44: TAP tombol serang = SATU tembakan meriam
-## (tank_shell.gd), lalu reload (FIRE_COOLDOWN di player.gd) sebelum bisa
-## menembak lagi. TIDAK ADA lagi mode tahan-untuk-mengisi (mantra Zoltraak
-## dihapus total bersama seluruh pack mage). Probe ini disederhanakan
-## mengikuti — hanya menguji jalur tap-tembak yang tersisa.
+## RONDE-46: pivot balik dari TANK ke penyihir anime prosedural. Semantik
+## serangan tap tetap sederhana: TAP tombol serang = SATU peluru sihir kecil
+## (arcane_bolt.gd, sebelumnya bernama tank_shell.gd di ronde-45), lalu
+## reload singkat (FIRE_COOLDOWN di player.gd) sebelum bisa menembak lagi.
+## Mantra andalan yang lebih megah (bag. B ronde-46) belum ada di probe ini —
+## akan ditambah probe terpisah jika mantra itu jadi node/kelas sendiri.
 ##
 ## Jalankan (CI & lokal):
 ##   godot --headless --path project --script dev_probe/fire_attack_check.gd
 ## Exit 0 = LULUS; exit != 0 = build konten WAJIB berhenti.
 ##
 ## Fase 1 : semua .gd di packs/ + semua scene inti WAJIB termuat & valid.
-## Fase 2 : TAP cepat via set_attack_held → satu tank_shell.gd HARUS muncul.
+## Fase 2 : TAP cepat via set_attack_held → satu arcane_bolt.gd HARUS muncul.
 ## Fase 3 : HUD ditanam, handler tombol serang (_on_attack) TAP cepat →
-##          tank_shell.gd HARUS muncul (jalur persis tombol tembak di layar).
+##          arcane_bolt.gd HARUS muncul (jalur persis tombol tembak di layar).
 ##
 ## Catatan urutan engine (diverifikasi dari source Godot 4.5.2):
 ## _initialize() dipanggil SEBELUM root masuk tree — node yang ditambahkan di
@@ -44,14 +44,14 @@ const SCENES := [
 	"res://packs/ui/pause_menu.tscn",
 ]
 # WAJIB lebih besar dari DUA hal sekaligus, bukan cuma reload:
-#   1) FIRE_COOLDOWN (1.1) di player.gd — supaya fase berikutnya tak
+#   1) FIRE_COOLDOWN (0.3) di player.gd — supaya fase berikutnya tak
 #      tertelan reload.
-#   2) siklus hidup PENUH tank_shell.gd di dunia uji TANPA lantai (tak ada
+#   2) siklus hidup PENUH arcane_bolt.gd di dunia uji TANPA lantai (tak ada
 #      collider sama sekali di "TestWorld") — peluru jatuh bebas sampai
-#      y<=0 (~0.7 dtk dgn gravitasi & LIFT saat ini) lalu meledak, dan BARU
-#      benar-benar queue_free() 1 dtk KEMUDIAN (lihat tank_shell.gd
+#      y<=0 (~0.8 dtk dgn gravitasi & BOLT_LIFT saat ini) lalu meledak, dan
+#      BARU benar-benar queue_free() 1 dtk KEMUDIAN (lihat arcane_bolt.gd
 #      _explode()). Insiden ronde-45: nilai lama (1.3) lebih pendek dari
-#      siklus itu (~1.7 dtk) -> peluru fase sebelumnya kadang ke-free()
+#      siklus itu (~1.7-1.9 dtk) -> peluru fase sebelumnya kadang ke-free()
 #      TEPAT saat hitungan "after" fase berikutnya diambil, menyamarkan
 #      peluru baru yang sebenarnya berhasil ditembak (before==after palsu,
 #      "tombol serang HUD tidak menghasilkan tembakan"). Beri margin besar
@@ -79,7 +79,7 @@ func _fail(msg: String) -> void:
 
 func _finish() -> void:
 	if _exit_code == 0:
-		print("[fire-check] LULUS ✔ (serangan tank bekerja)")
+		print("[fire-check] LULUS ✔ (serangan sihir bekerja)")
 	else:
 		print("[fire-check] TIDAK LULUS ✘ — jangan terbitkan konten!")
 	quit(_exit_code)
@@ -127,7 +127,7 @@ func _run() -> void:
 	player.call("set_settings", null)
 	hud.call("bind_player", player)
 
-	# ---------- Fase 2: TAP cepat → tank_shell.gd ----------
+	# ---------- Fase 2: TAP cepat → arcane_bolt.gd ----------
 	await process_frame          # tree hidup; _ready pemain+HUD pasti sudah jalan
 	if not bool(player.get("is_ready")):
 		_fail("pemain tidak siap setelah 1 frame (is_ready=false)")
@@ -138,34 +138,34 @@ func _run() -> void:
 		_finish()
 		return
 	print("[fire-check] fase 2: TAP cepat…")
-	var before_tap := _count_by_suffix(world, "tank_shell.gd")
+	var before_tap := _count_by_suffix(world, "arcane_bolt.gd")
 	player.call("set_attack_held", true)
 	await create_timer(TAP_HOLD_SEC).timeout
 	player.call("set_attack_held", false)
 	await create_timer(RELEASE_SETTLE_SEC).timeout
-	var after_tap := _count_by_suffix(world, "tank_shell.gd")
+	var after_tap := _count_by_suffix(world, "arcane_bolt.gd")
 	if after_tap > before_tap:
-		print("[fire-check] fase 2 ✔ tap → ", after_tap - before_tap, " tank_shell.gd")
+		print("[fire-check] fase 2 ✔ tap → ", after_tap - before_tap, " arcane_bolt.gd")
 	else:
-		_fail("fase 2: tap cepat tidak menghasilkan tank_shell.gd — tombol serang mati")
+		_fail("fase 2: tap cepat tidak menghasilkan arcane_bolt.gd — tombol serang mati")
 
 	# ---------- Fase 3: jalur tombol HUD (TAP cepat) ----------
 	if not hud.has_method("_on_attack"):
 		_fail("handler tombol serang HUD (_on_attack) tidak ada")
 		_finish()
 		return
-	# jeda melewati sisa reload meriam (fase 2) supaya penekanan HUD diuji
-	# jujur, bukan tertelan cooldown tembakan terakhir
+	# jeda melewati sisa reload + siklus hidup peluru fase 2 supaya penekanan
+	# HUD diuji jujur, bukan tertelan cooldown/peluru lama yang masih hidup
 	await create_timer(COOLDOWN_WAIT_SEC).timeout
 	print("[fire-check] fase 3: tekan tombol serang via HUD (tap cepat)…")
-	var before := _count_by_suffix(world, "tank_shell.gd")
+	var before := _count_by_suffix(world, "arcane_bolt.gd")
 	hud.call("_on_attack", true)
 	await create_timer(TAP_HOLD_SEC).timeout
 	hud.call("_on_attack", false)
 	await create_timer(RELEASE_SETTLE_SEC).timeout
-	var after := _count_by_suffix(world, "tank_shell.gd")
+	var after := _count_by_suffix(world, "arcane_bolt.gd")
 	if after > before:
-		print("[fire-check] fase 3 ✔ tombol HUD → ", after - before, " peluru meriam baru")
+		print("[fire-check] fase 3 ✔ tombol HUD → ", after - before, " peluru sihir baru")
 	else:
 		_fail("fase 3: tombol serang HUD tidak menghasilkan tembakan")
 	_finish()

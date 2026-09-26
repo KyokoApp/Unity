@@ -1,9 +1,10 @@
 extends Node3D
-## Dinding/bunker tinggi acak (ronde-44, dipertahankan sebagai rintangan
-## medan tempur tank di ronde-45): solid (menghalangi jalan tank & kamera
-## lewat collision_layer yang sama dengan lantai) dan berkeping-keping jadi
-## kotak yang berputar (RigidBody3D) saat hancur kena tembakan meriam cukup
-## besar — cocok jadi cover/bunker yang bisa diratakan tank.
+## Dinding batu/reruntuhan tinggi acak (ronde-44, dipertahankan lintas-ronde
+## sebagai rintangan & pemandangan dunia sihir terbuka di ronde-46): solid
+## (menghalangi jalan pemain & kamera lewat collision_layer yang sama dengan
+## lantai) dan berkeping-keping jadi kotak yang berputar (RigidBody3D) saat
+## hancur kena peluru sihir cukup kuat — cocok jadi reruntuhan kuno yang bisa
+## diruntuhkan dengan mantra.
 
 const HEALTH_PER_SEGMENT := 42.0
 const DEBRIS_LIFETIME := 3.2

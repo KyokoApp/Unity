@@ -1,12 +1,13 @@
 extends Node3D
-## World: DUNIA DATAR TANPA BATAS — medan tempur tank (ronde-45, pivot dari
-## game mage/monster). Bidang datar tak berujung (visual mengikuti pemain +
-## collider bidang WorldBoundaryShape3D — POLA SEDERHANA, bukan trimesh ⇒
-## is_on_floor() engine selalu benar), langit kartun + siklus siang-malam
-## dipertahankan utuh. Rintangan medan tempur: dinding/bunker destructible
-## acak (wall_system.gd). Roster tank musuh (wave survival) menyusul di
-## Bagian B ronde-45. API platform tetap lengkap agar HUD/pemain/game_root
-## tidak perlu berubah.
+## World: DUNIA DATAR TANPA BATAS bergaya sihir open-world (ronde-46, pivot
+## balik dari game tank ke tema penyihir anime). Bidang datar tak berujung
+## (visual mengikuti pemain + collider bidang WorldBoundaryShape3D — POLA
+## SEDERHANA, bukan trimesh ⇒ is_on_floor() engine selalu benar), langit
+## kartun + siklus siang-malam dipertahankan utuh. Reruntuhan/dinding batu
+## destructible acak (wall_system.gd) dipertahankan sebagai rintangan &
+## pemandangan dunia terbuka. Tanah rumput lebat (bag. C) & mantra andalan
+## yang dipoles (bag. B) menyusul. API platform tetap lengkap agar
+## HUD/pemain/game_root tidak perlu berubah.
 
 signal gen_progress(p: float, t: String)
 
@@ -24,7 +25,7 @@ var time_of_day := 16.4       # sore adem (cicilan ini boleh jalan terus)
 
 var _root: Node
 var _ground: MeshInstance3D   # bidang raksasa yang menyentak mengikuti pemain
-var wall_system: Node3D       # dinding/bunker destructible — rintangan medan tempur tank
+var wall_system: Node3D       # reruntuhan/dinding batu destructible — rintangan & pemandangan dunia
 const GROUND_SIZE := 1600.0
 var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 

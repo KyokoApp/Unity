@@ -1,7 +1,7 @@
 extends Node3D
-## Spawner dinding/bunker tinggi ACAK (ronde-44), dipertahankan di ronde-45
-## sebagai rintangan/cover medan tempur tank — solid dan bisa dihancurkan
-## kena tembakan meriam. Posisi slot tetap (deterministik, mudah diuji),
+## Spawner dinding batu/reruntuhan tinggi ACAK (ronde-44), dipertahankan
+## lintas-ronde sebagai rintangan & pemandangan dunia sihir terbuka —
+## solid dan bisa dihancurkan kena peluru sihir. Posisi slot tetap (deterministik, mudah diuji),
 ## tapi tinggi/lebar/warna tiap dinding acak lewat RNG berseed tetap supaya
 ## tata letak konsisten antar sesi permainan tanpa perlu menyimpan state
 ## manapun.

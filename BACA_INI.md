@@ -1,4 +1,4 @@
-# BACA INI — Ronde-45: pivot total ke game TANK (bag. A: hull+turret+meriam)
+# BACA INI — Ronde-46: pivot balik dari TANK ke penyihir anime (bag. A: karakter)
 
 ## Alur repository
 
@@ -9,144 +9,125 @@
 - `.github/workflows/apk_release.yml` tetap mendaftarkan branch sesi pada
   `on.push.branches`.
 
-## Latar belakang pivot
+## Latar belakang pivot (lagi)
 
-Setelah ronde-44 bag. A (Zoltraak) & bag. B (dinding tinggi destructible)
-selesai dan lolos CI, pengguna menyimpulkan game ini "lebih cocok jadi game
-tank". Setelah dikonfirmasi eksplisit (lihat keputusan di bawah), seluruh
-pack mage (kubus mantra Zoltraak, mana biru, monster) **dihapus total** dan
-diganti murni game tank. Rencana grapple ala Attack on Titan (bag. C
-ronde-44, belum sempat dikerjakan) ikut dibatalkan bersama pivot ini.
+Ronde-45 memindahkan seluruh game dari mage ke TANK (kamera orang-ketiga di
+belakang tank, meriam tap-tembak) dan berhasil terbit lewat CI. Setelah
+melihat hasilnya, pengguna menilai tank "kurang/jelek" dan minta pivot
+**kembali ke tema sihir**, kali ini dengan tuntutan visual jauh lebih tinggi:
+karakter bergaya anime beranimasi + banyak efek + dunia yang lebih hidup.
 
-Keputusan eksplisit pengguna (lewat pertanyaan klarifikasi):
-1. Kamera/kontrol: **orang ketiga di belakang tank** (bukan top-down/isometrik).
-2. Inti permainan: **bertahan dari gelombang tank musuh** (wave survival) —
-   akan dikerjakan di Bagian B ronde-45 (belum ada di commit ini).
-3. Aset/kode mage-Zoltraak-monster-AoT: **dihapus total** dari project (bukan
-   sekadar diarsipkan) — sudah dieksekusi di Bagian A ini.
+Keputusan eksplisit pengguna (lewat serangkaian pertanyaan klarifikasi):
+1. **Buang tank total**, balik ke karakter penyihir/spellcaster.
+2. Karakter: **bergaya anime**, TAPI harus **100% prosedural** — TIDAK ada
+   file model eksternal (.vrm/.glb/.fbx) yang diimpor. Ini bukan preferensi,
+   melainkan keterbatasan teknis yang sudah dikonfirmasi lewat percobaan
+   nyata: sandbox pengerjaan ini memblokir unduhan biner via `curl`/`wget`
+   (SSL_ERROR_SYSCALL ke domain CDN seperti githubusercontent.com,
+   arweave.net), dan `fetch_page` (yang punya jalur jaringan sendiri)
+   MERUSAK byte biner karena mengonversi hasil jadi teks/markdown —
+   dikonfirmasi dengan file GLB asli yang pengguna berikan via link Google
+   Drive: filenya valid (header glTF terbaca), tapi byte-nya korup begitu
+   lewat `fetch_page`. Pengguna juga tidak bisa melampirkan file secara
+   langsung sebagai lampiran chat saat ditawarkan. Jalur satu-satunya yang
+   sah untuk aset 3D eksternal (lampiran chat langsung) belum pernah
+   berhasil dicoba di sesi ini.
+3. Dunia: **tetap datar tak berbatas** (bukan bikin terrain baru berbukit),
+   tapi tanah/rumputnya dibuat **lebat & realistis** (bukan grid biru
+   blueprint yang sekarang) — direncanakan Bagian C ronde ini.
+4. Efek: fokus pada **satu mantra andalan** (gaya Zoltraak lama) yang dipoles
+   jauh lebih megah/detail partikelnya — BUKAN menambah variasi mantra baru.
+   Direncanakan Bagian B ronde ini.
 
-## Perubahan Bagian A (commit ini)
+## Perubahan Bagian A (commit ini): karakter penyihir anime prosedural
 
-### Dihapus total
+### Dihapus / diganti nama
 
-- `player.gd` versi mage (kubus mantra + charge Zoltraak) — DITULIS ULANG
-  PENUH jadi tank (lihat bawah), bukan dihapus filenya (nama file & scene
-  `player.tscn` dipertahankan supaya `game_root.gd`/probe tidak perlu
-  berubah).
-- `fire_bolt.gd`, `zoltraak_bolt.gd`, `zoltraak_charge.gd`,
-  `zoltraak_aura.gdshader`, `zoltraak_core.gdshader` — dihapus.
-- `monster.gd`, `monster_system.gd` (roster monster tetap 8 ekor) — dihapus;
-  `world.gd` tidak lagi menginstansiasi sistem monster.
-- Rencana grapple ala Attack on Titan (belum ada kode-nya) dibatalkan; grup
-  `grapple_target` dan fungsi `grapple_anchor()` di `wall.gd` dihapus karena
-  tidak lagi relevan.
+- Kode tank di `player.gd` (hull+turret+meriam) — **ditulis ulang total**
+  jadi karakter penyihir (nama file & `player.tscn` dipertahankan supaya
+  `game_root.gd`/probe tidak perlu berubah).
+- `tank_shell.gd` → **direname** jadi `arcane_bolt.gd` (proyektil sihir kecil
+  untuk tap attack biasa; arsitektur ballistic+raycast yang sama, dipoles
+  ulang warnanya jadi kristal arcane ungu-biru, bukan lagi selongsong peluru
+  oranye).
+- `fireball_core.gdshader`, `fireball_shell.gdshader`, `shockwave.gdshader`,
+  `fire_explosion.gd` — **direcolor** dari tema api-oranye (tank) jadi tema
+  arcane ungu-biru-lavender. Nama file tetap "fire_*"/"fireball_*" (warisan
+  generik helper FX yang sudah dipakai ulang & direcolor beberapa kali
+  lintas-ronde: mana biru → api tank → arcane ungu-biru); isinya sudah
+  100% bertema sihir.
+- `player.tscn`: collision `BoxShape3D` (tank) → `CapsuleShape3D` (humanoid).
 
-### Dipertahankan (reuse lintas-ronde)
+### Karakter baru: penyihir bergaya anime, 100% prosedural
 
-- **Dinding/bunker destructible acak** (`wall.gd`/`wall_system.gd`, ronde-44
-  bag. B) TETAP ADA — kini berperan sebagai rintangan/cover medan tempur
-  tank yang bisa diratakan meriam. Tidak ada perubahan mekanik, hanya
-  komentar direvisi (bukan lagi target grapple).
-- `fire_fx.gd` (pustaka cache resource FX prosedural) dipakai apa adanya,
-  tidak mage-spesifik.
+Dirakit murni dari primitive Godot (sphere/cone/cylinder/capsule/torus) +
+shader cel-shading yang SUDAH ADA di project (`Materials.toon()` dari
+`shaders_materials/materials.gd`, memakai `toon.gdshader` 3-band + outline
+inverted-hull `outline.gdshader` otomatis via `next_pass`) — TIDAK ADA
+tekstur wajah atau file model eksternal:
 
-### Player = tank (hull + turret independen + meriam)
+- Proporsi chibi-anime: kepala besar, badan kecil berjubah.
+- Kepala: sphere kulit + **mata besar bulat** (sclera+iris+kilau unshaded,
+  ciri khas mata anime berbinar) + **pipi merona** (quad lembut) — semua
+  geometri, bukan tekstur, supaya tidak berisiko salah wrap UV (tak bisa
+  dipratinjau visual di sandbox ini).
+- Rambut: poni sphere + 7 jambul runcing (cone) tersebar + 2 kuncir
+  (capsule) di belakang, warna lavender terang.
+- Topi penyihir runcing (brim + cone) dengan pita emas — siluet ikonik.
+- Jubah ungu (cylinder tapered) + sabuk (torus emas).
+- Lengan: 2 capsule dengan **animasi ayun prosedural** (tanpa skeleton,
+  murni rotasi pivot berbasis `sin(t)`), disinkronkan ke kecepatan gerak.
+- **Aura partikel ungu-biru** yang melayang terus-menerus mengelilingi
+  karakter (bukan cuma saat menyerang) — permintaan "banyak efek" berlaku
+  juga saat idle.
+- Idle bob halus + ayunan rambut mengikuti arah gerak.
 
-- `player.gd` ditulis ulang total: badan/hull (`BoxMesh`) berputar mengikuti
-  arah GERAK (seperti track tank berbelok, logika sama seperti kubus mage
-  dulu), sedangkan TURRET (menara + laras) adalah node terpisah yang
-  berputar independen mengikuti arah kamera/swipe (`yaw`) — persis seperti
-  tank sungguhan: badan boleh jalan ke satu arah, moncong meriam tetap
-  mengincar arah lain.
-- Kamera third-person tidak berubah perilakunya (murni ikut swipe,
-  tanpa auto-aim), tapi sekarang turret "menempel" pada arah kamera —
-  jadi kamera terasa seperti membidik lewat teleskop tank.
-- Serangan disederhanakan drastis dibanding mage: TAP tombol serang = SATU
-  tembakan meriam (`tank_shell.gd`), lalu reload `FIRE_COOLDOWN` (1.1 detik)
-  sebelum bisa menembak lagi. **TIDAK ADA lagi mode tahan-untuk-mengisi**
-  (mantra Zoltraak dihapus total, tidak digantikan skill serupa di bag. A
-  ini).
-- Tombol "Dash" HUD dipertahankan APA ADANYA (`press_dash()`, tidak ada
-  perubahan wiring HUD sama sekali di ronde ini) tapi kini berperan sebagai
-  "Boost" tank: ledakan kecepatan singkat (0,5 detik) lalu cooldown panjang
-  (3 detik) — cocok untuk manuver mendadak, bukan spam seperti dash mage.
-- Gerak tank sengaja dibuat lebih berat/lambat dari mage (`MAX_SPEED` 10,5
-  → 7,2; akselerasi lebih pelan) supaya terasa seperti kendaraan berat.
-- `max_health` dinaikkan 100 → 150 (kesan tank berlapis baja).
-- Kolisi pemain di `player.tscn` diganti dari `SphereShape3D` ke
-  `BoxShape3D` supaya lebih pas menutupi bentuk hull tank dan bertabrakan
-  lebih akurat dengan dinding/bunker kotak.
+### Gerak & kamera
 
-### Peluru meriam (`tank_shell.gd`, ganti nama dari `fire_bolt.gd`)
+Arsitektur third-person murni ikut swipe + gerak bebas relatif kamera
+**tidak diubah** (terbukti stabil lintas-ronde sejak mage awal). Skala
+gerak dikembalikan ke penyihir jalan kaki (lebih lincah dari tank):
+`MAX_SPEED=9.0`, jarak kamera `CAM_DIST=7.6` (turun dari 9.5 milik tank).
+Dash (burst cepat) dipertahankan dengan efek kilau ungu saat dipakai.
 
-- Arsitektur proyektil (balistik: gravitasi + raycast per-frame) TIDAK
-  berubah dari mekanik lama — hanya nama file & tema visual/warna yang
-  berubah dari mana biru ke selongsong peluru berpijar oranye.
-- Damage dinaikkan 35 → 58 (sepadan dengan reload yang lebih lambat).
-- Sudah mendeteksi collider bermeta `"wall"` (dinding/bunker, ronde-44) DAN
-  `"enemy_tank"` (tank musuh, akan ada objeknya mulai Bagian B ronde-45 —
-  deteksinya ditambahkan sekarang secara forward-compatible, tidak
-  memengaruhi apa pun karena belum ada objek berlabel itu).
-- Getaran kamera saat ledakan kini benar-benar berfungsi: `tank_shell.gd`
-  memanggil `shake_target.add_shake(...)` dan `player.gd` sekarang punya
-  method `add_shake()` yang nyata (di mage lama method ini dipanggil tapi
-  TIDAK PERNAH ada di player.gd — dead code yang tidak pernah jalan).
+### Dunia
 
-### Ledakan & shader direcolor (mana biru → api oranye)
+- `world.gd`, `wall.gd`, `wall_system.gd`: hanya **komentar header**
+  diperbarui (dari "medan tempur tank" jadi "rintangan & pemandangan dunia
+  sihir terbuka") — dinding/reruntuhan destructible dari ronde-44
+  **dipertahankan** sebagai reruntuhan kuno yang bisa dihancurkan mantra,
+  bukan dihapus.
+- Tanah masih grid-blueprint biru (belum diganti) — itu Bagian C ronde ini,
+  BELUM dikerjakan di commit ini.
+- **Belum ada musuh di dunia** (monster_system dihapus ronde-45, roster
+  tank musuh ronde-45 bag. B tak pernah dibuat). Ini belum diminta ulang
+  oleh pengguna di ronde-46 — perlu ditanyakan lagi jika kombat/musuh mau
+  dikembalikan.
 
-- `fireball_core.gdshader`, `fireball_shell.gdshader`, `fire_explosion.gd`:
-  seluruh palet warna dikembalikan dari biru-putih (ronde-43) ke oranye/
-  merah (ledakan meriam khas tank) — hanya konstanta warna yang berubah,
-  logika shader/partikel tetap sama persis.
-- `shockwave.gdshader` TIDAK perlu diubah — defaultnya sudah oranye; yang
-  berubah cuma parameter `tint` yang di-override dari skrip caller.
+### Probe CI
 
-### Uji asap CI disederhanakan
+`dev_probe/fire_attack_check.gd` diperbarui mengikuti rename
+`tank_shell.gd` → `arcane_bolt.gd` (semua string suffix yang dicek). Logika
+& konstanta timing (`COOLDOWN_WAIT_SEC=3.0`) dipertahankan — siklus hidup
+penuh `arcane_bolt.gd` (jatuh bebas + delay `queue_free()` 1 dtk) dihitung
+ulang dan masih di bawah 3 detik.
 
-- `project/dev_probe/fire_attack_check.gd`: fase pengujian mode
-  tahan-untuk-mantra (fase 2b lama, menguji `zoltraak_bolt.gd`) DIHAPUS
-  karena mekaniknya sudah tidak ada. Probe kini hanya menguji jalur TAP →
-  `tank_shell.gd` muncul (fase 2 & 3), sesuai semantik serangan tank yang
-  baru jauh lebih sederhana dari mage.
+## Yang BELUM dikerjakan (menyusul di bagian berikutnya)
 
-## Belum dikerjakan (menyusul di bagian berikutnya ronde-45)
+- **Bagian B**: mantra andalan (gaya Zoltraak) dipoles jauh lebih
+  megah/detail partikelnya — masih memakai sistem tap-fire kecil
+  (`arcane_bolt.gd`) untuk serangan biasa; mantra besar belum ada.
+- **Bagian C**: reskin tanah dari grid biru jadi rumput lebat realistis di
+  `world.gd` (`_make_ground_material()`).
+- Nasib musuh/kombat di dunia sihir open-world: belum dibahas ulang dengan
+  pengguna di ronde ini.
 
-- **Bagian B**: roster tank musuh + AI dasar (gerak + tembak) + mode
-  bertahan dari gelombang (wave survival) — dunia saat ini belum ada musuh
-  sama sekali setelah `monster_system.gd` dihapus.
-- **Bagian C (kemungkinan)**: polish HUD (ikon tombol serang, sembunyikan
-  tombol yang tidak relevan untuk tank seperti jump/crouch/emote), indikator
-  reload meriam, dan pertimbangan mengganti kubus prosedural dengan aset
-  tank 3D CC0 gratis (mis. paket "Tank" dari Quaternius — sudah dicek
-  tersedia, belum diunduh/diintegrasikan).
+## Validasi yang dijalankan (sandbox ini, tanpa GPU/Godot lokal)
 
-## Verifikasi
-
-- Semua 18 file GDScript di `project/packs` (+ `dev_probe/fire_attack_check.gd`)
-  lolos `gdparse` lokal.
-- `python3 tools/analyze_checks.py /home/user/Unity` → `BERSIH ✓`.
-- `git diff --check` → bersih, tidak ada marker konflik.
-- Uji CI GitHub Actions: lihat commit message untuk run ID & hasil (diisi
-  setelah `gh run watch` selesai).
-
-## Cara test di HP
-
-1. Tutup game sepenuhnya lalu buka lagi agar delta terbaru terunduh.
-2. Pastikan karakter kini tampak seperti tank kotak (hull rendah + menara +
-   laras), bukan lagi kubus polos.
-3. Gerakkan joystick kiri: hull tank berputar mengikuti arah gerak (seperti
-   track berbelok).
-4. Swipe layar untuk memutar kamera: perhatikan MENARA & LARAS ikut berputar
-   mengincar arah kamera, independen dari arah gerak hull.
-5. Tap tombol serang: satu peluru oranye meluncur searah laras lalu meledak
-   (api oranye, bukan lagi ledakan biru). Tap lagi dengan cepat: HARUS ada
-   jeda reload (~1 detik) sebelum bisa menembak lagi.
-6. Tembak ke arah dinding tinggi (peninggalan ronde-44): dinding harus rusak
-   dan akhirnya runtuh jadi pecahan kotak berputar setelah beberapa kali
-   kena tembak.
-7. Tombol "Dash" sekarang jadi "Boost": tank meluncur cepat sesaat lalu
-   melambat, ada cooldown sebelum bisa dipakai lagi.
-8. Belum ada musuh di dunia (menyusul Bagian B) — ini BUKAN bug, memang
-   belum dikerjakan di bagian ini.
-
-*Terakhir diperbarui: 2026-09-26*
+- `gdparse` (gdtoolkit) pada semua `.gd` yang diubah + loop penuh
+  `project/**/*.gd` → semua lolos parse.
+- `python3 tools/analyze_checks.py .` → BERSIH ✓ (18 file `.gd` diperiksa).
+- `git diff --cached --check` → tidak ada whitespace/marker konflik.
+- **Verifikasi render/visual sesungguhnya HARUS lewat CI GitHub Actions**
+  (`gh run watch`) — tidak ada Godot binary lokal di sandbox ini dan tidak
+  bisa diunduh (firewall sandbox), jadi tidak ada cara preview lokal.
