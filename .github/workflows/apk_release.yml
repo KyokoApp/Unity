@@ -139,12 +139,20 @@ jobs:
       # CATATAN PATH: path --script relatif di-resolve terhadap CWD proses,
       # BUKAN --path project (jebakan run_all_tests lama) → pakai path absolut.
       - name: Uji asap serangan (skrip compile + bola api keluar)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RC=0; timeout 300 ./godot --headless --path project --script "$GITHUB_WORKSPACE/project/dev_probe/fire_attack_check.gd" > "$GITHUB_WORKSPACE/firecheck.log" 2>&1 || RC=$?
           cat "$GITHUB_WORKSPACE/firecheck.log"
           if [ "$RC" != "0" ]; then
             TAIL=$(tail -c 700 "$GITHUB_WORKSPACE/firecheck.log" | tr '\n' '|' | tr -d '\r')
             echo "::error file=project/dev_probe/fire_attack_check.gd,title=UJI SERANGAN GAGAL (rc=$RC)::${TAIL}"
+            # DIAGNOSTIK SANDBOX (sementara, ronde ini saja): lihat catatan di
+            # session memory — blob storage Actions diblokir jaringan sandbox
+            # agen, jadi log penuh dipublikasikan ke komentar commit lewat
+            # api.github.com. Hapus blok ini setelah investigasi selesai.
+            BODY=$(tail -c 60000 "$GITHUB_WORKSPACE/firecheck.log")
+            gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -f body="$BODY" || true
             exit 1
           fi
           echo "uji serangan lulus ✔"

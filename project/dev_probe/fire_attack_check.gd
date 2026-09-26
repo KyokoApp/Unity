@@ -157,13 +157,20 @@ func _run() -> void:
 	# jujur, bukan tertelan cooldown tembakan terakhir
 	await create_timer(COOLDOWN_WAIT_SEC).timeout
 	print("[fire-check] fase 3: tekan tombol serang via HUD (tap cepat)…")
+	print("[dbg3] pre cooldown=", player.get("_fire_cooldown"), " charge_active=", player.get("_charge_active"), " was_holding=", player.get("_was_holding"), " attack_held=", player.get("_attack_held"), " player_of_hud=", hud.get("player"))
 	var before := _count_by_suffix(world, "fire_bolt.gd")
 	hud.call("_on_attack", true)
-	await process_frame          # < CHARGE_START_DELAY (0.16s) -> tetap dianggap tap
+	print("[dbg3] t0 attack_held=", player.get("_attack_held"))
+	for i in range(4):
+		await process_frame
+		print("[dbg3] +", i, " charge_time=", player.get("_charge_time"), " charge_active=", player.get("_charge_active"), " was_holding=", player.get("_was_holding"))
 	hud.call("_on_attack", false)
-	await process_frame          # frame 1: _process menerima "lepas"
-	await process_frame          # frame 2: margin aman — hindari race 1-frame
+	print("[dbg3] release attack_held=", player.get("_attack_held"))
+	for i in range(4):
+		await process_frame
+		print("[dbg3] r+", i, " fire_bolt_count=", _count_by_suffix(world, "fire_bolt.gd"), " was_holding=", player.get("_was_holding"))
 	var after := _count_by_suffix(world, "fire_bolt.gd")
+	print("[dbg3] final before=", before, " after=", after)
 	if after > before:
 		print("[fire-check] fase 3 ✔ tombol HUD → ", after - before, " bola api baru")
 	else:
