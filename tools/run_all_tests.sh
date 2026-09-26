@@ -108,5 +108,15 @@ else
 fi
 tail -4 "$LOGS/quality_check.log" | grep -avE "fontconfig"
 
+say "10. Uji asap serangan (skrip compile + bola api keluar; penjaga Ronde-38)"
+# CATATAN: path --script relatif di-resolve terhadap CWD, BUKAN --path → absolut.
+timeout 300 "$GODOT" --headless --path "$PRJ" --script "$ROOT/project/dev_probe/fire_attack_check.gd" > "$LOGS/firecheck.log" 2>&1
+if [ $? -eq 0 ]; then
+    ok "serangan: semua skrip pack compile, bola api keluar via tombol HUD"
+else
+    fail "fire-check keluar non-zero — JANGAN terbitkan konten"
+fi
+tail -12 "$LOGS/firecheck.log" | grep -avE "fontconfig"
+
 say "Selesai — ringkasan:"
 cat "$LOGS/summary.txt"

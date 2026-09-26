@@ -94,6 +94,28 @@ def bump_version(v):
     parts[-1] += 1
     return ".".join(str(x) for x in parts)
 
+# Pola pesan Godot yang menandakan skrip GAGAL compile saat export. Godot
+# --export-pack tetap exit 0 walau ada SCRIPT ERROR (insiden Ronde-38: pack
+# character_player 1.0.26 terbit dengan player.gd rusak — tombol serang mati
+# diam-diam di perangkat). Daftar ini WAJIB gagal-kan build sebelum publish.
+SCRIPT_ERROR_PATTERNS = (
+    "SCRIPT ERROR",
+    "Failed to load script",
+    "Parse Error",
+    "Compile Error",
+    "Failed to compile",
+)
+
+def find_script_errors(text):
+    """Kembalikan baris yang mengindikasikan skrip gagal compile (case-sensitive
+    untuk pola resmi Godot; abaikan baris yang hanya MENYEBUT kata itu)."""
+    hits = []
+    for line in text.splitlines():
+        s = line.strip()
+        if any(p in s for p in SCRIPT_ERROR_PATTERNS):
+            hits.append(s)
+    return hits
+
 def gen_export_presets(pack_infos):
     """Tulis export_presets.cfg lengkap (semua key wajib preset Godot 4.5).
     preset.0 = Android Launcher APK; sisanya 1 preset .pck per pack."""
@@ -298,11 +320,20 @@ def main():
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900, env=env)
             lines = [l for l in proc.stdout.splitlines() if "error" in l.lower() or "warn" in l.lower()]
             lines += [l for l in proc.stderr.splitlines() if l.strip()]
+            # GEMBOK SKRIP (insiden Ronde-38): Godot exit 0 walau skrip gagal
+            # compile — pack rusak sempat TERBIT ke perangkat. Skrip yang gagal
+            # compile = konten pasti mati saat berjalan → gagal-kan build.
+            script_errors = find_script_errors(proc.stdout + "\n" + proc.stderr)
             export_log.append({
                 "pack": pid, "version": info["version"], "returncode": proc.returncode,
                 "duration_s": round(time.time() - t0, 1),
                 "messages": lines[-25:],
             })
+            if script_errors:
+                print(f"[error] export {pid}: SKRIP GAGAL COMPILE ({len(script_errors)} pesan) — build dihentikan")
+                for l in script_errors[:10]:
+                    print("    " + l)
+                sys.exit(4)
             if proc.returncode != 0:
                 print(f"[error] export {pid} gagal (rc={proc.returncode})")
                 print("\n".join(lines[-15:]))

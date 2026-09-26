@@ -15,4 +15,7 @@ assets_src/
 *.log
 .DS_Store
 dev_probe/
+!project/dev_probe/
+project/dev_probe/*
+!project/dev_probe/fire_attack_check.gd
 !project/dev_probe/visual_proof.gd
