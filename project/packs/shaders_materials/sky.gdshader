@@ -53,20 +53,50 @@ void sky() {
 	// Bintang: proyeksi sederhana arah pandang ke petak-petak, hanya di atas
 	// cakrawala & memudar mendekati horizon (bukan hard cutoff yg aneh).
 	// STATIS (tak ada TIME di sini sama sekali) — realistis, tak berkedip.
+	//
+	// PERBAIKAN #2 (laporan "gk kayak referensi github"): versi sebelumnya
+	// TIDAK punya bentuk titik sama sekali — seluruh SEL yg lolos ambang
+	// diwarnai rata (jadi tiap "bintang" tampak spt bercak kotak/pipih
+	// pucat, bukan titik bulat berkilau). Sekarang tiap sel yg lolos diberi
+	// 1 titik bulat (posisi & ukuran acak per-sel dari hash, spt magnitudo
+	// bintang sungguhan — kebanyakan kecil, sesekali agak besar) + halo
+	// lembut tipis di sekitarnya. JUMLAH bintang TETAP SEDIKIT (star_density
+	// & ambang tak diubah, sesuai permintaan sebelumnya) — cuma bentuknya
+	// yg dibetulkan jadi titik nyata, bukan ditambah banyak.
 	if (star_visibility > 0.003 && y > 0.015) {
 		vec2 cell_uv = EYEDIR.xz / (y + 0.15) * star_density;
 		vec2 cell = floor(cell_uv);
+		vec2 f = fract(cell_uv);
 		float h = star_hash(cell);
 		float on = step(0.992, h);   // ambang lebih tinggi drpd versi awal -> lebih sedikit yg jadi bintang
+		// titik tak selalu pas di tengah sel -> taburan terasa alami, bukan grid kaku
+		vec2 star_pt = vec2(star_hash(cell + 3.1), star_hash(cell + 9.7));
+		float d = length(f - star_pt);
+		float size = mix(0.045, 0.15, pow(star_hash(cell + 13.0), 3.0));
+		float dot_core = smoothstep(size, size * 0.15, d);       // inti tajam bulat
+		float dot_glow = smoothstep(size * 2.6, 0.0, d) * 0.30;  // halo tipis di sekitarnya
 		float fade_horizon = smoothstep(0.02, 0.22, y);
 		float brightness = mix(0.6, 1.0, star_hash(cell + 7.0));
-		COLOR += vec3(0.92, 0.95, 1.0) * on * brightness * fade_horizon * star_visibility;
+		float shape = clamp(dot_core + dot_glow, 0.0, 1.0);
+		COLOR += vec3(0.92, 0.95, 1.0) * on * brightness * shape * fade_horizon * star_visibility;
 	}
 
+	// Cakram matahari/bulan + corona. PERBAIKAN "bulan kurang indah": dulu
+	// cuma 1 lapis halo SANGAT sempit (pow(d,24), nyaris tak kelihatan
+	// kecuali nempel persis cakram) & cakram warna rata datar. Sekarang
+	// ditambah 1 lapis corona LEBAR+lembut (pow(d,5)) biar ada aura cahaya
+	// menyebar di sekitarnya (kesan "bersinar", bukan cuma bulatan solid),
+	// plus gradasi halus di dalam cakram sendiri (tepi sedikit meredup)
+	// biar tak terlihat flat. Mekanisme sun/moon TETAP SAMA (dipakai
+	// bersama, cuma beda uniform dari world.gd sesuai waktu).
 	if (LIGHT0_ENABLED) {
 		float d = dot(EYEDIR, LIGHT0_DIRECTION);
 		float disc = smoothstep(1.0 - sun_size, (1.0 - sun_size) + sun_size * 0.4, d);
-		float glow = pow(clamp(d, 0.0, 1.0), 24.0) * halo;
-		COLOR += sun_color * (disc + glow) * max(LIGHT0_ENERGY, 0.0);
+		float disc_edge_dim = smoothstep(1.0 - sun_size, 1.0, d) * 0.12;
+		vec3 disc_col = sun_color * (1.0 - disc_edge_dim);
+		float glow_tight = pow(clamp(d, 0.0, 1.0), 20.0) * halo;
+		float glow_wide = pow(clamp(d, 0.0, 1.0), 5.0) * halo * 0.16;
+		COLOR += disc_col * disc * max(LIGHT0_ENERGY, 0.0);
+		COLOR += sun_color * (glow_tight + glow_wide) * max(LIGHT0_ENERGY, 0.0);
 	}
 }

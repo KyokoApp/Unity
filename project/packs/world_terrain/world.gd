@@ -436,11 +436,19 @@ func _apply_daylight() -> void:
 	_dl_last = time_of_day
 	var t := time_of_day
 	var dayf := sin((t - 6.0) / 12.0 * PI)
-	# Lantai elevasi 20° (bag. C: dunia SELALU malam sekarang, jadi lantai
-	# ini SELALU yang dipakai) — cukup tinggi drpd nempel horizon, tapi tetap
-	# masuk area pandang kamera (kamera selalu agak menunduk, lihat
-	# player.gd PITCH_MAX) supaya cakram bulan+halo-nya kelihatan jelas.
-	var elev := maxf(dayf * 62.0, 20.0)
+	# Lantai elevasi bulan (bag. C: dunia SELALU malam, jadi lantai ini
+	# SELALU yg dipakai). PERBAIKAN #2 (laporan "bulan gk indah/gk
+	# kliatan"): diturunkan lagi 20°->10°. Analisis kamera (player.gd):
+	# FOV 60° (setengah 30°), pitch default -34° & clamp maks "menengadah"
+	# cuma -10° -> tepi ATAS layar cuma capai elevasi (30 - (-pitch)):
+	# di default -34° tepi atas = -4° (msh DI BAWAH cakrawala, langit blm
+	# kelihatan sama sekali!), baru tembus ke elevasi +10..+20° kalau
+	# pemain aktif menengadah mendekati batas -10°. Jadi bulan/bintang
+	# MEMANG perlu pemain menengadah dulu (bukan tampil terus di layar
+	# default) — elevasi 10° dipilih spy sudah mulai kelihatan dgn
+	# tengadah SEDANG (blm perlu mentok ke batas ekstrem -10°), bukan cuma
+	# nongol tipis di detik terakhir spt versi 20° sebelumnya.
+	var elev := maxf(dayf * 62.0, 10.0)
 	var azim := (t - 12.0) / 12.0 * 140.0
 	sun.rotation_degrees = Vector3(-elev, azim - 90.0, 0)
 	var env := world_env.environment
@@ -504,8 +512,12 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("ground_bottom_color", Color(0.10, 0.15, 0.20).darkened(0.55))
 		sky_mat.set_shader_parameter("sun_color", Color(0.96, 0.97, 1.0))
 		sky_mat.set_shader_parameter("star_visibility", 1.0)
-		sky_mat.set_shader_parameter("sun_size", 0.06)
-		sky_mat.set_shader_parameter("halo", 0.32)
+		# bulan dibesarkan dikit (0.06->0.075) & halo dikuatkan (0.32->0.40)
+		# -- ditambah shader sky.gdshader skrg py lapisan corona lembut baru
+		# (bukan cuma pow(d,24) yg sempit) -> "bulan indah" bersinar nyata,
+		# bukan bulatan flat kecil.
+		sky_mat.set_shader_parameter("sun_size", 0.075)
+		sky_mat.set_shader_parameter("halo", 0.40)
 	# Di FOG_MODE_DEPTH, fog_density BUKAN lagi koefisien eksponensial —
 	# artinya opasitas MAKSIMUM kabut tepat di fog_depth_end (0=tak
 	# kelihatan, 1=menutup total). _lo.fog/_q_fog tetap dipakai sbg pengali
