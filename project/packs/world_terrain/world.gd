@@ -29,6 +29,7 @@ const SKY_SHADER := preload("res://packs/shaders_materials/sky.gdshader")
 const GRASS_SHADER := preload("res://packs/shaders_materials/grass_blade.gdshader")
 const DETAIL_GRASS_TEX := preload("res://packs/shaders_materials/textures/detail_grass.jpg")
 const WALL_SYSTEM := preload("res://packs/world_terrain/wall_system.gd")
+const IslandShape := preload("res://packs/world_terrain/island_shape.gd")
 
 var player: Node3D
 var quality_ref
@@ -246,6 +247,21 @@ func _build_grass() -> void:
 	mm.use_custom_data = true
 	mm.mesh = _build_grass_blade_mesh()
 	mm.instance_count = GRASS_COUNT
+	# PERBAIKAN BUG NYATA (laporan user: "rumput masih gk kerender", makin
+	# parah stlh pulau 12km ditambah): node MultiMesh ini SENGAJA tak pernah
+	# digeser (lihat catatan di atas) — instance CPU-side-nya selalu berada
+	# dlm kotak kecil ±GRASS_RADIUS di sekitar TITIK ASAL (0,0,0), sedangkan
+	# grass_blade.gdshader "membungkusnya" scr visual ke sekitar pemain di
+	# GPU. Godot menghitung frustum-culling MultiMeshInstance3D dari AABB
+	# LOKAL (kotak kecil itu) + extra_cull_margin, TANPA tahu soal
+	# pembungkusan GPU tsb -- begitu pemain menjauh dari (0,0,0) lebih dari
+	# ~GRASS_RADIUS+margin, seluruh rumput di-cull mesin (dianggap "di luar
+	# layar" krn geometri aslinya jauh dr kamera), padahal SEHARUSNYA selalu
+	# terlihat di sekitar pemain di manapun ia berada di pulau. custom_aabb
+	# dipaksa mencakup SELURUH pulau (radius pulau + buffer) supaya engine
+	# tak pernah meng-cull-nya keliru, berapa pun jauhnya pemain berjalan.
+	var island_r := IslandShape.RADIUS * 1.3 + 200.0
+	mm.custom_aabb = AABB(Vector3(-island_r, -4.0, -island_r), Vector3(island_r * 2.0, 8.0, island_r * 2.0))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20460301
 	# Domain KOTAK (bukan cakram) -1..+1 * GRASS_RADIUS: wrap di shader

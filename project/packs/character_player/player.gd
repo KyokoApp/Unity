@@ -45,6 +45,7 @@ const Materials := preload("res://packs/shaders_materials/materials.gd")
 const IslandShape := preload("res://packs/world_terrain/island_shape.gd")
 const SHOOT_SFX := "res://packs/audio_sfx/fire_shoot.wav"
 const ARCANE_BOLT := preload("res://packs/character_player/arcane_bolt.gd")
+const FIRE_SPIRIT := preload("res://packs/character_player/fire_spirit.gd")
 const MANNEQUIN_SCENE := preload("res://packs/character_player/mannequin/UAL1_Standard.glb")
 const FIRE_COOLDOWN := 0.3
 const BOLT_SPEED := 21.0
@@ -140,6 +141,7 @@ var max_health := 100.0
 var health := 100.0
 
 var _visual: Node3D
+var _fire_spirit: Node3D  # peliharaan elemental api di bahu, lihat _build_fire_spirit()
 var _model: Node3D
 var _anim: AnimationPlayer
 var _skeleton: Skeleton3D
@@ -182,6 +184,7 @@ func _ready() -> void:
 	cam_arm.add_excluded_object(get_rid())
 	_build_character()
 	_build_aura()
+	_build_fire_spirit()
 	is_ready = true
 	health_changed.emit(health, max_health)
 
@@ -437,6 +440,11 @@ func _shoot_direction() -> Vector3:
 	return (Basis(Vector3.UP, yaw) * Vector3(0, 0, -1)).normalized()
 
 func _hand_position(direction: Vector3) -> Vector3:
+	# Sumber lontar sihir SKRG di peliharaan elemental api di bahu (permintaan
+	# pengguna), bukan lagi di tangan/dada — fallback ke posisi lama kalau
+	# entah kenapa node peliharaan belum/tak ada (harusnya selalu ada).
+	if is_instance_valid(_fire_spirit):
+		return _fire_spirit.global_position + direction * 0.12
 	return _visual.global_position + Vector3.UP * CAST_HEIGHT + direction * 0.5
 
 func _try_fire() -> void:
@@ -456,6 +464,8 @@ func _try_fire() -> void:
 	host.add_child(bolt)
 	bolt.global_position = origin
 	_shake = minf(_shake + 0.14, 0.8)
+	if is_instance_valid(_fire_spirit):
+		_fire_spirit.pulse()
 	_play_shoot_sound()
 
 func _play_shoot_sound() -> void:
@@ -502,6 +512,18 @@ func _paint_purple() -> void:
 		var surfaces := mesh_inst.mesh.get_surface_count()
 		for i in range(surfaces):
 			mesh_inst.set_surface_override_material(i, mats[i % mats.size()])
+
+## Peliharaan elemental api kecil di bahu (permintaan pengguna: "spirit
+## elemental api kecil ... nembakin sihirnya dari situ, kayak peliharaan,
+## goyang goyang jangan kaku") — lihat fire_spirit.gd utk gerak idle
+## non-kaku (melayang+orbit+puter). Ditaruh sbg anak _visual spy ikut
+## rotasi/posisi badan, tapi py animasi mengambangnya SENDIRI tak tergantung
+## animasi tubuh. _hand_position() skrg mengembalikan posisi node ini —
+## artinya tembakan sihir scr visual keluar dari peliharaan ini, bukan tangan.
+func _build_fire_spirit() -> void:
+	_fire_spirit = FIRE_SPIRIT.new()
+	_fire_spirit.name = "FireSpirit"
+	_visual.add_child(_fire_spirit)
 
 ## Aura sihir ungu-biru yang melayang terus-menerus di sekitar karakter —
 ## permintaan pengguna "banyak efek" berlaku juga saat idle, bukan cuma saat

@@ -6,7 +6,11 @@ render_mode cull_disabled;
 
 uniform vec3 wind_dir = vec3(1.0, 0.0, 0.35);
 uniform float wind_speed = 1.7;
-uniform float wind_strength = 0.16;
+// PERBAIKAN (laporan user: "rumput ... gk goyang yang kayak digithub" — msh
+// terlalu halus dr referensi 3d-grass-shader): dinaikkan ~1.8x + ditambah
+// gust sekunder (freq beda, lihat vertex()) spy goyangannya kelihatan jelas
+// di perangkat & tak terasa seragam/monoton spt gelombang tunggal.
+uniform float wind_strength = 0.29;
 uniform vec3 base_color : source_color = vec3(0.09, 0.22, 0.08);  // dekat akar
 uniform vec3 tip_color : source_color = vec3(0.42, 0.62, 0.20);   // dekat ujung
 uniform float shadow_tint : hint_range(0.0, 1.0) = 0.48;
@@ -94,9 +98,15 @@ void vertex() {
 	}
 
 	float phase = INSTANCE_CUSTOM.y * TAU;
+	// Dua gelombang beda frekuensi+arah dijumlah (bukan satu sinus tunggal)
+	// spy goyangannya terasa spt "gust" angin sungguhan yg tak seragam antar
+	// rumpun, bukan gelombang mekanis berulang persis — lebih dekat ke kesan
+	// referensi 3d-grass-shader yg diminta user.
 	float sway = sin(TIME * wind_speed + world_pos.x * 0.6 + world_pos.z * 0.6 + phase);
+	float gust = sin(TIME * wind_speed * 0.37 + world_pos.x * 0.11 - world_pos.z * 0.08 + phase * 1.7);
+	float sway_total = sway * 0.7 + gust * 0.5;
 	// hanya bagian atas helai yg bergoyang (akar diam) -> height_w^2 sbg bobot
-	VERTEX += wind_dir * sway * wind_strength * height_w * height_w;
+	VERTEX += wind_dir * sway_total * wind_strength * height_w * height_w;
 	// normal "palsu" dicondongkan ke atas biar cahaya tak terlihat pipih-datar
 	NORMAL = normalize(mix(NORMAL, vec3(0.0, 1.0, 0.0), 0.55));
 }
