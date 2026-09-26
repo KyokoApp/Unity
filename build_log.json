@@ -3,7 +3,7 @@
   "pack": "core_scripts",
   "version": "1.0.12",
   "returncode": 0,
-  "duration_s": 3.8,
+  "duration_s": 3.6,
   "messages": [
    "cannot connect to daemon at tcp:5037: Connection refused"
   ]
