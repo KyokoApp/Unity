@@ -20,6 +20,13 @@ uniform float mid_tint : hint_range(0.0, 1.0) = 0.85;
 // "lompat" ke sisi berlawanan (disamarkan kabut jauh).
 uniform vec2 wrap_center = vec2(0.0, 0.0);
 uniform float wrap_size = 84.0;
+// "Injak" rumput (ronde-46, ide diadaptasi dari gameidea-studio/3d-grass-
+// shader): helai menekuk MENJAUH dari pemain saat dilewati, di luar goyangan
+// angin biasa -> berasa "menerobos rumput" waktu jalan, bukan cuma statis.
+// Dipakai lagi wrap_center sbg posisi pemain (sudah diberi tahu tiap frame
+// dari world.gd), jadi tak perlu uniform posisi pemain terpisah.
+uniform float trample_power : hint_range(0.0, 3.0) = 1.1;
+uniform float trample_radius : hint_range(0.1, 5.0) = 1.3;
 
 varying float height_w;   // 0=akar, 1=ujung (dibaca dari COLOR.a mesh)
 varying float variant;    // keacakan warna per-instance (INSTANCE_CUSTOM.x)
@@ -35,6 +42,19 @@ void vertex() {
 	rel = mod(rel + vec2(wrap_size * 0.5), vec2(wrap_size)) - vec2(wrap_size * 0.5);
 	MODEL_MATRIX[3].xz = wrap_center + rel;
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+
+	// Tekukan injak: cuma dihitung (termasuk inverse(MODEL_MATRIX) yg agak
+	// mahal) utk helai yg BENAR2 dekat pemain — dibungkus if supaya ribuan
+	// helai jauh lainnya tak ikut nanggung biayanya (hemat GPU mobile).
+	vec2 to_player = world_pos.xz - wrap_center;
+	float dist_p = length(to_player);
+	if (dist_p < trample_radius) {
+		vec2 away_w = dist_p > 0.0005 ? (to_player / dist_p) : vec2(0.0);
+		float trample = smoothstep(trample_radius, 0.0, dist_p) * height_w * height_w;
+		vec3 away_model = (inverse(MODEL_MATRIX) * vec4(away_w.x, 0.0, away_w.y, 0.0)).xyz;
+		VERTEX += away_model * trample * trample_power;
+	}
+
 	float phase = INSTANCE_CUSTOM.y * TAU;
 	float sway = sin(TIME * wind_speed + world_pos.x * 0.6 + world_pos.z * 0.6 + phase);
 	// hanya bagian atas helai yg bergoyang (akar diam) -> height_w^2 sbg bobot
