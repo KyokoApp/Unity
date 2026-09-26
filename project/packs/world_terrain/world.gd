@@ -354,8 +354,16 @@ func _setup_environment() -> void:
 	env.glow_normalized = true
 	env.glow_intensity = 0.8
 	env.glow_strength = 1.0
-	env.glow_bloom = 0.05
-	env.glow_hdr_threshold = 0.9
+	env.glow_bloom = 0.02
+	# PERBAIKAN BUG (laporan user: rumput jadi PUTIH — screenshot): ambang
+	# HDR 0.9 kelewat rendah stlh malam dibikin lbh terang (ambient/fog/sky
+	# dinaikkan bbrp ronde lalu) — cakrawala yg skrg cukup terang ikut lolos
+	# ambang glow & "bleed"/bocor blur ke rumput yg posisinya pas di garis
+	# cakrawala layar, kelihatan spt petak putih. Dinaikkan jauh (0.9->1.35)
+	# supaya HANYA yg BENAR2 HDR (bola api/ledakan, warna >1.0) yg berpendar
+	# — sesuai niat awal glow ("bola api pakai warna HDR -> berpendar"),
+	# bukan cahaya ambient malam yg cuma "terang", bukan "menyala".
+	env.glow_hdr_threshold = 1.35
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
 	env.set("glow_levels/1", true)
 	env.set("glow_levels/2", false)
@@ -375,20 +383,19 @@ func _setup_environment() -> void:
 	env.adjustment_saturation = 1.12
 	env.adjustment_contrast = 1.03
 	world_env.environment = env
-	# Auto-exposure (CameraAttributesPractical) — kamera "membiasakan mata"
-	# spt mata sungguhan: area gelap malam otomatis sedikit terangkat,
-	# area terang (dkt bola api/ledakan) tak over-expose. Ini yg benar2
-	# relevan dari ide plugin tsb (fitur ini JALAN normal di Mobile,
-	# beda dari SDFGI/Volumetric Fog/SSAO di atas). DOF bawaan plugin itu
-	# SENGAJA tidak diambil (settingannya blur dari jarak 0.01m -> bikin
-	# game aksi ini buram terus, tak cocok utk gameplay tarung).
+	# KOREKSI (laporan user: rumput jadi PUTIH — screenshot bukti): auto-
+	# exposure di atas TERNYATA TAK BERFUNGSI di renderer Mobile — dicek
+	# ulang ke dokumentasi resmi Godot: "Note: Auto-exposure is only
+	# supported in the Forward+ rendering method, not Mobile or
+	# Compatibility." PERSIS kesalahan yg sama spt yg diperingatkan soal
+	# plugin "Instant Realistic Light" (SDFGI/Volumetric Fog/SSAO), tapi
+	# kali ini kejeblos sendiri. Krn tak aktif di device, ia BUKAN
+	# penyebab langsung rumput putih (kemungkinan besar itu dari ambang
+	# glow yg kelewat rendah, lihat glow_hdr_threshold di atas) — tapi
+	# tetap dihapus krn cuma kode mati yg menyesatkan. exposure_multiplier
+	# statis (bukan auto) TETAP dipakai — itu beneran jalan di Mobile.
 	var cam_attr := CameraAttributesPractical.new()
-	cam_attr.exposure_multiplier = 1.15
-	cam_attr.auto_exposure_enabled = true
-	cam_attr.auto_exposure_scale = 0.32
-	cam_attr.auto_exposure_speed = 0.6
-	cam_attr.auto_exposure_min_sensitivity = 60.0
-	cam_attr.auto_exposure_max_sensitivity = 800.0
+	cam_attr.exposure_multiplier = 1.05
 	world_env.camera_attributes = cam_attr
 	add_child(world_env)
 
@@ -499,11 +506,22 @@ func _apply_daylight() -> void:
 		# kayak sebelum nya"): nilai awal terlalu redup — dinaikkan cukup
 		# besar di sini supaya malam terasa "menyala lembut" (moonlit),
 		# bukan gelap gulita, sambil tetap bernuansa biru dingin ala malam.
+		#
+		# KOREKSI #2 (laporan rumput jd PUTIH — bukti screenshot): nilai
+		# INI ditumpuk lagi dgn kenaikan glow/exposure/saturasi di ronde2
+		# setelahnya -> total kecerahan sesekali cukup tinggi shg ACES
+		# tonemap MEMUTIHKAN (hue hilang, jadi abu2/putih — ciri khas
+		# filmic tonemap saat overexposed) area yg kena kombinasi ambient+
+		# cahaya langsung+fog terbanyak. Angka di sini ditarik turun
+		# SEDIKIT (msh JAUH lbh terang drpd nilai asli 0.34/0.62 yg
+		# dikeluhkan "gelap banget") sbg bagian dari perbaikan, digabung
+		# dgn glow_hdr_threshold dinaikkan & exposure_multiplier diturunkan
+		# di _setup_environment (cari margin aman drpd overexposed lagi).
 		sun.light_color = Color(0.62, 0.72, 0.95)
-		sun.light_energy = 0.62
+		sun.light_energy = 0.52
 		env.ambient_light_color = Color(0.36, 0.44, 0.58)
-		env.ambient_light_energy = 0.88
-		env.fog_light_color = Color(0.24, 0.30, 0.42)
+		env.ambient_light_energy = 0.74
+		env.fog_light_color = Color(0.22, 0.28, 0.38)
 		sky_mat.set_shader_parameter("zenith_color", Color(0.08, 0.15, 0.25))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.17, 0.23, 0.33))
 		sky_mat.set_shader_parameter("ground_color", Color(0.10, 0.15, 0.20))
