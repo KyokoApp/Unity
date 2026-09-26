@@ -8,9 +8,10 @@ extends CharacterBody3D
 ## mengikuti input pemain.
 ##
 ## Serangan: tap cepat = tembakan mana biru kecil. Tahan tombol serang selama
-## 5 detik memunculkan mantra "ZOLTRAAK" di depan karakter (tumbuh dari pudar
-## ke lengkap); melepas tombol langsung menembakkan gelombang Zoltraak besar
-## searah hadap karakter saat itu.
+## 7 detik memunculkan mantra "ZOLTRAAK" di depan karakter (tumbuh dari pudar
+## ke lengkap, kamera zoom-in supaya balok karakter tampak menutupi sebagian
+## lingkaran seolah mantranya persis di depan wajah); melepas tombol langsung
+## menembakkan laser Zoltraak besar bergelombang searah hadap karakter.
 
 signal stats_changed(kind: String, count: int)
 signal nearest_interactable_changed(meta)
@@ -27,8 +28,9 @@ const BOLT_LIFT := 2.0
 
 # --- mantra Zoltraak: tahan tombol serang untuk mengisi, lepas untuk tembak ---
 const CHARGE_START_DELAY := 0.16
-const CHARGE_FULL_TIME := 5.0
+const CHARGE_FULL_TIME := 7.0
 const ZOLTRAAK_COOLDOWN := 0.55
+const CHARGE_ZOOM_IN := 2.8   # spring_length dikurangi sebesar ini saat charge aktif
 
 # --- gerak ---
 const MAX_SPEED := 10.5
@@ -71,6 +73,7 @@ var _base_amounts := {}
 var _t := 0.0
 var _speed01 := 0.0
 var _cam_extra := 0.0
+var _charge_zoom := 0.0
 var _cam_snapped := false
 var _facing := Vector3.ZERO
 var _attack_held := false
@@ -243,7 +246,12 @@ func _apply_camera(delta: float) -> void:
 		cam_pivot.global_position = cam_pivot.global_position.lerp(focus, 1.0 - exp(-CAM_FOLLOW * delta))
 	cam_pivot.rotation = Vector3(pitch, yaw, 0.0)
 	_cam_extra = lerpf(_cam_extra, _speed01 * 1.3, 1.0 - exp(-3.0 * delta))
-	cam_arm.spring_length = CAM_DIST + _cam_extra
+	# Zoom-in dramatis selagi menahan mantra Zoltraak: kamera mendekat supaya
+	# balok karakter tampak menutupi sebagian lingkaran, seolah mantranya
+	# persis menempel di depan wajah.
+	var zoom_target := -CHARGE_ZOOM_IN if _charge_active else 0.0
+	_charge_zoom = lerpf(_charge_zoom, zoom_target, 1.0 - exp(-3.2 * delta))
+	cam_arm.spring_length = maxf(2.2, CAM_DIST + _cam_extra + _charge_zoom)
 	_shake = maxf(0.0, _shake - 1.6 * delta)
 	var shake_power := _shake * _shake * 0.35
 	var cam: Camera3D = $CameraPivot/CamArm/Cam
@@ -308,7 +316,10 @@ func _position_charge_node() -> void:
 	if _charge_node == null or not is_instance_valid(_charge_node):
 		return
 	var direction := _shoot_direction()
-	_charge_node.global_position = _visual.global_position + Vector3.UP * 0.05 + direction * 0.95
+	# Dekat & setinggi dada/wajah balok karakter (bukan di tengah badan) supaya,
+	# dipadukan dengan kamera zoom-in saat charge, balok karakter tampak
+	# menutupi sebagian lingkaran seolah mantranya persis di depan wajah.
+	_charge_node.global_position = _visual.global_position + Vector3.UP * 0.28 + direction * 0.68
 
 func _update_charge_visual(delta: float) -> void:
 	if _charge_node == null or not is_instance_valid(_charge_node):
@@ -341,6 +352,7 @@ func _fire_zoltraak(direction: Vector3, charge_fraction: float) -> void:
 	bolt.setup(direction, charge_fraction)
 	host.add_child(bolt)
 	bolt.global_position = _visual.global_position + direction * 0.7 + Vector3.UP * 0.05
+	bolt.activate() # WAJIB setelah global_position di-set, lihat komentar di zoltraak_bolt.gd
 	_shake = minf(_shake + 0.30 + 0.30 * charge_fraction, 0.9)
 	_fire_cooldown = maxf(_fire_cooldown, ZOLTRAAK_COOLDOWN)
 	_play_shoot_sound()

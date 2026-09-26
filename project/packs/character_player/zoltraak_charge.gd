@@ -1,6 +1,6 @@
 extends Node3D
 ## Lingkaran mantra "ZOLTRAAK" yang muncul di depan karakter saat tombol
-## serang ditahan. Tumbuh dari pudar (baru mulai menahan) ke lengkap (5 detik)
+## serang ditahan. Tumbuh dari pudar (baru mulai menahan) ke lengkap (7 detik)
 ## dan berputar pelan. Selalu menghadap kamera lewat look_at manual supaya
 ## huruf mantra tetap terbaca dari sudut kamera mana pun.
 

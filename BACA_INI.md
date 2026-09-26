@@ -46,7 +46,7 @@
   selama tombol ditahan (autofire lama dihapus sesuai desain baru).
 - Menahan tombol serang ≥ 0,16 detik memicu mode mantra: lingkaran sihir
   "ZOLTRAAK" (`zoltraak_charge.gd`) muncul melayang di depan karakter,
-  tumbuh dari pudar (alpha/skala kecil) ke lengkap selama 5 detik
+  tumbuh dari pudar (alpha/skala kecil) ke lengkap selama 7 detik
   (`CHARGE_FULL_TIME`), lengkap dengan 8 huruf "Z O L T R A A K" tersusun di
   sekeliling cincin yang berputar pelan. Lingkaran selalu menghadap kamera
   (look_at manual tiap frame) supaya hurufnya tetap terbaca dari sudut
@@ -54,7 +54,7 @@
 - Melepas tombol kapan pun setelah mode mantra aktif langsung menembakkan
   gelombang besar Zoltraak (`zoltraak_bolt.gd`) searah hadap karakter saat
   itu. Kekuatan/ukurannya sebanding progres pengisian (0,16 detik = lemah,
-  5 detik penuh = maksimal); menahan lebih dari 5 detik cukup mempertahankan
+  7 detik penuh = maksimal); menahan lebih dari 7 detik cukup mempertahankan
   status penuh sampai dilepas.
 - Visual Zoltraak: untaian 7 segmen kapsul yang meliuk mengikuti fungsi sinus
   tegak lurus arah gerak (mensimulasikan gelombang air mengalir), warna putih
@@ -116,10 +116,10 @@
 2. Gerak dan tembak sekali (tap): pastikan warna tembakan sekarang biru dan
    ukurannya kecil, bukan bola api oranye besar.
 3. Arahkan kamera manual (swipe) ke musuh, lalu tahan tombol serang: lihat
-   lingkaran mantra "ZOLTRAAK" tumbuh di depan karakter selama 5 detik dengan
+   lingkaran mantra "ZOLTRAAK" tumbuh di depan karakter selama 7 detik dengan
    huruf berputar. Kamera TIDAK boleh berputar sendiri ke arah musuh.
 4. Lepas tombol serang: pastikan keluar gelombang besar putih-biru yang
    meliuk seperti air mengalir, searah hadap karakter (bukan otomatis ke
    musuh manapun).
-5. Coba lepas lebih awal (sebelum 5 detik penuh): Zoltraak tetap keluar tapi
+5. Coba lepas lebih awal (sebelum 7 detik penuh): Zoltraak tetap keluar tapi
    lebih kecil/lemah dibanding yang ditahan penuh.
