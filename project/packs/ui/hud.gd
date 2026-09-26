@@ -381,7 +381,7 @@ func _build_layout() -> void:
 	_connect_rpg("BtnCrouch", Callable(self, "_on_crouch_toggle"), false)
 	_connect_rpg("BtnAction", Callable(self, "_on_action"), false)
 	_connect_rpg("BtnAtk", Callable(self, "_on_attack"), true)
-	_connect_rpg("BtnDash", Callable(self, "_on_dash"), false)
+	_connect_rpg("BtnDash", Callable(self, "_on_dash"), true)
 	_connect_rpg("BtnEmote", Callable(self, "_on_emote"), false)
 	_buttons["BtnAction"].visible = false
 	# UI MINIMAL (perintah user 22/09): SEMUA tombol disembunyikan, sisakan
@@ -517,6 +517,8 @@ func _on_attack(down: bool) -> void:
 func _on_dash(down: bool) -> void:
 	if down and player and player.has_method("press_dash"):
 		player.press_dash()
+	if _buttons.has("BtnDash"):
+		_buttons["BtnDash"].set_active(down)
 
 func _on_emote(_down: bool) -> void:
 	if player:
@@ -668,7 +670,7 @@ const EDIT_ACTION_NAMES := ["BtnJump", "BtnAtk", "BtnDash", "BtnSprint", "BtnCro
 ## Tombol yang sengaja disembunyikan (UI minimal). Hapus nama dari daftar ini
 ## untuk memunculkan tombol itu lagi — satu tempat saja.
 const SHOW_PAUSE_BUTTON := false
-const HIDDEN_BUTTONS := ["BtnJump", "BtnDash", "BtnCrouch", "BtnSprint", "BtnEmote", "BtnAction"]
+const HIDDEN_BUTTONS := ["BtnJump", "BtnCrouch", "BtnSprint", "BtnEmote", "BtnAction"]
 
 func set_edit_mode(on: bool) -> void:
 	edit_mode = on

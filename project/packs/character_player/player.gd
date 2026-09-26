@@ -1,11 +1,10 @@
 extends CharacterBody3D
-## Pemain = satu kubus kotak sederhana yang berjalan tepat di atas tanah.
-## Percikan hanya muncul dari titik gesek bawah kubus saat bergerak: kecil,
-## pendek, dipengaruhi arah gerak dan gravitasi, bukan aura atau api yang
-## mengambang di sekitar karakter.
+## Pemain = satu balok kotak sederhana di atas tanah.
+## Balok berputar ke kiri/kanan mengikuti arah gerak, punya outline gelap,
+## dan meninggalkan trail ekor tipis. Percikan lama sudah dihapus.
 ##
-## Kamera tetap third-person SpringArm seperti versi awal: mengikuti posisi
-## pemain dengan smoothing, tetapi TIDAK otomatis memutar yaw ke arah lari.
+## Kamera tetap third-person versi awal: hanya mengikuti posisi pemain dan
+## berubah karena swipe. Saat menembak, kamera boleh mengarah langsung ke target.
 
 signal stats_changed(kind: String, count: int)
 signal nearest_interactable_changed(meta)
@@ -17,6 +16,8 @@ const FIRE_EXPLOSION := preload("res://packs/character_player/fire_explosion.gd"
 const FIRE_COOLDOWN := 0.26
 const BOLT_SPEED := 20.0
 const BOLT_LIFT := 2.0
+const AUTO_AIM_RANGE := 30.0
+const AUTO_AIM_BEHIND_RANGE := 10.0
 
 # --- gerak ---
 const MAX_SPEED := 10.5
@@ -31,6 +32,11 @@ const PITCH_MAX := deg_to_rad(-10.0)
 const CAM_DIST := 8.5
 const CAM_FOLLOW := 7.0
 const LOOK_K := 0.0036
+
+# --- dash: burst cepat lalu melambat, satu bayangan per dash ---
+const DASH_SPEED := 24.0
+const DASH_DURATION := 0.32
+const DASH_COOLDOWN := 1.15
 
 var world: Node
 var settings
@@ -47,8 +53,9 @@ var health := 100.0
 
 var _visual: Node3D
 var _body_material: StandardMaterial3D
-var _sparks: GPUParticles3D
-var _spark_material: ParticleProcessMaterial
+var _outline_material: StandardMaterial3D
+var _trail_particles: GPUParticles3D
+var _trail_material: ParticleProcessMaterial
 var _base_amounts := {}
 var _t := 0.0
 var _speed01 := 0.0
@@ -59,6 +66,9 @@ var _attack_held := false
 var _fire_cooldown := 0.0
 var _shake := 0.0
 var _fx := 1.0
+var _dash_left := 0.0
+var _dash_cooldown := 0.0
+var _dash_dir := Vector3.ZERO
 
 func set_world(w: Node) -> void:
 	world = w
@@ -115,6 +125,20 @@ func set_attack_held(down: bool) -> void:
 	if down:
 		_try_fire()
 
+func press_dash() -> void:
+	if not is_ready or _dash_cooldown > 0.0 or _dash_left > 0.0:
+		return
+	var wish := joy
+	if wish == Vector2.ZERO:
+		wish = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var direction := Basis(Vector3.UP, yaw) * Vector3(wish.x, 0.0, wish.y)
+	if direction.length_squared() < 0.01:
+		direction = _shoot_direction()
+	_dash_dir = direction.normalized()
+	_dash_left = DASH_DURATION
+	_dash_cooldown = DASH_COOLDOWN
+	_spawn_dash_shadow()
+
 func press_emote() -> void:
 	pass
 
@@ -132,13 +156,26 @@ func _process(delta: float) -> void:
 	delta = minf(delta, 0.1)
 	_t += delta
 	_fire_cooldown = maxf(0.0, _fire_cooldown - delta)
+	_dash_cooldown = maxf(0.0, _dash_cooldown - delta)
 	if _attack_held or Input.is_key_pressed(KEY_SPACE) or Input.is_key_pressed(KEY_F):
 		_try_fire()
 	_move(delta)
 	_apply_camera(delta)
-	_animate_cube()
+	_animate_cube(delta)
 
 func _move(delta: float) -> void:
+	if _dash_left > 0.0:
+		_dash_left = maxf(0.0, _dash_left - delta)
+		var progress := 1.0 - _dash_left / DASH_DURATION
+		# Ease-out: ledakan cepat di awal, lalu melambat sebelum normal lagi.
+		var dash_factor := 1.0 - progress * progress
+		var dash_velocity := _dash_dir * DASH_SPEED * dash_factor
+		velocity = Vector3(dash_velocity.x, -global_position.y / maxf(delta, 0.001), dash_velocity.z)
+		move_and_slide()
+		_facing = _dash_dir
+		_speed01 = lerpf(_speed01, dash_factor, 1.0 - exp(-12.0 * delta))
+		return
+
 	var wish := joy
 	if wish == Vector2.ZERO:
 		wish = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
@@ -151,7 +188,6 @@ func _move(delta: float) -> void:
 	hv = hv.lerp(target, 1.0 - exp(-rate * delta))
 	if hv.length_squared() < 0.0004 and target == Vector3.ZERO:
 		hv = Vector3.ZERO
-	# Origin pemain tetap di y=0; kubus diletakkan setengah tinggi di atasnya.
 	velocity = Vector3(hv.x, -global_position.y / maxf(delta, 0.001), hv.z)
 	move_and_slide()
 	if hv.length() > 0.1:
@@ -181,36 +217,89 @@ func _apply_camera(delta: float) -> void:
 	cam.h_offset = (sin(_t * 43.0) * 0.72 + sin(_t * 67.0 + 0.8) * 0.28) * shake_power
 	cam.v_offset = (sin(_t * 51.0 + 1.7) * 0.7 + sin(_t * 79.0) * 0.3) * shake_power
 
-func _animate_cube() -> void:
-	# Tidak ada bob, kaki, aura, atau kamera yang menempel ke arah gerak.
-	# Dasar kubus tetap menyentuh y=0.
+func _animate_cube(delta: float) -> void:
 	_visual.position = Vector3(0.0, HOVER, 0.0)
 	var moving := _speed01 > 0.035 and _facing.length_squared() > 0.01
-	_sparks.emitting = moving
+	if _facing.length_squared() > 0.01:
+		var facing_yaw := atan2(-_facing.x, -_facing.z)
+		_visual.rotation.y = lerp_angle(_visual.rotation.y, facing_yaw, 1.0 - exp(-14.0 * delta))
+	_trail_particles.emitting = moving
 	if moving:
-		_sparks.position = Vector3(0.0, -HOVER + 0.055, 0.0) - _facing * 0.38
-		_spark_material.direction = (-_facing + Vector3.UP * 0.42).normalized()
+		_trail_particles.position = Vector3(0.0, -HOVER + 0.12, 0.0) - _facing * 0.46
+		_trail_material.direction = (-_facing + Vector3.UP * 0.08).normalized()
 	else:
-		_sparks.position = Vector3(0.0, -HOVER + 0.055, 0.0)
+		_trail_particles.position = Vector3(0.0, -HOVER + 0.12, 0.0)
 
-# =============== Serangan ===============
+# =============== Auto aim + serangan ===============
 
 func _shoot_direction() -> Vector3:
 	if _facing.length_squared() > 0.01:
 		return _facing.normalized()
 	return (Basis(Vector3.UP, yaw) * Vector3(0, 0, -1)).normalized()
 
+func _select_auto_target() -> Node3D:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return null
+	var viewport_size := get_viewport().get_visible_rect().size
+	var screen_center := viewport_size * 0.5
+	var best: Node3D = null
+	var best_score := INF
+	for candidate in get_tree().get_nodes_in_group("enemies"):
+		if not candidate is Node3D or not is_instance_valid(candidate):
+			continue
+		var enemy: Node3D = candidate
+		var target_pos := enemy.global_position + Vector3.UP * 0.30
+		var distance := global_position.distance_to(enemy.global_position)
+		if distance > AUTO_AIM_RANGE:
+			continue
+		var behind := cam.is_position_behind(target_pos)
+		var visible_on_screen := false
+		if not behind:
+			var screen_pos := cam.unproject_position(target_pos)
+			visible_on_screen = Rect2(Vector2.ZERO, viewport_size).has_point(screen_pos)
+		if not visible_on_screen and (not behind or distance > AUTO_AIM_BEHIND_RANGE):
+			continue
+		var score := distance
+		if visible_on_screen:
+			var screen_distance := cam.unproject_position(target_pos).distance_to(screen_center)
+			score += screen_distance / maxf(viewport_size.length(), 1.0) * 8.0
+		else:
+			# Musuh di belakang boleh dipilih bila dekat, sesuai prioritas HP.
+			score = distance * 0.62 + 0.5
+		if score < best_score:
+			best_score = score
+			best = enemy
+	return best
+
+func _aim_camera_at(target_pos: Vector3) -> void:
+	var flat := target_pos - global_position
+	flat.y = 0.0
+	if flat.length_squared() > 0.01:
+		yaw = atan2(-flat.x, -flat.z)
+	var to_target := target_pos - (global_position + Vector3.UP * HOVER)
+	var horizontal := Vector2(to_target.x, to_target.z).length()
+	pitch = clampf(atan2(to_target.y, maxf(horizontal, 0.001)), PITCH_MIN, PITCH_MAX)
+
 func _try_fire() -> void:
 	if not is_ready or _fire_cooldown > 0.0:
 		return
 	_fire_cooldown = FIRE_COOLDOWN
+	var target := _select_auto_target()
 	var direction := _shoot_direction()
+	var auto_targeted := target != null
+	if auto_targeted:
+		var target_pos := target.global_position + Vector3.UP * 0.30
+		direction = (target_pos - _visual.global_position).normalized()
+		_aim_camera_at(target_pos)
 	var origin := _visual.global_position + direction * 0.58
 	var host: Node = world if is_instance_valid(world) and world.is_inside_tree() else get_parent()
 	if host == null:
 		return
 	var bolt := FIRE_BOLT.new()
-	bolt.vel = direction * BOLT_SPEED + Vector3(velocity.x, 0, velocity.z) * 0.6 + Vector3.UP * BOLT_LIFT
+	bolt.vel = direction * BOLT_SPEED + Vector3(velocity.x, 0, velocity.z) * 0.6
+	if not auto_targeted:
+		bolt.vel += Vector3.UP * BOLT_LIFT
 	bolt.fx = _fx
 	bolt.exclude_rids.append(get_rid())
 	bolt.shake_target = self
@@ -236,16 +325,28 @@ func _play_shoot_sound() -> void:
 	add_child(sound)
 	sound.play()
 
-# =============== Visual kubus + percikan gesekan ===============
+# =============== Kubus, outline, trail, bayangan dash ===============
 
 func _build_cube() -> void:
 	_visual = Node3D.new()
 	_visual.name = "SquareCharacter"
 	_visual.position = Vector3(0.0, HOVER, 0.0)
 	add_child(_visual)
-
 	var mesh := BoxMesh.new()
 	mesh.size = CHARACTER_SIZE
+
+	# Inverted hull sederhana: shell sedikit lebih besar dan cull front.
+	var outline := MeshInstance3D.new()
+	outline.name = "PlayerOutline"
+	outline.mesh = mesh
+	outline.scale = Vector3.ONE * 1.07
+	_outline_material = StandardMaterial3D.new()
+	_outline_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_outline_material.albedo_color = Color(0.015, 0.02, 0.035, 1.0)
+	_outline_material.cull_mode = BaseMaterial3D.CULL_FRONT
+	outline.material_override = _outline_material
+	_visual.add_child(outline)
+
 	var body := MeshInstance3D.new()
 	body.name = "PlayerCube"
 	body.mesh = mesh
@@ -256,37 +357,61 @@ func _build_cube() -> void:
 	body.material_override = _body_material
 	_visual.add_child(body)
 
-	_sparks = _base_particles("GroundFrictionSparks", 52, 0.30)
-	_spark_material = ParticleProcessMaterial.new()
-	_spark_material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	_spark_material.emission_sphere_radius = 0.075
-	_spark_material.direction = Vector3(0.0, 0.42, -1.0).normalized()
-	_spark_material.spread = 16.0
-	_spark_material.initial_velocity_min = 1.1
-	_spark_material.initial_velocity_max = 3.3
-	_spark_material.gravity = Vector3(0.0, -9.8, 0.0)
-	_spark_material.damping_min = 0.15
-	_spark_material.damping_max = 0.55
-	_spark_material.scale_min = 0.45
-	_spark_material.scale_max = 0.95
-	_spark_material.scale_curve = _curve([Vector2(0.0, 1.0), Vector2(0.22, 0.88), Vector2(1.0, 0.0)], 1.0)
-	_spark_material.color_ramp = _ramp(
-		[0.0, 0.18, 0.55, 1.0],
-		[Color(3.0, 2.4, 1.0, 1.0), Color(2.2, 0.75, 0.12, 1.0), Color(1.0, 0.16, 0.01, 0.70), Color(0.2, 0.01, 0.0, 0.0)])
-	_sparks.process_material = _spark_material
-	var spark_mesh := QuadMesh.new()
-	spark_mesh.size = Vector2(0.035, 0.10)
-	spark_mesh.material = _fx_mat(_soft_tex(0.35), true, Color(2.8, 1.5, 0.25, 1.0))
-	_sparks.draw_pass_1 = spark_mesh
-	_sparks.emitting = false
-	_base_amounts[_sparks] = _sparks.amount
+	_trail_particles = _base_particles("CubeTrail", 24, 0.48)
+	_trail_material = ParticleProcessMaterial.new()
+	_trail_material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	_trail_material.emission_sphere_radius = 0.16
+	_trail_material.direction = Vector3(0.0, 0.0, 1.0)
+	_trail_material.spread = 10.0
+	_trail_material.initial_velocity_min = 0.35
+	_trail_material.initial_velocity_max = 1.35
+	_trail_material.gravity = Vector3(0.0, 0.18, 0.0)
+	_trail_material.damping_min = 0.25
+	_trail_material.damping_max = 0.60
+	_trail_material.scale_min = 0.50
+	_trail_material.scale_max = 1.0
+	_trail_material.scale_curve = _curve([Vector2(0.0, 0.72), Vector2(0.35, 0.52), Vector2(1.0, 0.0)], 1.0)
+	_trail_material.color_ramp = _ramp(
+		[0.0, 0.15, 0.65, 1.0],
+		[Color(0.20, 0.75, 1.0, 0.36), Color(0.10, 0.55, 0.90, 0.24), Color(0.04, 0.18, 0.36, 0.08), Color(0.0, 0.0, 0.0, 0.0)])
+	_trail_particles.process_material = _trail_material
+	var trail_mesh := QuadMesh.new()
+	trail_mesh.size = Vector2(0.20, 0.07)
+	trail_mesh.material = _fx_mat(_soft_tex(0.18), true, Color(0.18, 0.72, 1.0, 0.42))
+	_trail_particles.draw_pass_1 = trail_mesh
+	_trail_particles.emitting = false
+	_base_amounts[_trail_particles] = _trail_particles.amount
+
+func _spawn_dash_shadow() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var shadow := MeshInstance3D.new()
+	shadow.name = "DashAfterimage"
+	var mesh := BoxMesh.new()
+	mesh.size = CHARACTER_SIZE * 1.04
+	shadow.mesh = mesh
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(0.10, 0.36, 0.55, 0.48)
+	mat.cull_mode = BaseMaterial3D.CULL_BACK
+	shadow.material_override = mat
+	parent.add_child(shadow)
+	shadow.global_position = global_position + Vector3.UP * HOVER
+	shadow.rotation.y = _visual.global_rotation.y
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(mat, "albedo_color", Color(0.03, 0.12, 0.18, 0.0), 0.62)
+	tween.parallel().tween_property(shadow, "scale", Vector3(1.10, 0.35, 1.10), 0.62)
+	tween.tween_callback(shadow.queue_free)
 
 func _base_particles(pname: String, amount: int, lifetime: float) -> GPUParticles3D:
 	var p := GPUParticles3D.new()
 	p.name = pname
 	p.amount = amount
 	p.lifetime = lifetime
-	p.randomness = 0.28
+	p.randomness = 0.34
 	p.local_coords = false
 	p.fixed_fps = 60
 	p.interpolate = true

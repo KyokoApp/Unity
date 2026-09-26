@@ -30,6 +30,7 @@ func setup(spec: Dictionary, target: Node3D) -> void:
 	player = target
 
 func _ready() -> void:
+	add_to_group("enemies")
 	_build_cube()
 
 func _process(delta: float) -> void:
