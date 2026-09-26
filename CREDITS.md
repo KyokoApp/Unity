@@ -64,6 +64,13 @@
 - **Pemain kubus** — BoxMesh, visor, kaki, aura, ground glow, dan TravelSparks
   dirakit di `packs/character_player/player.gd`.
 
+## Ronde-41: bentuk visual disederhanakan
+
+- Pemain dan seluruh monster kini hanya memakai `BoxMesh` procedural buatan
+  proyek ini; tidak ada aset monster eksternal yang dibundel pada ronde ini.
+- Mata merah monster dan percikan gesekan tanah dibuat procedural dengan
+  material/partikel Godot.
+
 *Terakhir diperbarui: 2026-09-26*
 
 ## Ronde-8: Aset Desa & Alam — KayKit Medieval Hexagon Pack (CC0)
