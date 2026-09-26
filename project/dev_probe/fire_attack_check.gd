@@ -124,6 +124,9 @@ func _run() -> void:
 		_fail("handler tombol serang HUD (_on_attack) tidak ada")
 		_finish()
 		return
+	# jeda melewati sisa cooldown fase 2 (FIRE_COOLDOWN 0.26 dtk) supaya
+	# penekanan HUD diuji jujur, bukan tertelan cooldown tembakan terakhir
+	await create_timer(0.4).timeout
 	print("[fire-check] fase 3: tekan tombol serang via HUD…")
 	var before := _count_bolts(world)
 	hud.call("_on_attack", true)
