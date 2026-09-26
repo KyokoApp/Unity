@@ -69,6 +69,10 @@
   Godot tidak tersedia di checkout/sandbox ini; CI workflow di atas tetap akan
   menjalankan import, gdparse, analyzer, probe serangan, dan build pack pada
   runner GitHub.
+- Setelah push pertama, CI menemukan marker parse lama yang memang sudah ada
+  di ekor `ui/hud.gd` (baris `font_color", ...` terlepas dari fungsi). Marker
+  itu sudah dihapus di follow-up commit ronde ini; semua 18 file `.gd` sekarang
+  lolos `gdparse` lokal + analyzer.
 
 ## Cara test di HP
 

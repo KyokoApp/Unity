@@ -458,7 +458,6 @@ func _build_layout() -> void:
 	# --- toast tengah atas ---
 	toast_label = Label.new()
 	toast_label.add_theme_font_size_override("font_size", 30)
-	toast_label.add_theme_color_override("font_color", Colerride("font_size", 30)
 	toast_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
 	toast_label.add_theme_color_override("font_shadow", Color(0, 0, 0, 0.6))
 	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -870,24 +869,6 @@ func _build_edit_bar() -> void:
 	done.custom_minimum_size = Vector2(0, 64)
 	done.add_theme_font_size_override("font_size", 24)
 	done.add_theme_color_override("font_color", Color(0.8, 1.0, 0.85))
-	done.pressed.connect(func(): _exit_edit())
-	v.add_child(done)
-
-func _pick_sky(ix: int) -> void:
-	if _world:
-		_world.apply_lighting({"sky": ix})
-	if settings:
-		settings.set_value("light_sky", ix)
-	toast("Gradien langit " + (str(ix) if ix >= 0 else "otomatis"))
-
-func _select_tool(m: String) -> void:
-	edit_tool = m
-	_update_tool_visual()
-
-func _update_tool_visual() -> void:
-	for m in _edit_tool_btns:
-		_edit_tool_btns[m].button_pressed = m == edit_tool
-font_color", Color(0.8, 1.0, 0.85))
 	done.pressed.connect(func(): _exit_edit())
 	v.add_child(done)
 
