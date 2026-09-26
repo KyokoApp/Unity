@@ -110,6 +110,11 @@ func _load_skin() -> void:
 	if model_root and is_instance_valid(model_root):
 		model_root.queue_free()
 	anim = null
+	# skin tersimpan dari versi lama ("polygirl"/"knight" sudah dihapus) dulu
+	# jatuh ke EmptyRoot = pemain TAK TERLIHAT. Kembalikan ke bawaan.
+	if not SKINS.has(char_skin):
+		_trace("boot: skin '%s' tak dikenal → pakai 'mannequin'" % char_skin)
+		char_skin = "mannequin"
 	var def: Dictionary = SKINS.get(char_skin, {})
 	var mesh_path: String = def.get("mesh", "")
 	var anim_paths: Dictionary = def.get("anims", {})
@@ -184,12 +189,28 @@ func _build_mannequin(mesh_path: String, anim_paths: Dictionary) -> Node3D:
 		mesh_holder.queue_free()
 		return null
 	_trace("boot: pemain… %d mesh ditemukan, menempel ke skeleton…" % meshes.size())
+	# FIX mesh ganda: file animasi UAL1 MEMBAWA mesh "Mannequin" sendiri
+	# (dicek dari GLB: node Mannequin, skin 0, anak Armature). Dulu mesh itu
+	# dibiarkan → 2 badan tumpang-tindih: Mannequin bawaan (material GLB abu,
+	# tanpa toon/outline) menembus Mannequin_F ungu. Buang mesh bawaan host,
+	# dan pasang Mannequin_F PERSIS di induk yang sama (struktur impor yang
+	# sudah terbukti benar; transform di kedua GLB = identitas).
+	var host_meshes: Array = []
+	_find_mesh_instances(host, host_meshes)
+	var mesh_parent: Node = skeleton
+	if not host_meshes.is_empty() and host_meshes[0].get_parent() != null:
+		mesh_parent = host_meshes[0].get_parent()
+	for hm in host_meshes:
+		var hmi: MeshInstance3D = hm
+		if hmi.get_parent():
+			hmi.get_parent().remove_child(hmi)
+		hmi.free()
 	for mi in meshes:
 		var mi3: MeshInstance3D = mi
 		var old_parent := mi3.get_parent()
 		if old_parent:
 			old_parent.remove_child(mi3)
-		host.add_child(mi3)   # taruh di root host; NodePath skeleton tetap relatif-benar
+		mesh_parent.add_child(mi3)
 		mi3.transform = Transform3D.IDENTITY
 		mi3.skeleton = mi3.get_path_to(skeleton)
 		_apply_toon(mi3)

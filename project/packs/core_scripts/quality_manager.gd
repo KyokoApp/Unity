@@ -7,7 +7,7 @@ extends Node
 var settings  # GameSettings
 var world     # World (opsional, didaftarkan)
 var sun: DirectionalLight3D  # didaftarkan oleh scene world
-var blob_shadow: Node3D      # blob shadow karakter (opsional)
+var blob_shadow: Node3D      # pemain (punya set_blob_shadow) — opsional
 
 const PRESETS := {
 	0: {  # Rendah
@@ -44,6 +44,9 @@ func apply_all() -> void:
 		sun.shadow_enabled = bool(p.shadows)
 		sun.directional_shadow_max_distance = float(p.shadow_distance)
 	RenderingServer.directional_shadow_atlas_set_size(int(p.shadow_size), true)
+	# blob shadow murah menggantikan shadow map saat preset tanpa bayangan
+	if blob_shadow and is_instance_valid(blob_shadow) and blob_shadow.has_method("set_blob_shadow"):
+		blob_shadow.set_blob_shadow(not bool(p.shadows))
 	# fog & jarak pandang diserahkan ke world
 	if world and world.has_method("apply_quality"):
 		world.apply_quality(p)

@@ -20,31 +20,48 @@ var current: String = ""          # dibaca player.gd utk jejak diagnostik
 var _names := {}                  # nama_lower -> nama_asli terdaftar
 var _busy := false                # true selagi klip one-shot dari action() main
 
+## NAMA SEBENARNYA setelah import Godot 4.5 (diverifikasi dari .scn hasil CI,
+## pack character_player-1.0.24): importer glTF OTOMATIS memberi LOOP_LINEAR
+## pada klip berakhiran "_Loop" DAN MEMBUANG suffix itu dari namanya
+## (resource_importer_scene.cpp::_pre_fix_node → library.rename_animation).
+## Jadi "Idle_Loop" di file GLB = "Idle" di AnimationPlayer, "Dance_Loop" =
+## "Dance" (dan ter-loop!). Library ual1 = host → namespace kosong (""),
+## hanya ual2 yang digabung dengan awalan "ual2/".
+## Dulu alias memakai "ual1/Idle_Loop" dkk. — tak ada yang cocok persis, dan
+## hanya kebetulan ketemu lewat pencarian substring; "swim_idle" malah
+## nyasar ke "Idle" darat. Resolver di bawah tetap dipertahankan sebagai
+## jaring pengaman bila nama berubah lagi.
 const ALIASES := {
-	"idle": "ual1/Idle_Loop",
-	"walk": "ual1/Walk_Loop",
-	"run": "ual1/Jog_Fwd_Loop",
-	"sprint": "ual1/Sprint_Loop",
-	"crouch_idle": "ual1/Crouch_Idle_Loop",
-	"crouch_walk": "ual1/Crouch_Fwd_Loop",
-	"swim_idle": "ual1/Swim_Idle_Loop",
-	"swim_fwd": "ual1/Swim_Fwd_Loop",
-	"roll": "ual1/Roll",
-	"pickup": "ual1/Interact",
-	"jump_start": "ual1/Jump_Start",
-	"jump_fall": "ual1/Jump_Loop",
-	"jump_land": "ual1/Jump_Land",
-	"emote": "ual1/Dance_Loop",
+	"idle": "Idle",
+	"walk": "Walk",
+	"run": "Jog_Fwd",
+	"sprint": "Sprint",
+	"crouch_idle": "Crouch_Idle",
+	"crouch_walk": "Crouch_Fwd",
+	"swim_idle": "Swim_Idle",
+	"swim_fwd": "Swim_Fwd",
+	"roll": "Roll",
+	"pickup": "Interact",
+	"jump_start": "Jump_Start",
+	"jump_fall": "Jump",
+	"jump_land": "Jump_Land",
+	"emote": "Dance",
 	"attack": "ual2/Sword_Regular_Combo",
 }
 
 # Whitelist eksplisit klip yang WAJIB loop (dipakai via set_move/set_air/
 # set_swim). Sengaja tidak "tebak dari nama" — lihat catatan header.
+# (Importer biasanya sudah me-loop-kan ini; di sini hanya penegasan.)
 const LOOP_STATES := [
-	"ual1/Idle_Loop", "ual1/Walk_Loop", "ual1/Jog_Fwd_Loop", "ual1/Sprint_Loop",
-	"ual1/Crouch_Idle_Loop", "ual1/Crouch_Fwd_Loop", "ual1/Jump_Loop",
-	"ual1/Swim_Idle_Loop", "ual1/Swim_Fwd_Loop",
+	"Idle", "Walk", "Jog_Fwd", "Sprint", "Crouch_Idle", "Crouch_Fwd",
+	"Jump", "Swim_Idle", "Swim_Fwd",
 ]
+
+## Batas waktu kunci untuk klip action() yang ternyata LOOP (mis. "Dance"):
+## klip loop TIDAK PERNAH memancarkan animation_finished, sehingga dulu
+## _busy tak pernah turun → karakter joget selamanya, jalan/lompat mati.
+var _busy_until_ms := 0
+var _busy_is_loop := false
 
 func setup(p_player: AnimationPlayer) -> void:
 	player = p_player
@@ -92,21 +109,45 @@ func _play(name: String, blend_ms: float) -> bool:
 	var real := _resolve(name)
 	if real == "":
 		return false
+	# dipanggil tiap frame fisika dari set_move(): jangan play() ulang klip
+	# yang sedang main — tiap panggilan menambah entri blend baru di
+	# AnimationPlayer (boros CPU, terutama di HP).
+	if real == current and player.is_playing() and player.current_animation == real:
+		return true
 	current = real
 	player.play(real, blend_ms / 1000.0)
 	return true
 
+func _is_busy() -> bool:
+	if _busy and _busy_is_loop and Time.get_ticks_msec() >= _busy_until_ms:
+		_busy = false
+		_busy_is_loop = false
+	return _busy
+
 ## Klip one-shot (serang/roll/pickup/emote/...): mengunci state sampai
 ## selesai lewat animation_finished, supaya lokomosi tak menyela di tengah.
 func action(name: String, blend_ms: float = 150.0) -> void:
-	if _play(name, blend_ms):
-		_busy = true
+	var real := _resolve(name)
+	if real == "":
+		return
+	# one-shot: selalu mulai dari awal walau klip yang sama baru saja main
+	current = real
+	player.play(real, blend_ms / 1000.0)
+	player.seek(0.0, true)
+	_busy = true
+	_busy_is_loop = false
+	var a := player.get_animation(real)
+	if a and a.loop_mode != Animation.LOOP_NONE:
+		# klip loop: lepas kunci setelah SATU siklus (0,6–6 dtk)
+		_busy_is_loop = true
+		_busy_until_ms = Time.get_ticks_msec() + int(clampf(a.length, 0.6, 6.0) * 1000.0)
 
 func _on_finished(_anim_name: StringName) -> void:
 	_busy = false
+	_busy_is_loop = false
 
 func set_air(state: String) -> void:
-	if _busy:
+	if _is_busy():
 		return
 	if state == "jump_start":
 		_play("jump_start", 100.0)
@@ -114,14 +155,18 @@ func set_air(state: String) -> void:
 		_play("jump_fall", 220.0)
 
 func set_swim(_on: bool, speed01: float) -> void:
-	if _busy:
+	if _is_busy():
 		return
 	_play("swim_fwd" if speed01 > 0.15 else "swim_idle", 220.0)
 
 ## Dipanggil player.gd HANYA saat grounded & tak sedang berenang/di-udara —
 ## jadi aman jadi satu-satunya tempat mereset makna "kembali ke darat".
 func set_move(speed01: float, sprinting: bool, crouching: bool) -> void:
-	if _busy:
+	# emote/klip loop lain dibatalkan begitu pemain mulai bergerak
+	if _busy and _busy_is_loop and speed01 > 0.06:
+		_busy = false
+		_busy_is_loop = false
+	if _is_busy():
 		return
 	if crouching:
 		_play("crouch_walk" if speed01 > 0.12 else "crouch_idle", 150.0)

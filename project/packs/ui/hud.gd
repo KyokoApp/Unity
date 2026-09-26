@@ -311,7 +311,8 @@ func _build_layout() -> void:
 	_buttons["BtnAction"].visible = false
 	# UI MINIMAL (perintah user 22/09): SEMUA tombol disembunyikan, sisakan
 	# hanya JOYSTICK (jalan) + PAUSE. Tombol tak terlihat = tak menerima sentuh.
-	for k in ["BtnJump", "BtnAtk", "BtnDash", "BtnCrouch", "BtnSprint", "BtnEmote", "BtnAction"]:
+	# Daftar ada di konstanta HIDDEN_BUTTONS (dipakai juga saat keluar Mode Edit).
+	for k in HIDDEN_BUTTONS:
 		if _buttons.has(k):
 			_buttons[k].visible = false
 
@@ -504,7 +505,7 @@ func _set_joy(v: Vector2) -> void:
 # ---------- sinyal dari player ----------
 
 func _on_near_changed(meta: Dictionary) -> void:
-	var show := meta and meta.size() > 0 and not edit_mode
+	var show := meta and meta.size() > 0 and not edit_mode and not HIDDEN_BUTTONS.has("BtnAction")
 	if meta and meta.size() > 0:
 		var t := str(meta.get("type", ""))
 		label_prompt.text = "Ambil: " + ("🥥 Kelapa" if t == "coconut" else "🌼 Bunga")
@@ -569,6 +570,9 @@ var _edit_paint := -1
 var _edit_bar: Control
 var _edit_tool_btns := {}
 const EDIT_ACTION_NAMES := ["BtnJump", "BtnAtk", "BtnDash", "BtnSprint", "BtnCrouch", "BtnAction", "BtnEmote"]
+## Tombol yang sengaja disembunyikan (UI minimal). Hapus nama dari daftar ini
+## untuk memunculkan tombol itu lagi — satu tempat saja.
+const HIDDEN_BUTTONS := ["BtnJump", "BtnAtk", "BtnDash", "BtnCrouch", "BtnSprint", "BtnEmote", "BtnAction"]
 
 func set_edit_mode(on: bool) -> void:
 	edit_mode = on
@@ -582,8 +586,11 @@ func set_edit_mode(on: bool) -> void:
 		if on:
 			_buttons[n].visible = false
 		else:
-			_buttons[n].visible = true
-			_buttons["BtnAction"].visible = label_prompt.text != ""
+			# dulu: SEMUA tombol dimunculkan lagi → melanggar UI minimal
+			# (tombol serang/lompat/dll tiba-tiba muncul setelah Mode Edit)
+			_buttons[n].visible = not HIDDEN_BUTTONS.has(n)
+	if not on and not HIDDEN_BUTTONS.has("BtnAction"):
+		_buttons["BtnAction"].visible = label_prompt.text != ""
 	toast("Mode Edit — sentuh & geser tanah untuk membentuknya" if on else "Kembali bermain")
 
 func _exit_edit() -> void:

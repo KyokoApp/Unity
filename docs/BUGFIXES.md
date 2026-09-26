@@ -105,3 +105,24 @@ fungsi itu diam-diam, loading screen tertutup, sisanya langit.
 | 1.0.23 | user kembali "masih blue screen": dua akar baru — (1) workflow salah pakai preset "Android AIO" (APK berisi bundle konten → "tak ada unduhan sama sekali" dan menyalahi aturan launcher-murni); (2) `_static_walk` sinkron total bisa membekukan layar pada ponsel lemah (watchdog takdapat memberi jejak) | (1) preset AIO DIHAPUS dari export_presets + workflow export "Android Launcher" (APK kecil; konten SELALU dari server pack; APK tak disentuh lagi); (2) `_static_walk` jadi async + watchdog 40 dtk ▶ |
 
 | 1.0.25 | **FOTO WATCHDOG (bukti user)**: macet 40 dtk di tahap "membangun dunia", frames hidup — pembunuhnya diidentifikasi: pemrosesan segitiga GDScript (cari lantai manual lewat grid bucket + `_grid_add_tri` per segitiga) atas kanvas diorama jutaan poligon; backdrop AlphaCutouts_2 (253m) saja ratusan ribu poligon → parsing script melambatkan boot bnyak menit | buang TOTAL kalkulasi segitiga GDScript: (a) `_static_floor_at` jadi ray-physics `intersect_ray` (native, μs); (b) collision trimesh HANYA untuk mesh SOLID (lebar/tinggi ≥ 6m) — kecil/dekoratif/backdrop tak pernah (visual-only); (c) outline tetap per-mesh tapi yield per-mesh; (d) panel FATAL kini gulung-dari-atas + autowrap (ekor log tak terpotong lagi) |
+
+---
+
+## 5) AUDIT MENYELURUH 2026-09-26 (branch arena/01a0db20-unity)
+
+Metode: .pck asli dari branch `content` (game 1.0.34) dibongkar (PCK v3 +
+RSCC/zstd), nama animasi hasil import dibaca dari `.scn`, dicocokkan dengan
+source importer Godot 4.5.2 (`resource_importer_scene.cpp`).
+
+| Gejala | Akar | Perbaikan |
+|---|---|---|
+| Karakter tampak "dobel"/badan abu menembus Mannequin ungu | `ual1_standard.glb` membawa mesh `Mannequin` sendiri; `_build_mannequin` tak pernah membuangnya | mesh bawaan host di-`free()`, Mannequin_F dipasang di induk yang sama |
+| Emote → karakter joget SELAMANYA, jalan/lompat mati | importer me-loop + mengganti nama `Dance_Loop`→`Dance`; klip loop tak pernah memancarkan `animation_finished` → `_busy` abadi | `action()` pada klip loop: kunci lepas setelah 1 siklus / saat mulai bergerak |
+| Alias animasi `ual1/*_Loop` tak pernah cocok persis; `swim_idle` jatuh ke `Idle` darat | nama sebenarnya: `Idle`, `Walk`, `Jog_Fwd`, `Sprint`, `Crouch_*`, `Swim_*`, `Jump`, `Dance` (ual1 = library "" tanpa awalan) | alias & LOOP_STATES pakai nama nyata |
+| `play()` dipanggil ulang tiap frame fisika | tiap panggilan menambah entri blend | lewati bila klip sama sedang main |
+| Preset Rendah tetap ber-shadow, blob shadow tak pernah muncul, kabut preset diabaikan | `quality.world/sun/blob_shadow` & `world.quality_ref` tak pernah disambung | disambung di `game_root._boot_world` |
+| Setelah Mode Edit semua tombol aksi muncul lagi | `set_edit_mode(false)` men-`visible=true` semua | hormati `HIDDEN_BUTTONS` |
+| Skin tersimpan lama (`polygirl`/`knight`) → pemain tak terlihat | `SKINS.get()` kosong → EmptyRoot | skin tak dikenal → `mannequin` |
+| `tools/pck_list.py` selalu "0 file" | tak paham PCK v3 (direktori di akhir file) | dukung v3 |
+
+Belum diuji di perangkat (sandbox tanpa Godot/GPU); lolos gdparse + analyze_checks.

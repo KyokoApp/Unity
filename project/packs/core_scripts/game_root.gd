@@ -130,6 +130,12 @@ func _boot_world(progress_cb: Callable) -> void:
 		_fatal("Scene dunia hilang:\n" + WORLD_SCENE)
 		return
 	world = wp.instantiate()
+	# sambungkan QualityManager <-> world SEBELUM add_child/generate: world
+	# mendaftarkan `sun` ke quality di _setup_environment(). Dulu tak pernah
+	# disambung → preset Rendah tetap ber-shadow, blob shadow tak pernah
+	# tampil, kabut preset diabaikan.
+	world.set("quality_ref", quality)
+	quality.world = world
 	add_child(world)
 	if world.has_signal("gen_progress"):
 		world.gen_progress.connect(progress_cb)
@@ -159,6 +165,7 @@ func _boot_world(progress_cb: Callable) -> void:
 	player.global_position = spawn + Vector3(0, 0.12, 0)
 	player.call("set_world", world)
 	player.call("set_settings", settings)
+	quality.blob_shadow = player
 	quality.apply_all()  # shadow sudah terdaftar
 	await get_tree().process_frame
 	var hp = load(HUD_SCENE)
