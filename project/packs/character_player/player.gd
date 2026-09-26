@@ -188,7 +188,6 @@ func _update_attack_hold(delta: float) -> void:
 		if _charge_active:
 			_update_charge_visual(delta)
 	elif _was_holding and not holding_now:
-		print("[dbg-player] lepas terdeteksi charge_active=", _charge_active, " cooldown=", _fire_cooldown, " is_ready=", is_ready)
 		if _charge_active:
 			_release_charge()
 		else:
@@ -273,9 +272,7 @@ func _shoot_direction() -> Vector3:
 
 func _try_fire() -> void:
 	if not is_ready or _fire_cooldown > 0.0:
-		print("[dbg-player] _try_fire diblokir is_ready=", is_ready, " cooldown=", _fire_cooldown)
 		return
-	print("[dbg-player] _try_fire lanjut")
 	_fire_cooldown = FIRE_COOLDOWN
 	var direction := _shoot_direction()
 	var origin := _visual.global_position + direction * 0.58
