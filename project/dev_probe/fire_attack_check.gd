@@ -43,7 +43,21 @@ const SCENES := [
 	"res://packs/ui/loading_screen.tscn",
 	"res://packs/ui/pause_menu.tscn",
 ]
-const COOLDOWN_WAIT_SEC := 1.3 # > FIRE_COOLDOWN (1.1) di player.gd supaya fase berikut tak tertelan reload
+# WAJIB lebih besar dari DUA hal sekaligus, bukan cuma reload:
+#   1) FIRE_COOLDOWN (1.1) di player.gd — supaya fase berikutnya tak
+#      tertelan reload.
+#   2) siklus hidup PENUH tank_shell.gd di dunia uji TANPA lantai (tak ada
+#      collider sama sekali di "TestWorld") — peluru jatuh bebas sampai
+#      y<=0 (~0.7 dtk dgn gravitasi & LIFT saat ini) lalu meledak, dan BARU
+#      benar-benar queue_free() 1 dtk KEMUDIAN (lihat tank_shell.gd
+#      _explode()). Insiden ronde-45: nilai lama (1.3) lebih pendek dari
+#      siklus itu (~1.7 dtk) -> peluru fase sebelumnya kadang ke-free()
+#      TEPAT saat hitungan "after" fase berikutnya diambil, menyamarkan
+#      peluru baru yang sebenarnya berhasil ditembak (before==after palsu,
+#      "tombol serang HUD tidak menghasilkan tembakan"). Beri margin besar
+#      supaya sisa peluru fase sebelumnya SUDAH BENAR-BENAR lenyap sebelum
+#      hitungan "before" fase berikutnya diambil.
+const COOLDOWN_WAIT_SEC := 3.0
 # TAP_HOLD_SEC/RELEASE_SETTLE_SEC dipakai (bukan `await process_frame` tunggal)
 # supaya waktu-nyata yang berlalu dijamin cukup untuk beberapa siklus
 # _process() node pemain benar-benar berjalan sebelum/di antara aksi tekan-
