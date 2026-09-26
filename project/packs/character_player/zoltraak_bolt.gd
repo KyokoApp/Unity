@@ -67,7 +67,10 @@ func _process(delta: float) -> void:
 		if collider and collider.has_meta("monster"):
 			var target = collider.get_meta("monster")
 			if is_instance_valid(target) and target.has_method("take_damage"):
-				var id := target.get_instance_id()
+				# WAJIB tipe eksplisit (bukan `:=`): `target` tidak bertipe statis
+				# (Variant dari get_meta) -> analyzer Godot 4.5 gagal keras dengan
+				# "Cannot infer the type of id variable" (insiden ronde ini).
+				var id: int = target.get_instance_id()
 				if not _hit_monsters.has(id):
 					_hit_monsters[id] = true
 					target.take_damage(_damage)
