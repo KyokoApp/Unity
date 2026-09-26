@@ -313,6 +313,44 @@ depan), atau klip tak benar-benar berganti & berjalan saat disimulasikan
 gerak. Diagnostik sementara (dump tree penuh + release-notes) sudah
 dibersihkan setelah tugasnya selesai.
 
+## Ronde-46 bag. A4 lanjutan #2: dash diganti — sprint burst + afterimage
+
+Setelah bug animasi & arah hadap beres, pengguna diberi menu gaya dash
+alternatif (roll / lunge-Push / sprint burst / blink-teleport / afterimage)
+dan memilih **kombinasi #3 (sprint burst) + #5 (afterimage)**, menggantikan
+animasi `Roll` yang dipakai sebelumnya.
+
+- Animasi dash kini memakai klip lari yang SAMA (`ANIM_SPRINT`) seperti
+  lari kencang biasa — bukan animasi berguling khusus — tapi diputar lebih
+  cepat lewat `AnimationPlayer.speed_scale` (`DASH_ANIM_SPEED_SCALE = 1.8`,
+  direset ke `1.0` begitu dash selesai) supaya kaki terkesan "meledak
+  ngebut" tanpa perlu klip animasi baru.
+- Jejak bayangan (afterimage): tiap `AFTERIMAGE_INTERVAL` (0.05 dtk) selama
+  dash, `_spawn_afterimage()` menduplikasi SEMUA `MeshInstance3D` model
+  jadi node "hantu" transparan ungu (`AFTERIMAGE_COLOR`, blend tambah/
+  additive), dibekukan di posisi & rotasi model SAAT ITU, lalu memudar
+  dalam `AFTERIMAGE_FADE` (0.32 dtk). Tiap ghost tetap menaut ke
+  `Skeleton3D` ASLI karakter lewat `MeshInstance3D.skeleton` (NodePath
+  relatif dihitung via `get_path_to()`) — jadi bentuknya ikut pose lari
+  saat momen itu (bukan T-pose kaku), tanpa perlu membekukan pose tulang
+  secara manual.
+- Efek dash lain dari ronde sebelumnya (cincin kilat `_spawn_dash_shimmer`,
+  kamera tertarik mundur mengikuti `_speed01`) **tidak diubah** — tetap
+  jadi bagian dari kesan "burst" di awal dash.
+- Klip `Roll` tidak lagi dipakai di mana pun (masih ada di paket kalau
+  ingin dipakai utk fitur lain nanti, mis. dodge/parry).
+- **Pencegahan regresi:** `dev_probe/fire_attack_check.gd` dapat Fase 1d
+  baru (`_check_dash_effects`) — men-simulasikan `press_dash()` lalu
+  memverifikasi animasi benar-benar pindah ke `ANIM_SPRINT` dgn
+  `speed_scale` terpercepat, DAN minimal satu node `DashAfterimage`
+  benar-benar muncul di dunia (bukti pola API "duplikasi MeshInstance3D +
+  penaut ulang Skeleton3D via NodePath relatif" — pola yang agak eksotis
+  dan belum pernah dipakai di proyek ini — benar-benar jalan tanpa error
+  di headless, bukan cuma lolos parse).
+- **Masih belum bisa diverifikasi visual** (apakah "sprint burst" +
+  afterimage terasa/terlihat pas) karena sandbox ini tanpa GPU/Godot
+  lokal — perlu konfirmasi pengguna di device lagi.
+
 ## Yang BELUM dikerjakan (menyusul di bagian berikutnya)
 
 

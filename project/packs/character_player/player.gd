@@ -83,7 +83,6 @@ const ANIM_IDLE := "Idle"
 const ANIM_WALK := "Walk"
 const ANIM_JOG := "Jog_Fwd"
 const ANIM_SPRINT := "Sprint"
-const ANIM_ROLL := "Roll"   # tanpa akhiran _Loop di sumber -> nama tak berubah
 
 # Ambang speed01 (0..1) utk pindah state, dgn histeresis (naik/turun beda
 # ambang) supaya tak "flicker" bolak-balik dekat batas.
@@ -94,8 +93,17 @@ const JOG_OFF := 0.30
 const SPRINT_ON := 0.82
 const SPRINT_OFF := 0.70
 const ANIM_BLEND := 0.18
-const ROLL_DURATION_SRC := 1.467   # durasi asli klip Roll (dtk), diukur dari glTF
-const ROLL_ANIM_SPEED := ROLL_DURATION_SRC / 0.42  # percepat spy pas dgn durasi dash
+
+# --- dash: "sprint burst" ala pengguna (bag. A4 lanjutan #2) — BUKAN lagi
+# animasi roll/berguling. Badan tetap main klip lari (ANIM_SPRINT) yang
+# sama seperti lari biasa, tapi kaki dipercepat drastis (speed_scale) demi
+# kesan "meledak ngebut", ditambah jejak bayangan (afterimage) transparan
+# yg mengikuti pose animasi berjalan saat itu.
+const DASH_ANIM_SPEED_SCALE := 1.8
+const AFTERIMAGE_INTERVAL := 0.05    # jarak waktu antar-ghost yg di-spawn saat dash
+const AFTERIMAGE_FADE := 0.32        # durasi tiap ghost memudar
+const AFTERIMAGE_COLOR := Color(0.62, 0.34, 1.0, 0.4)
+
 
 # --- kamera third-person (murni ikut swipe, arsitektur tak berubah) ---
 const PITCH_MIN := deg_to_rad(-72.0)
@@ -126,8 +134,9 @@ var health := 100.0
 var _visual: Node3D
 var _model: Node3D
 var _anim: AnimationPlayer
+var _skeleton: Skeleton3D
 var _anim_state := ""
-var _dash_anim_triggered := false
+var _afterimage_timer := 0.0
 var _aura_particles: GPUParticles3D
 var _aura_material: ParticleProcessMaterial
 var _base_amounts := {}
@@ -251,6 +260,10 @@ func _move(delta: float) -> void:
 		_facing = _dash_dir
 		_speed01 = lerpf(_speed01, dash_factor, 1.0 - exp(-12.0 * delta))
 		_advance_footsteps(DASH_SPEED * dash_factor, delta)
+		_afterimage_timer -= delta
+		if _afterimage_timer <= 0.0:
+			_afterimage_timer = AFTERIMAGE_INTERVAL
+			_spawn_afterimage()
 		return
 
 	var wish := joy
@@ -320,13 +333,17 @@ func _animate_character(delta: float) -> void:
 	if _anim == null:
 		return
 
+	# Dash = "sprint burst": klip lari yang SAMA (ANIM_SPRINT), bukan
+	# animasi khusus — cuma kakinya dipercepat drastis via speed_scale, plus
+	# jejak bayangan (lihat _spawn_afterimage, dipanggil dari _move()).
 	if _dash_left > 0.0:
-		if not _dash_anim_triggered:
-			_anim.play(ANIM_ROLL, 0.08, ROLL_ANIM_SPEED)
-			_anim_state = ANIM_ROLL
-			_dash_anim_triggered = true
+		if _anim_state != ANIM_SPRINT or not _anim.is_playing():
+			_anim.play(ANIM_SPRINT, 0.06)
+			_anim_state = ANIM_SPRINT
+		_anim.speed_scale = DASH_ANIM_SPEED_SCALE
 		return
-	_dash_anim_triggered = false
+	if not is_equal_approx(_anim.speed_scale, 1.0):
+		_anim.speed_scale = 1.0
 
 	# Histeresis: state saat ini menentukan ambang MASUK vs KELUAR, supaya
 	# tak lompat-lompat pas speed01 pas di garis batas.
@@ -416,6 +433,7 @@ func _build_character() -> void:
 		if _anim.has_animation(ANIM_IDLE):
 			_anim.play(ANIM_IDLE)
 			_anim_state = ANIM_IDLE
+	_skeleton = _model.find_child("Skeleton3D", true, false) as Skeleton3D
 
 	_paint_purple()
 
@@ -476,6 +494,53 @@ func _build_aura() -> void:
 	_aura_particles.draw_pass_1 = trail_mesh
 	_aura_particles.emitting = true
 	_base_amounts[_aura_particles] = _aura_particles.amount
+
+## Jejak bayangan (afterimage) saat dash — beberapa "hantu" transparan
+## menduplikasi mesh mannequin, dibekukan di posisi/rotasi saat itu, lalu
+## memudar cepat. Tiap ghost tetap merujuk Skeleton3D ASLI yang sama (jadi
+## posenya ikut pose lari saat itu, bukan T-pose) — cukup utk kesan "trail
+## kecepatan" tanpa perlu membekukan pose tulang secara manual.
+func _spawn_afterimage() -> void:
+	if not is_instance_valid(_model) or not is_instance_valid(_skeleton):
+		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	var ghost := Node3D.new()
+	ghost.name = "DashAfterimage"
+	parent.add_child(ghost)
+	ghost.global_transform = _visual.global_transform
+
+	var ghost_mat := StandardMaterial3D.new()
+	ghost_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	ghost_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	ghost_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	ghost_mat.albedo_color = AFTERIMAGE_COLOR
+	ghost_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	ghost_mat.disable_receive_shadows = true
+
+	var made_any := false
+	for mi in _model.find_children("*", "MeshInstance3D", true, false):
+		var src := mi as MeshInstance3D
+		if src == null or src.mesh == null:
+			continue
+		var copy := MeshInstance3D.new()
+		copy.mesh = src.mesh
+		copy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ghost.add_child(copy)
+		copy.global_transform = src.global_transform
+		copy.skeleton = copy.get_path_to(_skeleton)
+		for i in range(src.mesh.get_surface_count()):
+			copy.set_surface_override_material(i, ghost_mat)
+		made_any = true
+	if not made_any:
+		ghost.queue_free()
+		return
+
+	var tween := create_tween()
+	tween.tween_property(ghost_mat, "albedo_color:a", 0.0, AFTERIMAGE_FADE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_callback(ghost.queue_free)
 
 func _spawn_dash_shimmer() -> void:
 	var parent := get_parent()

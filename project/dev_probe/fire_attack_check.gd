@@ -151,6 +151,16 @@ func _run() -> void:
 		_finish()
 		return
 
+	# ---------- Fase 1d: dash "sprint burst" + jejak bayangan ----------
+	# Ronde-46 bag. A4 lanjutan #2: dash diganti dari animasi Roll jadi
+	# klip lari (ANIM_SPRINT) dipercepat + duplikasi MeshInstance3D "hantu"
+	# yg merujuk Skeleton3D asli via NodePath relatif — pola API yg agak
+	# eksotis, cek ini memastikan itu benar2 jalan tanpa error di headless.
+	await _check_dash_effects(player, world)
+	if _exit_code != 0:
+		_finish()
+		return
+
 	print("[fire-check] fase 2: TAP cepat…")
 	var before_tap := _count_by_suffix(world, "arcane_bolt.gd")
 	player.call("set_attack_held", true)
@@ -193,7 +203,7 @@ func _run() -> void:
 ## cek ini otomatis ikut benar kalau nama klip berubah lagi di masa depan.
 func _check_mannequin_animates(player: Node) -> void:
 	var consts: Dictionary = (player.get_script() as GDScript).get_script_constant_map()
-	var clip_names := ["ANIM_IDLE", "ANIM_WALK", "ANIM_JOG", "ANIM_SPRINT", "ANIM_ROLL"]
+	var clip_names := ["ANIM_IDLE", "ANIM_WALK", "ANIM_JOG", "ANIM_SPRINT"]
 	var anim: AnimationPlayer = player.get("_anim")
 	if anim == null:
 		_fail("mannequin: AnimationPlayer tidak ditemukan (_anim null) — model beku total")
@@ -226,6 +236,35 @@ func _check_mannequin_animates(player: Node) -> void:
 		_fail("mannequin: klip animasi tidak berganti dari Idle walau karakter disimulasikan bergerak penuh")
 		return
 	print("[fire-check] fase 1c ✔ mannequin beranimasi (idle→", after_clip, ", is_playing=", after_playing, ")")
+
+## Verifikasi dash "sprint burst": animasi berpindah ke ANIM_SPRINT dgn
+## speed_scale dipercepat, DAN minimal satu node jejak bayangan
+## ("DashAfterimage") benar-benar muncul di dunia (bukti duplikasi
+## MeshInstance3D + penautan Skeleton3D via NodePath relatif tidak error).
+func _check_dash_effects(player: Node, world: Node) -> void:
+	var consts: Dictionary = (player.get_script() as GDScript).get_script_constant_map()
+	var sprint_name: String = consts.get("ANIM_SPRINT", "")
+	var anim: AnimationPlayer = player.get("_anim")
+	player.call("press_dash")
+	await create_timer(0.12).timeout
+	if anim != null:
+		if anim.current_animation != sprint_name:
+			_fail("dash: animasi saat dash bukan ANIM_SPRINT (dpt: \"%s\")" % anim.current_animation)
+			return
+		if anim.speed_scale <= 1.01:
+			_fail("dash: speed_scale animasi tidak dipercepat saat dash (burst tak terasa)")
+			return
+	var ghost_found := false
+	for c in world.get_children():
+		if String(c.name).begins_with("DashAfterimage"):
+			ghost_found = true
+			break
+	if not ghost_found:
+		_fail("dash: tidak ada node DashAfterimage muncul saat dash (jejak bayangan gagal spawn)")
+		return
+	print("[fire-check] fase 1d ✔ dash sprint-burst (speed_scale=", anim.speed_scale if anim else "?", ") + afterimage OK")
+	# tunggu dash+cooldown reda supaya tidak mengganggu fase 2/3 setelahnya
+	await create_timer(1.3).timeout
 
 func _count_by_suffix(world: Node, suffix: String) -> int:
 	var n := 0

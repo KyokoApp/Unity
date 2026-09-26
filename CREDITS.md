@@ -242,6 +242,15 @@
   permanen lewat pemeriksaan baru di `dev_probe/fire_attack_check.gd`
   (`_check_mannequin_animates`, membaca nama klip dari konstanta skrip
   `player.gd` sendiri via `get_script_constant_map()` agar tak ikut basi).
+- **Update lanjutan (dash diganti sesuai permintaan pengguna):** animasi
+  dash yang tadinya klip `Roll` (berguling) diganti jadi "sprint burst" —
+  klip lari yang sama (`Sprint`) tapi `speed_scale` dipercepat
+  (`DASH_ANIM_SPEED_SCALE`), plus jejak bayangan (afterimage): beberapa
+  duplikat `MeshInstance3D` transparan ungu yang tetap merujuk
+  `Skeleton3D` asli (jadi ikut pose lari saat itu, bukan T-pose), dibekukan
+  di posisi saat spawn, lalu memudar cepat. Klip `Roll` tak lagi dipakai
+  di mana pun (tetap ada di paket kalau mau dipakai lain kali). Dijaga via
+  cek CI baru `_check_dash_effects`.
 
 *Terakhir diperbarui: 2026-09-26*
 
