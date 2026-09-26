@@ -57,8 +57,21 @@ var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 # terlihat terpaku di tanah spt sungguhan, cuma helai yg pas di TEPI TERJAUH
 # yg "lompat" ke sisi berlawanan — disamarkan krn radiusnya sengaja SEDIKIT
 # LEBIH KECIL dari titik mulai kabut jauh (fog_depth_begin).
-const GRASS_RADIUS := 42.0
-const GRASS_COUNT := 9000
+# PERBAIKAN #2 (laporan user: "rumputnya masih kayak awal, gk sesuai
+# referensi github yg lebat"): versi sebelumnya cuma ~1.3 rumpun/m² (9000
+# tersebar di kotak 84x84m) — kelihatan jarang drpd referensi (karpet rumput
+# nyaris tanpa celah tanah). Dipadatkan: radius domain diperkecil (30, msh
+# nyaman di bawah fog_depth_begin=45 dgn buffer 15m) SEKALIGUS jumlah
+# instance dinaikkan >2.5x -> kepadatan efektif naik ~5x (~6.7 rumpun/m²),
+# dan tiap rumpun kini 5 helai bersilang (dari 3) jadi tampak lebih rimbun.
+# CATATAN JUJUR ke user: kepadatan super-rapat di GIF referensi itu demo
+# PATCH KECIL (bbrp meter persegi) yg di-zoom, bukan area terbuka seluas
+# ini — mereplikasi persis itu di seluruh radius 30m dunia terbuka mobile
+# tak realistis (bisa jutaan segitiga). Ini kompromi signifikan lbh padat
+# drpd sebelumnya, tetap ramah GPU mobile (quality preset masih memangkas
+# via grass_density spt biasa).
+const GRASS_RADIUS := 30.0
+const GRASS_COUNT := 24000
 var _grass_mmi: MultiMeshInstance3D
 var _grass_mat: ShaderMaterial   # wrap_center-nya diperbarui tiap frame (lihat _process)
 
@@ -201,17 +214,19 @@ func _build_grass() -> void:
 	_grass_mmi = mmi
 
 
-## Mesh 1 tuft rumput: 3 helai (segitiga) tersusun bersilang membentuk bintang
-## dari atas, tiap helai punya sedikit "condong" di ujung biar tak kaku lurus.
-## Warna vertex.a dipakai grass_blade.gdshader sbg bobot tinggi (0=akar,1=ujung).
+## Mesh 1 tuft rumput: 5 helai (segitiga, naik dari 3 — perbaikan "lebat" #2)
+## tersusun bersilang membentuk bintang dari atas, tiap helai punya sedikit
+## "condong" di ujung biar tak kaku lurus. Warna vertex.a dipakai
+## grass_blade.gdshader sbg bobot tinggi (0=akar,1=ujung).
 func _build_grass_blade_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var h := 0.40
-	var w := 0.05
-	var lean := 0.09
-	for i in range(3):
-		var rot := Basis(Vector3.UP, deg_to_rad(60.0 * i))
+	var h := 0.46
+	var w := 0.065
+	var lean := 0.10
+	const BLADE_N := 5
+	for i in range(BLADE_N):
+		var rot := Basis(Vector3.UP, deg_to_rad((360.0 / BLADE_N) * i))
 		var bl := rot * Vector3(-w * 0.5, 0.0, 0.0)
 		var br := rot * Vector3(w * 0.5, 0.0, 0.0)
 		var tip := rot * Vector3(0.0, h, lean)

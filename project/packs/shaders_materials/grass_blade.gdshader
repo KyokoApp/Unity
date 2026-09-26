@@ -41,6 +41,17 @@ void vertex() {
 	vec2 rel = inst_xz - wrap_center;
 	rel = mod(rel + vec2(wrap_size * 0.5), vec2(wrap_size)) - vec2(wrap_size * 0.5);
 	MODEL_MATRIX[3].xz = wrap_center + rel;
+
+	// Fade tepi (perbaikan #2, radius domain diperkecil dr 42->30 biar lbh
+	// padat): tanpa ini, helai persis di garis wrap_size/2 akan "lompat"
+	// (pop) ke sisi berlawanan tiap kali dilewati batas -> kentara krn
+	// radius baru kini jauh dari fog_depth_begin. Jadi helai yg mendekati
+	// garis batas MENGECIL ke arah akarnya sendiri (bukan tersembunyi tiba2)
+	// sampai nol persis di garis batas -> lompatannya jadi tak kelihatan.
+	float edge_dist = length(rel);
+	float edge_fade = 1.0 - smoothstep(wrap_size * 0.5 * 0.80, wrap_size * 0.5 * 0.985, edge_dist);
+	VERTEX *= edge_fade;
+
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 
 	// Tekukan injak: cuma dihitung (termasuk inverse(MODEL_MATRIX) yg agak
