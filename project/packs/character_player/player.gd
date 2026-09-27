@@ -244,13 +244,32 @@ class SkinRetarget:
 
 # Dua corak ungu: badan utama (permukaan besar) + aksen sendi (kontras
 # lebih gelap, mempertahankan "color-blocking" asli model sumber).
-const BODY_COLOR := Color(0.50, 0.26, 0.92)
-const JOINT_COLOR := Color(0.22, 0.10, 0.44)
+# RONDE INI (permintaan user: "buat warna gk bentrok ama warna lain jadi
+# mereka nyambung semua... ala warna pastel gitu") — dilembutkan dr ungu
+# tua pekat jadi purple-PASTEL (lavender lembut, tetap jelas ungu): serasi
+# dgn langit sore keemasan+hijau pucat dunia; bukan lagi ungu neon yg
+# "berteriak" sendirian di tengah warna pastel lainnya.
+const BODY_COLOR := Color(0.62, 0.46, 0.90)
+const JOINT_COLOR := Color(0.38, 0.26, 0.66)
 
 # --- gerak (ringan, lincah — penyihir jalan kaki, bukan kendaraan) ---
 const MAX_SPEED := 9.0
 const ACCEL_RATE := 7.5
 const DECEL_RATE := 4.5
+
+# SKILL "gerak-cepat" (permintaan user ronde ini: "tambahkan skill movement
+# speed kalo kita pencet nambah 5 kali kecepatan speed lari") — tombol
+# toggle di HUD (BtnSpeed, emoji ≪≫): kecepatan target dilipat-gandakan
+# ×SPEED_SKILL_MULT saat aktif, laju akselerasi jg dibikin BRUTALCY (lihat
+# _move), bodi relatif-kamera tak dicampur sama: kamera tetap third-person
+# biasa, tapi homecam FOV di-"kick" sedikit (lihat _camera_boost_fx); arm
+# kamera digeser keluar sedikit (CAM_BOOST_PULL) spy pemain kelihatan lbh
+# kecil & cepat, lalu lari beneran; tween FOV tetap mengizinkan beda
+# pitch/look, cuma fov dasarnya yg berubah.
+const SPEED_SKILL_MULT := 5.0
+const SPEED_SKILL_ACCEL := 14.0
+const CAM_BOOST_FOV := 72.0
+const CAM_BOOST_PULL := 1.6
 const HOVER := 0.0           # model sudah berakar tepat di telapak kaki (Y=0 bind-pose)
 
 # --- proporsi model nyata (Quaternius mannequin, ~1.83 m bind-pose) ---
@@ -302,9 +321,17 @@ const ANIM_BLEND := 0.18
 # kesan "meledak ngebut", ditambah jejak bayangan (afterimage) transparan
 # yg mengikuti pose animasi berjalan saat itu.
 const DASH_ANIM_SPEED_SCALE := 1.8
-const AFTERIMAGE_INTERVAL := 0.05    # jarak waktu antar-ghost yg di-spawn saat dash
-const AFTERIMAGE_FADE := 0.32        # durasi tiap ghost memudar
-const AFTERIMAGE_COLOR := Color(0.62, 0.34, 1.0, 0.4)
+# Sama terapan pastel ke warna-warna lain karakter FX di file ini: dash
+# afterimage kini ABU-ABU pastel dgn asap bergoyang (permintaan user:
+# "hanya satu bayangannya aja yg tertinggal, abu abu dengan efek asap tapi
+# masih ada bentukan karakternya kayak goyangan asap"), trail speed-skill
+# pastel cyan lembut, dsb. Semuanya di-set ke satu palet pastel biar
+# nyambung, gak bentrok warna sen itu sendiri.
+const AFTERIMAGE_FADE := 0.85        # umur ghost dash (dinaikkan — hanya 1 ghost per dash)
+const AFTERIMAGE_COLOR := Color(0.55, 0.60, 0.68, 0.42)
+const TRAIL_INTERVAL := 0.05         # jarak spawn ghost trail saat speed-skill aktif
+const TRAIL_FADE := 0.30             # umur ghost trail (tilak faedah-efek smooth)
+const TRAIL_COLOR := Color(0.45, 0.62, 0.85, 0.30)
 
 
 # --- kamera third-person (murni ikut swipe, arsitektur tak berubah) ---
@@ -348,7 +375,6 @@ var _model: Node3D
 var _anim: AnimationPlayer
 var _skeleton: Skeleton3D
 var _anim_state := ""
-var _afterimage_timer := 0.0
 var _aura_particles: GPUParticles3D
 var _aura_material: ParticleProcessMaterial
 var _base_amounts := {}
@@ -369,6 +395,10 @@ var _fx := 1.0
 var _dash_left := 0.0
 var _dash_cooldown := 0.0
 var _dash_dir := Vector3.ZERO
+var _speed_skill := false          # status skill "gerak-cepat" aktif/tidak (toggle BtnSpeed)
+var _trail_timer := 0.0            # timer spawn ghost trail saat speed skill aktif
+var _cam_boost_fov := 0.0          # kick FOV saat skill kecepatan diaktifkan (efek "bush")
+var _cam_boost_arm := 0.0          # tarikan arm kamera keluar sedikit saat boost
 var _dust_dist_accum := 0.0
 var _dust_side := 1.0
 var _skin_id := SKIN_MANNEQUIN
@@ -451,6 +481,47 @@ func set_attack_held(down: bool) -> void:
 	if down:
 		_try_fire()
 
+func press_speed_skill(down: bool) -> void:
+	if not is_ready:
+		return
+	_speed_skill = down
+	# momentum: efek "bush" di awal aktivasi — shockwave ring + set kecepatan
+	# langsung diserok (bukan ditunggu lerpa pelan) + trail kamera (fov kick)
+	if down:
+		_spawn_speed_boost_fx()
+
+## Efek "bush"/lontaran awal skill kecepatan (permintaan user: "pas mencet
+## mov speed bajal ada efek bush gitu jadi berasa naik kecepatan nya"):
+##  1) ring kejut udara melingkar di tanah (shockwave.gdshader, tint pastel
+##     cyan-gray biar senada dgn trail speed, tak bentrok dgn ungu sihir);
+##  2) kamera di-"kick": FOV 60->melongok ke CAM_BOOST_FOV lalu lerp balik,
+##     lengan digeser keluar sedikit (CAM_BOOST_PULL) — tubuh terasa meluncur
+##     yang tak bisa dicapai umpama cuma menambah angka kecepatan saja.
+func _spawn_speed_boost_fx() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var ring := MeshInstance3D.new()
+	ring.name = "SpeedBoostRing"
+	var ring_mesh := PlaneMesh.new()
+	ring_mesh.size = Vector2(2.6, 2.6)
+	ring.mesh = ring_mesh
+	var ring_shader := preload("res://packs/character_player/shockwave.gdshader")
+	var ring_mat := ShaderMaterial.new()
+	ring_mat.shader = ring_shader
+	ring_mat.set_shader_parameter("tint", Color(0.55, 0.68, 0.90, 0.7))
+	ring_mat.set_shader_parameter("energy", 1.4)
+	ring.material_override = ring_mat
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(ring)
+	ring.global_position = global_position + Vector3(0.0, 0.06, 0.0)
+	var tween := create_tween()
+	tween.tween_property(ring_mat, "shader_parameter/progress", 1.0, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_callback(ring.queue_free)
+
+	_cam_boost_fov = CAM_BOOST_FOV - 60.0
+	_cam_boost_arm = CAM_BOOST_PULL
+
 func press_dash() -> void:
 	if not is_ready or _dash_cooldown > 0.0 or _dash_left > 0.0:
 		return
@@ -464,6 +535,13 @@ func press_dash() -> void:
 	_dash_left = DASH_DURATION
 	_dash_cooldown = DASH_COOLDOWN
 	_spawn_dash_shimmer()
+	# SATU-SATUNYA bayangan dash (permintaan user: "hanya satu bayangannya
+	# aja yg tertinggal") — ghost pose saat tombol ditekan, lalu kena efek
+	# asap bergoyang (lihat _spawn_afterimage + _spawn_ghost_smoke), warna
+	# abu-abu pastel (bukan lagi ungu bertumpuk per-interval 0.05 detik spt
+	# versi lama yg "berantakan banget"). Berlaku dua2 skin (lihat
+	# _spawn_afterimage: sumber mesh dipilih per skin aktif).
+	_spawn_afterimage()
 
 func press_emote() -> void:
 	pass
@@ -504,10 +582,9 @@ func _move(delta: float) -> void:
 		_facing = _dash_dir
 		_speed01 = lerpf(_speed01, dash_factor, 1.0 - exp(-12.0 * delta))
 		_advance_footsteps(DASH_SPEED * dash_factor, delta)
-		_afterimage_timer -= delta
-		if _afterimage_timer <= 0.0:
-			_afterimage_timer = AFTERIMAGE_INTERVAL
-			_spawn_afterimage()
+		# dash HANYA MENELAN HANTU SATU-SATUNYA di tekan tombol (lihat press_dash
+		# -> _spawn_afterimage) — tak ada lagi ghost train interval di sini
+		# (disuruh user: "afterimage itu hanya satu bayangannya aja yg tertinggal").
 		return
 
 	var wish := joy
@@ -516,9 +593,15 @@ func _move(delta: float) -> void:
 	if wish.length() > 1.0:
 		wish = wish.normalized()
 	var dir := Basis(Vector3.UP, yaw) * Vector3(wish.x, 0.0, wish.y)
-	var target := dir * MAX_SPEED
+	# --- kecepatan skill "gerak-cepat" (toggle BtnSpeed) ---
+	# Saat skill ON: kecepatan target ×5 DAN akselerasi jg dibikin jauh lbh
+	# agresif (SPEED_SKILL_ACCEL) spy 45m+ benar-benar terasa dijangkau dlm
+	# hitungan ratusan milidetik, bukan lari-dibersar tapi lambat merayap.
+	var spd_mult := SPEED_SKILL_MULT if _speed_skill else 1.0
+	var target := dir * (MAX_SPEED * spd_mult)
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
-	var rate := ACCEL_RATE if target.length_squared() > 0.0001 else DECEL_RATE
+	var accel_now := SPEED_SKILL_ACCEL if _speed_skill else ACCEL_RATE
+	var rate := accel_now if target.length_squared() > 0.0001 else DECEL_RATE
 	hv = hv.lerp(target, 1.0 - exp(-rate * delta))
 	if hv.length_squared() < 0.0004 and target == Vector3.ZERO:
 		hv = Vector3.ZERO
@@ -529,6 +612,14 @@ func _move(delta: float) -> void:
 		_facing = hv.normalized()
 	_speed01 = lerpf(_speed01, clampf(hv.length() / MAX_SPEED, 0.0, 1.0), 1.0 - exp(-8.0 * delta))
 	_advance_footsteps(hv.length(), delta)
+	# --- trail ghost smooth saat skill kecepatan aktif (jalan-kaki cepat sekali) ---
+	if _speed_skill and hv.length() > MAX_SPEED * 0.80:
+		_trail_timer -= delta
+		if _trail_timer <= 0.0:
+			_trail_timer = TRAIL_INTERVAL
+			_spawn_afterimage()
+	else:
+		_trail_timer = 0.0
 
 ## Batas pulau (~3km, diperkecil dari ~12km per permintaan user ronde ini —
 ## angka sebenarnya SELALU ikut IslandShape.RADIUS, tak di-hardcode di sini)
@@ -593,12 +684,16 @@ func _apply_camera(delta: float) -> void:
 	_cam_zoom_idle_t += delta
 	if _speed01 > 0.05 or _cam_zoom_idle_t > CAM_ZOOM_RETURN_IDLE_S:
 		_cam_zoom = lerpf(_cam_zoom, 0.0, 1.0 - exp(-CAM_ZOOM_RETURN_RATE * delta))
-	cam_arm.spring_length = maxf(2.0, CAM_DIST + _cam_extra + _cam_zoom)
+	cam_arm.spring_length = maxf(2.0, CAM_DIST + _cam_extra + _cam_zoom + _cam_boost_arm)
 	_shake = maxf(0.0, _shake - 1.6 * delta)
 	var shake_power := _shake * _shake * 0.35
 	var cam: Camera3D = $CameraPivot/CamArm/Cam
 	cam.h_offset = (sin(_t * 43.0) * 0.72 + sin(_t * 67.0 + 0.8) * 0.28) * shake_power
 	cam.v_offset = (sin(_t * 51.0 + 1.7) * 0.7 + sin(_t * 79.0) * 0.3) * shake_power
+	# Kick FOV skill kecepatan (lihat press_speed_skill/_spawn_speed_boost_fx)
+	_cam_boost_fov = lerpf(_cam_boost_fov, 0.0, 1.0 - exp(-3.2 * delta))
+	_cam_boost_arm = lerpf(_cam_boost_arm, 0.0, 1.0 - exp(-3.2 * delta))
+	cam.fov = 60.0 + _cam_boost_fov
 
 ## Putar model menghadap arah gerak, lalu pilih & mainkan klip mocap yang
 ## cocok dgn kecepatan/dash saat ini via AnimationPlayer (bukan lagi rotasi
@@ -621,8 +716,13 @@ func _animate_character(delta: float) -> void:
 			_anim_state = ANIM_SPRINT
 		_anim.speed_scale = DASH_ANIM_SPEED_SCALE
 		return
-	if not is_equal_approx(_anim.speed_scale, 1.0):
-		_anim.speed_scale = 1.0
+	## speed_scale dasar state non-dash: 1.0 biasa; 2.8 selagi skill
+	## gerak-cepat ×5 ON (kaki klip mocap ~9m/s akan "ban selip" dibanding
+	## laju fisik 45m/s kalau tetap tempo asli — butuh tempat cukup tinggi
+	## spy gerakannya TERASA 5×, sejalan efek trail-smooth yg diminta user).
+	var baseline_scale := 2.8 if _speed_skill else 1.0
+	if not is_equal_approx(_anim.speed_scale, baseline_scale):
+		_anim.speed_scale = baseline_scale
 
 	# Histeresis: state saat ini menentukan ambang MASUK vs KELUAR, supaya
 	# tak lompat-lompat pas speed01 pas di garis batas.
@@ -785,8 +885,50 @@ func _build_kanna_skin() -> void:
 	add_child(_retarget)
 	_retarget.configure(_skeleton, _kanna_skeleton, KANNA_RETARGET_PAIRS)
 
+	# POLE warna Kanna (laporan user: "karakter nya terlalu terang visual
+	# kurang rapih") — file VRM itu pakai glTF extension KHR_materials_unlit:
+	# semua meshnya dirender UNLIT (warna flat penuh, tak merespons cahaya/
+	# ambient/bayangan scene sama sekali) — di dunia sore-hangat baru, karakter
+	# jadi "nempel" terang sendirian & tak rapi visual. Diubah jadi LIT lembut
+	# (kena lampu sore + bayangan sendiri yg rapi), tint albedo putih-hangat
+	# krim pastel (bukan sepia/pudar, bukan juga jelas-acak), specular/roughness
+	# dirapikan supaya kilau plastik berhenti & warna2nya jadi "nyambung" dgn
+	# palet scene (lihat _polish_kanna_materials).
+	_polish_kanna_materials()
+
 	# barulah mannequin "puppeteer" disembunyikan (pose tetap jalan utk dicopy)
 	_set_mannequin_mesh_visible(false)
+
+## Pole material mesh Kanna: override material bawaan VRM (unlit penuh) jadi
+## mat_lit pastel hangat yg TETAP mempertahankan TEKSTUR asli (wajah/rambut/
+## baju/mata) — material StandardMaterial3D di-duplicate (bukan di-share)
+## supaya tak mengubah file-nya & terpisah dari material lain — lalu shading
+## diubah: UNLIT→PER_PIXEL-lit (kena cahaya sore hangat & punya bayangan
+## sendiri rapi), tint albedo krim-hangat pastel (0.02-0.06 derajat tint,
+## cukup utk keharmonisan warna, tidak mengubah tekstur), roughness naik
+## (kilau plastik-oranye VRM berhenti, ganti sheen lembut), specular redup.
+func _polish_kanna_materials() -> void:
+	for mi in _kanna.find_children("*", "MeshInstance3D", true, false):
+		var mesh_inst := mi as MeshInstance3D
+		if mesh_inst == null or mesh_inst.mesh == null:
+			continue
+		for surf in range(mesh_inst.mesh.get_surface_count()):
+			var m := mesh_inst.get_active_material(surf)
+			var new_mat: StandardMaterial3D = null
+			if m is StandardMaterial3D:
+				new_mat = m.duplicate() as StandardMaterial3D
+			else:
+				new_mat = StandardMaterial3D.new()
+				new_mat.albedo_color = Color(1.0, 1.0, 1.0)
+			new_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+			new_mat.albedo_color = Color(1.02, 0.99, 0.94)
+			new_mat.roughness = 0.82
+			new_mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+			new_mat.metallic = 0.0
+			new_mat.back_light = 0.0
+			new_mat.disable_receive_shadows = false
+			new_mat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+			mesh_inst.set_surface_override_material(surf, new_mat)
 
 ## Tinggi berdiri (Head - rata2 kaki) dari REST POSE sebuah skeleton, dipakai
 ## _build_kanna_skin() utk menyamakan skala tanpa perlu angka tebakan manual.
@@ -968,6 +1110,18 @@ func _build_aura() -> void:
 ## memudar cepat. Tiap ghost tetap merujuk Skeleton3D ASLI yang sama (jadi
 ## posenya ikut pose lari saat itu, bukan T-pose) — cukup utk kesan "trail
 ## kecepatan" tanpa perlu membekukan pose tulang secara manual.
+## Bayangan pemain: satu ghost abu-abu pastel untuk DASH (dipanggil SEKALI
+## di press_dash) ATAU ghost trail biru-pastel saat skill kecepatan aktif
+## (dipanggil berulang tiap TRAIL_INTERVAL selama >80% kecepatan lari).
+## Dua mode beda gaya fade/asap:
+##   DASH: 1 ghost saja per tekanan tombol (cek AFTERIMAGE_*), lapisan asap
+##         lembut bergoyang di sekelilingnya (lihat _spawn_ghost_smoke) +
+##         bergeser naik pelan + fade-out panjang — kesan "bentukan karakter
+##         masih kelihatan, cuma seperti goyangan asap" sesuai permintaan
+##         user, di KEDUA skin (mannequin & Kanna pakai kode yg sama persis).
+##   TRAIL: ghost tipis cepat-lenyap utk kesan "smooth" saat 5× speed.
+## Sumber mesh/skeleton dipilih eksplisit per skin (mannequin mesh
+## tersembunyi saat skin Kanna TETAP valid krn di-pick di sini per-skin).
 func _spawn_afterimage() -> void:
 	# sumber mesh & skeleton = skin yg AKTIF (kanna: node kanna + skeletonnya;
 	# mannequin: _model + _skeleton spt biasa — jaringan mesh mannequin lg
@@ -983,8 +1137,11 @@ func _spawn_afterimage() -> void:
 	var parent := get_parent()
 	if parent == null:
 		return
+	var is_trail := _speed_skill and _dash_left <= 0.0
+	var tint := TRAIL_COLOR if is_trail else AFTERIMAGE_COLOR
+	var fade := TRAIL_FADE if is_trail else AFTERIMAGE_FADE
 	var ghost := Node3D.new()
-	ghost.name = "DashAfterimage"
+	ghost.name = "SpeedTrail" if is_trail else "DashAfterimage"
 	parent.add_child(ghost)
 	ghost.global_transform = _visual.global_transform
 
@@ -993,7 +1150,7 @@ func _spawn_afterimage() -> void:
 	ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	ghost_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	ghost_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	ghost_mat.albedo_color = AFTERIMAGE_COLOR
+	ghost_mat.albedo_color = tint
 	ghost_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	ghost_mat.disable_receive_shadows = true
 
@@ -1016,9 +1173,80 @@ func _spawn_afterimage() -> void:
 		ghost.queue_free()
 		return
 
+	# ghost pakai skeleton SAMA drpd mesh aslinya (skin terikat duru utk
+	# skeleton yg hidup), jd pose ghost = pose animasi berjalan saat itu juga
+	# (sengaja dipertahankan, prinsip yg dikehendaki era peristiwa dash —
+	# "bentukan karakter yg masih kelihatan" walau kita sudah lewat).
+	# Khusus DASH ditambahkan awan asap bergoyang di sekeliling ghost
+	# (lihat _spawn_ghost_smoke) — permintaan user: "efek asap tapi masih
+	# ada bentukan karakternya, kayak goyangan asap gitu, mannequin juga
+	# sama" (kode satu drat dua skin).
+	if not is_trail:
+		_spawn_ghost_smoke(ghost)
+	else:
+		# trail (speed skill): fade tipis + menggeliat vertikal (rasa kencang/
+		# "halus" ala motion-blur, bukan bayangan kaku berhenti diam).
+		var tween := create_tween()
+		tween.tween_property(ghost_mat, "albedo_color:a", 0.0, fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tween.parallel().tween_property(ghost, "scale", Vector3(1.0, 1.22, 1.0), fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tween.tween_callback(ghost.queue_free)
+		return
+
+	# dash: fade panjang hampir 1 detik + awan asap (lihat _spawn_ghost_smoke)
+	# + ghost sendiri bergeser pelan ke atas (goyangan asap yg dijanjikan).
 	var tween := create_tween()
-	tween.tween_property(ghost_mat, "albedo_color:a", 0.0, AFTERIMAGE_FADE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_property(ghost_mat, "albedo_color:a", 0.0, fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(ghost, "global_position", ghost.global_position + Vector3(0.0, 0.16, 0.0), fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tween.tween_callback(ghost.queue_free)
+
+## Awan asap bergoyang di sekeliling ghost dash (permintaan user: "efek asap
+## tapi masih ada bentukan karakter nya cuman kayak goyangan asap gitu,
+## manequin juga sama"). Partikel bola-bola abu-abu pastel lembut (blend
+## NORMAL-mix dengan alpha, bukan additive-terik, spy nyambung dgn palet sore
+## hangat & tetap halus pastel), goncangan orbit/tangensial kecil supaya
+## bergoyang (bukan statis), mengembang & naik pelan, lalu memudar — ikut
+## hilang sendiri saat ghost-nya di-queue_free (anak langsung dr ghost).
+func _spawn_ghost_smoke(ghost: Node3D) -> void:
+	var p := GPUParticles3D.new()
+	p.name = "GhostSmoke"
+	p.amount = 18
+	p.lifetime = 0.85
+	p.one_shot = false
+	p.explosiveness = 0.85
+	p.local_coords = false
+	p.fixed_fps = 30
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.visibility_aabb = AABB(Vector3(-2, -2, -2), Vector3(4, 5, 4))
+	ghost.add_child(p)
+	p.position = Vector3(0.0, 0.9, 0.0)   # tinggi torso karakter
+
+	var mat := ParticleProcessMaterial.new()
+	mat.direction = Vector3.UP
+	mat.spread = 100.0
+	mat.initial_velocity_min = 0.05
+	mat.initial_velocity_max = 0.32
+	# gravitasi NEGATIF-tipis = asap mengapung naik pelan (bukan jatuh
+	# turun), sesuai "asap bergoyang" yg diminta user; damping udara besar
+	# spy gerakannya lembut & tak liar berhamburan.
+	mat.gravity = Vector3(0.0, -0.06, 0.0)
+	mat.damping_min = 0.8
+	mat.damping_max = 1.4
+	mat.orbit_velocity_min = 0.04
+	mat.orbit_velocity_max = 0.12
+	mat.tangential_accel_min = 0.04
+	mat.tangential_accel_max = 0.10
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	mat.emission_sphere_radius = 0.34
+	mat.scale_min = 0.14
+	mat.scale_max = 0.26
+	mat.scale_curve = _curve([Vector2(0.0, 0.5), Vector2(0.35, 1.0), Vector2(1.0, 1.35)], 1.0)
+	mat.color_ramp = _ramp(
+		[0.0, 0.5, 1.0],
+		[Color(0.55, 0.58, 0.65, 0.0), Color(0.62, 0.66, 0.72, 0.34), Color(0.70, 0.74, 0.80, 0.0)])
+	p.process_material = mat
+	var puff := _quad(Vector2(0.28, 0.28), _fx_mat(_soft_tex(0.22), false, Color(0.80, 0.82, 0.86, 0.7)))
+	p.draw_pass_1 = puff
+	p.emitting = true
 
 func _spawn_dash_shimmer() -> void:
 	var parent := get_parent()

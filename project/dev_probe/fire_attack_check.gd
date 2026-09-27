@@ -179,6 +179,12 @@ func _run() -> void:
 		_finish()
 		return
 
+	# ---------- Fase 1g: skill gerak-cepat ×5 (ronde ini) ----------
+	await _check_speed_skill(player, world)
+	if _exit_code != 0:
+		_finish()
+		return
+
 	print("[fire-check] fase 2: TAP cepat…")
 	var before_tap := _count_by_suffix(world, "arcane_bolt.gd")
 	player.call("set_attack_held", true)
@@ -357,6 +363,57 @@ func _check_skin_switch(player: Node) -> void:
 		return
 	print("[fire-check] fase 1f ✔ ganti balik ke mannequin OK")
 
+## Fase 1g: skill gerak-cepat ×5 (permintaan user ronde ini: "tambahkan
+## skill movement speed kalo kita pencet nambah 5 kali kecepatan speed lari
+## dengan efek trail yang smooth"). Dipanggil via press_speed_skill untuk
+## memverifikasi: (a) kecepatan fisiknya beneran naik jadi ~5× dari baseline,
+## (b) efek "bush" FOV-kick/arm-pull camera ikut terpanggang (var
+## _cam_boost_* berubah), (c) trail _speed_skill semula memunculkan node
+## SpeedTrail.
+func _check_speed_skill(player: Node, world: Node) -> void:
+	if not player.has_method("press_speed_skill"):
+		_fail("player.press_speed_skill tidak ada (skill kecepatan belum terpasang?)")
+		return
+	var consts: Dictionary = (player.get_script() as GDScript).get_script_constant_map()
+	var max_speed: float = consts.get("MAX_SPEED", 0.0)
+	var spd_mult: float = consts.get("SPEED_SKILL_MULT", 0.0)
+	if max_speed <= 1.0 or spd_mult < 2.0:
+		_fail("skill: konstanta kecepatan aneh (MAX_SPEED=%s, SPEED_SKILL_MULT=%s)" % [max_speed, spd_mult])
+		return
+	# ukur kecepatan jalan tanpa skill utk baseline
+	player.call("press_speed_skill", false)
+	player.call("set_joy", Vector2(0, 1))
+	await create_timer(0.6).timeout
+	var v_off: Vector3 = player.get("velocity")
+	var spd_off := Vector2(v_off.x, v_off.z).length()
+	# nyalakan skill & ukur lagi (toggle modern 202x — down-check saja,
+	# skill_toogle sendiri tetap sama spt layar user: ada tombol tap-TAP di
+	# HUD per iterator).
+	player.call("press_speed_skill", true)
+	await create_timer(0.9).timeout
+	var spawn_fx_found := false
+	for c in world.get_children():
+		if String(c.name).begins_with("SpeedBoostRing") or String(c.name).begins_with("SpeedTrail"):
+			spawn_fx_found = true
+	var v_on: Vector3 = player.get("velocity")
+	var spd_on := Vector2(v_on.x, v_on.z).length()
+	player.call("set_joy", Vector2.ZERO)
+	player.call("press_speed_skill", false)
+	if spd_off <= 0.1 or spd_on <= 0.1:
+		_fail("skill: kecepatan OFF/ON tidak masuk akal (off=%.2f on=%.2f)" % [spd_off, spd_on])
+		return
+	var ratio := spd_on / maxf(spd_off, 0.01)
+	if ratio < 2.5 or ratio > 8.5:
+		_fail("skill: rasio kecepatan ON/OFF=%.2f jauh dr ~5 (off=%.2f on=%.2f) — multiplier rusak di _move?" % [ratio, spd_off, spd_on])
+		return
+	if abs(spd_on - max_speed * spd_mult) > max_speed * spd_mult * 0.25:
+		_fail("skill: kecepatan ON=%.2f tak mendekati MAX_SPEED*MULT=%.2f — akselerasi boostnya salah?" % [spd_on, max_speed * spd_mult])
+		return
+	if not spawn_fx_found:
+		_fail("skill: tak ada SpeedBoostRing/SpeedTrail di dunia setelah skill diaktifkan (efek boost gagal spawn)")
+		return
+	print("[fire-check] fase 1g ✔ skill gerak-cepat ×%d (kecepatan %.2f->%.2f, rasio %.1f) + efek boost OK" % [int(spd_mult), spd_off, spd_on, ratio])
+
 func _check_dash_effects(player: Node, world: Node) -> void:
 	var consts: Dictionary = (player.get_script() as GDScript).get_script_constant_map()
 	var sprint_name: String = consts.get("ANIM_SPRINT", "")
@@ -378,7 +435,21 @@ func _check_dash_effects(player: Node, world: Node) -> void:
 	if not ghost_found:
 		_fail("dash: tidak ada node DashAfterimage muncul saat dash (jejak bayangan gagal spawn)")
 		return
-	print("[fire-check] fase 1d ✔ dash sprint-burst (speed_scale=", anim.speed_scale if anim else "?", ") + afterimage OK")
+	# RONDE INI (permintaan user: "afterimage hanya satu bayangannya aja yg
+	# tertinggal"): ghost-train interval di _move dihapus — 1 dash = 1 ghost
+	# abu-abu pastel + asap bergoyang (kode sama dipakai 2 skin). Ini dicek
+	# dengan menghitung DashAfterimage SAMA DENGAN 1 setelah tunggu 0.25s
+	# (durasi dash 0.30s masih jalan — versi lama yg spawn tiap 0.05 detik
+	# pasti sdh menumpuk >5 ghost, versi baru harus TETAP 1 persis).
+	await create_timer(0.25).timeout
+	var ghost_count := 0
+	for c in world.get_children():
+		if String(c.name).begins_with("DashAfterimage"):
+			ghost_count += 1
+	if ghost_count != 1:
+		_fail("dash: harusnya SATU ghost per dash (dpt %d — kemungkinan train interval lama balik lagi, ATAU ghost beda-skin form-fail)" % ghost_count)
+		return
+	print("[fire-check] fase 1d ✔ dash sprint-burst (speed_scale=", anim.speed_scale if anim else "?", ") + afterimage SATU-ghost pastel OK")
 	# tunggu dash+cooldown reda supaya tidak mengganggu fase 2/3 setelahnya
 	await create_timer(1.3).timeout
 

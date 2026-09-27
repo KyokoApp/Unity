@@ -121,6 +121,14 @@ class RpgButton:
 				draw_line(c + Vector2(0, 0.06) * r, c + Vector2(0.24, 0.34) * r, w, 3.0, true)
 				draw_line(c + Vector2(-0.42, 0.62) * r, c + Vector2(0, 0.42) * r, w, 3.5, true)
 				draw_line(c + Vector2(0, 0.42) * r, c + Vector2(0.42, 0.62) * r, w, 3.5, true)
+			"speed":  # skill gerak-cepat (permintaan user ronde ini): chevron
+				# ganda "≫" (bukan sprint-satu; itu utk sprint biasa yg TDK
+				# ditampilkan krn UI minimal) — kecepatan ×5, tombol baru.
+				var acc2 := Color(0.85, 0.95, 1.0, 0.95) if (_down or active) else w
+				draw_line(c + Vector2(-0.28, -0.42) * r, c + Vector2(0.08, 0.0) * r, acc2, 4.0, true)
+				draw_line(c + Vector2(0.08, 0.0) * r, c + Vector2(-0.28, 0.42) * r, acc2, 4.0, true)
+				draw_line(c + Vector2(0.02, -0.42) * r, c + Vector2(0.38, 0.0) * r, acc2, 4.0, true)
+				draw_line(c + Vector2(0.38, 0.0) * r, c + Vector2(0.02, 0.42) * r, acc2, 4.0, true)
 			"dash":  # sepatu + garis kecepatan
 				var pts := PackedVector2Array([
 					c + Vector2(-0.5, 0.14) * r, c + Vector2(-0.1, 0.14) * r,
@@ -394,6 +402,11 @@ func _build_layout() -> void:
 	_add_rpg(root, "BtnAction", "hand", 36.0, att_c + Vector2(-132.0, -70.0) - Vector2(36.0, 36.0))
 	_add_rpg(root, "BtnCrouch", "crouch", 32.0, att_c + Vector2(-132.0, 2.0) - Vector2(32.0, 32.0))
 	_add_rpg(root, "BtnSprint", "bolt", 32.0, att_c + Vector2(-44.0, -118.0) - Vector2(32.0, 32.0))
+	# --- skill gerak-cepat ×5 (permintaan user: "tambahkan skill mov speed
+	# kalo kita pencet nambah 5 kali kecepatan lari") — TOGGLE: tekan sewaktu
+	# (bukan hold), chevron-ganda, di sisi kiri klaster aksi drpd bertumpuk di
+	# dash (btn lain yg lbh sering kesentuh — fx "bush"-nya bikin kejutan).
+	_add_rpg(root, "BtnSpeed", "speed", 36.0, att_c + Vector2(-120.0, -150.0) - Vector2(36.0, 36.0))
 	_add_rpg(root, "BtnEmote", "smile", 27.0, Vector2(vsz.x - mr - 54.0, mt + 96.0))
 	# --- ganti karakter (permintaan user: "ada icon ganti karakter") ---
 	# sengaja TAK dimasukkan HIDDEN_BUTTONS (UI minimal) krn diminta eksplisit
@@ -409,6 +422,10 @@ func _build_layout() -> void:
 	_connect_rpg("BtnAtk", Callable(self, "_on_attack"), true)
 	_connect_rpg("BtnDash", Callable(self, "_on_dash"), true)
 	_connect_rpg("BtnEmote", Callable(self, "_on_emote"), false)
+	# skill kecepatan: tekan ke-jual TOGGLE (bukan hold). Blok take effect
+	# runtutan (user: "kalo kita pencet nambah 5 kali kecepatan") — toggle pilih
+	# memlih, ketuk lagi utk nonaktif. Indikator aktif = set_active lingkaran.
+	_buttons["BtnSpeed"].pressed.connect(_on_speed_toggle)
 	_buttons["BtnAction"].visible = false
 	# UI MINIMAL (perintah user 22/09): SEMUA tombol disembunyikan, sisakan
 	# hanya JOYSTICK (jalan) + PAUSE. Tombol tak terlihat = tak menerima sentuh.
@@ -508,9 +525,17 @@ func _connect_rpg(name: String, cb: Callable, holdable: bool) -> void:
 
 # ---------- handlers tombol ----------
 
+var _speed_skill_on := false   # state toggle skill gerak-cepat (lihat BtnSpeed)
+
 func _on_skin_switch(_down: bool) -> void:
 	if player and player.has_method("cycle_skin"):
 		player.cycle_skin()
+
+func _on_speed_toggle() -> void:
+	_speed_skill_on = not _speed_skill_on
+	_buttons["BtnSpeed"].set_active(_speed_skill_on)
+	if player and player.has_method("press_speed_skill"):
+		player.press_speed_skill(_speed_skill_on)
 
 func _on_jump(down: bool) -> void:
 	if down and player:
