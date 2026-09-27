@@ -127,7 +127,7 @@ class SkinRetarget:
 	extends Node
 	var src: Skeleton3D
 	var dst: Skeleton3D
-	var pairs: Array = []          # [src_idx, dst_idx]
+	var pairs: Array = []          # [src_idx, dst_idx] (indeks tulang, bukan nama)
 	var src_pelvis: int = -1
 	var dst_pelvis: int = -1
 	var rest_src_q: Dictionary = {}    # src_idx -> Quaternion (global rest)
@@ -206,39 +206,40 @@ class SkinRetarget:
 			var dq: Quaternion = gq * rest_src_q[si].inverse()
 			var cdq := Quaternion(-dq.x, dq.y, -dq.z, dq.w)
 			target_gq[di] = (cdq * rest_dst_q[di]).normalized()
-		# 2) susun pose LOKAL Kanna. PENTING: bone "pose" Godot4 ADALAH DELTA
-		#    dari rest (bukan lokal absolut: final = rest * pose), makanya
-		#    faktor rest_lokal^-1 wajib dikali di depan. Utamanya tak berpengaruh
-		#    utk rig Kanna (semua 209 tulang rest rotasi = identity, dari dump
-		#    glb-nya) tapi tetap ditulis benar spy UMUM.
+		# 2) susun pose LOKAL Kanna: pose tulang Godot 4 adalah TRANSFORM LOKAL
+		#    ABSOLUT terhadap induknya (default-nya = rest; set_bone_pose_*
+		#    menimpa penuh, BUKAN delta di atas rest). Jadi rotasi lokal yg
+		#    diinginkan = induk_global^-1 * target_global. (Catatan sejarah:
+		#    di komit ini sempat dikali rest_lokal^-1 jg krn salah-baca spek —
+		#    utk Kanna kebetulan identik (rest tulang = identity), jadi tidak
+		#    mengubah perilaku; dihapus lg utk kebenaran konsep.)
 		var cache: Dictionary = {}
 		for pp in pairs:
 			var di: int = pp[1]
 			var pidx: int = dst.get_bone_parent(di)
 			var pg := _dst_global_q(pidx, target_gq, cache)
-			var lq: Quaternion = (_dst_rest_local_q[di].inverse() * pg.inverse() * target_gq[di]).normalized()
+			var lq: Quaternion = (pg.inverse() * target_gq[di]).normalized()
 			dst.set_bone_pose_rotation(di, lq)
 		# 3) posisi: hanya pelvis (bob naik-turun/condong src diikuti, diskala).
-		#    Hitung via transform penuh: pose = (parent_global * rest_lokal)^-1
-		#    * target, spy hasil global pelvis = rest_pelvis_dst + delta_src
-		#    (utamanya: rest translation tulang Kanna (.81m) jangan sampai
-		#    KESEPA SEPERTI dua kali — pelvis "melayang" s/s kasus bug ronde ini).
+		#    Seperti rotasi di atas: pose lokal = induk_global^-1 * target_global,
+		#    TANPA komposisi rest tambahan (pose Godot = lokal absolut relatif
+		#    induk). Bug sebelumnya: sempat dihitung sbg komposisi rest+target
+		#    shg pelvis jatuh ke y≈0 ("tenggelam") — itulah kegagalan CI
+		#    terakhir (berhasil ditangkap persis oleh probe _check_skin_switch).
 		if src_pelvis >= 0 and dst_pelvis >= 0:
 			var sdp: Vector3 = (src.get_bone_global_pose(src_pelvis).origin - rest_src_pelvis_pos) * height_ratio
 			sdp = Vector3(-sdp.x, sdp.y, -sdp.z)
 			var target_pos := rest_dst_pelvis_pos + sdp
-			var target_T := Transform3D(Basis(target_gq[dst_pelvis]), target_pos)
-			var parent_gT := Transform3D.IDENTITY
 			var ppar: int = dst.get_bone_parent(dst_pelvis)
+			var local_pos := target_pos
 			if ppar >= 0:
-				# utk Kanna: pelvis ("root") adalah bone akar (parent=-1) jadi
-				# cabang ini mati-pijit; dijaga utk rig lain yg pelvis-nya nested.
+				# utk Kanna: pelvis ("root") adalah bone akar (parent=-1), cabang
+				# ini cuma cadangan bila suatu hari rig lain pelvis-nya nested.
+				var pgt: Transform3D = dst.get_bone_global_rest(ppar)
 				var pgq: Quaternion = _dst_global_q(ppar, target_gq, cache)
-				var pgo: Vector3 = dst.get_bone_global_rest(ppar).origin
-				parent_gT = Transform3D(Basis(pgq), pgo)
-			var rest_lT: Transform3D = dst.get_bone_rest(dst_pelvis)
-			var pose_T := (parent_gT * rest_lT).affine_inverse() * target_T
-			dst.set_bone_pose_position(dst_pelvis, pose_T.origin)
+				pgt.basis = Basis(pgq)
+				local_pos = pgt.basis.inverse() * (target_pos - pgt.origin)
+			dst.set_bone_pose_position(dst_pelvis, local_pos)
 
 
 # Dua corak ungu: badan utama (permukaan besar) + aksen sendi (kontras
