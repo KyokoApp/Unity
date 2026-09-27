@@ -427,14 +427,27 @@ func _check_dash_effects(player: Node, world: Node) -> void:
 		if anim.speed_scale <= 1.01:
 			_fail("dash: speed_scale animasi tidak dipercepat saat dash (burst tak terasa)")
 			return
-	var ghost_found := false
+	var ghost: Node = null
 	for c in world.get_children():
 		if String(c.name).begins_with("DashAfterimage"):
-			ghost_found = true
+			ghost = c
 			break
-	if not ghost_found:
+	if ghost == null:
 		_fail("dash: tidak ada node DashAfterimage muncul saat dash (jejak bayangan gagal spawn)")
 		return
+	# HOTFIX "bayangan dash ikut gerak ... jadi bayangan nya gk gerak": ghost
+	# wajib membawa Skeleton3D HANTU sendiri (bukan rujukan ke skeleton hidup)
+	# dan pose-nya dibekukan — nilai pose tulang harus IDENTIK antar-frame.
+	var gskel: Skeleton3D = null
+	for c in ghost.get_children():
+		if c is Skeleton3D:
+			gskel = c
+			break
+	if gskel == null:
+		_fail("dash: ghost afterimage tak punya Skeleton3D hantu ('GhostSkeleton') — ghost masih merujuk skeleton hidup, bayangan bakal ikut gerak lagi")
+		return
+	var probe_bone := mini(3, gskel.get_bone_count() - 1)
+	var pose_a: Transform3D = gskel.get_bone_global_pose(probe_bone)
 	# RONDE INI (permintaan user: "afterimage hanya satu bayangannya aja yg
 	# tertinggal"): ghost-train interval di _move dihapus — 1 dash = 1 ghost
 	# abu-abu pastel + asap bergoyang (kode sama dipakai 2 skin). Ini dicek
@@ -449,7 +462,16 @@ func _check_dash_effects(player: Node, world: Node) -> void:
 	if ghost_count != 1:
 		_fail("dash: harusnya SATU ghost per dash (dpt %d — kemungkinan train interval lama balik lagi, ATAU ghost beda-skin form-fail)" % ghost_count)
 		return
-	print("[fire-check] fase 1d ✔ dash sprint-burst (speed_scale=", anim.speed_scale if anim else "?", ") + afterimage SATU-ghost pastel OK")
+	# lanjutan pemeriksaan "frozen": baca pose yg sama SETELAH 0.25s berlalu
+	# (animasi pemain pasti sudah berganti-ganti) — harus tetap identik.
+	if not is_instance_valid(gskel):
+		_fail("dash: GhostSkeleton hilang terlalu dini (belum selesai fade)")
+		return
+	var pose_b: Transform3D = gskel.get_bone_global_pose(probe_bone)
+	if not pose_a.is_equal_approx(pose_b):
+		_fail("dash: pose ghost afterimage BERUBAH antar-frame (bayangan masih ikut animasi pemain — pembekuan pose gagal)")
+		return
+	print("[fire-check] fase 1d ✔ dash sprint-burst (speed_scale=", anim.speed_scale if anim else "?", ") + afterimage SATU-ghost asap DIBEKUKAN OK")
 	# tunggu dash+cooldown reda supaya tidak mengganggu fase 2/3 setelahnya
 	await create_timer(1.3).timeout
 

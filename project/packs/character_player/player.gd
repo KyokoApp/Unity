@@ -332,6 +332,12 @@ const AFTERIMAGE_COLOR := Color(0.55, 0.60, 0.68, 0.42)
 const TRAIL_INTERVAL := 0.05         # jarak spawn ghost trail saat speed-skill aktif
 const TRAIL_FADE := 0.30             # umur ghost trail (tilak faedah-efek smooth)
 const TRAIL_COLOR := Color(0.45, 0.62, 0.85, 0.30)
+# Hotfix lanjutan ronde ini (permintaan user: "bayangan dash ikut gerak...
+# jadi bayangan nya gk gerak"): ghost kini membawa skeleton hantu DIBEKUKAN
+# di pose spawn (lihat _spawn_afterimage) dan (untuk DASH) bahannya shader
+# asap abu-abu ber-wooble (afterimage_smoke.gdshader) — siluet karakter
+# tetap kebaca, tapi seolah terbuat dr gumpalan asap yg bergoyang.
+const AFTERIMAGE_SHADER := preload("res://packs/character_player/afterimage_smoke.gdshader")
 
 
 # --- kamera third-person (murni ikut swipe, arsitektur tak berubah) ---
@@ -924,11 +930,18 @@ func _polish_kanna_materials() -> void:
 			new_mat.albedo_color = Color(1.02, 0.99, 0.94)
 			new_mat.roughness = 0.82
 			new_mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-			new_mat.metallic = 0.0
-			new_mat.back_light = 0.0
-			new_mat.disable_receive_shadows = false
-			new_mat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
-			mesh_inst.set_surface_override_material(surf, new_mat)
+		new_mat.metallic = 0.0
+		new_mat.back_light = 0.0
+		new_mat.disable_receive_shadows = false
+		new_mat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+		# HOTFIX "visual kurang rapih": mesh transparan VRM (rambut/alis/mata
+		# anime) digambar dgn urutan serampangan kalau polos ALPHA-biasa ->
+		# tampak tembus-tak-karuan. ALPHA_DEPTH_PRE_PASS menulis depth dulu
+		# sebelum blend, jadi siluet transparannya rapi stabil dr sudut mana
+		# pun (standar umum utk karakter anime/VRM di Godot).
+		if new_mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+			new_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS
+		mesh_inst.set_surface_override_material(surf, new_mat)
 
 ## Tinggi berdiri (Head - rata2 kaki) dari REST POSE sebuah skeleton, dipakai
 ## _build_kanna_skin() utk menyamakan skala tanpa perlu angka tebakan manual.
@@ -1145,14 +1158,55 @@ func _spawn_afterimage() -> void:
 	parent.add_child(ghost)
 	ghost.global_transform = _visual.global_transform
 
-	var ghost_mat := StandardMaterial3D.new()
-	ghost_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	ghost_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	ghost_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	ghost_mat.albedo_color = tint
-	ghost_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-	ghost_mat.disable_receive_shadows = true
+	# HOTFIX (permintaan user: "bayangan dash ikut gerak ... jadi bayangan
+	# nya gk gerak" + "dash kanna acak-acakan banget bukan bentuk karakter
+	# nya"): ghost TIDAK BOLEH merujuk skeleton HIDUP (versi sebelum hotfix:
+	# copy.skeleton menunjuk skeleton asli => tiap frame ghost ikut diposekan
+	# animasi yg sedang main — tampak "bergerak ngikutin", dan utk Kanna jadi
+	# kacau krn titik rujuk ini berada di luar node skala _kanna).
+	# Solusinya: tiap ghost membawa SKELETON HANTU PRIBADI yg dibekukan
+	# SEKALI saat spawn (persistent global-pose-override) — ghost menampilkan
+	# pose momen spawn persis, dan TAK PERNAH ikut animasi lagi. Sekaligus
+	# memperbaiki kasus skala Kanna (transform skeleton hantu disamakan dgn
+	# skeleton sumber apa adanya, termasuk skala _kanna=1.26x).
+	var ghost_skel: Skeleton3D = null
+	if is_instance_valid(src_skel):
+		ghost_skel = Skeleton3D.new()
+		ghost_skel.name = "GhostSkeleton"
+		ghost.add_child(ghost_skel)
+		# urutan add_bone = urutan indeks sumber => indeks tulang TETAP COCOK
+		# dgn referensi skin mesh (skinning by index); hirarki+rest disalin.
+		var bone_count := src_skel.get_bone_count()
+		for i in bone_count:
+			var b := ghost_skel.add_bone(src_skel.get_bone_name(i))
+			var bp := src_skel.get_bone_parent(i)
+			if bp >= 0:
+				ghost_skel.set_bone_parent(b, bp)
+			ghost_skel.set_bone_rest(b, src_skel.get_bone_rest(i))
+		ghost_skel.global_transform = src_skel.global_transform
+		for i in bone_count:
+			ghost_skel.set_bone_global_pose_override(i, src_skel.get_bone_global_pose(i), 1.0, true)
+
+	# DASH: siluetnya memakai shader asap abu-abu ber-wooble (warna+abrasi
+	# asap langsung DI bentuk karakternya — permintaan "masih ada bentukan
+	# karakter nya, kayak goyangan asap"). TRAIL (speed skill): tetap bahan
+	# ungu-cyan aditif murah (rendaman cepat, 0.05 detik/ghost).
+	var ghost_mat: Material
+	var smoke_mat: ShaderMaterial = null
+	if is_trail:
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mat.albedo_color = tint
+		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		mat.disable_receive_shadows = true
+		ghost_mat = mat
+	else:
+		smoke_mat = ShaderMaterial.new()
+		smoke_mat.shader = AFTERIMAGE_SHADER
+		ghost_mat = smoke_mat
 
 	var made_any := false
 	for mi in src_root.find_children("*", "MeshInstance3D", true, false):
@@ -1162,10 +1216,11 @@ func _spawn_afterimage() -> void:
 		var copy := MeshInstance3D.new()
 		copy.mesh = src.mesh
 		copy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		copy.extra_cull_margin = 1.5   # wobble asap (dash) menggeser AABB mesh
 		ghost.add_child(copy)
 		copy.global_transform = src.global_transform
-		if is_instance_valid(src_skel):
-			copy.skeleton = copy.get_path_to(src_skel)
+		if is_instance_valid(ghost_skel):
+			copy.skeleton = copy.get_path_to(ghost_skel)
 		for i in range(src.mesh.get_surface_count()):
 			copy.set_surface_override_material(i, ghost_mat)
 		made_any = true
@@ -1173,11 +1228,9 @@ func _spawn_afterimage() -> void:
 		ghost.queue_free()
 		return
 
-	# ghost pakai skeleton SAMA drpd mesh aslinya (skin terikat duru utk
-	# skeleton yg hidup), jd pose ghost = pose animasi berjalan saat itu juga
-	# (sengaja dipertahankan, prinsip yg dikehendaki era peristiwa dash —
-	# "bentukan karakter yg masih kelihatan" walau kita sudah lewat).
-	# Khusus DASH ditambahkan awan asap bergoyang di sekeliling ghost
+	# pose ghost IALAH pose momen spawn (dibekukan via skeleton hantu di atas)
+	# — "bentukan karakter tetap kelihatan, tapi TAK ikut gerak lagi".
+	# Khusus DASH ditambah awan asap bergoyang di sekeliling ghost
 	# (lihat _spawn_ghost_smoke) — permintaan user: "efek asap tapi masih
 	# ada bentukan karakternya, kayak goyangan asap gitu, mannequin juga
 	# sama" (kode satu drat dua skin).
@@ -1192,10 +1245,11 @@ func _spawn_afterimage() -> void:
 		tween.tween_callback(ghost.queue_free)
 		return
 
-	# dash: fade panjang hampir 1 detik + awan asap (lihat _spawn_ghost_smoke)
-	# + ghost sendiri bergeser pelan ke atas (goyangan asap yg dijanjikan).
+	# dash: umur asap digerakkan uniform life01 (0->1: wobble mengembang +
+	# padam) + ghost bergeser pelan ke atas (mengapung spt asap). Bahan
+	# dash dijamin ShaderMaterial (lihat pemilihan ghost_mat di atas).
 	var tween := create_tween()
-	tween.tween_property(ghost_mat, "albedo_color:a", 0.0, fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_property(smoke_mat, "shader_parameter/life01", 1.0, fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.parallel().tween_property(ghost, "global_position", ghost.global_position + Vector3(0.0, 0.16, 0.0), fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tween.tween_callback(ghost.queue_free)
 
