@@ -57,7 +57,10 @@ func _build_mesh_library() -> void:
 	var box := BoxMesh.new()
 	box.size = CELL
 	box.material = mat
-	meshlib.set_item_mesh(ITEM_FLAT, box, Transform3D(Basis.IDENTITY, Vector3(0, 0.5, 0)))
+	meshlib.set_item_mesh(ITEM_FLAT, box)
+	# Godot 4: transform mesh item DIPISAH dr set_item_mesh (Godot3-era
+	# 3-arg dipangkas) — auto-compile guard CI fase-1 menolak yg lama.
+	meshlib.set_item_mesh_transform(ITEM_FLAT, Transform3D(Basis.IDENTITY, Vector3(0, 0.5, 0)))
 	var flat_shape := BoxShape3D.new()
 	flat_shape.size = CELL
 	meshlib.set_item_shapes(ITEM_FLAT, [flat_shape, Transform3D(Basis.IDENTITY, Vector3(0, 0.5, 0))])

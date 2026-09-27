@@ -116,7 +116,10 @@ func _rebuild_mesh(curve: Curve3D, mesh_node: MeshInstance3D, width: float) -> v
 	if pts.size() < 2:
 		return
 	# buffer samping tiap titik dulu (tahap 1) supaya quad lurus menyambung
-	var sides: Array = []
+	# PackedVector3Array (bukan Array polos): elemen bertipe Vector3 kuat
+# — compile Godot menolak inferensi `var l0 := pts[i]-sides[i]...` ketika
+# sides Array (elemen Variant); insiden ini tertangkap CI probe fase-1.
+	var sides := PackedVector3Array()
 	var dists: Array = [0.0]
 	var half := width * 0.5
 	var up := Vector3.UP
