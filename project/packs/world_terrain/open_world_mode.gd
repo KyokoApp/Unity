@@ -82,14 +82,12 @@ func enable() -> void:
 	if active:
 		return
 	active = true
-	visible = true
 	_last = Vector2i(9999999, 9999999)   # paksa stream ulang ratioan frame ini
 
 func disable() -> void:
 	if not active:
 		return
 	active = false
-	visible = false
 	# bongkar sekaligus (bug falsy _chunks.clear() next frame tetap lambat
 	# kalau node mati-hidden dibareng-bareng); hutan hanya berfungsi kalau
 	# mode-nya on, jd aman queue_free semuanya.
