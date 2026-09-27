@@ -128,32 +128,6 @@ class SkinRetarget:
 	extends Node
 	var src: Skeleton3D
 	var dst: Skeleton3D
-
-## Penggerak peleburan ghost dash SCR MANUAL per-frame (deterministik —
-## TAK pakai Tween properti "shader_parameter/*": pola itu menyebabkan
-## ghost "tertinggal permanen"; lihat catatan di _spawn_afterimage).
-## life01 dinaikkan 0->1 merata selama `fade` detik (wobble asap di shader
-## makin mengembang + alpha padam), ghost juga diangkat pelan ke atas,
-## lalu node ghost (induk driver ini) di-queue_free.
-class DashGhost:
-	extends Node
-	var fade := 0.85
-	var smoke_mat: ShaderMaterial
-	var RISE := 0.22                  # meter terangkat selagi memudar
-	var _age := 0.0
-	func _process(delta: float) -> void:
-		_age += delta
-		var life01: float = clampf(_age / maxf(fade, 0.05), 0.0, 1.0)
-		var p := get_parent() as Node3D
-		if is_instance_valid(smoke_mat):
-			smoke_mat.set_shader_parameter("life01", life01)
-		if is_instance_valid(p):
-			p.position.y += (RISE / maxf(fade, 0.05)) * delta
-		if life01 >= 1.0 and is_instance_valid(p):
-			# bersihkan override tulang spy lepas RS tepat waktu, baru hilang
-			for n in p.find_children("*", "Skeleton3D", true, false):
-				(n as Skeleton3D).clear_bones_global_pose_override()
-			p.queue_free()
 	var pairs: Array = []          # [src_idx, dst_idx] (indeks tulang, bukan nama)
 	var src_pelvis: int = -1
 	var dst_pelvis: int = -1
@@ -267,6 +241,33 @@ class DashGhost:
 				pgt.basis = Basis(pgq)
 				local_pos = pgt.basis.inverse() * (target_pos - pgt.origin)
 			dst.set_bone_pose_position(dst_pelvis, local_pos)
+
+
+## Penggerak peleburan ghost dash SCR MANUAL per-frame (deterministik —
+## TAK pakai Tween properti "shader_parameter/*": pola itu menyebabkan
+## ghost "tertinggal permanen"; lihat catatan di _spawn_afterimage).
+## life01 dinaikkan 0->1 merata selama `fade` detik (wobble asap di shader
+## makin mengembang + alpha padam), ghost juga diangkat pelan ke atas,
+## lalu node ghost (induk driver ini) di-queue_free.
+class DashGhost:
+	extends Node
+	var fade := 0.85
+	var smoke_mat: ShaderMaterial
+	var RISE := 0.22                  # meter terangkat selagi memudar
+	var _age := 0.0
+	func _process(delta: float) -> void:
+		_age += delta
+		var life01: float = clampf(_age / maxf(fade, 0.05), 0.0, 1.0)
+		var p := get_parent() as Node3D
+		if is_instance_valid(smoke_mat):
+			smoke_mat.set_shader_parameter("life01", life01)
+		if is_instance_valid(p):
+			p.position.y += (RISE / maxf(fade, 0.05)) * delta
+		if life01 >= 1.0 and is_instance_valid(p):
+			# bersihkan override tulang spy lepas RS tepat waktu, baru hilang
+			for n in p.find_children("*", "Skeleton3D", true, false):
+				(n as Skeleton3D).clear_bones_global_pose_override()
+			p.queue_free()
 
 
 # Dua corak ungu: badan utama (permukaan besar) + aksen sendi (kontras

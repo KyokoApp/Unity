@@ -71,7 +71,7 @@ func _process(delta: float) -> void:
 	_accum += delta
 	if _accum >= sample_interval and is_instance_valid(_anchor):
 		_accum = 0.0
-		_pts.push_front(_anchor.to_global(_anchor_offset))
+		_pts.insert(0, _anchor.to_global(_anchor_offset))  # sampel TERBARU di indeks 0
 		while _pts.size() > points:
 			_pts.remove_at(_pts.size() - 1)
 	if _pts.size() < 2:
