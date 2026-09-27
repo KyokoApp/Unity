@@ -56,6 +56,23 @@ func _trace(msg: String) -> void:
 		add_child(cl)
 	_trail.text = msg
 
+## Terapkan pilihan menu (world_mode + quality_preset) dr user://boot.cfg.
+## Dipanggil di EKOR _boot_world: dunia+pemain+HUD SUDAH hidup, jadi
+## set_open_world_mode/on_settings_changed aman jalan penuh.
+func _apply_boot_options() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("user://boot.cfg") != OK:
+		return
+	var qp: int = int(cfg.get_value("boot", "quality_preset", -1))
+	if qp >= 0 and qp <= 2 and qp != int(settings.get("quality_preset")):
+		settings.quality_preset = qp
+		settings.save_settings()
+		quality.apply_all()
+	var wm := str(cfg.get_value("boot", "world_mode", ""))
+	if wm != "" and world and world.has_method("set_open_world_mode"):
+		world.set_open_world_mode(wm == "open")
+		print("[game_root] mode dunia dr menu: ", wm)
+
 func _fatal(msg: String) -> void:
 	push_error("[game] FATAL: " + msg)
 	_fatal_layer = CanvasLayer.new()
@@ -184,6 +201,10 @@ func _boot_world(progress_cb: Callable) -> void:
 		var ad = load("res://packs/audio_music/audio_director.gd").new()
 		add_child(ad)
 		ad.setup(world, player)
+	# PRESET BOOT DARI MENU LAUNCHER (ronde ini — permintaan user): mode dunia
+	# pilihan pemain (creative/open) + preset grafik, sampai di sini LEBIH
+	# lambat dr settings tapi CEPAT dr frame pertama — mulus tanpa flicker.
+	_apply_boot_options()
 	progress_cb.call(1.0, "Selesai")
 	_boot_ok = true
 	_trace("boot: HUD ✔ — selamat bermain")

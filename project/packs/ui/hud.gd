@@ -10,16 +10,18 @@ class RpgButton:
 	signal released
 	var icon := "sword"
 	var emoji := ""
+	var tex: Texture2D = null        # ikon gambar (PNG) — mengungguli glyph canvas
 	var radius := 44.0
 	var active := false
 	var _down := false
 	var _tidx := -1
 	var _label: Label
 
-	func _init(ic: String, r: float, emj := "") -> void:
+	func _init(ic: String, r: float, emj := "", p_tex: Texture2D = null) -> void:
 		icon = ic
 		radius = r
 		emoji = emj
+		tex = p_tex
 		custom_minimum_size = Vector2(r * 2, r * 2)
 		size = custom_minimum_size
 		mouse_filter = Control.MOUSE_FILTER_STOP
@@ -78,6 +80,14 @@ class RpgButton:
 
 	func _draw() -> void:
 		var c := Vector2(radius, radius)
+		# Mode gambar-ikon (permintaan user ronde ini: tombol speed memakai
+		# artwork yg dikirim user; tombol dash pakai artwork senada hasil
+		# generate): gambar tekstur utuh memenuhi tombol + ring status.
+		if tex != null:
+			draw_texture_rect(tex, Rect2(Vector2.ZERO, Vector2(radius * 2, radius * 2)), false, Color(1, 1, 1, 1.0 if _down or active else 0.92))
+			if active or _down:
+				draw_arc(c, radius - 3.0, 0.0, TAU, 48, Color(0.62, 0.82, 1.0, 0.85), 2.5, true)
+			return
 		# gaya referensi (Genshin-like): lingkaran gelap translusen + glyph putih
 		draw_circle(c, radius - 1.0, Color(0.10, 0.12, 0.15, 0.62 if _down else 0.42))
 		draw_arc(c, radius - 2.5, 0.0, TAU, 48, Color(1, 1, 1, 0.30), 2.0, true)
@@ -88,6 +98,40 @@ class RpgButton:
 		var w := Color(1, 1, 1, 0.94)
 		var r := radius * 0.62
 		match icon:
+			"forest":  # TOGGLE MODE DUNIA (ronde ini): siluet pohon pinus (hutan)
+				var acc_f := Color(0.70, 0.94, 0.62, 0.95) if (_down or active) else w
+				# tiga segitiga menumpuk (kanopi berlapis "hutan")
+				var t1 := PackedVector2Array([c + Vector2(0,-0.55)*r, c + Vector2(0.30,-0.14)*r, c + Vector2(-0.30,-0.14)*r, c + Vector2(0,-0.55)*r])
+				draw_polyline(t1, acc_f, 3.0, true)
+				var t2 := PackedVector2Array([c + Vector2(0,-0.28)*r, c + Vector2(0.38,0.10)*r, c + Vector2(-0.38,0.10)*r, c + Vector2(0,-0.28)*r])
+				draw_polyline(t2, acc_f, 3.0, true)
+				var t3 := PackedVector2Array([c + Vector2(0,-0.02)*r, c + Vector2(0.46,0.36)*r, c + Vector2(-0.46,0.36)*r, c + Vector2(0,-0.02)*r])
+				draw_polyline(t3, acc_f, 3.0, true)
+				draw_line(c + Vector2(0,0.36)*r, c + Vector2(0,0.56)*r, acc_f, 3.0, true)   # batang
+			"cam":  # MODE KAMERA BAHU (ronde ini): bodi kamera + lensa + indikator
+				# orang-di-kiri — komposisi over-shoulder (lihat player.gd).
+				var acc_c := Color(0.65, 0.85, 1.0, 0.9) if (_down or active) else w
+				# bodi kamera (kotak rounded-implisit)
+				draw_rect(Rect2(c + Vector2(-0.52, -0.30) * r, Vector2(0.80, 0.55) * r), w, false, 3.0)
+				# jendela bidik di atas
+				draw_rect(Rect2(c + Vector2(-0.44, -0.40) * r, Vector2(0.28, 0.12) * r), w, false, 3.0)
+				# lensa bulat
+				draw_arc(c + Vector2(-0.12, -0.02) * r, r * 0.16, 0.0, TAU, 24, acc_c, 3.0, true)
+				# siluet orang di KIRI (karakter disisir kiri = pemandangan kanan)
+				draw_arc(c + Vector2(0.34, -0.06) * r, r * 0.14, 0.0, TAU, 16, acc_c, 2.5, true)  # kepala
+				draw_line(c + Vector2(0.34, 0.08) * r, c + Vector2(0.34, 0.30) * r, acc_c, 2.5, true)  # badan
+				draw_line(c + Vector2(0.22, 0.30) * r, c + Vector2(0.46, 0.30) * r, acc_c, 2.5, true)  # bahu
+			"skin":  # ganti karakter: topan/cermin 2 wajah (ghost) — digambar
+				# canvas spt tombol lain (emoji mentah berisiko kotak tofu di
+				# font default Android, lihat komentar di _add_rpg BtnSkin).
+				var acc := Color(0.65, 0.85, 1.0, 0.9) if (_down or active) else w
+				draw_arc(c + Vector2(-0.18, -0.34) * r, r * 0.20, 0.0, TAU, 20, acc, 3.0, true)  # kepala kiri
+				draw_arc(c + Vector2(-0.18, 0.28) * r, r * 0.30, PI * 1.15, TAU - PI * 0.15, 16, acc, 3.0, true)  # bahu
+				draw_arc(c + Vector2(0.30, 0.06) * r, r * 0.42, -PI * 0.30, PI * 0.55, 16, w, 3.0, true)  # garis transisi melengkung
+				var a0 := -PI * 0.30
+				var atip: Vector2 = c + Vector2(0.30, 0.06) * r + Vector2(cos(a0), sin(a0)) * (r * 0.42)
+				draw_line(atip, atip + Vector2(-0.16, -0.04) * r, w, 3.0, true)
+				draw_line(atip, atip + Vector2(-0.02, 0.15) * r, w, 3.0, true)
 			"flame":
 				var outer := PackedVector2Array([
 					c + Vector2(0.02, -0.62) * r, c + Vector2(0.32, -0.22) * r,
@@ -110,6 +154,14 @@ class RpgButton:
 				draw_line(c + Vector2(0, 0.06) * r, c + Vector2(0.24, 0.34) * r, w, 3.0, true)
 				draw_line(c + Vector2(-0.42, 0.62) * r, c + Vector2(0, 0.42) * r, w, 3.5, true)
 				draw_line(c + Vector2(0, 0.42) * r, c + Vector2(0.42, 0.62) * r, w, 3.5, true)
+			"speed":  # skill gerak-cepat (permintaan user ronde ini): chevron
+				# ganda "≫" (bukan sprint-satu; itu utk sprint biasa yg TDK
+				# ditampilkan krn UI minimal) — kecepatan ×5, tombol baru.
+				var acc2 := Color(0.85, 0.95, 1.0, 0.95) if (_down or active) else w
+				draw_line(c + Vector2(-0.28, -0.42) * r, c + Vector2(0.08, 0.0) * r, acc2, 4.0, true)
+				draw_line(c + Vector2(0.08, 0.0) * r, c + Vector2(-0.28, 0.42) * r, acc2, 4.0, true)
+				draw_line(c + Vector2(0.02, -0.42) * r, c + Vector2(0.38, 0.0) * r, acc2, 4.0, true)
+				draw_line(c + Vector2(0.38, 0.0) * r, c + Vector2(0.02, 0.42) * r, acc2, 4.0, true)
 			"dash":  # sepatu + garis kecepatan
 				var pts := PackedVector2Array([
 					c + Vector2(-0.5, 0.14) * r, c + Vector2(-0.1, 0.14) * r,
@@ -160,8 +212,23 @@ var joy_vec := Vector2.ZERO
 var _joy_touch := -1
 var _look_touch := -1
 var _look_last := Vector2.ZERO
+# Pinch-to-zoom (permintaan user: kamera bs di-zoom out lalu balik smooth):
+# jari KEDUA yg nempel selagi jari "look" (_look_touch) sudah aktif dipakai
+# sbg jari cubit. Jarak antar 2 jari berubah -> player.add_zoom(). Kalau
+# salah satu jari lepas, gestur cubit dibatalkan (sederhana, aman).
+var _zoom_touch := -1
+var _zoom_last := Vector2.ZERO
+var _pinch_dist := 0.0
+const PINCH_ZOOM_SENSITIVITY := 0.018
 const JOY_RADIUS := 110.0
 const DEADZONE := 0.14
+## Artwork tombol ikon-gambar (permintaan user ronde ini: "button move speed
+## pake gambar yang aku kasih ... button dash juga redesign"): btn_speed
+## adalah reka-ulang loyal-100% desain kiriman user (lingkaran hitam +
+## pegulat siluet lari + garis kecepatan); btn_dash hasil generate senada
+## (sepatu sprint monokrom-putih di atas disc hitam + ring putih).
+const ICON_BTN_SPEED := preload("res://packs/ui/icons/btn_speed.png")
+const ICON_BTN_DASH := preload("res://packs/ui/icons/btn_dash.png")
 
 var _buttons := {}   # nama -> Control(Button-like)
 var _btn_colors := {}
@@ -169,6 +236,9 @@ var label_prompt: Label
 var label_stats: Label
 var label_fps: Label
 var label_clock: Label
+var health_panel: Panel
+var health_bar: ProgressBar
+var health_label: Label
 var toast_label: Label
 var _toast_timer := 0.0
 var _fps_acc := 0.0
@@ -181,6 +251,9 @@ func bind_player(p: Node) -> void:
 		player.nearest_interactable_changed.connect(_on_near_changed)
 	if player and player.has_signal("stats_changed"):
 		player.stats_changed.connect(_on_stats)
+	if player and player.has_signal("health_changed"):
+		player.health_changed.connect(_on_health_changed)
+		_on_health_changed(float(player.get("health")), float(player.get("max_health")))
 
 func bind_root(r: Node) -> void:
 	root_node = r
@@ -260,9 +333,74 @@ func _make_action_button(name: String, txt: String, emoji_color: Color, edge: Co
 	_btn_colors[name] = emoji_color
 	return b
 
+func _build_health_bar(root: Control, left: float, top: float) -> void:
+	health_panel = Panel.new()
+	health_panel.name = "PlayerHealthPanel"
+	health_panel.position = Vector2(left, top)
+	health_panel.size = Vector2(306, 48)
+	health_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_panel.add_theme_stylebox_override("panel", _make_panel_col(Color(0.04, 0.07, 0.10, 0.84), 12))
+	root.add_child(health_panel)
+
+	health_bar = ProgressBar.new()
+	health_bar.name = "PlayerHealthBar"
+	health_bar.position = Vector2(7, 7)
+	health_bar.size = Vector2(292, 34)
+	health_bar.min_value = 0.0
+	health_bar.max_value = 100.0
+	health_bar.value = 100.0
+	health_bar.show_percentage = false
+	health_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var back := StyleBoxFlat.new()
+	back.bg_color = Color(0.12, 0.15, 0.18, 0.94)
+	back.corner_radius_top_left = 10
+	back.corner_radius_top_right = 10
+	back.corner_radius_bottom_left = 10
+	back.corner_radius_bottom_right = 10
+	health_bar.add_theme_stylebox_override("background", back)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.82, 0.18, 0.14, 0.96)
+	fill.corner_radius_top_left = 10
+	fill.corner_radius_top_right = 10
+	fill.corner_radius_bottom_left = 10
+	fill.corner_radius_bottom_right = 10
+	health_bar.add_theme_stylebox_override("fill", fill)
+	health_panel.add_child(health_bar)
+
+	health_label = Label.new()
+	health_label.name = "PlayerHealthText"
+	health_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	health_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	health_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	health_label.text = "HP  100 / 100"
+	health_label.add_theme_font_size_override("font_size", 18)
+	health_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.96))
+	health_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.75))
+	health_label.add_theme_constant_override("shadow_offset_x", 1)
+	health_label.add_theme_constant_override("shadow_offset_y", 1)
+	health_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_bar.add_child(health_label)
+
+func _on_health_changed(current: float, maximum: float) -> void:
+	if health_bar == null:
+		return
+	health_bar.max_value = maxf(1.0, maximum)
+	health_bar.value = clampf(current, 0.0, health_bar.max_value)
+	if health_label:
+		health_label.text = "HP  %d / %d" % [int(round(current)), int(round(maximum))]
+	var ratio := clampf(current / maxf(maximum, 1.0), 0.0, 1.0)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.18 + 0.72 * (1.0 - ratio), 0.82 * ratio + 0.08, 0.14, 0.96)
+	fill.corner_radius_top_left = 10
+	fill.corner_radius_top_right = 10
+	fill.corner_radius_bottom_left = 10
+	fill.corner_radius_bottom_right = 10
+	health_bar.add_theme_stylebox_override("fill", fill)
+
 func _build_layout() -> void:
 	var sa := DisplayServer.get_display_safe_area()
 	var root := Control.new()
+	_hud_root = root
 	root.name = "HudRoot"
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -300,19 +438,46 @@ func _build_layout() -> void:
 	# attack besar kanan-tengah-bawah; dash di bawah-kanannya; lompat pojok kanan bawah
 	var att_c := Vector2(vsz.x - mr - 156.0, vsz.y - mb - 234.0)
 	_add_rpg(root, "BtnAtk", "flame", 58.0, att_c - Vector2(58.0, 58.0))
-	_add_rpg(root, "BtnDash", "dash", 40.0, att_c + Vector2(96.0, 116.0) - Vector2(40.0, 40.0))
+	_add_rpg(root, "BtnDash", "dash", 40.0, att_c + Vector2(96.0, 116.0) - Vector2(40.0, 40.0), ICON_BTN_DASH)
 	_add_rpg(root, "BtnJump", "jump", 50.0, Vector2(vsz.x - mr - 100.0, vsz.y - mb - 100.0) - Vector2(50.0, 50.0))
 	_add_rpg(root, "BtnAction", "hand", 36.0, att_c + Vector2(-132.0, -70.0) - Vector2(36.0, 36.0))
 	_add_rpg(root, "BtnCrouch", "crouch", 32.0, att_c + Vector2(-132.0, 2.0) - Vector2(32.0, 32.0))
 	_add_rpg(root, "BtnSprint", "bolt", 32.0, att_c + Vector2(-44.0, -118.0) - Vector2(32.0, 32.0))
+	# --- skill gerak-cepat ×5 (permintaan user: "tambahkan skill mov speed
+	# kalo kita pencet nambah 5 kali kecepatan lari") — TOGGLE: tekan sewaktu
+	# (bukan hold), chevron-ganda, di sisi kiri klaster aksi drpd bertumpuk di
+	# dash (btn lain yg lbh sering kesentuh — fx "bush"-nya bikin kejutan).
+	_add_rpg(root, "BtnSpeed", "speed", 36.0, att_c + Vector2(-120.0, -150.0) - Vector2(36.0, 36.0), ICON_BTN_SPEED)
 	_add_rpg(root, "BtnEmote", "smile", 27.0, Vector2(vsz.x - mr - 54.0, mt + 96.0))
+	# --- ganti karakter (permintaan user: "ada icon ganti karakter") ---
+	# sengaja TAK dimasukkan HIDDEN_BUTTONS (UI minimal) krn diminta eksplisit
+	# ronde ini — pojok kanan atas, jauh dr klaster tombol aksi kanan-bawah.
+	# Ikon digambar canvas ("skin", lihat RpgButton._draw match), BUKAN emoji
+	# mentah — glyph emoji warna kerap jadi kotak tofu di font default Android.
+	_add_rpg(root, "BtnSkin", "skin", 34.0, Vector2(vsz.x - mr - 34.0 * 2, mt))
+	_connect_rpg("BtnSkin", Callable(self, "_on_skin_switch"), false)
+	# --- MODE KAMERA BAHU (permintaan user: "buatkan button kamera disamping
+	# mode switch karakter") — pojok-kanan-atas berderet kiri dr BtnSkin.
+	# Toggle: indikator aktif dari balikan player.toggle_shoulder_cam().
+	_add_rpg(root, "BtnCam", "cam", 34.0, Vector2(vsz.x - mr - 34.0 * 4 - 10.0, mt))
+	_connect_rpg("BtnCam", Callable(self, "_on_cam_switch"), false)
+	# --- TOGGLE MODE DUNIA (ronde ini, permintaan user "buat mode world
+	# creative yg sekarang dan mode open world") — pojok kanan atas berderet
+	# kiri dari BtnCam; indikator hijau saat Open World aktif. FAB bangun
+	# tetap eksklusif milik creative (manager menetapkan visible-nya).
+	_add_rpg(root, "BtnMode", "forest", 34.0, Vector2(vsz.x - mr - 34.0 * 6 - 20.0, mt))
+	_connect_rpg("BtnMode", Callable(self, "_on_world_mode_toggle"), false)
 	_connect_rpg("BtnJump", Callable(self, "_on_jump"), false)
 	_connect_rpg("BtnSprint", Callable(self, "_on_sprint"), true)
 	_connect_rpg("BtnCrouch", Callable(self, "_on_crouch_toggle"), false)
 	_connect_rpg("BtnAction", Callable(self, "_on_action"), false)
 	_connect_rpg("BtnAtk", Callable(self, "_on_attack"), true)
-	_connect_rpg("BtnDash", Callable(self, "_on_dash"), false)
+	_connect_rpg("BtnDash", Callable(self, "_on_dash"), true)
 	_connect_rpg("BtnEmote", Callable(self, "_on_emote"), false)
+	# skill kecepatan: tekan ke-jual TOGGLE (bukan hold). Blok take effect
+	# runtutan (user: "kalo kita pencet nambah 5 kali kecepatan") — toggle pilih
+	# memlih, ketuk lagi utk nonaktif. Indikator aktif = set_active lingkaran.
+	_buttons["BtnSpeed"].pressed.connect(_on_speed_toggle)
 	_buttons["BtnAction"].visible = false
 	# UI MINIMAL (perintah user 22/09): SEMUA tombol disembunyikan, sisakan
 	# hanya JOYSTICK (jalan) + PAUSE. Tombol tak terlihat = tak menerima sentuh.
@@ -334,6 +499,9 @@ func _build_layout() -> void:
 	# lewat tombol BACK Android / ESC. Ubah SHOW_PAUSE_BUTTON = true untuk
 	# memunculkan tombol pause di pojok kiri atas lagi.
 	bpause.visible = SHOW_PAUSE_BUTTON
+
+	# --- bar darah pemain: pojok kiri atas, tepat di bawah pause ---
+	_build_health_bar(root, ml, mt + 72.0)
 
 	# --- indikator atas: jam + fps ---
 	label_clock = Label.new()
@@ -394,8 +562,8 @@ func _build_layout() -> void:
 	toast_label.modulate.a = 0.0
 	root.add_child(toast_label)
 
-func _add_rpg(root: Control, name: String, icon: String, r: float, pos: Vector2, emj := "") -> void:
-	var b := RpgButton.new(icon, r, emj)
+func _add_rpg(root: Control, name: String, icon: String, r: float, pos: Vector2, tex: Texture2D = null, emj := "") -> void:
+	var b := RpgButton.new(icon, r, emj, tex)
 	b.name = name
 	b.position = pos
 	root.add_child(b)
@@ -408,6 +576,53 @@ func _connect_rpg(name: String, cb: Callable, holdable: bool) -> void:
 		b.released.connect(func(): cb.call(false))
 
 # ---------- handlers tombol ----------
+
+var _speed_skill_on := false   # state toggle skill gerak-cepat (lihat BtnSpeed)
+
+func _on_skin_switch(_down: bool) -> void:
+	if player and player.has_method("cycle_skin"):
+		player.cycle_skin()
+
+## TOGGLE MODE OPEN WORLD (ronde ini): memanggil world.set_open_world_mode
+## — seluruh orkestrasi ada di sana (hutan acak, fog, grass besar-betis,
+## kabut 14-46m, mannequin abu-pastel, kamera bahu deketin banget, jalan
+## lari saja). Indikator hijau di ikon "forest" = aktif.
+func _on_world_mode_toggle(_down: bool) -> void:
+	if root_node == null:
+		return
+	var w = root_node.get("world")
+	if w != null and w.has_method("set_open_world_mode"):
+		var target: bool = not bool(w.get("open_world_mode"))
+		w.set_open_world_mode(target)
+		if _buttons.has("BtnMode"):
+			_buttons["BtnMode"].set_active(target)
+
+## MODE OPEN WORLD (permintaan user: "gerakan hanya jalan dan lari pake
+## karakter mannequin only"): tombol gerak yg BKN jalan/lari DISEMBUNYIKAN —
+## jump/dash/speed-skill/crouch TIDAK ada lagi di sini (guard tf player jg
+## menolak inputnya). Tombol ganti-karakter disembunyikan (mannequin only,
+## warnanya full abu pastel di mode tsb). Seluruhnya dipulihkan saat
+## keluar mode (creative = dunia & kontrol penuh seperti semula).
+func set_open_world_ui(on: bool) -> void:
+	for key in ["BtnJump", "BtnDash", "BtnSpeed", "BtnCrouch", "BtnAction", "BtnSkin"]:
+		if _buttons.has(key):
+			_buttons[key].visible = not on
+	# tombol kamera tetap (boleh keluar mode bahu kapanpun), ~serang jg tetap
+	# (membidik api bahu-kanan tidak bagian "gerakan").
+
+## Tombol MODE KAMERA BAHU (ronde ini): toggle over-shoulder sinematik di
+## player.gd; indikator aktif (accent biru di ikon "cam") mengikuti balikan.
+func _on_cam_switch(_down: bool) -> void:
+	if player and player.has_method("toggle_shoulder_cam"):
+		var on: bool = player.toggle_shoulder_cam()
+		if _buttons.has("BtnCam"):
+			_buttons["BtnCam"].set_active(on)
+
+func _on_speed_toggle() -> void:
+	_speed_skill_on = not _speed_skill_on
+	_buttons["BtnSpeed"].set_active(_speed_skill_on)
+	if player and player.has_method("press_speed_skill"):
+		player.press_speed_skill(_speed_skill_on)
 
 func _on_jump(down: bool) -> void:
 	if down and player:
@@ -444,6 +659,8 @@ func _on_attack(down: bool) -> void:
 func _on_dash(down: bool) -> void:
 	if down and player and player.has_method("press_dash"):
 		player.press_dash()
+	if _buttons.has("BtnDash"):
+		_buttons["BtnDash"].set_active(down)
 
 func _on_emote(_down: bool) -> void:
 	if player:
@@ -451,7 +668,21 @@ func _on_emote(_down: bool) -> void:
 
 # ---------- input multi-touch ----------
 
+## BUILD MODE (ronde ini, build_mode_manager.gd): kalau build mode aktif,
+## HUD menahan diri TOTAL: gestur layar kosong ditahan (joystick melayang/
+## look/cubit digantikan gestur build) DAN seluruh kontrol permainan —
+## joystick, tombol skill/dash/pause, bar HP — DISEMBUNYIKAN (permintaan
+## user: "full layar gk ribet") sampai mode bangun ditutup lagi.
+var build_suspended := false:
+	set(v):
+		build_suspended = v
+		if _hud_root:
+			_hud_root.visible = not v
+var _hud_root: Control = null
+
 func _input(event: InputEvent) -> void:
+	if build_suspended:
+		return
 	if event is InputEventScreenTouch:
 		_handle_touch(event)
 	elif event is InputEventScreenDrag:
@@ -482,6 +713,12 @@ func _handle_touch(e: InputEventScreenTouch) -> void:
 		if _look_touch == -1:
 			_look_touch = e.index
 			_look_last = e.position
+		elif _zoom_touch == -1:
+			# jari kedua di area non-joystick selagi sudah ada jari "look"
+			# aktif -> jadi jari cubit (pinch) utk zoom kamera.
+			_zoom_touch = e.index
+			_zoom_last = e.position
+			_pinch_dist = _look_last.distance_to(_zoom_last)
 	else:
 		if e.index == _joy_touch:
 			_joy_touch = -1
@@ -489,6 +726,9 @@ func _handle_touch(e: InputEventScreenTouch) -> void:
 			_set_joy(Vector2.ZERO)
 		elif e.index == _look_touch:
 			_look_touch = -1
+			_zoom_touch = -1   # gestur cubit ikut batal kalau jari "look" lepas
+		elif e.index == _zoom_touch:
+			_zoom_touch = -1
 
 func _over_button(pos: Vector2) -> bool:
 	for button in _buttons.values():
@@ -506,8 +746,24 @@ func _handle_drag(e: InputEventScreenDrag) -> void:
 	elif e.index == _look_touch:
 		var d := e.position - _look_last
 		_look_last = e.position
-		if player:
+		if _zoom_touch != -1:
+			_update_pinch()   # 2 jari aktif -> ini bagian dr gestur cubit, bukan usap kamera
+		elif player:
 			player.add_look_px(d.x, d.y)
+	elif e.index == _zoom_touch:
+		_zoom_last = e.position
+		_update_pinch()
+
+## Jarak antar jari MEMBESAR (menjauh/"spread") -> zoom IN (kamera mendekat);
+## jarak MENGECIL ("pinch") -> zoom OUT (kamera menjauh) — konvensi umum
+## spt peta digital. Kembali ke jarak default ditangani otomatis di
+## player.gd (add_zoom cuma menggeser target, bukan set permanen).
+func _update_pinch() -> void:
+	var dist := _look_last.distance_to(_zoom_last)
+	var d := dist - _pinch_dist
+	_pinch_dist = dist
+	if player:
+		player.add_zoom(-d * PINCH_ZOOM_SENSITIVITY)
 
 func _update_joy(pos: Vector2) -> void:
 	var center := joy_base.global_position + Vector2(JOY_RADIUS, JOY_RADIUS)
@@ -595,7 +851,7 @@ const EDIT_ACTION_NAMES := ["BtnJump", "BtnAtk", "BtnDash", "BtnSprint", "BtnCro
 ## Tombol yang sengaja disembunyikan (UI minimal). Hapus nama dari daftar ini
 ## untuk memunculkan tombol itu lagi — satu tempat saja.
 const SHOW_PAUSE_BUTTON := false
-const HIDDEN_BUTTONS := ["BtnJump", "BtnDash", "BtnCrouch", "BtnSprint", "BtnEmote", "BtnAction"]
+const HIDDEN_BUTTONS := ["BtnJump", "BtnCrouch", "BtnSprint", "BtnEmote", "BtnAction"]
 
 func set_edit_mode(on: bool) -> void:
 	edit_mode = on

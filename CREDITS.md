@@ -1,5 +1,8 @@
 # CREDITS — Pulau Toon
 
+## Rumput (adopsi keseluruhan — permintaan user, ronde 2026-09-27):
+Grass-Shader-Example (@_Malido, Malidos) — CC0 — https://github.com/Malidos/Grass-Shader-Example — inti shader rumput baru: wind Perlin scroll + lag ujung UV.y/2.5, push-back pemain via instance-uniform player_position, NORMAL=up + FRONT_FACING flip, fake AO pangkal pow(UV.y,5), specular-toon; parameter material dari ExampleScene merk.
+
 ## Aset pihak ketiga (disertakan)
 
 ### (Dihapus) Female Mannequin + Universal Animation Library 1 & 2 (Quaternius, CC0)
@@ -52,7 +55,208 @@
   — lisensi bebas pakai (komersial diizinkan, redistribusi/penjualan aset dilarang);
   dipakai sebagai skin bawaan pemain (`packs/character_player/polygirl.glb`).
 
-*Terakhir diperbarui: 2026-09-20*
+## Ronde-40: Monster 3D low-poly + pemain kubus
+
+- **Quaternius LowPoly Animated Monsters** — kandidat sumber aset eksternal
+  yang ditelusuri untuk ronde lanjutan; 50 monster beranimasi, CC0:
+  https://quaternius.itch.io/lowpoly-animated-monsters
+- **Monster roster saat ini** — delapan bentuk 3D (slime, golem, bat, mushroom,
+  crawler), material, animasi bob/jalan/serang, dan percikan pemain dibuat
+  procedural memakai primitive/partikel Godot; bebas lisensi dan tidak membawa
+  binary eksternal sebelum arsip CC0 diverifikasi dan diintegrasikan.
+- **Pemain kubus** — BoxMesh, visor, kaki, aura, ground glow, dan TravelSparks
+  dirakit di `packs/character_player/player.gd`.
+
+## Ronde-41: bentuk visual disederhanakan
+
+- Pemain dan seluruh monster kini hanya memakai `BoxMesh` procedural buatan
+  proyek ini; tidak ada aset monster eksternal yang dibundel pada ronde ini.
+- Mata merah monster dan percikan gesekan tanah dibuat procedural dengan
+  material/partikel Godot.
+
+## Ronde-43: tembakan mana biru + mantra Zoltraak
+
+- `fireball_core.gdshader`, `fireball_shell.gdshader`, `fire_bolt.gd`, dan
+  `fire_explosion.gd` direvisi dari palet api oranye ke palet mana biru-putih
+  dan diperkecil ukurannya; semua tetap prosedural karya proyek ini, tanpa
+  aset/tekstur eksternal baru.
+- `zoltraak_charge.gd` (lingkaran mantra) dan `zoltraak_bolt.gd` (gelombang
+  besar) adalah skrip baru, seluruhnya prosedural (mesh primitive, partikel,
+  dan `Label3D` bawaan Godot untuk huruf mantra) — tidak ada aset pihak
+  ketiga yang ditambahkan.
+
+## Ronde-45: pivot total ke game TANK (mage/monster/Zoltraak dihapus)
+
+- Permintaan pengguna: seluruh pack mage (`player.gd` kubus mantra, mana biru,
+  Zoltraak) dan roster monster (`monster.gd`/`monster_system.gd`) **dihapus
+  total**, diganti murni game tank (hull+turret independen, meriam, dinding/
+  bunker destructible ronde-44 dipertahankan sebagai rintangan medan tempur).
+  Rencana grapple ala Attack on Titan (belum sempat dikerjakan di ronde-44)
+  ikut dibatalkan.
+- `player.gd` ditulis ulang penuh: BoxMesh hull + turret + laras, seluruhnya
+  prosedural (karya proyek ini), tanpa aset pihak ketiga.
+- `fire_bolt.gd` diganti nama & isi jadi `tank_shell.gd` (proyektil meriam);
+  `fireball_core.gdshader`, `fireball_shell.gdshader`, dan `fire_explosion.gd`
+  direvisi PALETNYA KEMBALI dari mana biru-putih (ronde-43) ke palet api
+  oranye/merah (ledakan meriam) — tetap prosedural, tanpa tekstur eksternal.
+- Sempat dicek ketersediaan aset tank 3D CC0 gratis (mis. paket "Tank" dari
+  Quaternius, quaternius.com, lisensi CC0/Public Domain) sebagai kandidat
+  peningkatan visual di masa depan; ronde ini TETAP memakai kubus prosedural
+  (konsisten dengan gaya visual proyek sejauh ini) — belum ada aset biner
+  eksternal yang diunduh/dibundel.
+
+## Ronde-46 (bag. A): pivot balik dari TANK ke penyihir anime prosedural
+
+- Permintaan pengguna: hasil visual tank dinilai "kurang/jelek"; pivot balik
+  ke karakter penyihir bergaya anime dengan banyak efek, dunia lebih hidup.
+- **Riset aset karakter anime eksternal (VRM/GLB) dilakukan tapi TERBUKTI
+  tidak feasible di sandbox ini** — dicoba nyata, bukan asumsi:
+  - `poly.pizza/m/jWS1CLA0RO` (Quaternius Tank, CC0) — dari riset ronde-45,
+    tidak relevan lagi.
+  - `quaternius.itch.io/universal-animation-library` (CC0, 120+ animasi
+    humanoid kompatibel Godot/Mixamo) — tidak bisa diunduh (blocker di bawah).
+  - `github.com/ToxSam/open-source-avatars` (registry avatar VRM CC0,
+    `opensourceavatars.com`) dan `github.com/MJMoonbow/VRMavatars` (VRM CC0
+    tema fantasy) — ditemukan lewat riset, tidak diunduh (blocker sama).
+  - Link Google Drive milik pengguna sendiri (file glTF/GLB valid berisi
+    mesh+skin+animasi, dikonfirmasi dari magic header `glTF` yang terbaca)
+    — TIDAK BISA ditransfer utuh: `fetch_page` mengonversi hasil jadi
+    teks/markdown yang merusak byte biner (karakter pengganti `�` muncul
+    di awal file). Pengguna juga tidak bisa melampirkan file secara
+    langsung sebagai lampiran chat saat ditawarkan.
+  - Kesimpulan: **TIDAK ADA aset 3D biner eksternal (.vrm/.glb/.fbx) yang
+    diunduh atau dibundel** di ronde ini maupun rencana ronde berikutnya
+    selama keterbatasan sandbox ini berlaku. Karakter dibangun 100%
+    prosedural (primitive mesh Godot + shader cel-shading yang sudah ada
+    di project, `shaders_materials/toon.gdshader` + `outline.gdshader`
+    lewat helper `Materials.toon()`) — karya proyek ini, bukan aset pihak
+    ketiga.
+- `player.gd` ditulis ulang penuh jadi karakter penyihir chibi-anime
+  (kepala besar, mata besar+kilau, pipi merona, rambut runcing, topi
+  penyihir, jubah, lengan beranimasi prosedural, aura partikel) — lihat
+  `BACA_INI.md` untuk detail lengkap.
+- `tank_shell.gd` diganti nama jadi `arcane_bolt.gd`; palet proyektil &
+  ledakan (`fireball_core.gdshader`, `fireball_shell.gdshader`,
+  `shockwave.gdshader`, `fire_explosion.gd`) direvisi dari api-oranye
+  (tank) jadi arcane ungu-biru-lavender — tetap prosedural, tanpa tekstur
+  eksternal.
+- `player.tscn`: collision `BoxShape3D` (tank) → `CapsuleShape3D`
+  (humanoid).
+- Dinding/reruntuhan destructible ronde-44 (`wall.gd`/`wall_system.gd`)
+  **dipertahankan** (hanya komentar diperbarui), direframe sebagai
+  reruntuhan kuno dunia sihir, bukan cover medan tempur tank.
+
+## Ronde-46 (bag. A3): stickman ungu + animasi jalan/lari/dash biomekanik
+
+- Permintaan pengguna (dengan gambar referensi stick figure): ganti bentuk
+  karakter jadi STICKMAN literal (kepala bulat + garis lurus untuk
+  torso/lengan/kaki, tanpa wajah/rambut/pakaian), warna ungu dipertahankan,
+  dan minta riset dulu cara kerja animasi jalan/lari/dash yang benar.
+- Riset biomekanik (bukan asumsi) via web search, sumber: jurnal "The
+  biomechanics of running" (Gait and Posture, 1998), "Swing phase running
+  biomechanics" (auptimo.com), "Biomechanics of running: An overview on
+  gait cycle" (IJPEFS), "Assessment of Gait" (musculoskeletalkey.com), serta
+  prinsip animasi walk/run-cycle (contact/recoil/passing/high-point poses,
+  kontralateral arm-leg swing) dari beberapa tutorial animasi karakter.
+  Angka yang diambil & dipakai di `player.gd`:
+  - Tekuk lutut maksimum saat mengayun: ~60° jalan normal, ~90° lari,
+    ~105-110° sprint terlatih (dipakai persis: `KNEE_BEND_WALK/RUN/DASH`).
+  - Condong badan ke depan: ~2-3° jalan, ~5-7.5° lari (dipakai persis;
+    nilai dash dilebih-lebihkan ke ~17° demi keterbacaan visual game).
+  - Lengan berayun KONTRALATERAL (berlawanan fasa dengan kaki di sisi
+    SEBERANG, bukan searah) — pola gerak manusia asli, bukan asumsi.
+  - Siku makin tertekuk & amplitudo ayun makin besar seiring kecepatan.
+  - Rotasi pinggul/bahu (transverse plane) ada tapi harus KECIL pada lari
+    efisien — dipakai sebagai detail halus (`HIP_TWIST_MAX`/
+    `SHOULDER_TWIST_MAX`, beberapa derajat saja).
+  - Panjang & frekuensi langkah naik bersama kecepatan — diimplementasikan
+    dengan fase gait yang maju sebanding JARAK TEMPUH (`_advance_gait`),
+    bukan `sin(waktu)` murni.
+- `player.gd`: seluruh mesh "berdaging" dari bag. A/A2 (tunik, cape,
+  bantalan bahu, manset, sepatu bot, rambut, topi, mata, pipi merona)
+  **dihapus**; diganti garis seragam (`CapsuleMesh` radius `LIMB_RADIUS`
+  konstan) untuk torso/lengan/kaki + `SphereMesh` polos untuk kepala, semua
+  1 warna ungu (`STICK_COLOR`) — 100% prosedural, tanpa tekstur/model
+  eksternal. Skeleton pivot (paha/betis, lengan-atas/siku) dari bag. A2
+  dipertahankan agar tetap bisa menekuk saat animasi.
+- `player.tscn`: collision `CapsuleShape3D` diperkecil (radius 0.32→0.24)
+  mengikuti badan yang jauh lebih ramping.
+- Aura partikel ungu-biru & debu jejak kaki (bag. A2) **dipertahankan** —
+  bukan bagian bentuk tubuh, tetap relevan untuk kesan "banyak efek".
+
+## Ronde-46 (bag. A4): mannequin Quaternius + mocap asli, dicat ungu
+
+- Pengguna menilai stickman bag. A3 (garis/kapsul prosedural) masih terlihat
+  seperti "stickman" dari sudut kamera manapun, meski gait-nya sudah
+  biomekanik. Pengguna lalu mengirim **file aset nyata**: paket animasi
+  mocap Quaternius, dengan cara mengunggahnya **langsung ke commit branch**
+  lewat uploader web GitHub (bukan lampiran chat) — jalur ini terbukti
+  berhasil membawa file biner besar utuh ke sandbox, setelah semua jalur
+  unduh URL/lampiran-chat terverifikasi gagal di ronde-ronde sebelumnya.
+- **Aset:** *Universal Animation Library [Standard]* oleh **Quaternius**
+  (https://www.patreon.com/quaternius) — **CC0 1.0 Universal**
+  (https://creativecommons.org/publicdomain/zero/1.0/), domain publik,
+  bebas dipakai/dimodifikasi termasuk komersial, tanpa wajib kredit (kredit
+  di sini tetap diberikan sbg praktik baik).
+  - Hanya varian `Unreal-Godot/UAL1_Standard.glb` yang disertakan
+    (`project/packs/character_player/mannequin/UAL1_Standard.glb`); varian
+    `_RM` (root-motion-baked) dan file `.fbx` khusus Unity dari paket asli
+    **tidak** disertakan (tidak dipakai — gerak karakter dikendalikan
+    kode, bukan root motion).
+  - Isi: 1 mesh berskin "Mannequin" (65 tulang, ~1.83 m tinggi bind-pose,
+    2 material `M_Main`/`M_Joints` TANPA tekstur — di-override total jadi
+    ungu lewat `toon.gdshader`) + 43 klip animasi mocap penuh-tubuh.
+  - Klip yang dipakai bag. A4 (lokomosi saja, sesuai fokus pengguna):
+    `Idle_Loop`, `Walk_Loop`, `Jog_Fwd_Loop`, `Sprint_Loop` (dipilih
+    otomatis berdasar kecepatan dgn histeresis), dan `Roll` (dipakai
+    ulang utk animasi dash — dipercepat via `custom_speed` supaya durasi
+    visualnya kira-kira pas dgn `DASH_DURATION`).
+  - Klip `Spell_Simple_Shoot`/`Spell_Simple_Idle_Loop` (paket sama)
+    **belum dipasang** — kandidat kuat utk animasi serang di bagian
+    berikutnya, sengaja di luar cakupan bag. A4.
+- `player.gd`: seluruh rakitan `CapsuleMesh`/`SphereMesh` prosedural bag.
+  A3 (torso/lengan/kaki/kepala garis tunggal) dan `_animate_stickman()`
+  (rotasi tulang manual per-frame) **dihapus total**, diganti: instance
+  `UAL1_Standard.glb` sbg child `_visual`, cari `AnimationPlayer` +
+  seluruh `MeshInstance3D` **secara rekursif** (`find_child`/
+  `find_children`, path node hasil import glTF tak di-hardcode), override
+  2 material dgn `Materials.toon()` ungu (badan utama + aksen sendi lebih
+  gelap), lalu `AnimationPlayer.play()` memilih klip berdasar kecepatan.
+- `player.tscn`: collision `CapsuleShape3D` disesuaikan ke skala manusia
+  nyata (radius 0.24→0.30, tinggi 1.3→1.65) mengikuti tinggi mannequin
+  ~1.83 m (sebelumnya dikalibrasi utk badan stickman yang jauh lebih kecil).
+- Debu jejak kaki disederhanakan dari pelacakan fase gait per-tulang manual
+  jadi berbasis **jarak tempuh** (gerak kaki kini datang dari mocap asli,
+  bukan dihitung tangan per-frame) — efek visual dipertahankan, hanya
+  pemicunya yang berubah.
+- Aura partikel ungu-biru (bag. A2) **dipertahankan** — tidak disentuh.
+- **Update setelah uji pengguna di device:** dilaporkan (1) karakter tak
+  beranimasi sama sekali (beku/meluncur kaku) dan (2) menghadap 180°
+  terbalik dari arah gerak. (2) diperbaiki dengan `MODEL_YAW_OFFSET = PI`.
+  (1) ternyata bug nyata: importer glTF Godot memotong akhiran `_Loop`
+  dari nama klip dan memakainya utk `loop_mode` native, jadi nama asli
+  (`Idle_Loop` dkk, seperti tercatat di atas) berubah jadi (`Idle`,
+  `Walk`, `Jog_Fwd`, `Sprint`) di `AnimationPlayer` hasil import —
+  konstanta `player.gd` sempat memakai nama lama yg salah sehingga
+  `AnimationPlayer.play()` gagal diam-diam. Ditemukan via diagnostik
+  sementara yang disalurkan ke release notes GitHub (karena log CI
+  blob-storage tak bisa diunduh dari sandbox ini — firewall memblok SNI
+  host tsb, dikonfirmasi lewat `curl -v`), sudah diperbaiki & dijaga
+  permanen lewat pemeriksaan baru di `dev_probe/fire_attack_check.gd`
+  (`_check_mannequin_animates`, membaca nama klip dari konstanta skrip
+  `player.gd` sendiri via `get_script_constant_map()` agar tak ikut basi).
+- **Update lanjutan (dash diganti sesuai permintaan pengguna):** animasi
+  dash yang tadinya klip `Roll` (berguling) diganti jadi "sprint burst" —
+  klip lari yang sama (`Sprint`) tapi `speed_scale` dipercepat
+  (`DASH_ANIM_SPEED_SCALE`), plus jejak bayangan (afterimage): beberapa
+  duplikat `MeshInstance3D` transparan ungu yang tetap merujuk
+  `Skeleton3D` asli (jadi ikut pose lari saat itu, bukan T-pose), dibekukan
+  di posisi saat spawn, lalu memudar cepat. Klip `Roll` tak lagi dipakai
+  di mana pun (tetap ada di paket kalau mau dipakai lain kali). Dijaga via
+  cek CI baru `_check_dash_effects`.
+
+*Terakhir diperbarui: 2026-09-26*
+
 
 ## Ronde-8: Aset Desa & Alam — KayKit Medieval Hexagon Pack (CC0)
 
@@ -69,3 +273,35 @@
   Sketchfab (fan-made). Nama pembuat model BELUM terverifikasi — diminta ke
   pengguna; entri akan dilengkapi. Catat: ini kandidat yang perlu konfirmasi
   lisensi sebelum rilis publik (di luar paket CC0/CC-BY wajib).
+
+## Ronde-2026-09-27: Build Mode — Modul Maskul Dunia + Objek Quaternius (CC0)
+
+- **Stylized Nature MegaKit** oleh Quaternius — CC0 1.0
+  (https://quaternius.com/packs/stylizednaturemegakit.html, diunggah pengguna
+  via tautan Google Drive sebagai koleksi "object buat world"). Dipakai: 17
+  model glTF (CommonTree_1/2/3, Pine_1, TwistedTree_1, DeadTree_1,
+  Bush_Common, Bush_Common_Flowers, Rock_1..4, Grass_1..3, dst.) di
+  `project/packs/build_mode/objects/nature/` sebagai palette objek taruh
+  pada Build Mode (butir 2). Tekstur telah diperkecil 15 MB utk ram mobile.
+- **Fitur Build Mode** (kode baru, `project/packs/build_mode/`): Build Mode
+  toggle UI; Place Object (raycast kamera→tap tanah, palette, slider rotasi
+  & skala); Terrain modular via GridMap+MeshLibrary kustom (datar, miring 4
+  arah, sudut — BUKAN free-sculpt); Road Path3D/Curve3D + mesh prosedural
+  SurfaceTool dgn tombol Selesai/Kunci; Delete; Save/Load JSON di
+  `user://build_map.json` dgn auto-load + autosave-saat-keluar.
+
+## Ronde-2026-09-27 (sore 2): Optimalisasi & UX Build Mode (permintaan user)
+
+- **Dunia diperkecil 3km→1km** (`island_shape.gd` RADIUS 1500→460; sungai
+  dipendekkan & kelakunya dipelankan; konstanta duplikat GLSL di shader
+  tanah+rumput disamakan). Ukuran pla(l)tan: PlaneMesh 1600→1400m.
+- **Rumput prosedural DIMATIKAN permanen** (`world.gd PROC_GRASS=false`) —
+  perf terbesar ronde ini; rumput = objek manual katalog (Grass_Common_Tall
+  dkk, Quaternius CC0 yg sama). Jalan BARU membersihkan rumput/objek cover
+  (entri "cover" di katalog) di dekat jalurnya saat dikunci "Selesai".
+- Mode Bangun: kamera **top-down SMOOTH + karakter disembunyikan**; drag
+  satu jari = **pan peta**, joystick build = pan (bukan gerak); bentuk jalan
+  **Catmull-Rom smooth otomatis**; penempatan objek: tap=calon, digeser
+  (tahan-drag), tombol **OK** utk sahkan, tombol **BATAL**; tombol **↶
+  Reverse** mengurungkan aksi terakhir (tumpukan LIFO untuk objek/tile/
+  jalan/unduh-hapus); objek "small" tanpa bayangan (ringan).
