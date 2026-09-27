@@ -798,8 +798,8 @@ func _make_grass_card_texture() -> Texture2D:
 		var t := 1.0 - float(y) / float(W - 1)   # 0 di bawah (y=127) -> 1 di atas citra (y=0)
 		var uv_v := 1.0 - t                      # v kartu (0=akar; shader: v=1 di ujung -> y=0) — dihitung terbalik dr kenyataan UV.
 		for b in blades:
-			var topy_m := W - 1 - b[3]
-			var top_t := 1.0 - topy_m / float(W - 1)  # t maksimal (ujung)
+			var topy_m: float = float(W - 1) - float(b[3])
+			var top_t: float = 1.0 - topy_m / float(W - 1)  # t maksimal (ujung)
 			if t > top_t:
 				continue
 			var arc := (t / maxf(top_t, 0.001))
