@@ -318,7 +318,9 @@ func _move(delta: float) -> void:
 	_speed01 = lerpf(_speed01, clampf(hv.length() / MAX_SPEED, 0.0, 1.0), 1.0 - exp(-8.0 * delta))
 	_advance_footsteps(hv.length(), delta)
 
-## Batas pulau ~12km (bag. C lanjutan, permintaan user): dunia dulu papan
+## Batas pulau (~3km, diperkecil dari ~12km per permintaan user ronde ini —
+## angka sebenarnya SELALU ikut IslandShape.RADIUS, tak di-hardcode di sini)
+## (bag. C lanjutan, permintaan user): dunia dulu papan
 ## tak berujung yg ikut pemain (WorldBoundaryShape3D, tak ada tepi sama
 ## sekali) — skrg pulau BERBATAS dgn laut di sekelilingnya. Drpd bikin mesh
 ## collision 3D yg cocok persis dgn garis pantai berombak (rumit & berat

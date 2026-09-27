@@ -185,9 +185,28 @@ func _make_flat_ground() -> void:
 ## "IslandShape" di island_shape.gd kalau perlu ubah radius/garis pantai).
 ## Krn baik darat maupun laut sama2 rata (y=0), satu bidang yg sama cukup
 ## utk keduanya, tinggal warnanya yg beda tergantung posisi dunia absolut.
+##
+## FIX BUG (laporan user: "tanah warna hitam bukan hijau"): ground_color
+## sblmnya (0.05,0.16,0.06) HAMPIR SAMA GELAP dgn warna akar (paling gelap)
+## di grass_blade.gdshader, lalu masih dikalikan lg shadow_tint (0.50) di
+## sisi tak-menghadap-bulan + ambient malam yg memang sengaja diredupkan —
+## hasil akhirnya berada di bawah ambang persepsi warna (kelihatan nyaris
+## hitam polos, bukan salah render, cuma kegelapan menumpuk kebablasan).
+## Dinaikkan ke (0.13,0.33,0.12) -- setara area TENGAH gradasi hijau helai
+## rumput (bukan sekelam akarnya) shg tetap "tua"/tak neon tapi terang cukup
+## utk lolos ambang itu & jelas kebaca hijau di bawah pencahayaan malam yg
+## sama persis dgn yg dipakai rumput 3D di atasnya.
+##
+## RONDE INI JUGA: danau+sungai (permintaan user "ada aliran danau atau
+## sungai") ditambah lewat any_water_factor() (gabungan laut ATAU danau
+## ATAU sungai, rumus lake_factor/river_factor disalin manual dr
+## island_shape.gd, WAJIB disamakan kalau salah satu diubah) — dipakai
+## gantikan water_factor() polos di fragment(), shg danau/sungai dapat
+## shading air+riak yg SAMA dgn laut tanpa kode terpisah.
 func _make_ground_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	var sh := Shader.new()
+
 	sh.code = """
 shader_type spatial;
 render_mode cull_back, depth_draw_opaque;
@@ -196,7 +215,7 @@ render_mode cull_back, depth_draw_opaque;
 // streaming yg SKRG jauh lebih tebal (world.gd GRASS_CHUNK_INSTANCES) yg
 // bertugas kasih detail/tekstur visual; tanah di baliknya cukup warna
 // solid senada spy menyatu, bukan malah "ramai" bersaing dgn tuft di atas.
-uniform vec3 ground_color : source_color = vec3(0.05, 0.16, 0.06);
+uniform vec3 ground_color : source_color = vec3(0.13, 0.33, 0.12);
 uniform float shadow_tint : hint_range(0.0, 1.0) = 0.50;
 uniform float mid_tint : hint_range(0.0, 1.0) = 0.82;
 // --- Pulau/laut (IslandShape, disalin manual dr island_shape.gd) ---
@@ -219,7 +238,7 @@ float gnoise(vec2 p) {
 
 // island_shape.gd IslandShape.radius_at() -- HARUS SAMA PERSIS (lihat
 // komentar di island_shape.gd kalau ubah salah satu, ubah keduanya).
-const float ISLAND_RADIUS = 6000.0;
+const float ISLAND_RADIUS = 1500.0;
 const float BEACH_WIDTH = 55.0;
 float island_radius_at(float theta) {
 	return ISLAND_RADIUS * (1.0
@@ -235,12 +254,47 @@ float water_factor(vec2 p) {
 	return clamp((r - (coast - BEACH_WIDTH)) / BEACH_WIDTH, 0.0, 1.0);
 }
 
+// --- Danau + sungai (IslandShape.lake_factor/river_factor, disalin manual —
+// permintaan user "ada aliran danau atau sungai"). HARUS SAMA PERSIS dgn
+// island_shape.gd & grass_blade.gdshader kalau salah satu diubah.
+const vec2 LAKE_CENTER = vec2(350.0, 450.0);
+const float LAKE_RADIUS = 90.0;
+const float LAKE_BANK = 14.0;
+const vec2 RIVER_DIR = vec2(0.6, 0.8);
+const vec2 RIVER_START = vec2(404.0, 522.0);
+const float RIVER_LENGTH = 900.0;
+const float RIVER_HALF_WIDTH = 16.0;
+const float RIVER_BANK = 10.0;
+const float RIVER_MEANDER_AMP = 55.0;
+const float RIVER_MEANDER_FREQ = 0.006;
+float lake_factor(vec2 p) {
+	float d = length(p - LAKE_CENTER);
+	return clamp((LAKE_RADIUS - d) / LAKE_BANK, 0.0, 1.0);
+}
+float river_factor(vec2 p) {
+	vec2 rp = p - RIVER_START;
+	vec2 perp = vec2(-RIVER_DIR.y, RIVER_DIR.x);
+	float u = dot(rp, RIVER_DIR);
+	float v = dot(rp, perp);
+	float meander = sin(u * RIVER_MEANDER_FREQ) * RIVER_MEANDER_AMP;
+	float dist = abs(v - meander);
+	float w = clamp((RIVER_HALF_WIDTH - dist) / RIVER_BANK, 0.0, 1.0);
+	float fade_in = clamp((u + RIVER_BANK) / (RIVER_BANK * 2.0), 0.0, 1.0);
+	float fade_out = 1.0 - clamp((u - (RIVER_LENGTH - RIVER_BANK)) / (RIVER_BANK * 2.0), 0.0, 1.0);
+	return w * fade_in * fade_out;
+}
+// Laut ATAU danau ATAU sungai — satu nilai gabungan dipakai fragment() shg
+// keduanya (bukan cuma laut) dapat shading air+riak yg sama.
+float any_water_factor(vec2 p) {
+	return max(water_factor(p), max(lake_factor(p), river_factor(p)));
+}
+
 void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 
 void fragment() {
 	vec3 land_col = ground_color;
 
-	float wf = water_factor(wp.xz);
+	float wf = any_water_factor(wp.xz);
 	// riak air sederhana & MURAH (2 lapis noise digeser TIME, bukan
 	// simulasi gelombang sungguhan) -- cukup utk kesan "air hidup" mobile.
 	float ripple = gnoise(wp.xz * 0.05 + vec2(TIME * 0.06, TIME * 0.04))

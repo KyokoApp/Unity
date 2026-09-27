@@ -56,10 +56,11 @@ uniform float trample_power : hint_range(0.0, 3.0) = 1.1;
 uniform float trample_radius : hint_range(0.1, 5.0) = 1.3;
 
 // Batas pulau (ronde-46 lanjutan bag. C, permintaan user "pulau 12km +
-// laut"): rumput TAK BOLEH tumbuh di pasir/laut. Rumus disalin manual dr
-// island_shape.gd (IslandShape) & dr shader tanah di world.gd — WAJIB
+// laut"; ronde ini: pulau diperkecil ke 3km + danau/sungai ditambah).
+// Rumput TAK BOLEH tumbuh di pasir/laut/danau/sungai. Rumus disalin manual
+// dr island_shape.gd (IslandShape) & dr shader tanah di world.gd — WAJIB
 // disamakan kalau salah satu diubah (lihat komentar di island_shape.gd).
-const float ISLAND_RADIUS = 6000.0;
+const float ISLAND_RADIUS = 1500.0;
 const float BEACH_WIDTH = 55.0;
 float island_radius_at(float theta) {
 	return ISLAND_RADIUS * (1.0
@@ -72,6 +73,38 @@ float island_water_factor(vec2 p) {
 	float r = length(p);
 	float coast = island_radius_at(theta);
 	return clamp((r - (coast - BEACH_WIDTH)) / BEACH_WIDTH, 0.0, 1.0);
+}
+// Danau + sungai (IslandShape.lake_factor/river_factor, disalin manual —
+// permintaan user "ada aliran danau atau sungai"). WAJIB disamakan dgn
+// island_shape.gd & world.gd kalau salah satu diubah.
+const vec2 LAKE_CENTER = vec2(350.0, 450.0);
+const float LAKE_RADIUS = 90.0;
+const float LAKE_BANK = 14.0;
+const vec2 RIVER_DIR = vec2(0.6, 0.8);
+const vec2 RIVER_START = vec2(404.0, 522.0);
+const float RIVER_LENGTH = 900.0;
+const float RIVER_HALF_WIDTH = 16.0;
+const float RIVER_BANK = 10.0;
+const float RIVER_MEANDER_AMP = 55.0;
+const float RIVER_MEANDER_FREQ = 0.006;
+float lake_factor(vec2 p) {
+	float d = length(p - LAKE_CENTER);
+	return clamp((LAKE_RADIUS - d) / LAKE_BANK, 0.0, 1.0);
+}
+float river_factor(vec2 p) {
+	vec2 rp = p - RIVER_START;
+	vec2 perp = vec2(-RIVER_DIR.y, RIVER_DIR.x);
+	float u = dot(rp, RIVER_DIR);
+	float v = dot(rp, perp);
+	float meander = sin(u * RIVER_MEANDER_FREQ) * RIVER_MEANDER_AMP;
+	float dist = abs(v - meander);
+	float w = clamp((RIVER_HALF_WIDTH - dist) / RIVER_BANK, 0.0, 1.0);
+	float fade_in = clamp((u + RIVER_BANK) / (RIVER_BANK * 2.0), 0.0, 1.0);
+	float fade_out = 1.0 - clamp((u - (RIVER_LENGTH - RIVER_BANK)) / (RIVER_BANK * 2.0), 0.0, 1.0);
+	return w * fade_in * fade_out;
+}
+float any_water_factor(vec2 p) {
+	return max(island_water_factor(p), max(lake_factor(p), river_factor(p)));
 }
 
 varying float height_w;   // 0=akar, 1=ujung (dibaca dari COLOR.a mesh)
@@ -91,13 +124,14 @@ void vertex() {
 
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 
-	// Rumput lenyap sblm garis pantai (bukan tumbuh di pasir/laut) — fade
-	// mulai SEBELUM pasir penuh (wf 0.0-0.3) spy transisinya alami, bukan
-	// terpotong tajam pas garis air. Pakai teknik shrink-ke-akar yg sama
-	// spt edge_fade di atas (aman digabung, tinggal dikali lagi).
-	float wf = island_water_factor(world_pos.xz);
+	// Rumput lenyap sblm garis air (laut/danau/sungai) — fade mulai SEBELUM
+	// pasir/tepi penuh (wf 0.0-0.3) spy transisinya alami, bukan terpotong
+	// tajam pas garis air. Pakai teknik shrink-ke-akar yg sama spt edge_fade
+	// di atas (aman digabung, tinggal dikali lagi).
+	float wf = any_water_factor(world_pos.xz);
 	float island_fade = 1.0 - smoothstep(0.0, 0.3, wf);
 	VERTEX *= island_fade;
+
 
 	// Tekukan injak: cuma dihitung (termasuk inverse(MODEL_MATRIX) yg agak
 	// mahal) utk helai yg BENAR2 dekat pemain — dibungkus if supaya ribuan
