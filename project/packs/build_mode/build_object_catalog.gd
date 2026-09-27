@@ -29,15 +29,15 @@ var candidates: Array = [
 	{"id": "DeadTree_1",     "label": "P. Mati",  "path": OBJ_DIR + "DeadTree_1.gltf",     "tint": Color(0.52, 0.45, 0.38)},
 	{"id": "Bush_Common",           "label": "Semak",   "path": OBJ_DIR + "Bush_Common.gltf",           "tint": Color(0.45, 0.62, 0.38)},
 	{"id": "Bush_Common_Flowers",   "label": "Semak B.", "path": OBJ_DIR + "Bush_Common_Flowers.gltf",  "tint": Color(0.60, 0.55, 0.62)},
-	{"id": "Fern_1",         "label": "Pakis",    "path": OBJ_DIR + "Fern_1.gltf",         "tint": Color(0.40, 0.60, 0.42)},
-	{"id": "Plant_1_Big",    "label": "Tanaman",  "path": OBJ_DIR + "Plant_1_Big.gltf",    "tint": Color(0.42, 0.58, 0.40)},
-	{"id": "Mushroom_Common", "label": "Jamur",   "path": OBJ_DIR + "Mushroom_Common.gltf", "tint": Color(0.66, 0.46, 0.38)},
-	{"id": "Flower_3_Group", "label": "Bunga",    "path": OBJ_DIR + "Flower_3_Group.gltf", "tint": Color(0.72, 0.52, 0.60)},
-	{"id": "Grass_Common_Tall", "label": "Alang", "path": OBJ_DIR + "Grass_Common_Tall.gltf", "tint": Color(0.55, 0.62, 0.40)},
+	{"id": "Fern_1",         "label": "Pakis",    "path": OBJ_DIR + "Fern_1.gltf",         "tint": Color(0.40, 0.60, 0.42), "small": true, "cover": true},
+	{"id": "Plant_1_Big",    "label": "Tanaman",  "path": OBJ_DIR + "Plant_1_Big.gltf",    "tint": Color(0.42, 0.58, 0.40), "small": true, "cover": true},
+	{"id": "Mushroom_Common", "label": "Jamur",   "path": OBJ_DIR + "Mushroom_Common.gltf", "tint": Color(0.66, 0.46, 0.38), "small": true, "cover": true},
+	{"id": "Flower_3_Group", "label": "Bunga",    "path": OBJ_DIR + "Flower_3_Group.gltf", "tint": Color(0.72, 0.52, 0.60), "small": true, "cover": true},
+	{"id": "Grass_Common_Tall", "label": "Alang", "path": OBJ_DIR + "Grass_Common_Tall.gltf", "tint": Color(0.55, 0.62, 0.40), "small": true, "cover": true},
 	{"id": "Rock_Medium_1",  "label": "Batu 1",   "path": OBJ_DIR + "Rock_Medium_1.gltf",  "tint": Color(0.55, 0.56, 0.58)},
 	{"id": "Rock_Medium_2",  "label": "Batu 2",   "path": OBJ_DIR + "Rock_Medium_2.gltf",  "tint": Color(0.52, 0.53, 0.56)},
-	{"id": "Pebble_Round_1", "label": "Kerikil",  "path": OBJ_DIR + "Pebble_Round_1.gltf", "tint": Color(0.58, 0.57, 0.58)},
-	{"id": "RockPath_Round_Wide", "label": "Pijakan", "path": OBJ_DIR + "RockPath_Round_Wide.gltf", "tint": Color(0.60, 0.58, 0.55)},
+	{"id": "Pebble_Round_1", "label": "Kerikil",  "path": OBJ_DIR + "Pebble_Round_1.gltf", "tint": Color(0.58, 0.57, 0.58), "small": true},
+	{"id": "RockPath_Round_Wide", "label": "Pijakan", "path": OBJ_DIR + "RockPath_Round_Wide.gltf", "tint": Color(0.60, 0.58, 0.55), "small": true},
 ]
 
 ## Entri katalog yg SUDAH lolos cek ketersediaan file (dipakai UI/Placer).
