@@ -10,16 +10,18 @@ class RpgButton:
 	signal released
 	var icon := "sword"
 	var emoji := ""
+	var tex: Texture2D = null        # ikon gambar (PNG) — mengungguli glyph canvas
 	var radius := 44.0
 	var active := false
 	var _down := false
 	var _tidx := -1
 	var _label: Label
 
-	func _init(ic: String, r: float, emj := "") -> void:
+	func _init(ic: String, r: float, emj := "", p_tex: Texture2D = null) -> void:
 		icon = ic
 		radius = r
 		emoji = emj
+		tex = p_tex
 		custom_minimum_size = Vector2(r * 2, r * 2)
 		size = custom_minimum_size
 		mouse_filter = Control.MOUSE_FILTER_STOP
@@ -78,6 +80,14 @@ class RpgButton:
 
 	func _draw() -> void:
 		var c := Vector2(radius, radius)
+		# Mode gambar-ikon (permintaan user ronde ini: tombol speed memakai
+		# artwork yg dikirim user; tombol dash pakai artwork senada hasil
+		# generate): gambar tekstur utuh memenuhi tombol + ring status.
+		if tex != null:
+			draw_texture_rect(tex, Rect2(Vector2.ZERO, Vector2(radius * 2, radius * 2)), false, Color(1, 1, 1, 1.0 if _down or active else 0.92))
+			if active or _down:
+				draw_arc(c, radius - 3.0, 0.0, TAU, 48, Color(0.62, 0.82, 1.0, 0.85), 2.5, true)
+			return
 		# gaya referensi (Genshin-like): lingkaran gelap translusen + glyph putih
 		draw_circle(c, radius - 1.0, Color(0.10, 0.12, 0.15, 0.62 if _down else 0.42))
 		draw_arc(c, radius - 2.5, 0.0, TAU, 48, Color(1, 1, 1, 0.30), 2.0, true)
@@ -189,6 +199,13 @@ var _pinch_dist := 0.0
 const PINCH_ZOOM_SENSITIVITY := 0.018
 const JOY_RADIUS := 110.0
 const DEADZONE := 0.14
+## Artwork tombol ikon-gambar (permintaan user ronde ini: "button move speed
+## pake gambar yang aku kasih ... button dash juga redesign"): btn_speed
+## adalah reka-ulang loyal-100% desain kiriman user (lingkaran hitam +
+## pegulat siluet lari + garis kecepatan); btn_dash hasil generate senada
+## (sepatu sprint monokrom-putih di atas disc hitam + ring putih).
+const ICON_BTN_SPEED := preload("res://packs/ui/icons/btn_speed.png")
+const ICON_BTN_DASH := preload("res://packs/ui/icons/btn_dash.png")
 
 var _buttons := {}   # nama -> Control(Button-like)
 var _btn_colors := {}
@@ -397,7 +414,7 @@ func _build_layout() -> void:
 	# attack besar kanan-tengah-bawah; dash di bawah-kanannya; lompat pojok kanan bawah
 	var att_c := Vector2(vsz.x - mr - 156.0, vsz.y - mb - 234.0)
 	_add_rpg(root, "BtnAtk", "flame", 58.0, att_c - Vector2(58.0, 58.0))
-	_add_rpg(root, "BtnDash", "dash", 40.0, att_c + Vector2(96.0, 116.0) - Vector2(40.0, 40.0))
+	_add_rpg(root, "BtnDash", "dash", 40.0, att_c + Vector2(96.0, 116.0) - Vector2(40.0, 40.0), ICON_BTN_DASH)
 	_add_rpg(root, "BtnJump", "jump", 50.0, Vector2(vsz.x - mr - 100.0, vsz.y - mb - 100.0) - Vector2(50.0, 50.0))
 	_add_rpg(root, "BtnAction", "hand", 36.0, att_c + Vector2(-132.0, -70.0) - Vector2(36.0, 36.0))
 	_add_rpg(root, "BtnCrouch", "crouch", 32.0, att_c + Vector2(-132.0, 2.0) - Vector2(32.0, 32.0))
@@ -406,7 +423,7 @@ func _build_layout() -> void:
 	# kalo kita pencet nambah 5 kali kecepatan lari") — TOGGLE: tekan sewaktu
 	# (bukan hold), chevron-ganda, di sisi kiri klaster aksi drpd bertumpuk di
 	# dash (btn lain yg lbh sering kesentuh — fx "bush"-nya bikin kejutan).
-	_add_rpg(root, "BtnSpeed", "speed", 36.0, att_c + Vector2(-120.0, -150.0) - Vector2(36.0, 36.0))
+	_add_rpg(root, "BtnSpeed", "speed", 36.0, att_c + Vector2(-120.0, -150.0) - Vector2(36.0, 36.0), ICON_BTN_SPEED)
 	_add_rpg(root, "BtnEmote", "smile", 27.0, Vector2(vsz.x - mr - 54.0, mt + 96.0))
 	# --- ganti karakter (permintaan user: "ada icon ganti karakter") ---
 	# sengaja TAK dimasukkan HIDDEN_BUTTONS (UI minimal) krn diminta eksplisit
@@ -510,8 +527,8 @@ func _build_layout() -> void:
 	toast_label.modulate.a = 0.0
 	root.add_child(toast_label)
 
-func _add_rpg(root: Control, name: String, icon: String, r: float, pos: Vector2, emj := "") -> void:
-	var b := RpgButton.new(icon, r, emj)
+func _add_rpg(root: Control, name: String, icon: String, r: float, pos: Vector2, tex: Texture2D = null, emj := "") -> void:
+	var b := RpgButton.new(icon, r, emj, tex)
 	b.name = name
 	b.position = pos
 	root.add_child(b)

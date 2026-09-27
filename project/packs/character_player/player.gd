@@ -46,6 +46,7 @@ const IslandShape := preload("res://packs/world_terrain/island_shape.gd")
 const SHOOT_SFX := "res://packs/audio_sfx/fire_shoot.wav"
 const ARCANE_BOLT := preload("res://packs/character_player/arcane_bolt.gd")
 const FIRE_SPIRIT := preload("res://packs/character_player/fire_spirit.gd")
+const SPEED_THREAD := preload("res://packs/character_player/speed_thread.gd")  # benang trail smooth ala Yelan
 const MANNEQUIN_SCENE := preload("res://packs/character_player/mannequin/UAL1_Standard.glb")
 const FIRE_COOLDOWN := 0.3
 const BOLT_SPEED := 21.0
@@ -127,6 +128,32 @@ class SkinRetarget:
 	extends Node
 	var src: Skeleton3D
 	var dst: Skeleton3D
+
+## Penggerak peleburan ghost dash SCR MANUAL per-frame (deterministik —
+## TAK pakai Tween properti "shader_parameter/*": pola itu menyebabkan
+## ghost "tertinggal permanen"; lihat catatan di _spawn_afterimage).
+## life01 dinaikkan 0->1 merata selama `fade` detik (wobble asap di shader
+## makin mengembang + alpha padam), ghost juga diangkat pelan ke atas,
+## lalu node ghost (induk driver ini) di-queue_free.
+class DashGhost:
+	extends Node
+	var fade := 0.85
+	var smoke_mat: ShaderMaterial
+	var RISE := 0.22                  # meter terangkat selagi memudar
+	var _age := 0.0
+	func _process(delta: float) -> void:
+		_age += delta
+		var life01: float = clampf(_age / maxf(fade, 0.05), 0.0, 1.0)
+		var p := get_parent() as Node3D
+		if is_instance_valid(smoke_mat):
+			smoke_mat.set_shader_parameter("life01", life01)
+		if is_instance_valid(p):
+			p.position.y += (RISE / maxf(fade, 0.05)) * delta
+		if life01 >= 1.0 and is_instance_valid(p):
+			# bersihkan override tulang spy lepas RS tepat waktu, baru hilang
+			for n in p.find_children("*", "Skeleton3D", true, false):
+				(n as Skeleton3D).clear_bones_global_pose_override()
+			p.queue_free()
 	var pairs: Array = []          # [src_idx, dst_idx] (indeks tulang, bukan nama)
 	var src_pelvis: int = -1
 	var dst_pelvis: int = -1
@@ -328,10 +355,6 @@ const DASH_ANIM_SPEED_SCALE := 1.8
 # pastel cyan lembut, dsb. Semuanya di-set ke satu palet pastel biar
 # nyambung, gak bentrok warna sen itu sendiri.
 const AFTERIMAGE_FADE := 0.85        # umur ghost dash (dinaikkan — hanya 1 ghost per dash)
-const AFTERIMAGE_COLOR := Color(0.55, 0.60, 0.68, 0.42)
-const TRAIL_INTERVAL := 0.05         # jarak spawn ghost trail saat speed-skill aktif
-const TRAIL_FADE := 0.30             # umur ghost trail (tilak faedah-efek smooth)
-const TRAIL_COLOR := Color(0.45, 0.62, 0.85, 0.30)
 # Hotfix lanjutan ronde ini (permintaan user: "bayangan dash ikut gerak...
 # jadi bayangan nya gk gerak"): ghost kini membawa skeleton hantu DIBEKUKAN
 # di pose spawn (lihat _spawn_afterimage) dan (untuk DASH) bahannya shader
@@ -402,7 +425,7 @@ var _dash_left := 0.0
 var _dash_cooldown := 0.0
 var _dash_dir := Vector3.ZERO
 var _speed_skill := false          # status skill "gerak-cepat" aktif/tidak (toggle BtnSpeed)
-var _trail_timer := 0.0            # timer spawn ghost trail saat speed skill aktif
+var _speed_threads: Array = []     # benang trail ala Yelan (speed_thread.gd), anak player
 var _cam_boost_fov := 0.0          # kick FOV saat skill kecepatan diaktifkan (efek "bush")
 var _cam_boost_arm := 0.0          # tarikan arm kamera keluar sedikit saat boost
 var _dust_dist_accum := 0.0
@@ -435,6 +458,7 @@ func _ready() -> void:
 	_build_character(_skin_id)
 	_build_aura()
 	_build_fire_spirit()
+	_build_speed_threads()
 	is_ready = true
 	health_changed.emit(health, max_health)
 
@@ -570,6 +594,13 @@ func _process(delta: float) -> void:
 	_move(delta)
 	_apply_camera(delta)
 	_animate_character(delta)
+	# Benang trail skill kecepatan: mengaum hanya saat skill ON dan laju
+	# fisik nyata sudah kencang (>55% MAX_SPEED). _speed01 dipakai spy tak
+	# perlu hitung ulang panjang velocity di sini.
+	var thread_on := 1.0 if (_speed_skill and _speed01 > 0.55) else 0.0
+	for t in _speed_threads:
+		if is_instance_valid(t):
+			t.set_target(thread_on)
 	# Peliharaan elemental (permintaan user: "lidah apinya bakal gerak kalo
 	# kita jalan") -- kasih tahu kecepatan pemain skrg spy shell shadernya
 	# bisa "menyeret" nyala api ke belakang arah jalan (lihat fire_spirit.gd).
@@ -618,14 +649,11 @@ func _move(delta: float) -> void:
 		_facing = hv.normalized()
 	_speed01 = lerpf(_speed01, clampf(hv.length() / MAX_SPEED, 0.0, 1.0), 1.0 - exp(-8.0 * delta))
 	_advance_footsteps(hv.length(), delta)
-	# --- trail ghost smooth saat skill kecepatan aktif (jalan-kaki cepat sekali) ---
-	if _speed_skill and hv.length() > MAX_SPEED * 0.80:
-		_trail_timer -= delta
-		if _trail_timer <= 0.0:
-			_trail_timer = TRAIL_INTERVAL
-			_spawn_afterimage()
-	else:
-		_trail_timer = 0.0
+	# CATATAN: trail ghost-mesh DIHAPUS total (laporan user: "trail mov speed
+	# jangan pake after image ... kayak benang smooth aja ala Yelan") —
+	# penggantinya pita benang speed yg digambar per-frame oleh node
+	# SpeedThread (lihat _build_speed_threads/_process), jauh lebih murah &
+	# tak memenuhi layar dgn patung putih.
 
 ## Batas pulau (~3km, diperkecil dari ~12km per permintaan user ronde ini —
 ## angka sebenarnya SELALU ikut IslandShape.RADIUS, tak di-hardcode di sini)
@@ -1072,6 +1100,28 @@ func _build_fire_spirit() -> void:
 	_fire_spirit.name = "FireSpirit"
 	_visual.add_child(_fire_spirit)
 
+## Benang-benang trail skill gerak-cepat (permintaan user: "trail mov speed
+## jangan pake after image tapi kayak semacam benang smooth gitu kayak
+## karakter yelan di genshin ... pas pake move speed efek benang juga dapet
+## di spirit api kecil itu"): 3 pita tipis pastel-biru dari punggung pemain
+## (beda tinggi/fase supaya "mengalir" natural, tak serempak kaku) + 1 pita
+## ungu-pastel di spirit api (kontrak yang dijanjikan). Target on/off diatur
+## per-frame dari _process (lihat bawah) — benang mengaum hanya saat skill
+## speed AKTIF dan gerakan benar2 cepat.
+func _build_speed_threads() -> void:
+	var specs: Array = [
+		# [anchor, offset lokal anchor, tint pastel, lebar, fase goyang]
+		[_visual, Vector3(0.00, 1.08, 0.00), Color(0.60, 0.78, 1.00), 0.060, 0.0],
+		[_visual, Vector3(0.13, 1.30, 0.00), Color(0.72, 0.85, 1.00), 0.044, 2.1],
+		[_visual, Vector3(-0.13, 0.84, 0.00), Color(0.66, 0.80, 1.00), 0.038, 4.2],
+		[_fire_spirit, Vector3.ZERO,        Color(0.76, 0.64, 1.00), 0.034, 1.3],
+	]
+	for spec in specs:
+		var t := SPEED_THREAD.new()
+		add_child(t)
+		t.setup(spec[0], spec[1], spec[2], spec[3], spec[4])
+		_speed_threads.append(t)
+
 ## Aura sihir ungu-biru yang melayang terus-menerus di sekitar karakter —
 ## permintaan pengguna "banyak efek" berlaku juga saat idle, bukan cuma saat
 ## menyerang. Dipertahankan lintas-ronde walau badan kini model mannequin.
@@ -1118,140 +1168,95 @@ func _build_aura() -> void:
 	_aura_particles.emitting = true
 	_base_amounts[_aura_particles] = _aura_particles.amount
 
-## Jejak bayangan (afterimage) saat dash — beberapa "hantu" transparan
-## menduplikasi mesh mannequin, dibekukan di posisi/rotasi saat itu, lalu
-## memudar cepat. Tiap ghost tetap merujuk Skeleton3D ASLI yang sama (jadi
-## posenya ikut pose lari saat itu, bukan T-pose) — cukup utk kesan "trail
-## kecepatan" tanpa perlu membekukan pose tulang secara manual.
-## Bayangan pemain: satu ghost abu-abu pastel untuk DASH (dipanggil SEKALI
-## di press_dash) ATAU ghost trail biru-pastel saat skill kecepatan aktif
-## (dipanggil berulang tiap TRAIL_INTERVAL selama >80% kecepatan lari).
-## Dua mode beda gaya fade/asap:
-##   DASH: 1 ghost saja per tekanan tombol (cek AFTERIMAGE_*), lapisan asap
-##         lembut bergoyang di sekelilingnya (lihat _spawn_ghost_smoke) +
-##         bergeser naik pelan + fade-out panjang — kesan "bentukan karakter
-##         masih kelihatan, cuma seperti goyangan asap" sesuai permintaan
-##         user, di KEDUA skin (mannequin & Kanna pakai kode yg sama persis).
-##   TRAIL: ghost tipis cepat-lenyap utk kesan "smooth" saat 5× speed.
-## Sumber mesh/skeleton dipilih eksplisit per skin (mannequin mesh
-## tersembunyi saat skin Kanna TETAP valid krn di-pick di sini per-skin).
+## Bayangan dash: SATU ghost abu-abu-berasap, bentuk KARAKTER PERSIS &
+## pose DIBEKUKAN di momen tombol ditekan. Revisi ronde ini (laporan user
+## lewat screenshot): ghost lama (klon skeleton bikinan tangan per-bone)
+## tampil "ngacak kayak error" khusus di skin KANNA — struktur skeleton
+## VRM rupanya tak cocok dgn rekonstruksi manual nam<->parent/index.
+## Solusinya sekarang ROBUST & sederhana: ghost = src_root.duplicate()
+## (seluruh subpohon model, TERMASUK skeleton & skin mesh-nya apa adanya
+## — apa pun keunikan struktur bawaan importer ikut terduplikasi), lalu
+## semua penggerak di dalam duplikat DIMATIKAN (AnimationPlayer dll) dan
+## tiap Skeleton3D duplikat di-STAMP pose-nya satu-kali dari skeleton
+## sumber yg sepadan-lewat-path (set_bone_global_pose_override persistent)
+## -> hasil akhir: siluet pose-momen-dash yg TAK PERNAH ikut animasi lagi.
+## Fade DIJALANKAN MANUAL per-frame oleh inner-class DashGhost (TAK lg
+## lewat Tween pada "shader_parameter/*" — pola tsb menyebabkan ghost
+## "tertinggal permanen" di perangkat user: callback free tak pernah
+## terpanggil). Efek asap bergoyang tetap dilengkapi _spawn_ghost_smoke.
 func _spawn_afterimage() -> void:
 	# sumber mesh & skeleton = skin yg AKTIF (kanna: node kanna + skeletonnya;
-	# mannequin: _model + _skeleton spt biasa — jaringan mesh mannequin lg
+	# mannequin: _model + _skeleton spt biasa -- jaringan mesh mannequin lg
 	# disembunyikan TERTUTUP krn di sini dipilih eksplisit per skin).
 	var src_root: Node3D = _model
-	var src_skel: Skeleton3D = _skeleton
 	if _skin_id == SKIN_KANNA:
 		src_root = _kanna
-		src_skel = _kanna_skeleton
-	# skeleton tak perlu valid utk mesm yg statis, tp tetap dicek utk skinned:
 	if not is_instance_valid(src_root):
 		return
 	var parent := get_parent()
 	if parent == null:
 		return
-	var is_trail := _speed_skill and _dash_left <= 0.0
-	var tint := TRAIL_COLOR if is_trail else AFTERIMAGE_COLOR
-	var fade := TRAIL_FADE if is_trail else AFTERIMAGE_FADE
-	var ghost := Node3D.new()
-	ghost.name = "SpeedTrail" if is_trail else "DashAfterimage"
+	var ghost := src_root.duplicate() as Node3D
+	if ghost == null:
+		return
+	ghost.name = "DashAfterimage"
 	parent.add_child(ghost)
-	ghost.global_transform = _visual.global_transform
+	ghost.global_transform = src_root.global_transform
 
-	# HOTFIX (permintaan user: "bayangan dash ikut gerak ... jadi bayangan
-	# nya gk gerak" + "dash kanna acak-acakan banget bukan bentuk karakter
-	# nya"): ghost TIDAK BOLEH merujuk skeleton HIDUP (versi sebelum hotfix:
-	# copy.skeleton menunjuk skeleton asli => tiap frame ghost ikut diposekan
-	# animasi yg sedang main — tampak "bergerak ngikutin", dan utk Kanna jadi
-	# kacau krn titik rujuk ini berada di luar node skala _kanna).
-	# Solusinya: tiap ghost membawa SKELETON HANTU PRIBADI yg dibekukan
-	# SEKALI saat spawn (persistent global-pose-override) — ghost menampilkan
-	# pose momen spawn persis, dan TAK PERNAH ikut animasi lagi. Sekaligus
-	# memperbaiki kasus skala Kanna (transform skeleton hantu disamakan dgn
-	# skeleton sumber apa adanya, termasuk skala _kanna=1.26x).
-	var ghost_skel: Skeleton3D = null
-	if is_instance_valid(src_skel):
-		ghost_skel = Skeleton3D.new()
-		ghost_skel.name = "GhostSkeleton"
-		ghost.add_child(ghost_skel)
-		# urutan add_bone = urutan indeks sumber => indeks tulang TETAP COCOK
-		# dgn referensi skin mesh (skinning by index); hirarki+rest disalin.
-		var bone_count := src_skel.get_bone_count()
-		for i in bone_count:
-			var b := ghost_skel.add_bone(src_skel.get_bone_name(i))
-			var bp := src_skel.get_bone_parent(i)
-			if bp >= 0:
-				ghost_skel.set_bone_parent(b, bp)
-			ghost_skel.set_bone_rest(b, src_skel.get_bone_rest(i))
-		ghost_skel.global_transform = src_skel.global_transform
-		for i in bone_count:
-			ghost_skel.set_bone_global_pose_override(i, src_skel.get_bone_global_pose(i), 1.0, true)
+	# 1) Matikan SEMUA animator bawaan di dalam duplikat spy duplikat tak
+	#    hidup sendiri (user: "bayangan nya gk gerak").
+	for n in ghost.find_children("*", "AnimationPlayer", true, false):
+		var ap := n as AnimationPlayer
+		if ap != null:
+			ap.stop()
+			ap.playback_active = false
+			ap.set_process(false)
+	for n in ghost.find_children("*", "AnimationTree", true, false):
+		var at := n as AnimationTree
+		if at != null:
+			at.active = false
+			at.set_process(false)
 
-	# DASH: siluetnya memakai shader asap abu-abu ber-wooble (warna+abrasi
-	# asap langsung DI bentuk karakternya — permintaan "masih ada bentukan
-	# karakter nya, kayak goyangan asap"). TRAIL (speed skill): tetap bahan
-	# ungu-cyan aditif murah (rendaman cepat, 0.05 detik/ghost).
-	var ghost_mat: Material
-	var smoke_mat: ShaderMaterial = null
-	if is_trail:
-		var mat := StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		mat.albedo_color = tint
-		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-		mat.disable_receive_shadows = true
-		ghost_mat = mat
-	else:
-		smoke_mat = ShaderMaterial.new()
-		smoke_mat.shader = AFTERIMAGE_SHADER
-		ghost_mat = smoke_mat
-
-	var made_any := false
-	for mi in src_root.find_children("*", "MeshInstance3D", true, false):
-		var src := mi as MeshInstance3D
-		if src == null or src.mesh == null:
+	# 2) STAMP pose beku: tiap Skeleton3D DALAM duplikat diberi override
+	#    global-pose PERSISTEN dari skeleton aslinya yg sepadan-menurut-path
+	#    (path relatif di dalam subpohon identik sesudah duplicate()).
+	for n in ghost.find_children("*", "Skeleton3D", true, false):
+		var gskel := n as Skeleton3D
+		var rel := ghost.get_path_to(gskel)
+		var sskel := src_root.get_node_or_null(rel) as Skeleton3D
+		if sskel == null:
 			continue
-		var copy := MeshInstance3D.new()
-		copy.mesh = src.mesh
-		copy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		copy.extra_cull_margin = 1.5   # wobble asap (dash) menggeser AABB mesh
-		ghost.add_child(copy)
-		copy.global_transform = src.global_transform
-		if is_instance_valid(ghost_skel):
-			copy.skeleton = copy.get_path_to(ghost_skel)
-		for i in range(src.mesh.get_surface_count()):
-			copy.set_surface_override_material(i, ghost_mat)
+		var cnt := mini(gskel.get_bone_count(), sskel.get_bone_count())
+		for i in cnt:
+			gskel.set_bone_global_pose_override(i, sskel.get_bone_global_pose(i), 1.0, true)
+
+	# 3) Ganti SEMUA bahan mesh duplikat jadi asap abu-abu ber-wooble
+	#    (afterimage_smoke.gdshader) — siluet karakter kebaca, permukaannya
+	#    "goyangan asap" (permintaan user), pakai SATU material dipakai ulang.
+	var smoke_mat := ShaderMaterial.new()
+	smoke_mat.shader = AFTERIMAGE_SHADER
+	var made_any := false
+	for mi in ghost.find_children("*", "MeshInstance3D", true, false):
+		var mesh_inst := mi as MeshInstance3D
+		if mesh_inst == null or mesh_inst.mesh == null:
+			continue
+		mesh_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mesh_inst.extra_cull_margin = maxf(mesh_inst.extra_cull_margin, 1.5)
+		for s in range(mesh_inst.mesh.get_surface_count()):
+			mesh_inst.set_surface_override_material(s, smoke_mat)
 		made_any = true
 	if not made_any:
 		ghost.queue_free()
 		return
 
-	# pose ghost IALAH pose momen spawn (dibekukan via skeleton hantu di atas)
-	# — "bentukan karakter tetap kelihatan, tapi TAK ikut gerak lagi".
-	# Khusus DASH ditambah awan asap bergoyang di sekeliling ghost
-	# (lihat _spawn_ghost_smoke) — permintaan user: "efek asap tapi masih
-	# ada bentukan karakternya, kayak goyangan asap gitu, mannequin juga
-	# sama" (kode satu drat dua skin).
-	if not is_trail:
-		_spawn_ghost_smoke(ghost)
-	else:
-		# trail (speed skill): fade tipis + menggeliat vertikal (rasa kencang/
-		# "halus" ala motion-blur, bukan bayangan kaku berhenti diam).
-		var tween := create_tween()
-		tween.tween_property(ghost_mat, "albedo_color:a", 0.0, fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		tween.parallel().tween_property(ghost, "scale", Vector3(1.0, 1.22, 1.0), fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		tween.tween_callback(ghost.queue_free)
-		return
-
-	# dash: umur asap digerakkan uniform life01 (0->1: wobble mengembang +
-	# padam) + ghost bergeser pelan ke atas (mengapung spt asap). Bahan
-	# dash dijamin ShaderMaterial (lihat pemilihan ghost_mat di atas).
-	var tween := create_tween()
-	tween.tween_property(smoke_mat, "shader_parameter/life01", 1.0, fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.parallel().tween_property(ghost, "global_position", ghost.global_position + Vector3(0.0, 0.16, 0.0), fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_callback(ghost.queue_free)
+	# 4) Awan asap partikel di sekeliling + peleburan DETERMINISTIK manual
+	#    (DashGhost._process menaikkan uniform life01 -> 1 lalu queue_free
+	#    diri sendiri — tanpa Tween properti-shader sama sekali).
+	_spawn_ghost_smoke(ghost)
+	var driver := DashGhost.new()
+	driver.fade = AFTERIMAGE_FADE
+	driver.smoke_mat = smoke_mat
+	ghost.add_child(driver)
 
 ## Awan asap bergoyang di sekeliling ghost dash (permintaan user: "efek asap
 ## tapi masih ada bentukan karakter nya cuman kayak goyangan asap gitu,

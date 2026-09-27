@@ -70,7 +70,13 @@ func _process(delta: float) -> void:
 	# _trail di arcane_bolt.gd tapi sumbernya kecepatan PEMAIN, bukan diri
 	# sendiri. Diubah ke RUANG LOKAL node ini (yg terus berputar pelan di
 	# atas) via basis invers, krn shader shell beroperasi di ruang lokal.
-	var target_trail := (-external_velocity * 0.045).limit_length(0.55)
+	# Tuning ronde ini (laporan user: "spirit api masih blom bener — kalo
+	# kita lari jadi kek bentuk segitiga miring lidahnya, bukan kobaran"):
+	# seretan angin DIBATASI JAUH lebih halus (0.045 -> 0.018, cap 0.55 ->
+	# 0.20) supaya lidah api tetap menjilat ke atas ala kobaran dan hanya
+	# MENCONDONG tipis ke belakang saat lari (apik juga saat skill speed
+	# x5 aktif: kecepatan 45 m/s tetap tidak menyeret bentuk jadi segitiga).
+	var target_trail := (-external_velocity * 0.018).limit_length(0.20)
 	_trail = _trail.lerp(target_trail, 1.0 - exp(-9.0 * delta))
 	var local_trail: Vector3 = global_transform.basis.inverse() * _trail
 	if _shell_mat:

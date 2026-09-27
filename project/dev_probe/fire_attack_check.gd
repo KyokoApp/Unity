@@ -393,8 +393,21 @@ func _check_speed_skill(player: Node, world: Node) -> void:
 	await create_timer(0.9).timeout
 	var spawn_fx_found := false
 	for c in world.get_children():
-		if String(c.name).begins_with("SpeedBoostRing") or String(c.name).begins_with("SpeedTrail"):
+		if String(c.name).begins_with("SpeedBoostRing"):
 			spawn_fx_found = true
+	# RONDE INI (laporan user): trail mesh-ghost GANTI TOTAL jadi benang
+	# "smooth" ala Yelan (speed_thread.gd) — dicek: di player ada node
+	# SpeedThread* yg targetnya sudah menyala (>0.5) saat skill+kencang,
+	# dan bikin zero "SpeedTrail"-ghost terbentuk sama sekali (regresi
+	# lama: layar penuh patung putih "permanen").
+	var thread_lit := false
+	for t in player.find_children("SpeedThread*", "MeshInstance3D", true, false):
+		if float(t.get("_target")) > 0.5:
+			thread_lit = true
+	for c in world.get_children():
+		if String(c.name).begins_with("SpeedTrail"):
+			_fail("skill: node SpeedTrail MASIH dibentuk (trail mesh-ghost lama belum dihilangkan total — laporan user: jangan pake afterimage)")
+			return
 	var v_on: Vector3 = player.get("velocity")
 	var spd_on := Vector2(v_on.x, v_on.z).length()
 	player.call("set_joy", Vector2.ZERO)
@@ -410,9 +423,12 @@ func _check_speed_skill(player: Node, world: Node) -> void:
 		_fail("skill: kecepatan ON=%.2f tak mendekati MAX_SPEED*MULT=%.2f — akselerasi boostnya salah?" % [spd_on, max_speed * spd_mult])
 		return
 	if not spawn_fx_found:
-		_fail("skill: tak ada SpeedBoostRing/SpeedTrail di dunia setelah skill diaktifkan (efek boost gagal spawn)")
+		_fail("skill: tak ada SpeedBoostRing di dunia setelah skill diaktifkan (efek boost bush gagal spawn)")
 		return
-	print("[fire-check] fase 1g ✔ skill gerak-cepat ×%d (kecepatan %.2f->%.2f, rasio %.1f) + efek boost OK" % [int(spd_mult), spd_off, spd_on, ratio])
+	if not thread_lit:
+		_fail("skill: benang trail (SpeedThread) tak menyala saat skill ON & kencang (trail benang ala-Yelan gagal aktif)")
+		return
+	print("[fire-check] fase 1g ✔ skill gerak-cepat ×%d (kecepatan %.2f->%.2f, rasio %.1f) + efek bush & benang trail OK" % [int(spd_mult), spd_off, spd_on, ratio])
 
 func _check_dash_effects(player: Node, world: Node) -> void:
 	var consts: Dictionary = (player.get_script() as GDScript).get_script_constant_map()
@@ -436,15 +452,17 @@ func _check_dash_effects(player: Node, world: Node) -> void:
 		_fail("dash: tidak ada node DashAfterimage muncul saat dash (jejak bayangan gagal spawn)")
 		return
 	# HOTFIX "bayangan dash ikut gerak ... jadi bayangan nya gk gerak": ghost
-	# wajib membawa Skeleton3D HANTU sendiri (bukan rujukan ke skeleton hidup)
-	# dan pose-nya dibekukan — nilai pose tulang harus IDENTIK antar-frame.
+	# KINI dibangun via src_root.duplicate() (subpohon penuh incl Skeleton3D
+	# dalamnya — robust thdp struktur VRM Kanna yg sempat bikin ghost kanna
+	# "ngacak kayak error"), lalu Skeleton3D duplikat di-STAMP pose beku
+	# (override persisten). Wajib: ada Skeleton3D DI DALAM ghost (bukan
+	# rujukan ke skeleton hidup di luar ghost) & pose-nya identik antar-frame.
 	var gskel: Skeleton3D = null
-	for c in ghost.get_children():
-		if c is Skeleton3D:
-			gskel = c
-			break
+	for c in ghost.find_children("*", "Skeleton3D", true, false):
+		gskel = c
+		break
 	if gskel == null:
-		_fail("dash: ghost afterimage tak punya Skeleton3D hantu ('GhostSkeleton') — ghost masih merujuk skeleton hidup, bayangan bakal ikut gerak lagi")
+		_fail("dash: ghost afterimage tak punya Skeleton3D di dalam dirinya — ghost bukan duplicate-subpohon / masih merujuk skeleton hidup, bayangan bakal ikut gerak lagi")
 		return
 	var probe_bone := mini(3, gskel.get_bone_count() - 1)
 	var pose_a: Transform3D = gskel.get_bone_global_pose(probe_bone)
