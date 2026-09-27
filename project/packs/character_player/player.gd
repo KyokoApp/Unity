@@ -111,10 +111,12 @@ const AFTERIMAGE_COLOR := Color(0.62, 0.34, 1.0, 0.4)
 const PITCH_MIN := deg_to_rad(-72.0)
 const PITCH_MAX := deg_to_rad(-10.0)
 # CAM_DIST didekatkan (permintaan user "kameranya agak deketin ke player"):
-# 7.6 -> 5.6. Zoom-out manual (pinch 2 jari, lihat hud.gd add_zoom) msh bisa
-# menjauhkan sampai CAM_ZOOM_MAX, tapi otomatis balik ke CAM_DIST ini lagi
-# scr smooth (lihat _cam_zoom di _process) begitu jalan lagi / diam sebentar.
-const CAM_DIST := 5.6
+# 7.6 -> 5.6. LALU didekatkan LAGI (permintaan lanjutan "jarak kamera ke
+# player deketin lagi"): 5.6 -> 4.4. Zoom-out manual (pinch 2 jari, lihat
+# hud.gd add_zoom) msh bisa menjauhkan sampai CAM_ZOOM_MAX, tapi otomatis
+# balik ke CAM_DIST ini lagi scr smooth (lihat _cam_zoom di _process) begitu
+# jalan lagi / diam sebentar.
+const CAM_DIST := 4.4
 const CAM_FOLLOW := 7.0
 const LOOK_K := 0.0036
 const CAM_FOCUS_HEIGHT := 1.05

@@ -96,11 +96,26 @@ const GRASS_CHUNK_SIZE := 22.0
 const GRASS_CHUNK_INSTANCES := 5400
 const GRASS_RENDER_RADIUS_CHUNKS := 2   # persegi (2*r+1)^2 petak selalu berusaha dimuat
 const GRASS_UNLOAD_RADIUS_CHUNKS := 3   # histeresis: dibongkar hanya kalau LEBIH jauh dr ini
-const GRASS_CHUNK_BUILD_PER_FRAME := 2  # cegah hentakan frame saat byk petak baru sekaligus
+# OPTIMASI (permintaan user: "optimalisasi biar smooth tapi tidak mengurangi
+# visual") — GRASS_CHUNK_BUILD_PER_FRAME skrg cuma ngatur brp NODE petak
+# baru boleh dibuat tiap frame (murah: cuma alokasi MultiMesh kosong, tak
+# lagi ngisi ribuan instance-nya di frame yg sama). Pengisian instance
+# sesungguhnya (yg MAHAL — dulu sampai 5400 pemanggilan set_instance_*
+# per petak, dobel kalau 2 petak kebangun bareng = ~10800 panggilan native
+# dlm 1 frame, itu biang hentakan/patah2 pas jalan masuk area baru) skrg
+# DICICIL lewat GRASS_FILL_INSTANCES_PER_FRAME instance/frame LINTAS semua
+# petak yg lg dibangun (lihat _grass_building/_process_grass_fill_budget) —
+# jumlah TOTAL rumput yg akhirnya tampil TETAP SAMA PERSIS (tak ada rumput
+# dikurangi), cuma proses ngisinya disebar bbrp frame drpd numpuk di 1
+# frame. Bonus: rumpun kelihatan "tumbuh" bertahap saat petak baru
+# dimuat—bukan nge-pop instan—yg jg terasa lebih halus dr sisi visual.
+const GRASS_CHUNK_BUILD_PER_FRAME := 3   # brp petak baru boleh MULAI dibangun /frame
+const GRASS_FILL_INSTANCES_PER_FRAME := 1800  # brp instance boleh DIISI /frame (semua petak digabung)
 var _grass_mesh: ArrayMesh                # 1 mesh tuft dipakai bersama semua chunk
 var _grass_mat: ShaderMaterial            # 1 material dipakai bersama semua chunk (player_pos diperbarui tiap frame)
 var _grass_chunks := {}                   # Vector2i koordinat petak -> MultiMeshInstance3D
-var _grass_pending: Array = []            # antrean koordinat petak menunggu dibangun
+var _grass_pending: Array = []            # antrean koordinat petak menunggu MULAI dibangun
+var _grass_building := {}                 # Vector2i -> {"rng":RandomNumberGenerator,"filled":int}: petak yg node-nya sudah ada tapi msh dicicil isi instance-nya
 var _grass_last_chunk := Vector2i(9999999, 9999999)  # paksa update pertama
 var _grass_density_frac := 1.0            # dari apply_quality() grass_density, diterapkan ke chunk baru & yg sudah ada
 
@@ -257,12 +272,15 @@ void light() {
 ## memberi kedalaman/volume. Setiap instance = tuft 5 helai bersilang, dgn
 ## goyangan angin & varian warna per-instance di grass_blade.gdshader.
 ## Inisialisasi sistem CHUNK STREAMING (lihat catatan arsitektur di atas):
-## mesh & material dibuat SEKALI (dipakai bersama semua petak), lalu petak
-## ASAL (0,0) dibangun SEKARANG JUGA (spawn pemain persis di situ, (0,0,0))
-## supaya rumput sudah ada dari detik pertama tanpa nunggu _process jalan &
-## tanpa perlu referensi `player` (blm tentu ada saat generate_async, lihat
-## jg dev_probe/fire_attack_check.gd yg menguji world sendirian tanpa
-## pemain) — petak lain menyusul otomatis begitu set_player() dipanggil &
+## mesh & material dibuat SEKALI (dipakai bersama semua petak), lalu node
+## petak ASAL (0,0) dibuat SEKARANG JUGA (spawn pemain persis di situ,
+## (0,0,0)) tanpa perlu referensi `player` (blm tentu ada saat
+## generate_async, lihat jg dev_probe/fire_attack_check.gd yg menguji world
+## sendirian tanpa pemain) — isi instance-nya sendiri dicicil lewat
+## _process_grass_fill_budget (lihat komentar GRASS_FILL_INSTANCES_PER_FRAME)
+## shg full-terisi dlm hitungan beberapa frame pertama (bukan langsung
+## sekaligus, demi smoothness — tapi tetap terasa "sudah ada dr detik
+## pertama"). Petak lain menyusul otomatis begitu set_player() dipanggil &
 ## pemain mulai jalan.
 func _build_grass() -> void:
 	_grass_mesh = _build_grass_blade_mesh()
@@ -295,18 +313,7 @@ func _build_grass_chunk(coord: Vector2i) -> void:
 	mm.use_custom_data = true
 	mm.mesh = _grass_mesh
 	mm.instance_count = GRASS_CHUNK_INSTANCES
-	var rng := RandomNumberGenerator.new()
-	rng.seed = _chunk_seed(coord)
-	var half := GRASS_CHUNK_SIZE * 0.5
-	for i in range(GRASS_CHUNK_INSTANCES):
-		var x := rng.randf_range(-half, half)
-		var z := rng.randf_range(-half, half)
-		var s := rng.randf_range(0.75, 1.35)
-		var blade_basis := Basis(Vector3.UP, rng.randf_range(0.0, TAU))
-		blade_basis = blade_basis.scaled(Vector3(s, s * rng.randf_range(0.8, 1.3), s))
-		mm.set_instance_transform(i, Transform3D(blade_basis, Vector3(x, 0.0, z)))
-		mm.set_instance_custom_data(i, Color(rng.randf(), rng.randf(), 0.0, 0.0))
-	mm.visible_instance_count = int(round(GRASS_CHUNK_INSTANCES * _grass_density_frac))
+	mm.visible_instance_count = 0  # belum ada instance terisi, lihat _process_grass_fill_budget
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "GrassChunk_%d_%d" % [coord.x, coord.y]
 	mmi.multimesh = mm
@@ -315,6 +322,55 @@ func _build_grass_chunk(coord: Vector2i) -> void:
 	mmi.position = Vector3((coord.x + 0.5) * GRASS_CHUNK_SIZE, 0.0, (coord.y + 0.5) * GRASS_CHUNK_SIZE)
 	add_child(mmi)
 	_grass_chunks[coord] = mmi
+	# Node & buffer kosong sudah ada (murah) — pengisian GRASS_CHUNK_INSTANCES
+	# instance sesungguhnya (mahal) dicicil lewat _grass_building, BUKAN di
+	# sini lagi, biar tak menghentak frame ini (lihat catatan di const
+	# GRASS_FILL_INSTANCES_PER_FRAME di atas).
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _chunk_seed(coord)
+	_grass_building[coord] = {"rng": rng, "filled": 0}
+
+## Dipanggil TIAP FRAME (bukan cuma saat pindah petak): isi maks
+## GRASS_FILL_INSTANCES_PER_FRAME instance rumput, disebar ke SEMUA petak yg
+## msh dlm proses (_grass_building), petak terlama diisi duluan. RNG per
+## petak sama & DILANJUTKAN (bukan diulang dr awal) tiap panggilan -> hasil
+## akhirnya identik persis dgn kalau diisi sekaligus (cuma bedanya waktu),
+## jadi TOTAL & KEPADATAN rumput tak berkurang sama sekali dibanding
+## sebelumnya — cuma cara ngisinya yg disebar biar smooth.
+func _process_grass_fill_budget() -> void:
+	var budget := GRASS_FILL_INSTANCES_PER_FRAME
+	var half := GRASS_CHUNK_SIZE * 0.5
+	var done: Array = []
+	for coord in _grass_building.keys():
+		if budget <= 0:
+			break
+		var mmi = _grass_chunks.get(coord)
+		if not is_instance_valid(mmi):
+			done.append(coord)
+			continue
+		var mm: MultiMesh = mmi.multimesh
+		var st: Dictionary = _grass_building[coord]
+		var rng: RandomNumberGenerator = st["rng"]
+		var filled: int = st["filled"]
+		var n: int = mini(budget, GRASS_CHUNK_INSTANCES - filled)
+		for j in range(n):
+			var i := filled + j
+			var x := rng.randf_range(-half, half)
+			var z := rng.randf_range(-half, half)
+			var s := rng.randf_range(0.75, 1.35)
+			var blade_basis := Basis(Vector3.UP, rng.randf_range(0.0, TAU))
+			blade_basis = blade_basis.scaled(Vector3(s, s * rng.randf_range(0.8, 1.3), s))
+			mm.set_instance_transform(i, Transform3D(blade_basis, Vector3(x, 0.0, z)))
+			mm.set_instance_custom_data(i, Color(rng.randf(), rng.randf(), 0.0, 0.0))
+		filled += n
+		budget -= n
+		st["filled"] = filled
+		var target_visible := int(round(GRASS_CHUNK_INSTANCES * _grass_density_frac))
+		mm.visible_instance_count = mini(filled, target_visible)
+		if filled >= GRASS_CHUNK_INSTANCES:
+			done.append(coord)
+	for coord in done:
+		_grass_building.erase(coord)
 
 ## Dipanggil dari _process tiap kali pemain PINDAH PETAK (bukan tiap frame —
 ## murah): tentukan set petak yg SEHARUSNYA aktif (persegi radius
@@ -338,6 +394,10 @@ func _update_grass_chunks(center: Vector2i) -> void:
 		if is_instance_valid(mmi):
 			mmi.queue_free()
 		_grass_chunks.erase(coord)
+		# Kalau petak ini dibongkar SEBELUM selesai dicicil isinya (pemain
+		# lari lalu balik arah cepat), hentikan pengisiannya jg — node-nya
+		# sudah free, lanjut ngisi cuma buang2 budget frame percuma.
+		_grass_building.erase(coord)
 	var still_wanted: Array = []
 	for coord in _grass_pending:
 		if wanted.has(coord):
@@ -355,10 +415,17 @@ func _process_grass_chunk_queue() -> void:
 			budget -= 1
 
 func _apply_grass_density_all() -> void:
+	var target := int(round(GRASS_CHUNK_INSTANCES * _grass_density_frac))
 	for coord in _grass_chunks:
 		var mmi = _grass_chunks[coord]
 		if is_instance_valid(mmi) and mmi.multimesh:
-			mmi.multimesh.visible_instance_count = int(round(GRASS_CHUNK_INSTANCES * _grass_density_frac))
+			# Petak yg msh dicicil isinya (_grass_building) jangan dipaksa
+			# nampilin instance yg BLM terisi (msh data default kosong) —
+			# batasi ke jumlah yg sudah benar2 diisi sejauh ini.
+			var cap := target
+			if _grass_building.has(coord):
+				cap = mini(target, int(_grass_building[coord]["filled"]))
+			mmi.multimesh.visible_instance_count = cap
 
 ## Mesh 1 tuft rumput (PEROMBAKAN #2 — user: "kurang tebel dan kurang
 ## realistis"). Versi lama: persis 5 helai simetris bintang 72° — dari atas
@@ -603,6 +670,7 @@ func _process(delta: float) -> void:
 			_grass_last_chunk = pchunk
 			_update_grass_chunks(pchunk)
 	_process_grass_chunk_queue()
+	_process_grass_fill_budget()
 	if _grass_mat:
 		_grass_mat.set_shader_parameter("player_pos", Vector2(player.global_position.x, player.global_position.z) if player else Vector2.ZERO)
 
@@ -710,12 +778,16 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("ground_bottom_color", Color(0.10, 0.15, 0.20).darkened(0.55))
 		sky_mat.set_shader_parameter("sun_color", Color(0.96, 0.97, 1.0))
 		sky_mat.set_shader_parameter("star_visibility", 1.0)
-		# bulan dibesarkan dikit (0.06->0.075) & halo dikuatkan (0.32->0.40)
-		# -- ditambah shader sky.gdshader skrg py lapisan corona lembut baru
-		# (bukan cuma pow(d,24) yg sempit) -> "bulan indah" bersinar nyata,
-		# bukan bulatan flat kecil.
-		sky_mat.set_shader_parameter("sun_size", 0.075)
-		sky_mat.set_shader_parameter("halo", 0.40)
+		# bulan (screenshot user: "bulannya terlalu gede banget gk realistis")
+		# — nilai SEBELUMNYA (0.075/halo 0.40) ternyata di layar HP hampir
+		# menutupi separuh atas frame, jauh dr kesan bulan sungguhan. Diturunkan
+		# banyak (skala non-linear: sky.gdshader pakai smoothstep atas cosinus
+		# sudut pandang, bukan linear piksel, jd penurunan sun_size sekecil ini
+		# msh menghasilkan cakram yg JELAS kelihatan & bersinar, cuma proporsi
+		# ukurannya wajar—bukan raksasa menutup layar) — halo jg diturunkan
+		# senada spy corona lembutnya tak ikut2an kelihatan besar.
+		sky_mat.set_shader_parameter("sun_size", 0.010)
+		sky_mat.set_shader_parameter("halo", 0.22)
 	# Di FOG_MODE_DEPTH, fog_density BUKAN lagi koefisien eksponensial —
 	# artinya opasitas MAKSIMUM kabut tepat di fog_depth_end (0=tak
 	# kelihatan, 1=menutup total). _lo.fog/_q_fog tetap dipakai sbg pengali
