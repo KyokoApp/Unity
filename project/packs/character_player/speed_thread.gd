@@ -14,8 +14,8 @@ extends MeshInstance3D
 ## ketika benang sedang tampak (_alpha > kecil), satu ImmediateMesh dipakai
 ## ulang tiap frame, buffer posisi adalah array statis.
 
-@export var width := 0.022          # lebar pita penuh (dimerutinkan ke ujung)
-@export var points := 22            # banyak sampel histori (lebih = lebih halus/panjang)
+@export var width := 0.030          # lebar pita penuh (dimerutinkan ke ujung)
+@export var points := 30            # banyak sampel histori (lebih = lebih halus/panjang; ronde ini 22->30: "benang masih kurang" -> ekor lebih panjang ngalir)
 @export var sample_interval := 0.016 # detik antar sampel
 @export var wobble_amp := 0.038     # amplitudo goyangan maks di ujung belakang
 @export var wobble_freq := 7.0      # laju goyangan
@@ -28,7 +28,11 @@ extends MeshInstance3D
 # -> bloom berpendar. _vtint = tint dinormal ke 0-1 utk diputar per-vertex,
 # pelipat kecerahannya masuk albedo_color material (unshaded -> albedo IS
 # warna final, HDR utuh tak di-clamp).
-const HDR_GAIN := 2.3
+# RONDE INI (user: "benang ungu masih kurang" di screenshot barunya): gain
+# dinaikkan 2.3 -> 4.6 — benang skrg jauh lebih mencolok/berpendar kuat
+# di layar walau tetap TIPIS; nilai puncak ~ (boost x tint) menembus
+# ambang glow 1.35 jauh -> aura bloom jelas.
+const HDR_GAIN := 4.6
 var _vtint := tint
 
 var _alpha := 0.0        # opasitas efektif sekarang (dierap ke _target)

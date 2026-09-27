@@ -560,16 +560,26 @@ func _check_world_ground_fog() -> void:
 		_fail("world: sky.gdshader tak lagi punya awan/haze (cloud_amount/haze_strength) — langit kembali polos?")
 		world.queue_free()
 		return
-	# RONDE INI (saran tier-menengah disetujui user): refleksi planar air —
-	# rig SubViewport kamera cermin y=0 (world.gd _setup_water_reflection)
-	# harus terbentuk bila WATER_REFLECTION aktif (default true).
+	# RONDE INI+V2: rig refleksi planar SubViewport sengaja DIMATIKAN demi
+	# jalur 60fps (laporan user: "air tak berubah malah jadi berat") — jadi
+	# dua-duanya SAH: viewport harus ADA bila WATER_REFLECTION=true, atau
+	# const itu memang disengaja false (default sekarang).
 	var has_refl_vp := false
 	for c in world.get_children():
 		if c is SubViewport:
 			has_refl_vp = true
 			break
-	if not has_refl_vp:
-		_fail("world: SubViewport refleksi air hilang (WATER_REFLECTION dimatikan? rig _setup_water_reflection gagal?)")
+	var wr_flag = world.get_script().get_script_constant_map().get("WATER_REFLECTION", true)
+	if not has_refl_vp and wr_flag != false:
+		_fail("world: WATER_REFLECTION=true tapi SubViewport refleksi tak terbentuk (rig _setup_water_reflection gagal?)")
+		world.queue_free()
+		return
+	# RONDE INI: air stylized mobile (adaptasi reff shader yg dikirim user:
+	# buih tepi, fresnel langit, kaustik, riak gelombang & serapan Beer
+	# tanpa pass berat) — shader tanah wajib bawa penyeragamannya.
+	var gmat = world.get("_ground_mat") as ShaderMaterial
+	if gmat == null or not gmat.shader.code.contains("player_water_pos") or not gmat.shader.code.contains("sky_reflect_color"):
+		_fail("world: shader tanah/air tak lagi punya player_water_pos/sky_reflect_color — air stylized mobile hilang?")
 		world.queue_free()
 		return
 	var kids: Array = []

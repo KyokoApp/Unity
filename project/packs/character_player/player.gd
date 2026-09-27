@@ -1144,10 +1144,12 @@ func _build_speed_threads() -> void:
 	# bercahaya via bloom; bukan lagi biru-pastel matte yg terasa hambar).
 	var specs: Array = [
 		# [anchor, offset lokal anchor, tint HDR ungu-menyala, lebar, fase]
-		[_visual, Vector3(0.00, 1.08, 0.00), Color(1.50, 0.35, 2.00), 0.022, 0.0],
-		[_visual, Vector3(0.13, 1.30, 0.00), Color(1.75, 0.55, 2.10), 0.018, 2.1],
-		[_visual, Vector3(-0.13, 0.84, 0.00), Color(1.35, 0.30, 2.20), 0.016, 4.2],
-		[_fire_spirit, Vector3.ZERO,        Color(1.70, 0.55, 2.20), 0.016, 1.3],
+		# (ronde ini "masih kurang" -> sedikit ditebalkan dr 0.022 dst,
+		# tetap benang; menyala HDR diperkuat di speed_thread HDR_GAIN)
+		[_visual, Vector3(0.00, 1.08, 0.00), Color(1.50, 0.35, 2.00), 0.030, 0.0],
+		[_visual, Vector3(0.13, 1.30, 0.00), Color(1.75, 0.55, 2.10), 0.024, 2.1],
+		[_visual, Vector3(-0.13, 0.84, 0.00), Color(1.35, 0.30, 2.20), 0.022, 4.2],
+		[_fire_spirit, Vector3.ZERO,        Color(1.70, 0.55, 2.20), 0.022, 1.3],
 	]
 	for spec in specs:
 		var t := SPEED_THREAD.new()

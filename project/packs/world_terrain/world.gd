@@ -49,14 +49,19 @@ var time_of_day := 17.2
 var _root: Node
 var _ground: MeshInstance3D   # bidang raksasa yang menyentak mengikuti pemain
 var _ground_mat: ShaderMaterial  # material tanah+air (dipakai set param refleksi/matahari-air)
-# --- REFLEKSI PLANAR DI AIR (ronde ini, saran tier-menengah user yg
-# disetujui "pasangin sekalian": pantulan langit&turan ke permukaan danau/
-# laut lewat kamera cermin y=0 + SubViewport kecil 384x216 murah).
-# Update ditutulkan 1-dari-3 frame (hemat mobile) — air beriak jadi
-# latensi 3 frame nyaris tak terbaca. SATU BARIS toggle di bawah utk
-# mematikan cepat bila bermasalah di device: ubah ke false, tak perlu
-# sentuh kode lain (shader tetap skip sampling krn reflect_strength 0). ---
-const WATER_REFLECTION := true
+# --- REFLEKSI PLANAR DI AIR: kode RIG masih ADA di bawah (_setup/_tick)
+# tapi DIMATIKAN lewat toggle ini. Alasan (laporan user ronde ini, hasil
+# test di HP: "air keliatan nya gk ada perubahan malah kek jadi berat") —
+# dua kekurangan sekaligus: (1) pantulannya nyaris tak terlihat (campuran
+# fresnel sudut pandang atas terlalu halus), (2) tapi biayanya NYATA:
+# bidang tanah+air raksasa + environment di-render DUA KALI tiap 3 frame
+# ke SubViewport (perf drop terasa di HP mid-range; user minta balik ke
+# jalur 60fps smooth). Penggantinya: air stylized mobile (buih pantai
+# bergerak, fresnel arah langit, serapan Beer-ish, riak gelombang pemain,
+# kaustik diperkuat) di shader tanah — NOL pass render tambahan. Kalau
+# besok mau dicoba lagi tinggal ubah const ini = true; shader sudah siap
+# pasang (reflect_strength/refl_tex diparametrikan dari _setup di bawah).
+const WATER_REFLECTION := false
 var _refl_vp: SubViewport
 var _refl_cam: Camera3D
 var _refl_ground: MeshInstance3D
@@ -325,7 +330,13 @@ uniform float reflect_strength : hint_range(0.0, 1.0) = 0.0;
 // + kilau kaustik dangkal --- arah MENUJU matahari di-set ulang tiap
 // _apply_daylight (sun.global_basis.z), default = sore 13deg di barat.
 uniform vec3 water_sun_dir = vec3(-0.628, 0.225, -0.362);
-uniform float sun_glint : hint_range(0.0, 2.0) = 0.55;
+uniform float sun_glint : hint_range(0.0, 2.0) = 0.85;
+// --- adaptasi shader air reff user (ronde ini): warna pantulan LANGIT
+// sore krim utk freshnel (wajah air menawan tanpa pass render ke-2), plus
+// posisi pemain utk riak gelombang (player waves) — diset tiap frame dr
+// world.gd _process spt player_pos rumput. ---
+uniform vec3 sky_reflect_color : source_color = vec3(0.88, 0.82, 0.68);
+uniform vec2 player_water_pos = vec2(0.0, 0.0);
 varying vec3 wp;
 
 float gh(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
@@ -399,55 +410,100 @@ void fragment() {
 	vec3 land_col = ground_color;
 
 	float wf = any_water_factor(wp.xz);
-	// riak air sederhana & MURAH (2 lapis noise digeser TIME, bukan
-	// simulasi gelombang sungguhan) -- cukup utk kesan "air hidup" mobile.
-	float ripple = gnoise(wp.xz * 0.05 + vec2(TIME * 0.06, TIME * 0.04))
-		+ gnoise(wp.xz * 0.13 - vec2(TIME * 0.03, TIME * 0.05)) * 0.5;
-	// variasi arah riak (dipakai distorsi kaca & jitter kilaun, tambahan
-	// normal air "palsu" — jauh lbh murah dr dalam normal-maps sungguhan)
-	float rx = gnoise(wp.xz * 0.09 + vec2(TIME * 0.10, 0.0)) - 0.5;
-	float rz = gnoise(wp.xz * 0.09 + vec2(0.0, TIME * 0.11)) - 0.5;
-	vec3 water_col = mix(water_shallow, water_deep, smoothstep(0.0, 1.0, (wf - 0.35) / 0.65));
-	water_col += ripple * 0.03;
 
 	// darat -> pasir -> air, transisi mulus di pita BEACH_WIDTH
 	vec3 col = mix(land_col, sand_color, smoothstep(0.0, 0.5, wf));
-	col = mix(col, water_col, smoothstep(0.35, 1.0, wf));
 
 	// --- PASIR BASAH (tier-menengah): pita gelap+dingin tipis persis di
 	// garis air (sebelum benang air penuh) — ciri pantai/danau sungguhan ---
 	float wet = smoothstep(0.02, 0.14, wf) * (1.0 - smoothstep(0.24, 0.44, wf));
-	col = mix(col, col * vec3(0.60, 0.66, 0.70), wet);
+	float ripple = 0.0;
 
-	// mask air penuh (dipakai refleksi/kilaun/kaustik di bawah)
-	float wm = smoothstep(0.50, 0.90, wf);
-	vec3 vdir = normalize(CAMERA_POSITION_WORLD - wp);
+	// ================= AIR STYLIZED MOBILE =================
+	// RONDE INI: adaptasi shader air "realistic/stylized water" yg dikirim
+	// user (SSR + caustics + player waves + Beer absorption) — TAPI BUKAN
+	// dipasang mentah: versi aslinya punya loop SSR ~100x sample tekstur
+	// per piksel air + screen/depth texture fullscreen copy (JAUH terlalu
+	// berat utk HP mid-range; user sendiri minta balik 60fps smooth).
+	// Yang DIAMBIL semangatnya: buih tepi bergerak, fresnel langit,
+	// serapan kedalaman, gelombang dari pemain. Semua noise tetap 2-oktaf
+	// murah & SELURUH blok dibungkus cabang (wf>0.26) supaya piksel darat
+	// (mayoritas layar saat main) TAK bayar ongkos airnya sama sekali.
+	if (wf > 0.26) {
+		// riak air: 2 lapis noise digeser TIME (reff pake normal-map tekstur;
+		// di sini cukup noise procedural — NOL memory tekstur)
+		ripple = gnoise(wp.xz * 0.05 + vec2(TIME * 0.06, TIME * 0.04))
+			+ gnoise(wp.xz * 0.13 - vec2(TIME * 0.03, TIME * 0.05)) * 0.5;
+		float rx = gnoise(wp.xz * 0.09 + vec2(TIME * 0.10, 0.0)) - 0.5;
+		float rz = gnoise(wp.xz * 0.09 + vec2(0.0, TIME * 0.11)) - 0.5;
+		vec3 vdir = normalize(CAMERA_POSITION_WORLD - wp);
+		float wm = smoothstep(0.50, 0.90, wf);
 
-	// --- KAUSTIK DANGKAL murah: dua irisan noise digeser TIME berlawanan,
-	// dipotong tajam (pita dangkal saja spy danau dalam tak berkilau heboh) ---
-	float c1 = gnoise(wp.xz * 0.30 + vec2(TIME * 0.11, -TIME * 0.08));
-	float c2 = gnoise(wp.xz * 0.30 - vec2(TIME * 0.09,  TIME * 0.10));
-	float caust = pow(clamp(c1 * c2 * 3.2 - 1.05, 0.0, 1.0), 4.0);
-	float shall = smoothstep(0.40, 0.55, wf) * (1.0 - smoothstep(0.60, 0.90, wf));
-	col += vec3(0.82, 0.92, 0.82) * caust * shall * 0.50;
+		// warna air dgn serapan gaya Beer (reff: absorption_color/Beer's
+		// law dgn depth-texture; di dunia datar ini proxy kedalaman = wf —
+		// makin jauh dari bibir air makin dalam; dangkal tembus pasir)
+		float depthish = smoothstep(0.40, 1.0, wf);
+		vec3 water_col = mix(mix(sand_color * 0.78, water_shallow * 1.30, 0.45),
+			mix(water_shallow * 1.30, water_deep, depthish),
+			smoothstep(0.34, 0.52, wf));
+		water_col += ripple * 0.035;
+		col = mix(col, water_col, smoothstep(0.35, 1.0, wf));
 
-	// --- KILAUN MATAHARI di permukaan air (fake spec streak): pantulkan
-	// arah pandang + jitter riak, pangkatkan tajam ke arah matahari ---
-	vec3 Rj = normalize(reflect(-vdir, vec3(0.0, 1.0, 0.0)) + vec3(rx, 0.0, rz) * 2.4);
-	float glint = pow(clamp(dot(Rj, normalize(water_sun_dir)), 0.0, 1.0), 64.0)
-		* (0.55 + 0.45 * gnoise(wp.xz * 0.9 + vec2(TIME * 0.35, -TIME * 0.28)));
-	col += vec3(1.0, 0.85, 0.60) * glint * wm * sun_glint;
+		// --- BUIH TEPi bergerak (reff: edge ripples via depth-texture; di
+		// sini pita wf + garis sinus maju ke darat + putus-putus noise) ---
+		float foam_band = smoothstep(0.30, 0.40, wf) * (1.0 - smoothstep(0.44, 0.62, wf));
+		float fw = sin(wf * 42.0 - TIME * 2.1) * 0.5 + 0.5;
+		float foam = smoothstep(0.45, 0.85, gnoise(wp.xz * 0.42 + vec2(TIME * 0.13, -TIME * 0.10)) * 0.75 + fw * 0.35);
+		col = mix(col, vec3(0.94, 0.97, 0.95), clamp(foam_band * foam * 0.85, 0.0, 1.0));
 
-	// --- REFLEKSI PLANAR (tier-menengah; viewport kamera cermin y=0).
-	// Sampel dilayar: balik sumbu-Y (kamera cermin), distorsi riak, campur
-	// fresnel (makin mendatar sudut pandang makin reflektif, khas air) ---
-	if (reflect_strength > 0.001 && wm > 0.001) {
-		vec2 suv = clamp(vec2(SCREEN_UV.x + rx * 0.06 * wm,
-			(1.0 - SCREEN_UV.y) + (rx + rz) * 0.05 * wm), 0.0, 1.0);
-		vec3 refl = texture(reflect_tex, suv).rgb;
-		float fres = pow(1.0 - clamp(dot(vdir, vec3(0.0, 1.0, 0.0)), 0.0, 1.0), 2.0) * 0.75 + 0.25;
-		col = mix(col, refl, wm * fres * reflect_strength);
+		// --- FRESNEL: mendatar -> memantulkan langit sore krim (pengganti
+		// pantulan planar yg kemarin tak kentara & berat, plus SSR reff yg
+		// terlalu mahal — rasa "air cermin" tetap tercapai lewat tint ini
+		// + kilau matahari di bawah) ---
+		float fres = pow(1.0 - clamp(dot(vdir, vec3(0.0, 1.0, 0.0)), 0.0, 1.0), 3.0);
+		col = mix(col, sky_reflect_color, clamp(fres * wm * 0.65, 0.0, 1.0));
+
+		// --- KAUSTIK DANGKAL murah (diperkuat 0.50 -> 0.85: reff punya
+		// noise opensimplex2 turunan, kita tetap gnoise 2 lapis tapi sengaja
+		// dibikin lebih cerah supaya TERLIHAT di layar kecil HP) ---
+		float c1 = gnoise(wp.xz * 0.30 + vec2(TIME * 0.11, -TIME * 0.08));
+		float c2 = gnoise(wp.xz * 0.30 - vec2(TIME * 0.09,  TIME * 0.10));
+		float caust = pow(clamp(c1 * c2 * 3.2 - 1.05, 0.0, 1.0), 4.0);
+		float shall = smoothstep(0.40, 0.55, wf) * (1.0 - smoothstep(0.60, 0.90, wf));
+		col += vec3(0.82, 0.92, 0.82) * caust * shall * 0.85;
+
+		// --- KILAUN MATAHARI di permukaan air (fake spec streak; ikut
+		// diperkuat krn keluhan "air keliatan nya gk ada perubahan") ---
+		vec3 Rj = normalize(reflect(-vdir, vec3(0.0, 1.0, 0.0)) + vec3(rx, 0.0, rz) * 2.4);
+		float glint = pow(clamp(dot(Rj, normalize(water_sun_dir)), 0.0, 1.0), 64.0)
+			* (0.55 + 0.45 * gnoise(wp.xz * 0.9 + vec2(TIME * 0.35, -TIME * 0.28)));
+		col += vec3(1.0, 0.85, 0.60) * glint * wm * sun_glint;
+
+		// --- GELOMBANG PEMAIN (reff: PLAYER_WAVES) — cincin riak melebar
+		// dari posisi pemain saat masuk air (sungai/danau/laut dangkal);
+		// posisi diset tiap frame dr world.gd _process (uniform biasa, bukan
+		// global shader param spy tak perlu edit ProjectSettings) ---
+		if (wm > 0.001) {
+			float pd = length(wp.xz - player_water_pos);
+			if (pd < 4.5) {
+				float pring = pow(0.5 + 0.5 * sin(pd * 9.0 - TIME * 6.5), 5.0)
+					* (1.0 - smoothstep(1.2, 4.0, pd)) * smoothstep(0.20, 0.75, pd);
+				col += vec3(0.88, 0.95, 0.96) * pring * wm * 0.7;
+			}
+		}
+
+		// --- REFLEKSI PLANAR (NONAKTIF: rigs dimatikan demi 60fps, lihat
+		// komentar WATER_REFLECTION di world.gd; blok dipertahankan supaya
+		// togglenya bisa dihidupkan lagi tanpa sentuh shader) ---
+		if (reflect_strength > 0.001 && wm > 0.001) {
+			vec2 suv = clamp(vec2(SCREEN_UV.x + rx * 0.06 * wm,
+				(1.0 - SCREEN_UV.y) + (rx + rz) * 0.05 * wm), 0.0, 1.0);
+			vec3 refl = texture(reflect_tex, suv).rgb;
+			col = mix(col, refl, wm * clamp(fres * 0.75 + 0.25, 0.0, 1.0) * reflect_strength);
+		}
 	}
+
+	col = mix(col, col * vec3(0.60, 0.66, 0.70), wet);
 
 	ALBEDO = col;
 	// pasir basah jg mengkilap (specular lembut), air tetap paling licin
@@ -903,6 +959,10 @@ func _process(delta: float) -> void:
 	_process_grass_fill_budget()
 	if _grass_mat:
 		_grass_mat.set_shader_parameter("player_pos", Vector2(player.global_position.x, player.global_position.z) if player else Vector2.ZERO)
+	# Posisi pemain jg utk riak gelombang air (shader tanah, uniform
+	# player_water_pos — pajangan balon gelombang kon-ver-tasi reff shader)
+	if _ground_mat:
+		_ground_mat.set_shader_parameter("player_water_pos", Vector2(player.global_position.x, player.global_position.z) if player else Vector2.ZERO)
 
 
 func _tick_daynight(_delta: float) -> void:
