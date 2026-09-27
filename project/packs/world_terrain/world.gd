@@ -27,7 +27,6 @@ signal gen_progress(p: float, t: String)
 const Materials := preload("res://packs/shaders_materials/materials.gd")
 const SKY_SHADER := preload("res://packs/shaders_materials/sky.gdshader")
 const GRASS_SHADER := preload("res://packs/shaders_materials/grass_blade.gdshader")
-const DETAIL_GRASS_TEX := preload("res://packs/shaders_materials/textures/detail_grass.jpg")
 const WALL_SYSTEM := preload("res://packs/world_terrain/wall_system.gd")
 const IslandShape := preload("res://packs/world_terrain/island_shape.gd")
 
@@ -85,7 +84,14 @@ var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 # tak kelihatan nge-pop, PERSIS spt referensi (optimization_by_distance +
 # smoothstep di grass.gdshaderinc mrk) walau implementasi detailnya beda.
 const GRASS_CHUNK_SIZE := 22.0
-const GRASS_CHUNK_INSTANCES := 900
+# PERMINTAAN USER (ronde ini): "kurang tebel, harus bener2 tebel nutupin
+# tanah" — dinaikkan ~4.7x dr percobaan chunk streaming pertama (900,
+# ~1.9 rumpun/m², ternyata jauh lbh jarang drpd sistem lama sblm di-chunk)
+# jadi ~8.7 rumpun/m², SEDIKIT lebih padat dr rekor terpadat sebelumnya
+# (~6.7/m² di sistem "wrap around player" yg sudah dihapus) — kali ini
+# amanteap krn area yg dirender dibatasi radius chunk (bukan seluruh
+# pulau), jadi kepadatan tinggi tak sebanding mahal dgn dunia terbuka penuh.
+const GRASS_CHUNK_INSTANCES := 4200
 const GRASS_RENDER_RADIUS_CHUNKS := 2   # persegi (2*r+1)^2 petak selalu berusaha dimuat
 const GRASS_UNLOAD_RADIUS_CHUNKS := 3   # histeresis: dibongkar hanya kalau LEBIH jauh dr ini
 const GRASS_CHUNK_BUILD_PER_FRAME := 2  # cegah hentakan frame saat byk petak baru sekaligus
@@ -147,12 +153,12 @@ func _make_flat_ground() -> void:
 	add_child(body)
 	_build_grass()
 
-## Lantai RUMPUT LEBAT (ronde-46 bag. C — ganti dari grid biru-putih ala
-## blueprint sebelumnya). Tekstur foto rumput (`detail_grass.jpg`, sudah ada
-## di aset) di-tile di ruang-dunia (bukan UV lokal mesh) supaya polanya diam
-## di tempat walau bidang menyentak mengikuti pemain; ditambah noise petak
-## skala-besar (2 corak hijau) biar tak terasa monoton berulang, lalu diberi
-## shading toon 2-tingkat senada dgn gaya seluruh game.
+## Lantai tanah (ronde-46 bag. C — ganti dari grid biru-putih ala blueprint
+## sebelumnya). PERMINTAAN USER (ronde ini): warna diganti HIJAU TUA POLOS
+## (dulu tekstur foto rumput + noise petak dua-corak, dianggap "ramai"/
+## bersaing visual dgn tuft 3D di atasnya skrg yg sudah jauh lebih tebal) —
+## cuma warna solid senada, diberi shading toon 2-tingkat spt gaya seluruh
+## game, rumput 3D chunk streaming yg kasih semua detail/tekstur visualnya.
 ##
 ## BAG. C LANJUTAN (permintaan user: "pulau 12km, bukan bulat bukan kotak,
 ## dikelilingi laut"): shader yg SAMA ini (mesh tanah tetap SATU bidang
@@ -168,19 +174,12 @@ func _make_ground_material() -> ShaderMaterial:
 	sh.code = """
 shader_type spatial;
 render_mode cull_back, depth_draw_opaque;
-uniform sampler2D grass_tex : filter_linear_mipmap, repeat_enable;
-// PERBAIKAN (laporan user: rumput 3D tuft di sekitar pemain kelihatan
-// terang normal, tapi begitu lewat radius muat petak rumput jadi HITAM
-// PEKAT kayak jurang — bukan bug culling/posisi spt dikira sebelumnya,
-// ternyata cuma tanah DATAR ini (dipakai di LUAR area tuft 3D) albedo-nya
-// jauh lebih gelap drpd material rumput 3D (grass_blade.gdshader) di bawah
-// pencahayaan malam yg sama -> beda kecerahan ~3-4x, kelihatan spt tebing
-// tajam di batas radius rumput. tint_a/tint_b & pengali dinaikkan supaya
-// kecerahan tanah datar SEPADAN dgn tuft 3D, jurang gelapnya hilang.
-uniform vec3 tint_a : source_color = vec3(0.17, 0.36, 0.16);  // corak gelap
-uniform vec3 tint_b : source_color = vec3(0.26, 0.48, 0.21);  // corak terang
-uniform float tex_scale = 0.35;    // kerapatan ulang tekstur foto (per meter)
-uniform float patch_scale = 0.02;  // skala noise petak corak besar
+// PERMINTAAN USER (ronde ini): tanah jadi HIJAU TUA POLOS (bukan lagi
+// tekstur foto rumput + noise petak dua-corak) — rumput 3D tuft chunk
+// streaming yg SKRG jauh lebih tebal (world.gd GRASS_CHUNK_INSTANCES) yg
+// bertugas kasih detail/tekstur visual; tanah di baliknya cukup warna
+// solid senada spy menyatu, bukan malah "ramai" bersaing dgn tuft di atas.
+uniform vec3 ground_color : source_color = vec3(0.05, 0.16, 0.06);
 uniform float shadow_tint : hint_range(0.0, 1.0) = 0.50;
 uniform float mid_tint : hint_range(0.0, 1.0) = 0.82;
 // --- Pulau/laut (IslandShape, disalin manual dr island_shape.gd) ---
@@ -222,10 +221,7 @@ float water_factor(vec2 p) {
 void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 
 void fragment() {
-	vec3 tex = texture(grass_tex, wp.xz * tex_scale).rgb;
-	float patch = gnoise(wp.xz * patch_scale);
-	vec3 tint = mix(tint_a, tint_b, patch);
-	vec3 land_col = tex * tint * 3.0;
+	vec3 land_col = ground_color;
 
 	float wf = water_factor(wp.xz);
 	// riak air sederhana & MURAH (2 lapis noise digeser TIME, bukan
@@ -252,7 +248,6 @@ void light() {
 }
 """
 	mat.shader = sh
-	mat.set_shader_parameter("grass_tex", DETAIL_GRASS_TEX)
 	return mat
 
 ## Tumpuk rumput 3D dekat pemain (MultiMesh, 1 draw call) — bag. "lebat" dari
@@ -371,7 +366,9 @@ func _build_grass_blade_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var h := 0.46
-	var w := 0.065
+	# Lebar dinaikkan sedikit (permintaan "bener2 tebel nutupin tanah") biar
+	# celah antar rumpun makin tersamar sekalipun kepadatan sudah dinaikkan.
+	var w := 0.085
 	var lean := 0.10
 	const BLADE_N := 5
 	for i in range(BLADE_N):
