@@ -599,6 +599,17 @@ func _check_world_ground_fog() -> void:
 	# _build_grass() sengaja membangun petak ASAL (0,0) SEKARANG JUGA (lihat
 	# komentarnya) — jadi minimal SATU chunk harus ada di sini walau tanpa
 	# pemain sama sekali, sama spt jaminan versi lama.
+	# RONDE-INI (permintaan user: "buat tanpa rumput Dunia nya"): rumput
+	# prosedural GrassChunk_* DIMATIKAN permanen (world.gd PROC_GRASS=false).
+	# Rumput kini ditaruh MANUAL via katalog Build Mode (cek keberadaannya di
+	# fase 1f: entri Grass_Common_Tall dkk valid). Verifikasi rumput lama di
+	# bawah hanya jalan kalau fitur ini suatu hari diaktifkan-balik — sengaja
+	# TIDAK dihapus, supaya bendera const tak bisa di-flip diam2 tanpa jejak.
+	if not bool(world.get("grass_enabled")):
+		print("[fire-check] rumput prosedural NONAKTIF (keputusan user, ronde ini — dunia 1km flat) — cek GrassChunk_* dilewati")
+		world.queue_free()
+		await process_frame
+		return
 	var grass: MultiMeshInstance3D = null
 	for c in world.get_children():
 		if c is MultiMeshInstance3D and String(c.name).begins_with("GrassChunk_"):
@@ -719,6 +730,59 @@ func _check_build_mode() -> void:
 		_fail("road terkunci tidak tercatat (butir 4)")
 	elif not bool(rb.call("delete_at", Vector3(6, 0, 3))) or rb.get("roads").size() != 0:
 		_fail("road delete_at() gagal menghapus jalan (butir 5)")
+	# (d2) RONDE-INI: jalan MULUS (handle Catmull-Rom otomatis), rumput
+	# dekat jalan ikut bersih, calon-objek pending→OK→Reverse (undo), dan
+	# ambil-objek (pickup) lewat API calon. Ini semua fitur permintaan user
+	# ronde ini — smoke-test runtime SUNGGUHAN, bukan kode-mati.
+	rb.call("add_point", Vector3(0, 0, 0))
+	rb.call("add_point", Vector3(8, 0, 0))
+	rb.call("add_point", Vector3(8, 0, 8))
+	var acurve: Curve3D = rb.get("active_curve")
+	if acurve == null:
+		_fail("kelokan jalan: active_curve hilang sesudah add_point")
+	elif acurve.get_point_out(1).length() < 0.05:
+		_fail("kelokan jalan TAK mulus: handle Catmull-Rom titik tengah nol (jalan kasar lagi?)")
+	# rumput di DEKAT jalur akan dibersihkan oleh _on_finish_road
+	placer.call("place", Vector3(4, 0, 0.5), "Grass_Common_Tall")
+	# pohon JAUH tu tetap utuh (bukan cover, jarak juga jauh)
+	placer.call("place", Vector3(100, 0, 100), "CommonTree_1")
+	var objs_pre := placer.get("objects").size()
+	bm.call("_on_finish_road")
+	if rb.get("roads").size() != 1:
+		_fail("finish_road: jalan tak terkunci saat memakai alur tombol manager")
+	elif placer.get("objects").size() != objs_pre - 1:
+		_fail("rumput dekat jalan tak ikut bersih (sisa=%d, sebelum=%d)" % [placer.get("objects").size(), objs_pre])
+	elif not bool(rb.call("delete_at", Vector3(2, 0, 0))):
+		_fail("road delete_at giliran setelah finish manager gagal")
+	# (d3) calon-objek: spawn → geser → OK → kembali lewat tombol Reverse
+	if not bool(placer.call("spawn_pending", Vector3(20, 0, 20))):
+		_fail("spawn_pending gagal membuat calon objek (mode taruh)")
+	elif not bool(placer.call("has_pending")):
+		_fail("has_pending palsu sesudah spawn_pending")
+	placer.call("move_pending", Vector3(21, 0, 22))
+	bm.call("_on_ok_pending")
+	if bool(placer.call("has_pending")):
+		_fail("calon objek tak disahkan bersih sesudah tombol OK")
+	elif placer.get("objects").size() != objs_pre:   # objek baru terbalik menggantikan rumput yg terhapus
+		_fail("objek sah tak tercatat setelah drag+OK (sisa=%d)" % placer.get("objects").size())
+	bm.call("undo")
+	if placer.get("objects").size() != objs_pre - 1:
+		_fail("Reverse/undo tak mengambil balik objek sah (sisa=%d)" % placer.get("objects").size())
+	# (d4) ambil-balik objek lama (pickup → batal → pulang ke asal)
+	var tree_pos := Vector3(100, 0, 100)
+	if not bool(placer.call("pickup_at", tree_pos)):
+		_fail("pickup_at (tahan-lama) gagal mengangkat objek tertanam")
+	elif not bool(placer.call("has_pending")):
+		_fail("objek terangkat tak berstatus calon")
+	placer.call("cancel_pending")
+	if bool(placer.call("has_pending")):
+		_fail("BATAL calon-angkat gagal dibersihkan")
+	elif placer.get("objects").size() != objs_pre - 1:
+		_fail("objek terangkat tak pulang ke daftar (sisa=%d)" % placer.get("objects").size())
+	if _exit_code != 0:
+		world.queue_free()
+		hud_node.queue_free()
+		return
 	# (e) save/load round-trip via BuildSaveLoad static (butir 6) — pakai
 	# berkas uji terpisah (param path) supaya tak menyentuh save pemain.
 	placer.call("place", Vector3(3, 0, 3), "CommonTree_1")

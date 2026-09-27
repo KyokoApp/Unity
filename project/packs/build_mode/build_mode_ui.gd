@@ -30,6 +30,7 @@ var rotate_btn: Button
 var level_label: Label
 var width_label: Label
 var width_slider: HSlider
+var pending_row: HBoxContainer  # baris OK/BATAL calon objek (ronde ini: teken-lama geser, lalu OK)
 var joy_control: Control      # mini joystick khusus build (BuildJoyControl)
 var _clear_armed := false     # konfirmasi 2x-tap utk "Hapus SEMUA"
 var _status_t := 0.0
@@ -95,10 +96,18 @@ func _build_layout() -> void:
 	pages["road"] = _build_page_road(pages_root)
 	pages["delete"] = _build_page_delete(pages_root)
 
-	# --- baris aksi bawah: Simpan / Muat / Tutup ---
+	# --- baris aksi bawah: Reverse / Simpan / Muat / Tutup ---
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", 8)
 	vb.add_child(bar)
+	# Tombol REVERSE (permintaan user): mengambil kembali aksi terakhir —
+	# objek yang sdh ditaruh bisa diambil lagi lewat ini (utuh 1 tumpukan
+	# LIFO utk semua aksi bangun: taruh objs, tile, jalan, hapus, dsb).
+	var bundo := _make_button("↶ Reverse", Color(0.46, 0.38, 0.26), Color(0.16, 0.13, 0.07))
+	bundo.custom_minimum_size = Vector2(0, MIN_TOUCH)
+	bundo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bundo.pressed.connect(func(): _call("undo"))
+	bar.add_child(bundo)
 	var bsave := _make_button("Simpan", Color(0.30, 0.42, 0.30), Color(0.10, 0.14, 0.10))
 	bsave.custom_minimum_size = Vector2(0, MIN_TOUCH)
 	bsave.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -183,8 +192,25 @@ func _build_page_place(root: Control) -> Control:
 	scale_slider.value_changed.connect(func(v): _call("scale_changed", v))
 	row2.add_child(scale_slider)
 
+	# Baris konfirmasi CALON OBJEK: muncul hanya saat ada calon di lapangan
+	# (spawn dr tap / angkat dr tahan-lama) — geser pindah terus, pas udah
+	# pas baru tekan OK (permintaan user, ronde ini).
+	pending_row = HBoxContainer.new()
+	pending_row.add_theme_constant_override("separation", 8)
+	pending_row.visible = false
+	page.add_child(pending_row)
+	var bok := _make_button("✔ OK — Simpan Posisi", Color(0.30, 0.50, 0.30), Color(0.10, 0.16, 0.10))
+	bok.custom_minimum_size = Vector2(0, MIN_TOUCH)
+	bok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bok.pressed.connect(func(): _call("ok_pending"))
+	pending_row.add_child(bok)
+	var bno := _make_button("✖ BATAL", Color(0.48, 0.28, 0.24), Color(0.15, 0.08, 0.06))
+	bno.custom_minimum_size = Vector2(120, MIN_TOUCH)
+	bno.pressed.connect(func(): _call("cancel_pending"))
+	pending_row.add_child(bno)
+
 	var hint := Label.new()
-	hint.text = "Tap tanah = pasang/pilih objek • tombol besar bawah: simpan/muat"
+	hint.text = "Tap tanah = bikin calon • geser (tahan drag) • OK simpan • tombol ↶ Reverse: ambil aksi terakhir"
 	hint.add_theme_font_size_override("font_size", 15)
 	hint.modulate = Color(1, 1, 1, 0.65)
 	page.add_child(hint)
@@ -280,7 +306,7 @@ func _build_page_road(root: Control) -> Control:
 	row2.add_child(bcancel)
 
 	var hint := Label.new()
-	hint.text = "Tiap tap tanah = titik curve baru; 'Selesai' kunci jalan lalu bisa mulai baru"
+	hint.text = "Tiap tap tanah = titik curve baru (kelokan OTOMATIS mulus) • rumput dekat jalan ikut bersih saat dikunci"
 	hint.add_theme_font_size_override("font_size", 15)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.modulate = Color(1, 1, 1, 0.65)
@@ -370,6 +396,11 @@ func set_level_text(lv: int) -> void:
 
 func set_width_text(w: float) -> void:
 	width_label.text = "Lebar: %.2f m" % w
+
+## Tampilkan/sembunyikan baris OK/BATAL calon objek (dipanggil manager).
+func set_pending_visible(v: bool) -> void:
+	if pending_row:
+		pending_row.visible = v
 
 ## ---------- util ----------
 

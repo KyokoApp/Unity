@@ -286,3 +286,19 @@
   arah, sudut — BUKAN free-sculpt); Road Path3D/Curve3D + mesh prosedural
   SurfaceTool dgn tombol Selesai/Kunci; Delete; Save/Load JSON di
   `user://build_map.json` dgn auto-load + autosave-saat-keluar.
+
+## Ronde-2026-09-27 (sore 2): Optimalisasi & UX Build Mode (permintaan user)
+
+- **Dunia diperkecil 3km→1km** (`island_shape.gd` RADIUS 1500→460; sungai
+  dipendekkan & kelakunya dipelankan; konstanta duplikat GLSL di shader
+  tanah+rumput disamakan). Ukuran pla(l)tan: PlaneMesh 1600→1400m.
+- **Rumput prosedural DIMATIKAN permanen** (`world.gd PROC_GRASS=false`) —
+  perf terbesar ronde ini; rumput = objek manual katalog (Grass_Common_Tall
+  dkk, Quaternius CC0 yg sama). Jalan BARU membersihkan rumput/objek cover
+  (entri "cover" di katalog) di dekat jalurnya saat dikunci "Selesai".
+- Mode Bangun: kamera **top-down SMOOTH + karakter disembunyikan**; drag
+  satu jari = **pan peta**, joystick build = pan (bukan gerak); bentuk jalan
+  **Catmull-Rom smooth otomatis**; penempatan objek: tap=calon, digeser
+  (tahan-drag), tombol **OK** utk sahkan, tombol **BATAL**; tombol **↶
+  Reverse** mengurungkan aksi terakhir (tumpukan LIFO untuk objek/tile/
+  jalan/unduh-hapus); objek "small" tanpa bayangan (ringan).

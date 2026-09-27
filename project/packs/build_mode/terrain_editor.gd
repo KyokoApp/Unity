@@ -25,6 +25,8 @@ var current_item := 0         # 0=datar, 1=miring, 2=sudut
 var rot_idx := 0              # 0..3 = putaran 90 derajat searah jarum jam
 var build_level := 0          # level Y sel target (atas-bawah bukit)
 var cells_changed := {}       # Vector3i -> {item, rot} utk save/load cepat
+var last_placed := {}         # {cell, prev} — prev {item,rot} sel lama|{} kosong (utk undo manager)
+var last_erased := {}         # {cell,item,rot} — sel terakhir terhapus (utk undo manager)
 
 const CELL := Vector3(2.0, 1.0, 2.0)   # ukuran sel GridMap (m)
 const ITEM_FLAT := 0
@@ -136,18 +138,48 @@ func set_level(l: int) -> int:
 	build_level = clampi(l, -4, 16)
 	return build_level
 
-## Tap di tanah (world_pos raycast manager): hitung sel GridMap, pasang/
-## ganti tile di sel itu dengan item+rotasi sekarang.
-func place_at(world_pos: Vector3) -> bool:
-	if gridmap == null:
-		return false
+## Koordinat sel GridMap utk world_pos (sel XZ dr posisi, level dr UI).
+func _cell_of(world_pos: Vector3) -> Vector3i:
 	var local := gridmap.to_local(world_pos)
 	# sel XZ dari posisi, level Y dari pilihan UI (bukan dari tinggi tap,
 	# supaya bukit bertingkat tetap intuitif dikontrol)
-	var cell := Vector3i(int(floor(local.x / CELL.x)), build_level, int(floor(local.z / CELL.z)))
+	return Vector3i(int(floor(local.x / CELL.x)), build_level, int(floor(local.z / CELL.z)))
+
+## Isi sel sekarang (utk catatan undo) — {} bila kosong.
+func state_at_cell(cell: Vector3i) -> Dictionary:
+	if gridmap == null:
+		return {}
+	var item := gridmap.get_cell_item(cell)
+	if item == GridMap.INVALID_CELL_ITEM:
+		return {}
+	return {"item": item, "rot": gridmap.get_cell_item_orientation(cell)}
+
+## Tap di tanah (world_pos raycast manager): hitung sel GridMap, pasang/
+## ganti tile di sel itu dengan item+rotasi sekarang. Sebelum menimpa,
+## sel LAMA dicatat ke last_placed supaya aksi ini bisa di-undo manager.
+func place_at(world_pos: Vector3) -> bool:
+	if gridmap == null:
+		return false
+	var cell := _cell_of(world_pos)
+	last_placed = {"cell": cell, "prev": state_at_cell(cell), "item": current_item, "rot": _orientation()}
 	gridmap.set_cell_item(cell, current_item, _orientation())
 	cells_changed[cell] = {"item": current_item, "rot": _orientation()}
 	return true
+
+## Pasang sel EKSPLISIT (undo "tile place" dg prev != kosong / "tile del").
+func set_cell_explicit(cell: Vector3i, item: int, rot: int) -> void:
+	if gridmap == null:
+		return
+	gridmap.set_cell_item(cell, item, rot)
+	cells_changed[cell] = {"item": item, "rot": rot}
+
+## Kosongkan sel (undo "tile place" dg prev kosong).
+func clear_cell(cell: Vector3i) -> void:
+	if gridmap == null:
+		return
+	if gridmap.get_cell_item(cell) != GridMap.INVALID_CELL_ITEM:
+		gridmap.set_cell_item(cell, GridMap.INVALID_CELL_ITEM)
+	cells_changed.erase(cell)
 
 ## Delete mode: hapus tile di sel yg disentuh (level ikut yg sekarang;
 ## kalau kosong, coba level di bawah/atas 1 — bukit jarang rata).
@@ -161,6 +193,8 @@ func delete_at(world_pos: Vector3) -> bool:
 	for l in levels:
 		var cell := Vector3i(cx, l, cz)
 		if gridmap.get_cell_item(cell) != GridMap.INVALID_CELL_ITEM:
+			# catatan utk undo (manager): apa yg tepat dihapus
+			last_erased = {"cell": cell, "item": gridmap.get_cell_item(cell), "rot": gridmap.get_cell_item_orientation(cell)}
 			gridmap.set_cell_item(cell, GridMap.INVALID_CELL_ITEM)
 			cells_changed.erase(cell)
 			return true

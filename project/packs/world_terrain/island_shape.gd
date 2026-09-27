@@ -1,8 +1,8 @@
 extends RefCounted
 class_name IslandShape
-## Bentuk pulau (permintaan user, ronde ini: "map nya ubah jadi ukuran 3km x
-## 3km") — SEBELUMNYA ~12km (RADIUS=6000), sekarang RADIUS=1500 (~3km
-## diameter). Garis pantai "alami" dibentuk dari jumlah beberapa gelombang
+## Bentuk pulau (permintaan user, ronde ini: "world perkecil ukuran nya jadi
+## 1km x 1km") — SEBELUMNYA 3km (RADIUS=1500), sekarang RADIUS=460 (~1km
+## diameter tipikal ± harmonik pantai). Garis pantai "alami" dibentuk dari jumlah beberapa gelombang
 ## sinus (harmonik) pada sudut (theta) di sekeliling pusat pulau, bukan noise
 ## acak biasa. Sengaja pakai sinus (bukan Perlin/noise texture) supaya
 ## RUMUS YANG SAMA PERSIS gampang disalin manual ke GLSL (grass_blade.gdshader
@@ -20,7 +20,7 @@ class_name IslandShape
 ## gampang disalin ke GLSL persis spt formula pantai. Sungai dibuat berkelok
 ## lewat 1 gelombang sinus tegak lurus arah alirannya (bukan garis lurus kaku).
 
-const RADIUS := 1500.0          # radius dasar sblm dibengkokkan harmonik (~3km diameter)
+const RADIUS := 460.0           # radius dasar sblm dibengkokkan harmonik (~1km diameter)
 const BEACH_WIDTH := 55.0       # lebar pita pasir/transisi darat->air (pantai laut)
 const COAST_MARGIN := 30.0      # pemain berhenti sekian meter SEBELUM garis air penuh
 
@@ -40,11 +40,11 @@ const LAKE_BANK := 14.0
 # (v = offset menyamping).
 const RIVER_DIR := Vector2(0.784, 0.621)      # ~satuan, arah: dari danau menjauhi pusat spawn ke laut
 const RIVER_START := Vector2(142.04, 112.26)  # = LAKE_CENTER + RIVER_DIR*LAKE_RADIUS (tepi danau)
-const RIVER_LENGTH := 1600.0                   # lbh dr cukup utk tembus garis pantai (coast ~1.5km) di arah ini
+const RIVER_LENGTH := 620.0                    # lbh dr cukup utk tembus garis pantai (coast ~460m) di arah ini
 const RIVER_HALF_WIDTH := 18.0
 const RIVER_BANK := 10.0                       # lebar transisi tepi sungai
-const RIVER_MEANDER_AMP := 55.0                # sejauh apa sungai berkelok menyamping
-const RIVER_MEANDER_FREQ := 0.006              # makin kecil = kelokan makin lebar/landai
+const RIVER_MEANDER_AMP := 16.0                # sejauh apa sungai berkelok menyamping
+const RIVER_MEANDER_FREQ := 0.008              # makin kecil = kelokan makin lebar/landai
 
 ## Jarak dari pusat pulau (world XZ) sampai batas pantai, pada sudut theta
 ## (radian, dari atan2(z, x)). Hasil > jarak ini = laut.

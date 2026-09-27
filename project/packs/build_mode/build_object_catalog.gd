@@ -59,6 +59,23 @@ func populate() -> void:
 		entries.append({"id": "Prim_Tree", "label": "Pohon*", "path": "", "tint": Color(0.42, 0.62, 0.38)})
 		entries.append({"id": "Prim_Rock", "label": "Batu*", "path": "", "tint": Color(0.55, 0.56, 0.58)})
 
+## Entri ditandai "small" (rumput/bunga/kerikil...) → bayangan dimatikan
+## saat di-place (optimalisasi: tebaran ratusan objek tetap 60fps).
+func is_small(id: String) -> bool:
+	for e in entries:
+		if e["id"] == id:
+			return bool(e.get("small", false))
+	return false
+
+## Daftar id "cover" (penutup tanah): rumput/pakis/bunga/jamur dkk —
+## dibersihkan otomatis dekat jalan baru (permintaan user ronde ini).
+func cover_ids() -> Dictionary:
+	var out := {}
+	for e in entries:
+		if bool(e.get("cover", false)):
+			out[String(e["id"])] = true
+	return out
+
 ## Ambil PackedScene utk id (cache). Model primitif dibuat prosedural.
 func get_scene(id: String) -> PackedScene:
 	if _scene_cache.has(id):

@@ -19,10 +19,13 @@ var active_curve: Curve3D = null   # curve yg sedang digambar (null = antar-road
 var active_path: Path3D = null
 var active_mesh: MeshInstance3D = null
 var roads: Array = []              # [{points:[Vector3], width, path, mesh}]
+var last_baked := PackedVector3Array()   # titik sampel curve jalan YG TERAKHIR dikunci (permintaan bersih rumput dekat jalan)
+var last_deleted := {}            # rekaman road terakhir yg di-delete_at (utk undo manager)
 var _material: StandardMaterial3D
 
 const ROAD_Y := 0.055              # tinggi visual jalan di atas tanah (anti z-fight)
-const BAKE_STEP := 0.9             # rapat sampel curve (m/pasangan segitiga)
+const BAKE_STEP := 0.45            # rapat sampel curve (m/pasangan segitiga) — 2x rapat spy kelokan jalan tampak HALUS (permintaan user)
+const SMOOTH_T := 0.24             # tegangan Catmull-Rom handle (0..0.5) — makin besar makin melengkung
 
 func setup(p_world: Node3D) -> void:
 	world = p_world
@@ -59,6 +62,10 @@ func add_point(world_pos: Vector3) -> void:
 		active_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		active_path.add_child(active_mesh)
 	active_curve.add_point(Vector3(world_pos.x, 0.0, world_pos.z))
+	# Permintaan user (ronde ini): "setiap buat jalan bentuk jalannya buat
+	# lebih smooth, jangan kasar" — pasang HANDLE Catmull-Rom otomatis di
+	# semua titik tiap kali bertambah (bukan garis zig-zag kaku antar tap).
+	_smooth_curve(active_curve)
 	if active_curve.point_count >= 2:
 		_rebuild_mesh(active_curve, active_mesh, road_width)
 
@@ -69,12 +76,54 @@ func finish() -> bool:
 	var pts: Array = []
 	for i in active_curve.point_count:
 		pts.append(active_curve.get_point_position(i))
+	last_baked = active_curve.get_baked_points()   # sampel halus akhir (utk bersih rumput di sekitar jalan)
 	active_path.name = "Road_%d" % roads.size()
 	roads.append({"points": pts, "width": road_width, "path": active_path, "mesh": active_mesh})
 	active_curve = null
 	active_path = null
 	active_mesh = null
 	return true
+
+## Kelokan mulus Catmull-Rom: tiap titik dapat handle in/out simetris
+## sebanding selisih kedua tetangga (t*SMOOTH_T). Titik ujung pakai arah
+## satu tetangga — selalu diselesaikan ulang (idempoten) tiap add_point /
+## restore spy bentuk jalan TERBATAS halus kaya melengkung, tak "kasar".
+func _smooth_curve(c: Curve3D) -> void:
+	var n := c.point_count
+	for i in n:
+		var pa := c.get_point_position(maxi(i - 1, 0))
+		var pb := c.get_point_position(mini(i + 1, n - 1))
+		var t := (pb - pa) * SMOOTH_T
+		t.y = 0.0
+		c.set_point_in(i, -t)
+		c.set_point_out(i, t)
+
+## Kembalikan jalan dari rekaman {points, width} (undo delete / bukan
+## load-penuh — restore() di bawah selalu clear_all dulu).
+func restore_road(rec: Dictionary) -> void:
+	var saved_width := road_width
+	road_add_points(rec.get("points", []), float(rec.get("width", 3.0)))
+	road_width = saved_width
+
+## Tambahkan jalan penuh dari array titik Vector3; dipakai restore_road.
+func road_add_points(raw_points: Array, w: float) -> void:
+	road_width = clampf(w, 1.5, 8.0)
+	for p in raw_points:
+		if p is Vector3:
+			add_point(p)
+	finish()
+
+## Undo penarikan jalan: hapus road yg path-node-nya sama (node unik per
+## road → aman walau urutan berubah; LIFO manager menjaga kontraksi).
+func remove_by_node(path_node: Node3D) -> bool:
+	for i in roads.size():
+		if roads[i]["path"] == path_node:
+			var r: Dictionary = roads[i]
+			if is_instance_valid(r["path"]):
+				r["path"].queue_free()
+			roads.remove_at(i)
+			return true
+	return false
 
 ## Batalkan draft curve aktif tanpa menyimpan (mis. salah taruh).
 func cancel_draft() -> void:
@@ -99,6 +148,7 @@ func delete_at(world_pos: Vector3) -> bool:
 	# toleransi: setengah lebar jalan + sedikit
 	if best >= 0 and bd <= float(roads[best]["width"]) * 0.5 + 2.0:
 		var r: Dictionary = roads[best]
+		last_deleted = {"points": r["points"].duplicate(), "width": float(r["width"]), "path": r["path"]}
 		if is_instance_valid(r["path"]):
 			r["path"].queue_free()
 		roads.remove_at(best)

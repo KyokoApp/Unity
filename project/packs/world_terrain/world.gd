@@ -1,7 +1,7 @@
 extends Node3D
 ## World: PULAU DATAR ~12km bergaya sihir open-world (ronde-46, pivot balik
 ## dari game tank ke tema penyihir anime). Visual tanah TETAP satu bidang
-## datar (PlaneMesh 1600m) yg mengikuti pemain scr visual (collider bidang
+## datar (PlaneMesh 1400m) yg mengikuti pemain scr visual (collider bidang
 ## WorldBoundaryShape3D tetap tak berujung scr FISIK — POLA SEDERHANA, bukan
 ## trimesh ⇒ is_on_floor() engine selalu benar) — TAPI skrg dunia scr LOGIS
 ## dibatasi jadi pulau (lihat island_shape.gd: garis pantai "alami" dari
@@ -64,12 +64,23 @@ var _ground_mat: ShaderMaterial  # material tanah+air (dipakai set param refleks
 # besok mau dicoba lagi tinggal ubah const ini = true; shader sudah siap
 # pasang (reflect_strength/refl_tex diparametrikan dari _setup di bawah).
 const WATER_REFLECTION := false
+# RUMPUT PROSEDURAL DIMATIKAN (permintaan user, ronde ini: "buat tanpa
+# rumput Dunia nya, jadi kita bisa nambah rumput dari tambahan objek"):
+# tak ada lagi petak MultiMesh GrassChunk_*/tuft perlin live-render — dunia
+# "tandus hijau murni shader tanah" & rumput ditaruh MANUAL lewat katalog
+# Build Mode (Grass_Common_Tall dkk). Sebagai bonus: INI optimasi terbesar
+# ronde ini — chunk-streaming rumput ~5400 instans/petak tak lagi ada, HP
+# mid-range bernapas utk target 60fps. Arsitektur chunk DIBIARKAN utuh di
+# bawah (tinggal ubah const balik = true) karena jalannya sudah teruji.
+const PROC_GRASS := false
+## Bendera runtime dibaca probe CI (const tak bisa di-get() dari instance).
+var grass_enabled: bool = PROC_GRASS
 var _refl_vp: SubViewport
 var _refl_cam: Camera3D
 var _refl_ground: MeshInstance3D
 var _refl_tick := 0
 var wall_system: Node3D       # reruntuhan/dinding batu destructible — rintangan & pemandangan dunia
-const GROUND_SIZE := 1600.0
+const GROUND_SIZE := 1400.0   # ~1km pulau + tepi laut (ronde ini: perkecil dunia)
 var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 
 # ---------------- rumput lebat di sekitar pemain (ronde-46 bag. C) ----------------
@@ -202,7 +213,7 @@ func _setup_build_mode() -> void:
 
 ## Bidang datar tak berbatas: SATU collider WorldBoundary (bidang y=0, normal
 ## atas) — tak ada tepi, tak ada trimesh, is_on_floor() engine selalu konstan.
-## Visual: PlaneMesh 1600m yang menyentak digeser bersama pemain; pola tanah
+## Visual: PlaneMesh 1400m yang menyentak digeser bersama pemain; pola tanah
 ## memakai UV RUANG-DUNIA sehingga gerakan tampak mulus.
 func _make_flat_ground() -> void:
 	_ground = MeshInstance3D.new()
@@ -222,7 +233,8 @@ func _make_flat_ground() -> void:
 	col.shape = WorldBoundaryShape3D.new()  # bidang tak terbatas y=0, normal +Y
 	body.add_child(col)
 	add_child(body)
-	_build_grass()
+	if PROC_GRASS:
+		_build_grass()   # permintaan user: dunia tanpa rumput otomatis
 
 ## Rig refleksi planar (dipanggil sekali dari _make_flat_ground). Bidang
 ## air DUNIA sama dgn darat (bidang y=0), jd cermin yg tepat = bidang y=0
@@ -378,7 +390,7 @@ float gnoise(vec2 p) {
 
 // island_shape.gd IslandShape.radius_at() -- HARUS SAMA PERSIS (lihat
 // komentar di island_shape.gd kalau ubah salah satu, ubah keduanya).
-const float ISLAND_RADIUS = 1500.0;
+const float ISLAND_RADIUS = 460.0;
 const float BEACH_WIDTH = 55.0;
 float island_radius_at(float theta) {
 	return ISLAND_RADIUS * (1.0
@@ -402,11 +414,11 @@ const float LAKE_RADIUS = 60.0;
 const float LAKE_BANK = 14.0;
 const vec2 RIVER_DIR = vec2(0.784, 0.621);
 const vec2 RIVER_START = vec2(142.04, 112.26);
-const float RIVER_LENGTH = 1600.0;
+const float RIVER_LENGTH = 620.0;
 const float RIVER_HALF_WIDTH = 18.0;
 const float RIVER_BANK = 10.0;
-const float RIVER_MEANDER_AMP = 55.0;
-const float RIVER_MEANDER_FREQ = 0.006;
+const float RIVER_MEANDER_AMP = 16.0;
+const float RIVER_MEANDER_FREQ = 0.008;
 float lake_factor(vec2 p) {
 	float d = length(p - LAKE_CENTER);
 	return clamp((LAKE_RADIUS - d) / LAKE_BANK, 0.0, 1.0);
@@ -993,17 +1005,18 @@ func _process(delta: float) -> void:
 	# betul2 PINDAH petak (bukan tiap frame, murah), tapi antrean
 	# pembangunan petak baru tetap dicicil tiap frame (budget kecil) biar
 	# tak menghentak. player_pos dikirim tiap frame spy fade jarak halus.
-	if player:
-		var pcx := int(floor(player.global_position.x / GRASS_CHUNK_SIZE))
-		var pcz := int(floor(player.global_position.z / GRASS_CHUNK_SIZE))
-		var pchunk := Vector2i(pcx, pcz)
-		if pchunk != _grass_last_chunk:
-			_grass_last_chunk = pchunk
-			_update_grass_chunks(pchunk)
-	_process_grass_chunk_queue()
-	_process_grass_fill_budget()
-	if _grass_mat:
-		_grass_mat.set_shader_parameter("player_pos", Vector2(player.global_position.x, player.global_position.z) if player else Vector2.ZERO)
+	if PROC_GRASS:
+		if player:
+			var pcx := int(floor(player.global_position.x / GRASS_CHUNK_SIZE))
+			var pcz := int(floor(player.global_position.z / GRASS_CHUNK_SIZE))
+			var pchunk := Vector2i(pcx, pcz)
+			if pchunk != _grass_last_chunk:
+				_grass_last_chunk = pchunk
+				_update_grass_chunks(pchunk)
+		_process_grass_chunk_queue()
+		_process_grass_fill_budget()
+		if _grass_mat:
+			_grass_mat.set_shader_parameter("player_pos", Vector2(player.global_position.x, player.global_position.z) if player else Vector2.ZERO)
 	# Posisi pemain jg utk riak gelombang air (shader tanah, uniform
 	# player_water_pos — pajangan balon gelombang kon-ver-tasi reff shader)
 	if _ground_mat:

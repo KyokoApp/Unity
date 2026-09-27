@@ -81,7 +81,7 @@ uniform float trample_radius : hint_range(0.1, 5.0) = 1.3;
 // Rumput TAK BOLEH tumbuh di pasir/laut/danau/sungai. Rumus disalin manual
 // dr island_shape.gd (IslandShape) & dr shader tanah di world.gd — WAJIB
 // disamakan kalau salah satu diubah (lihat komentar di island_shape.gd).
-const float ISLAND_RADIUS = 1500.0;
+const float ISLAND_RADIUS = 460.0;
 const float BEACH_WIDTH = 55.0;
 float island_radius_at(float theta) {
 	return ISLAND_RADIUS * (1.0
@@ -103,11 +103,11 @@ const float LAKE_RADIUS = 60.0;
 const float LAKE_BANK = 14.0;
 const vec2 RIVER_DIR = vec2(0.784, 0.621);
 const vec2 RIVER_START = vec2(142.04, 112.26);
-const float RIVER_LENGTH = 1600.0;
+const float RIVER_LENGTH = 620.0;
 const float RIVER_HALF_WIDTH = 18.0;
 const float RIVER_BANK = 10.0;
-const float RIVER_MEANDER_AMP = 55.0;
-const float RIVER_MEANDER_FREQ = 0.006;
+const float RIVER_MEANDER_AMP = 16.0;
+const float RIVER_MEANDER_FREQ = 0.008;
 float lake_factor(vec2 p) {
 	float d = length(p - LAKE_CENTER);
 	return clamp((LAKE_RADIUS - d) / LAKE_BANK, 0.0, 1.0);

@@ -476,7 +476,64 @@ func add_look_px(dx: float, dy: float) -> void:
 ## menjauh, negatif = mendekat. Auto-balik ke 0 (CAM_DIST) ditangani di
 ## _process, bukan di sini — di sini cuma menggeser target & reset idle-timer.
 func add_zoom(delta_dist: float) -> void:
-	_cam_zoom = clampf(_cam_zoom + delta_dist, 0.0, CAM_ZOOM_MAX)
+	# MODE BANGUN: zoom-out top-down butuh jangkau lebih jauh (BUILD_CAM_ZOOM_
+	# MAX) — kapasitas normal CAM_ZOOM_MAX tetap utk gameplay (batas dinamis).
+	var zmax := BUILD_CAM_ZOOM_MAX if build_cam else CAM_ZOOM_MAX
+	_cam_zoom = clampf(_cam_zoom + delta_dist, 0.0, zmax)
+
+# ===== KAMERA MODE BANGUN (permintaan user, ronde ini) =====
+# Saat Build Mode aktif: kamera digerakkan ke TOP-DOWN scr SMOOTH (pitch
+# hampir tegak-lurus, jarak besar — semua transisi di-lerp di _apply_camera),
+# model karakter DISEMBUNYIKAN sementara (layar penuh lega utk editing),
+# drag satu jari jadi PAN peta (bukan putar kamera), joystick build jadi
+# pan berkelanjutan (bukan gerak badan), dan pemain dibekukan (velocity 0).
+var build_cam := false                    # true selagi Build Mode terbuka
+var _build_pan := Vector3.ZERO            # offset kamera XZ relatif posisi pemain
+var _build_joy := Vector2.ZERO            # joystick build → pan, bukan langkah
+const BUILD_CAM_PITCH := -1.40            # rad ≈ -80°, menatap hampir tegak
+const BUILD_CAM_DIST := 24.0              # jarak pandang default top-down (m)
+const BUILD_CAM_ZOOM_MAX := 45.0          # jangkau pinch zoom-out mode bangun
+const BUILD_PAN_LIMIT := 220.0            # pan maks (bidang tanah visual ikut pemain!)
+const BUILD_PAN_SPEED := 26.0             # m/dtk pan dari joystick build
+
+## Dipanggil BuildModeManager.toggle() saat MASUK build mode.
+func enter_build_cam() -> void:
+	build_cam = true
+	_look_vel = Vector2.ZERO
+	joy = Vector2.ZERO
+	velocity = Vector3.ZERO            # bekukan sisa momentum (lihat _move)
+	if _visual:
+		_visual.visible = false        # "karakter otomatis dihilangkan dulu"
+	if is_instance_valid(_fire_spirit):
+		_fire_spirit.visible = false   # pet elemen jg disembunyikan — layar bersih
+
+## Dipanggil BuildModeManager.toggle() saat KELUAR build mode.
+func exit_build_cam() -> void:
+	build_cam = false
+	_build_pan = Vector3.ZERO          # kamera kembali mulus ke kepala pemain
+	_build_joy = Vector2.ZERO
+	_cam_zoom = 0.0
+	if _visual:
+		_visual.visible = true
+	if is_instance_valid(_fire_spirit):
+		_fire_spirit.visible = true
+
+## Drag satu jari di build mode (bakal album "geser peta"): konten peta
+## MENGIKUTI jari (seperti geser Google Maps) → offset kamera bergerak
+## berlawanan dr geseran jari, dikonversi skala meter sesuai zoom saat ini.
+func add_pan_px(dx: float, dy: float) -> void:
+	var px2m := (BUILD_CAM_DIST + _cam_zoom) * 0.0016
+	_build_pan += Basis(Vector3.UP, yaw) * Vector3(-dx, 0.0, -dy) * px2m
+	_clamp_build_pan()
+
+## Joystick build (BuildJoyControl) → pan peta berkelanjutan per frame.
+func set_build_joy(v: Vector2) -> void:
+	_build_joy = v
+
+func _clamp_build_pan() -> void:
+	_build_pan.y = 0.0
+	if _build_pan.length() > BUILD_PAN_LIMIT:
+		_build_pan = _build_pan.normalized() * BUILD_PAN_LIMIT
 	_cam_zoom_idle_t = 0.0
 
 func take_damage(amount: float) -> void:
@@ -609,6 +666,8 @@ func _process(delta: float) -> void:
 		_fire_spirit.external_velocity = Vector3(velocity.x, 0.0, velocity.z)
 
 func _move(delta: float) -> void:
+	if build_cam:
+		return   # Mode Bangun: pemain dibekukan (enter_build_cam sdh nol-kan velocity)
 	if _dash_left > 0.0:
 		_dash_left = maxf(0.0, _dash_left - delta)
 		var progress := 1.0 - _dash_left / DASH_DURATION
@@ -720,6 +779,20 @@ func _footstep_stride(speed: float) -> float:
 	return clampf(speed * clip_len / (2.0 * ss), 0.35, 5.0)
 
 func _apply_camera(delta: float) -> void:
+	# --------- CABANG MODE BANGUN: top-down smooth (lihat blok BUILD_* di
+	# atas); seluruh nilai di-lerp (permintaan "top down smooth"), pitch
+	# tidak lagi di-clamp PITCH_MIN, zoom tak auto-balik (stabil utk edit).
+	if build_cam:
+		if _build_joy.length_squared() > 0.0004:
+			_build_pan += Basis(Vector3.UP, yaw) * Vector3(_build_joy.x, 0.0, _build_joy.y) * BUILD_PAN_SPEED * delta
+			_clamp_build_pan()
+		pitch = lerpf(pitch, BUILD_CAM_PITCH, 1.0 - exp(-6.0 * delta))
+		var bfocus := global_position + _build_pan + Vector3(0.0, CAM_FOCUS_HEIGHT, 0.0)
+		cam_pivot.global_position = cam_pivot.global_position.lerp(bfocus, 1.0 - exp(-5.0 * delta))
+		cam_pivot.rotation = Vector3(pitch, yaw, 0.0)
+		var want_len := maxf(6.0, BUILD_CAM_DIST + _cam_zoom)
+		cam_arm.spring_length = lerpf(cam_arm.spring_length, want_len, 1.0 - exp(-5.0 * delta))
+		return
 	var sens := 1.0
 	if settings:
 		sens = clampf(settings.camera_sens, 0.3, 2.5)
