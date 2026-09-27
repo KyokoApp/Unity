@@ -1083,7 +1083,6 @@ func _process(delta: float) -> void:
 				_update_grass_chunks(pchunk)
 		_process_grass_chunk_queue()
 		_process_grass_fill_budget()
-		if _grass_mat:
 	# Posisi pemain jg utk riak gelombang air (shader tanah, uniform
 	# player_water_pos — pajangan balon gelombang kon-ver-tasi reff shader)
 	if _ground_mat:
