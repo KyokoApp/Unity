@@ -51,6 +51,54 @@ const FIRE_COOLDOWN := 0.3
 const BOLT_SPEED := 21.0
 const BOLT_LIFT := 1.8
 
+## Skin ke-2 (permintaan user: file OC-Kanna.vrm dikirim via Google Drive,
+## "pake 2 karakter ada icon ganti karakter satu yang manequin satu karakter
+## vrm"). File .vrm SECARA BINER adalah glTF/.glb biasa (VRM = glTF + data
+## tambahan avatar) — disalin apa adanya jd .glb spy importer bawaan Godot
+## mengenalinya sbg PackedScene normal, TANPA perlu plugin VRM apa pun.
+##
+## PERINGATAN JUJUR (disampaikan jg ke pengguna): rig Kanna adalah rig
+## custom Blender (Rigify, 209 tulang "DEF-...") — SANGAT beda dr rig
+## mannequin (65 tulang gaya UE) yg jadi sumber 43 klip mocap game ini.
+## Tak ada cara utk memastikan hasil retarget di bawah ini 100% mulus tanpa
+## menjalankan Godot scr visual (sandbox ini tak py render Godot) — kalau
+## ada sendi yg kelihatan bengkok/aneh pas dites di HP, itu risiko yg sudah
+## diperkirakan, laporkan bagian mana yg salah biar bisa dikoreksi presisi.
+const KANNA_SCENE := preload("res://packs/character_player/mannequin/kanna.glb")
+const SKIN_MANNEQUIN := "mannequin"
+const SKIN_KANNA := "kanna"
+
+## Peta ganti-nama tulang UTAMA Kanna (nama asli Rigify "DEF-...", diambil
+## dr extensions.VRM.humanoid.humanBones di file aslinya) -> nama tulang yg
+## SAMA PERSIS dipakai 43 klip animasi mocap mannequin (root/pelvis/
+## spine_0N/dst, lihat dump node UAL1_Standard.glb). Cuma tulang INTI (bukan
+## jari/tulang kembar Rigify per-segmen) yg dipetakan — cukup utk lokomosi
+## (jalan/lari/lompat); segmen anak yg tak dipetakan (mis. "DEF-Left
+## leg.001/.002") otomatis ikut kaku mengikuti induknya yg sudah dianimasi,
+## jadi scr visual tetap terlihat sbg SATU tulang paha/lengan yg menekuk.
+const KANNA_BONE_MAP := {
+	"root": "pelvis",
+	"DEF-Spine": "spine_01",
+	"DEF-Chest": "spine_02",
+	"DEF-Upper Chest": "spine_03",
+	"DEF-Neck": "neck_01",
+	"DEF-Head": "Head",
+	"DEF-Left leg": "thigh_l",
+	"DEF-Left knee": "calf_l",
+	"DEF-Left ankle": "foot_l",
+	"DEF-Left toe": "ball_l",
+	"DEF-Right leg": "thigh_r",
+	"DEF-Right knee": "calf_r",
+	"DEF-Right ankle": "foot_r",
+	"DEF-Right toe": "ball_r",
+	"DEF-Left arm": "upperarm_l",
+	"DEF-Left elbow": "lowerarm_l",
+	"DEF-Left wrist": "hand_l",
+	"DEF-Right arm": "upperarm_r",
+	"DEF-Right elbow": "lowerarm_r",
+	"DEF-Right wrist": "hand_r",
+}
+
 # Dua corak ungu: badan utama (permukaan besar) + aksen sendi (kontras
 # lebih gelap, mempertahankan "color-blocking" asli model sumber).
 const BODY_COLOR := Color(0.50, 0.26, 0.92)
@@ -73,6 +121,17 @@ const CAST_HEIGHT := 1.32     # perkiraan tinggi tangan/dada utk titik lontar pe
 ## rupanya membalik sumbu depan juga -> kompensasi di sini, di level visual,
 ## bukan di rig (lebih aman & mudah diubah lagi kalau ternyata masih meleset).
 const MODEL_YAW_OFFSET := PI
+## Koreksi yaw TAMBAHAN per-skin (di atas MODEL_YAW_OFFSET di atas, yg
+## dikalibrasi KHUSUS utk rig mannequin). Skin lain (VRM dll) bisa saja py
+## konvensi hadap beda (VRM 0.x scr spec menghadap +Z, kebalikan konvensi
+## glTF biasa) — belum bisa dipastikan tanpa dites lgsg di HP, makanya
+## disiapkan sbg 1 angka gampang diubah per-skin, default 0.0 (asumsi sama
+## dgn mannequin dulu) drpd ubah MODEL_YAW_OFFSET global & berisiko balik
+## merusak arah hadap mannequin yg sudah terbukti benar.
+const SKIN_YAW_EXTRA := {
+	"mannequin": 0.0,
+	"kanna": 0.0,
+}
 
 # --- nama klip animasi SETELAH import Godot (BUKAN nama asli di glTF!) ---
 # Dikonfirmasi via probe CI (dev_probe/fire_attack_check.gd _diag_mannequin):
@@ -171,6 +230,8 @@ var _dash_cooldown := 0.0
 var _dash_dir := Vector3.ZERO
 var _dust_dist_accum := 0.0
 var _dust_side := 1.0
+var _skin_id := SKIN_MANNEQUIN
+var _skin_switching := false
 
 func set_world(w: Node) -> void:
 	world = w
@@ -184,7 +245,14 @@ func _ready() -> void:
 	cam_arm = $CameraPivot/CamArm
 	cam_pivot.top_level = true
 	cam_arm.add_excluded_object(get_rid())
-	_build_character()
+	# _visual dibuat SEKALI di sini (bukan lagi di _build_character) — ganti
+	# skin (lihat cycle_skin()) cuma menukar isi _model DI DALAM _visual yg
+	# sama, spy fire_spirit/aura yg jd anak _visual tak ikut hilang/dibuat ulang.
+	_visual = Node3D.new()
+	_visual.name = "Visual"
+	_visual.position = Vector3(0.0, HOVER, 0.0)
+	add_child(_visual)
+	_build_character(_skin_id)
 	_build_aura()
 	_build_fire_spirit()
 	is_ready = true
@@ -393,7 +461,8 @@ func _apply_camera(delta: float) -> void:
 ## tulang manual per-frame).
 func _animate_character(delta: float) -> void:
 	if _facing.length_squared() > 0.01:
-		var facing_yaw := atan2(-_facing.x, -_facing.z) + MODEL_YAW_OFFSET
+		var yaw_extra: float = SKIN_YAW_EXTRA.get(_skin_id, 0.0)
+		var facing_yaw := atan2(-_facing.x, -_facing.z) + MODEL_YAW_OFFSET + yaw_extra
 		_visual.rotation.y = lerp_angle(_visual.rotation.y, facing_yaw, 1.0 - exp(-14.0 * delta))
 
 	if _anim == null:
@@ -488,27 +557,33 @@ func _play_shoot_sound() -> void:
 	add_child(sound)
 	sound.play()
 
-# =============== Rakitan visual: mannequin Quaternius, dicat ungu ===============
+# =============== Rakitan visual: mannequin Quaternius (dicat ungu) ATAU skin Kanna ===============
 
-func _build_character() -> void:
-	_visual = Node3D.new()
-	_visual.name = "Visual"
-	_visual.position = Vector3(0.0, HOVER, 0.0)
-	add_child(_visual)
-
+## Bangun/rakit ulang badan pemain sesuai `skin_id` (SKIN_MANNEQUIN/SKIN_KANNA)
+## DI DALAM _visual yg sudah ada (lihat _ready()). SELALU instance mannequin
+## dulu (satu-satunya sumber Armature/AnimationPlayer/43 klip mocap yg valid)
+## — kalau skin_id==kanna, _apply_kanna_skin() lalu MENUKAR skeleton+mesh di
+## dalam Armature yg sama (nama node "Skeleton3D" dipertahankan persis) spy
+## semua NodePath track animasi yg sudah direkam ttp nyambung tanpa diubah.
+func _build_character(skin_id: String) -> void:
+	_skin_id = skin_id
 	_model = MANNEQUIN_SCENE.instantiate()
 	_model.name = "Mannequin"
 	_visual.add_child(_model)
 
 	_anim = _model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	_skeleton = _model.find_child("Skeleton3D", true, false) as Skeleton3D
+
+	if skin_id == SKIN_KANNA:
+		_apply_kanna_skin()
+	else:
+		_paint_purple()
+
 	if _anim != null:
 		_anim.playback_default_blend_time = ANIM_BLEND
 		if _anim.has_animation(ANIM_IDLE):
 			_anim.play(ANIM_IDLE)
 			_anim_state = ANIM_IDLE
-	_skeleton = _model.find_child("Skeleton3D", true, false) as Skeleton3D
-
-	_paint_purple()
 
 ## Kedua material sumber (M_Main oranye, M_Joints ungu) TANPA tekstur ->
 ## override total aman, tak kehilangan detail UV apa pun.
@@ -521,6 +596,177 @@ func _paint_purple() -> void:
 		var surfaces := mesh_inst.mesh.get_surface_count()
 		for i in range(surfaces):
 			mesh_inst.set_surface_override_material(i, mats[i % mats.size()])
+
+## Pasang skin Kanna (VRM) menggantikan mesh+skeleton mannequin, TAPI tetap
+## di dalam Armature yg SAMA (posisi & nama node "Skeleton3D" dipertahankan
+## persis) — trik ini menghindari sama sekali risiko harus menebak NodePath
+## internal hasil-import Godot (yg tak bisa dipastikan tanpa render editor):
+## krn parent node ("Armature") & nama child ("Skeleton3D") tak berubah,
+## SEMUA track animasi mocap yg sudah ada otomatis tetap nyambung ke
+## skeleton BARU, asal nama tulang di dalamnya cocok (lihat KANNA_BONE_MAP).
+##
+## Warna/tekstur asli Kanna DIPERTAHANKAN (TAK dicat ungu spt mannequin) —
+## "pasang skin karakter ini" scr wajar berarti tampil sbg karakter itu
+## sendiri, bukan diseragamkan ungu.
+func _apply_kanna_skin() -> void:
+	var armature := _skeleton.get_parent() if is_instance_valid(_skeleton) else null
+	if armature == null:
+		push_warning("Kanna: Armature/Skeleton3D mannequin tak ditemukan, batal — pakai mannequin ungu")
+		_paint_purple()
+		return
+
+	var kanna := KANNA_SCENE.instantiate()
+	var kanna_skel := kanna.find_child("Skeleton3D", true, false) as Skeleton3D
+	if kanna_skel == null:
+		push_warning("Kanna: Skeleton3D tak ditemukan di kanna.glb, batal — pakai mannequin ungu")
+		kanna.queue_free()
+		_paint_purple()
+		return
+	var kanna_meshes := kanna.find_children("*", "MeshInstance3D", true, false)
+
+	# ganti nama tulang inti Kanna spy cocok dgn nama yg dipakai track
+	# animasi mocap (lihat KANNA_BONE_MAP) SEBELUM diukur/ditanam.
+	for i in range(kanna_skel.get_bone_count()):
+		var nm := kanna_skel.get_bone_name(i)
+		if KANNA_BONE_MAP.has(nm):
+			kanna_skel.set_bone_name(i, KANNA_BONE_MAP[nm])
+
+	# skala tinggi Kanna spy sepadan dgn tinggi mannequin asli (kamera/hover/
+	# collider dikalibrasi utk tinggi itu) — diukur dr rest pose Head/kaki,
+	# bukan angka tebakan, jd otomatis pas walau proporsi badan beda.
+	var mannequin_h := _standing_height(_skeleton, "Head", "foot_l", "foot_r")
+	var kanna_h := _standing_height(kanna_skel, "Head", "foot_l", "foot_r")
+
+	# buang mesh+skeleton mannequin lama, tanam skeleton+mesh Kanna PERSIS di
+	# posisi (parent=armature, nama="Skeleton3D") yg lama — lihat komentar fungsi.
+	for mi in _model.find_children("*", "MeshInstance3D", true, false):
+		mi.queue_free()
+	var old_skeleton := _skeleton
+	armature.remove_child(old_skeleton)
+	old_skeleton.queue_free()
+
+	kanna_skel.get_parent().remove_child(kanna_skel)
+	kanna_skel.name = "Skeleton3D"
+	armature.add_child(kanna_skel)
+	_skeleton = kanna_skel
+
+	for mi in kanna_meshes:
+		var mesh_inst := mi as MeshInstance3D
+		if mesh_inst == null:
+			continue
+		mesh_inst.get_parent().remove_child(mesh_inst)
+		armature.add_child(mesh_inst)
+		mesh_inst.skeleton = mesh_inst.get_path_to(kanna_skel)
+	kanna.queue_free()
+
+	if mannequin_h > 0.01 and kanna_h > 0.01:
+		var s: float = mannequin_h / kanna_h
+		_model.scale = Vector3(s, s, s)
+
+## Tinggi berdiri (Head - rata2 kaki) dari REST POSE sebuah skeleton, dipakai
+## _apply_kanna_skin() utk menyamakan skala tanpa perlu angka tebakan manual.
+func _standing_height(skel: Skeleton3D, head_name: String, foot_l_name: String, foot_r_name: String) -> float:
+	if skel == null:
+		return 0.0
+	var head_i := skel.find_bone(head_name)
+	var fl_i := skel.find_bone(foot_l_name)
+	var fr_i := skel.find_bone(foot_r_name)
+	if head_i < 0 or (fl_i < 0 and fr_i < 0):
+		return 0.0
+	var head_y: float = skel.get_bone_global_rest(head_i).origin.y
+	var foot_y: float
+	if fl_i >= 0 and fr_i >= 0:
+		foot_y = (skel.get_bone_global_rest(fl_i).origin.y + skel.get_bone_global_rest(fr_i).origin.y) * 0.5
+	elif fl_i >= 0:
+		foot_y = skel.get_bone_global_rest(fl_i).origin.y
+	else:
+		foot_y = skel.get_bone_global_rest(fr_i).origin.y
+	return head_y - foot_y
+
+## Ganti skin (permintaan user: "pake 2 karakter ada icon ganti karakter" +
+## "setiap switch karakter kek ada efek sinar glitch") — dipanggil dari HUD
+## (tombol baru, lihat hud.gd BtnSkin). _visual (fire_spirit+aura) TAK
+## dibongkar, cuma isi _model di dalamnya yg ditukar.
+func cycle_skin() -> void:
+	if _skin_switching or not is_ready:
+		return
+	_skin_switching = true
+	var next_id := SKIN_KANNA if _skin_id == SKIN_MANNEQUIN else SKIN_MANNEQUIN
+	_spawn_skin_switch_fx(global_position + Vector3(0.0, 0.9, 0.0))
+	# kedip cepat (kesan "glitch") sebelum model lama disembunyikan, biar
+	# proses bongkar-pasang di baliknya tak kelihatan nge-pop.
+	var flicker := create_tween()
+	for i in range(4):
+		flicker.tween_property(_visual, "visible", false, 0.0)
+		flicker.tween_interval(0.045)
+		flicker.tween_property(_visual, "visible", true, 0.0)
+		flicker.tween_interval(0.045)
+	await flicker.finished
+	_visual.visible = false
+	if is_instance_valid(_model):
+		_model.queue_free()
+	_model = null
+	_anim = null
+	_skeleton = null
+	await get_tree().create_timer(0.10).timeout
+	_build_character(next_id)
+	_visual.visible = true
+	_skin_switching = false
+
+## Ledakan partikel cahaya + kilat lampu sesaat, kesan "teleport glitch"
+## pas ganti skin (permintaan user "efek sinar glitch"). Ditaruh sbg anak
+## CharacterBody3D langsung (BUKAN _visual) spy tak ikut disembunyikan oleh
+## flicker _visual di cycle_skin() & tetap ada meski _model lg dibongkar-pasang.
+func _spawn_skin_switch_fx(at: Vector3) -> void:
+	var burst := GPUParticles3D.new()
+	burst.name = "SkinSwitchFX"
+	burst.amount = 46
+	burst.lifetime = 0.55
+	burst.one_shot = true
+	burst.explosiveness = 0.95
+	burst.local_coords = false
+	burst.fixed_fps = 60
+	burst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(burst)
+	burst.global_position = at
+	var mat := ParticleProcessMaterial.new()
+	mat.direction = Vector3.UP
+	mat.spread = 180.0
+	mat.initial_velocity_min = 1.4
+	mat.initial_velocity_max = 3.6
+	mat.gravity = Vector3.ZERO
+	mat.damping_min = 2.0
+	mat.damping_max = 3.5
+	mat.scale_min = 0.05
+	mat.scale_max = 0.15
+	mat.color_ramp = _ramp(
+		[0.0, 0.4, 1.0],
+		[Color(0.75, 0.95, 1.0, 1.0), Color(0.55, 0.75, 1.0, 0.85), Color(0.4, 0.6, 1.0, 0.0)])
+	burst.process_material = mat
+	var qm := QuadMesh.new()
+	qm.size = Vector2(0.09, 0.09)
+	qm.material = _fx_mat(_soft_tex(0.2), true, Color(0.8, 0.95, 1.0, 0.9))
+	burst.draw_pass_1 = qm
+	burst.emitting = true
+
+	var flash := OmniLight3D.new()
+	flash.name = "SkinSwitchFlash"
+	flash.light_color = Color(0.78, 0.93, 1.0)
+	flash.omni_range = 4.5
+	flash.light_energy = 0.0
+	add_child(flash)
+	flash.global_position = at
+	var tw := create_tween()
+	tw.tween_property(flash, "light_energy", 3.4, 0.09)
+	tw.tween_property(flash, "light_energy", 0.0, 0.4)
+	tw.finished.connect(func():
+		if is_instance_valid(flash):
+			flash.queue_free())
+
+	var t := get_tree().create_timer(1.0)
+	t.timeout.connect(func():
+		if is_instance_valid(burst):
+			burst.queue_free())
 
 ## Peliharaan elemental api kecil di bahu (permintaan pengguna: "spirit
 ## elemental api kecil ... nembakin sihirnya dari situ, kayak peliharaan,

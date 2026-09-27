@@ -384,6 +384,11 @@ func _build_layout() -> void:
 	_add_rpg(root, "BtnCrouch", "crouch", 32.0, att_c + Vector2(-132.0, 2.0) - Vector2(32.0, 32.0))
 	_add_rpg(root, "BtnSprint", "bolt", 32.0, att_c + Vector2(-44.0, -118.0) - Vector2(32.0, 32.0))
 	_add_rpg(root, "BtnEmote", "smile", 27.0, Vector2(vsz.x - mr - 54.0, mt + 96.0))
+	# --- ganti karakter (permintaan user: "ada icon ganti karakter") ---
+	# sengaja TAK dimasukkan HIDDEN_BUTTONS (UI minimal) krn diminta eksplisit
+	# ronde ini — pojok kanan atas, jauh dr klaster tombol aksi kanan-bawah.
+	_add_rpg(root, "BtnSkin", "skin", 34.0, Vector2(vsz.x - mr - 34.0 * 2, mt), "🎭")
+	_connect_rpg("BtnSkin", Callable(self, "_on_skin_switch"), false)
 	_connect_rpg("BtnJump", Callable(self, "_on_jump"), false)
 	_connect_rpg("BtnSprint", Callable(self, "_on_sprint"), true)
 	_connect_rpg("BtnCrouch", Callable(self, "_on_crouch_toggle"), false)
@@ -489,6 +494,10 @@ func _connect_rpg(name: String, cb: Callable, holdable: bool) -> void:
 		b.released.connect(func(): cb.call(false))
 
 # ---------- handlers tombol ----------
+
+func _on_skin_switch(_down: bool) -> void:
+	if player and player.has_method("cycle_skin"):
+		player.cycle_skin()
 
 func _on_jump(down: bool) -> void:
 	if down and player:

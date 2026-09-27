@@ -173,6 +173,12 @@ func _run() -> void:
 		_finish()
 		return
 
+	# ---------- Fase 1f: ganti skin (mannequin <-> Kanna VRM) ----------
+	await _check_skin_switch(player)
+	if _exit_code != 0:
+		_finish()
+		return
+
 	print("[fire-check] fase 2: TAP cepat…")
 	var before_tap := _count_by_suffix(world, "arcane_bolt.gd")
 	player.call("set_attack_held", true)
@@ -253,6 +259,57 @@ func _check_mannequin_animates(player: Node) -> void:
 ## speed_scale dipercepat, DAN minimal satu node jejak bayangan
 ## ("DashAfterimage") benar-benar muncul di dunia (bukti duplikasi
 ## MeshInstance3D + penautan Skeleton3D via NodePath relatif tidak error).
+## Fase 1f: ganti skin (Kanna VRM, permintaan user "pake 2 karakter... ada
+## icon ganti karakter") — memanggil cycle_skin() SUNGGUHAN (headless) &
+## pastikan skeleton/model baru benar2 terbentuk (bukan cuma "tak crash"),
+## lalu ganti balik ke mannequin & pastikan itu jg pulih normal. WAJIB ada
+## krn rig Kanna (custom Rigify 209 tulang) SANGAT beda dr mannequin (65
+## tulang) — risiko nyata gagal total (skeleton null/bone count aneh) kalau
+## KANNA_BONE_MAP salah, jauh lebih murah ketahuan di sini drpd di HP user.
+## CATATAN: cek ini memverifikasi STRUKTUR (skeleton/mesh/animasi terbentuk),
+## BUKAN kebenaran visual pose retarget (bengkok/tidaknya sendi) — itu tetap
+## perlu dicek langsung di perangkat, di luar jangkauan probe headless ini.
+func _check_skin_switch(player: Node) -> void:
+	if not player.has_method("cycle_skin"):
+		_fail("player.cycle_skin tidak ada (fitur ganti skin belum terpasang?)")
+		return
+	player.call("cycle_skin")
+	await create_timer(1.0).timeout
+	if String(player.get("_skin_id")) != "kanna":
+		_fail("ganti skin ke kanna gagal (_skin_id masih \"%s\")" % String(player.get("_skin_id")))
+		return
+	var skel: Skeleton3D = player.get("_skeleton")
+	if skel == null or not is_instance_valid(skel):
+		_fail("skin kanna: _skeleton null setelah cycle_skin")
+		return
+	if skel.get_bone_count() < 20:
+		_fail("skin kanna: skeleton jumlah tulang mencurigakan (%d, seharusnya >200)" % skel.get_bone_count())
+		return
+	for essential in ["pelvis", "spine_01", "Head", "thigh_l", "thigh_r", "hand_l", "hand_r"]:
+		if skel.find_bone(essential) < 0:
+			_fail("skin kanna: tulang \"%s\" tak ditemukan setelah rename (KANNA_BONE_MAP salah?)" % essential)
+			return
+	var mdl: Node = player.get("_model")
+	if mdl == null or not is_instance_valid(mdl):
+		_fail("skin kanna: _model null setelah cycle_skin")
+		return
+	if mdl.find_children("*", "MeshInstance3D", true, false).is_empty():
+		_fail("skin kanna: tak ada MeshInstance3D tersisa (mesh gagal ditanam?)")
+		return
+	print("[fire-check] fase 1f ✔ ganti ke skin kanna OK (tulang=", skel.get_bone_count(), ")")
+
+	# ganti balik ke mannequin — pastikan jalur baliknya jg tak rusak
+	player.call("cycle_skin")
+	await create_timer(1.0).timeout
+	if String(player.get("_skin_id")) != "mannequin":
+		_fail("ganti skin balik ke mannequin gagal (_skin_id masih \"%s\")" % String(player.get("_skin_id")))
+		return
+	var anim: AnimationPlayer = player.get("_anim")
+	if anim == null or not anim.has_animation("Idle"):
+		_fail("skin mannequin (setelah ganti balik): AnimationPlayer/Idle hilang")
+		return
+	print("[fire-check] fase 1f ✔ ganti balik ke mannequin OK")
+
 func _check_dash_effects(player: Node, world: Node) -> void:
 	var consts: Dictionary = (player.get_script() as GDScript).get_script_constant_map()
 	var sprint_name: String = consts.get("ANIM_SPRINT", "")
