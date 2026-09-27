@@ -26,6 +26,18 @@ uniform float wind_speed = 1.7;
 // gust sekunder (freq beda, lihat vertex()) spy goyangannya kelihatan jelas
 // di perangkat & tak terasa seragam/monoton spt gelombang tunggal.
 uniform float wind_strength = 0.29;
+// --- ANGIN TEKSTUR (ronde ini, user kirim shader rumput @_Malido "ini apa
+// kalo bagus pasang dah" — ditelaah: sebagian sudah ada di shader ini
+// sbg padanan (gradasi dasar->ujung, dorongan pemain=trample, normal
+// up-koreksi, AO dasar); yg BENER2 baru & bagus = angin dari TEKSTUR
+// noise: gelombang PERLIN organik melintasi ladang, jauh lbh hidup dr
+// sinus mekanis; dipasang di bawah dgn tekstur dibuat RUNTIME
+// NoiseTexture2D+FastNoiseLite di world.gd — NOL file aset baru) ---
+uniform sampler2D wind_noise : hint_default_black, repeat_enable;
+uniform float wind_tex_enabled : hint_range(0.0, 1.0) = 1.0;
+uniform float wind_noise_size : hint_range(0.0, 0.5, 0.0005) = 0.05;
+uniform float wind_noise_speed : hint_range(0.0, 1.0, 0.001) = 0.1;
+uniform float wind_tex_strength : hint_range(0.0, 1.0, 0.01) = 0.30;
 // SATU WARNA HIJAU MULUS v2 (permintaan user ronde ini: "buat tanah jadi
 // hijau lagi" + "tanah & rumput gabungin jadi 1 warna jadi kayak cuma liat
 // ujung2 rumput doang"): base_color kini SAMA PERSIS dgn ground_color
@@ -170,8 +182,22 @@ void vertex() {
 		- TIME * wind_speed * 0.55);
 	band = band * band * band;
 	float sway_total = (sway * 0.7 + gust * 0.5) * (0.75 + 1.35 * band);
+	// rakit angin di RUANG DUNIA dulu (bukan langsung tambah lokal): sama
+	// teknik shader @_Malido — vektor dunia ditransform ke model lewat
+	// v * MODEL_MATRIX (kebalikan rotasi utk basis rotasi-murni). WAJIB
+	// krn tiap rumpun diputar yaw acak (world.gd blade_basis) — tanpa ini
+	// tiap rumpun tertiup ke ARAH BERBEDA (angin dunia tak seragam lagi).
+	vec3 wind_world = wind_dir * sway_total * wind_strength;
+	// angin TEKSTUR Perlin (teknik @_Malido): sampling di ruang dunia,
+	// digulir lawan arah angin; height_w/2.5 = ujung tertiup sedikit
+	// melambat dr akar -> konstruktur aliran organik, bukan sinus seragam.
+	if (wind_tex_enabled > 0.5) {
+		vec3 wt = texture(wind_noise, world_pos.xz * wind_noise_size
+			+ normalize(-wind_dir.xz) * (TIME + height_w / 2.5) * wind_noise_speed).rgb;
+		wind_world += wt * normalize(wind_dir) * wind_tex_strength;
+	}
 	// hanya bagian atas helai yg bergoyang (akar diam) -> height_w^2 sbg bobot
-	VERTEX += wind_dir * sway_total * wind_strength * height_w * height_w;
+	VERTEX += (vec4(wind_world * (height_w * height_w), 0.0) * MODEL_MATRIX).xyz;
 	// normal "palsu" dicondongkan ke atas biar cahaya tak terlihat pipih-datar
 	NORMAL = normalize(mix(NORMAL, vec3(0.0, 1.0, 0.0), 0.55));
 }

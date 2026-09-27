@@ -616,6 +616,14 @@ func _check_world_ground_fog() -> void:
 		_fail("world: rumput tidak punya material (bakal tampil putih polos)")
 		world.queue_free()
 		return
+	# RONDE INI (user kirim shader @_Malido, bagian angin-tekstur kita
+	# pasang): material rumput wajib bawa tekstur noise Perlin FBM runtime
+	# (world.gd _grass_material) — tak boleh kembali ke sinus saja.
+	var gshader_mat := grass.material_override as ShaderMaterial
+	if gshader_mat == null or gshader_mat.get_shader_parameter("wind_noise") == null:
+		_fail("world: material rumput tak punya tekstur angin (wind_noise) — angin tekstur @_Malido hilang?")
+		world.queue_free()
+		return
 	print("[fire-check] fase 1e ✔ tanah rumput + kabut jauh (begin=%.0f end=%.0f) + sore hangat OK (chunk %s, %d tuft rumput)" % [env.fog_depth_begin, env.fog_depth_end, grass.name, grass.multimesh.instance_count])
 	world.queue_free()
 	await process_frame

@@ -737,6 +737,21 @@ func _grass_material() -> ShaderMaterial:
 	mat.set_shader_parameter("fade_start", fade_end - GRASS_CHUNK_SIZE)
 	mat.set_shader_parameter("fade_end", fade_end)
 	mat.set_shader_parameter("player_pos", Vector2.ZERO)
+	# Tekstur angin Perlin FBM (teknik shader @_Malido yg dikirim user ronde
+	# ini) — dibuat RUNTIME pakai NoiseTexture2D+FastNoiseLite, JADI NOL
+	# file aset/tekstur baru di repo; polanya gumpalan lembut besar (octave
+	# fbm rendah) persis rekomendasi "Perlin FBM looks best" di shader reff.
+	var wind_noise_tex := NoiseTexture2D.new()
+	wind_noise_tex.width = 256
+	wind_noise_tex.height = 256
+	var nl := FastNoiseLite.new()
+	nl.noise_type = FastNoiseLite.TYPE_PERLIN
+	nl.fractal_type = FastNoiseLite.FRACTAL_FBM
+	nl.fractal_octaves = 4
+	nl.frequency = 0.05
+	wind_noise_tex.noise = nl
+	wind_noise_tex.seamless = true  # repeat_enable di shader: tak boleh ada sambungan
+	mat.set_shader_parameter("wind_noise", wind_noise_tex)
 	return mat
 
 # ---------------- API kompatibel ----------------
