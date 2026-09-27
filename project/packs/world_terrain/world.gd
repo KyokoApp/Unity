@@ -116,7 +116,7 @@ var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 # helai skrg BENERAN tetap di dunia (node tiap chunk ditaruh di titik
 # tengah petaknya, TAK PERNAH digeser lagi) — grass_blade.gdshader jadi
 # jauh lbh sederhana (tak ada lagi logika wrap/modulo), cuma nyisain fade
-# jarak biasa (spt kabut) di uniform player_pos supaya batas radius-muat
+## jarak biasa (fadeout_envelope design user, jarak KE KAMERA) supaya batas radius-muat
 # tak kelihatan nge-pop, PERSIS spt referensi (optimization_by_distance +
 # smoothstep di grass.gdshaderinc mrk) walau implementasi detailnya beda.
 const GRASS_CHUNK_SIZE := 22.0
@@ -148,7 +148,7 @@ const GRASS_UNLOAD_RADIUS_CHUNKS := 3   # histeresis: dibongkar hanya kalau LEBI
 const GRASS_CHUNK_BUILD_PER_FRAME := 3   # brp petak baru boleh MULAI dibangun /frame
 const GRASS_FILL_INSTANCES_PER_FRAME := 1800  # brp instance boleh DIISI /frame (semua petak digabung)
 var _grass_mesh: ArrayMesh                # 1 mesh tuft dipakai bersama semua chunk
-var _grass_mat: ShaderMaterial            # 1 material dipakai bersama semua chunk (player_pos diperbarui tiap frame)
+var _grass_mat: ShaderMaterial            # 1 material dipakai bersama semua chunk grass (tekstur digambar runtime)
 var _grass_chunks := {}                   # Vector2i koordinat petak -> MultiMeshInstance3D
 var _grass_pending: Array = []            # antrean koordinat petak menunggu MULAI dibangun
 var _grass_building := {}                 # Vector2i -> {"rng":RandomNumberGenerator,"filled":int}: petak yg node-nya sudah ada tapi msh dicicil isi instance-nya
@@ -731,64 +731,132 @@ func _apply_grass_density_all() -> void:
 ## GPU tetap terkendali: cuma 9 segitiga/rumpun, naik dari 5, bukan per-
 ## instance count yg jauh lbh mahal). Warna vertex.a dipakai grass_blade.
 ## gdshader sbg bobot tinggi (0=akar,1=ujung). Dipakai BERSAMA semua petak.
+## DESIGN BARU (ronde ini, permintaan user "pake design ini ajh biar
+## gampang"): geometri rumpun BUKAN segitiga-tipis lagi, melainkan KARTU
+## persegi bertekstur tuft (cara space-grass/design-1 user). Enam kartu
+## per rumpun dgn UV BERSIH (u 0..1 melintang, v 0=akar .. 1=ujung) supaya
+## pattern foliage_texture melekat sempurna & shader membaca UV.y sbg
+## bobot tinggi/angin/warna. Total 12 segitiga/rumpun (jd 54 tri/rotasi
+## instancing standar), tapi FAR lebih efektif: foliage_texture mengerjakan
+## tampilan helai per-piksel, bukan geometri. Mesh deterministik (seed
+## tetap) — dipakai bersama SEMUA chunk; keberagaman bentuk dtambahkan
+## oleh yaw/scaling per-instance di builder chunk.
 func _build_grass_blade_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 88172645  # tetap & deterministik, lihat komentar di atas
-	const PRIMARY_N := 5
-	const FILLER_N := 4
-	var total := PRIMARY_N + FILLER_N
-	for i in range(total):
-		var is_primary := i < PRIMARY_N
-		# Sebaran sudut dasarnya merata (360/total) tapi dijitter acak biar
-		# BUKAN simetri sempurna spt versi lama.
-		var base_angle: float = (TAU / float(total)) * float(i) + rng.randf_range(-0.32, 0.32)
-		var h: float = rng.randf_range(0.40, 0.58) if is_primary else rng.randf_range(0.20, 0.34)
-		var w: float = rng.randf_range(0.075, 0.098) if is_primary else rng.randf_range(0.045, 0.064)
-		var lean := rng.randf_range(0.07, 0.18)
-		# Titik tumbuh digeser sedikit dr pusat rumpun -> tak semua helai
-		# muncul dr 1 titik yg sama persis (spt rumpun asli, bukan payung).
-		var base_shift := rng.randf_range(0.0, 0.055)
+	const CARDS_N := 6
+	for i in range(CARDS_N):
+		var base_angle: float = (TAU / float(CARDS_N)) * float(i) + rng.randf_range(-0.30, 0.30)
+		var h := rng.randf_range(0.34, 0.52)          # tinggi kartu
+		var w := rng.randf_range(0.15, 0.22)          # lebar kartu (gambar tuft berisi bbrp helai)
+		var tip_shrink := rng.randf_range(0.10, 0.25) # ujung menyempit
+		var lean := rng.randf_range(0.06, 0.16)       # kondangan ke depan
+		var base_shift := rng.randf_range(0.0, 0.05)
 		var rot := Basis(Vector3.UP, base_angle)
 		var origin: Vector3 = rot * Vector3(0.0, 0.0, base_shift)
-		var bl: Vector3 = origin + rot * Vector3(-w * 0.5, 0.0, 0.0)
-		var br: Vector3 = origin + rot * Vector3(w * 0.5, 0.0, 0.0)
-		var tip: Vector3 = origin + rot * Vector3(0.0, h, lean)
-		st.set_color(Color(1, 1, 1, 0.0))
-		st.add_vertex(bl)
-		st.set_color(Color(1, 1, 1, 0.0))
-		st.add_vertex(br)
-		st.set_color(Color(1, 1, 1, 1.0))
-		st.add_vertex(tip)
+		# kartu = quad 2 segitiga, akar tenggelam -0.06 biar tak mengambang.
+		var bl: Vector3 = origin + rot * Vector3(-w * 0.5, -0.06, 0.0)
+		var br: Vector3 = origin + rot * Vector3(w * 0.5, -0.06, 0.0)
+		var tl: Vector3 = origin + rot * Vector3(-w * 0.5 * tip_shrink, h, lean)
+		var tr: Vector3 = origin + rot * Vector3(w * 0.5 * tip_shrink, h, lean)
+		var uv_bl := Vector2(0, 0)
+		var uv_br := Vector2(1, 0)
+		var uv_tl := Vector2(0, 1)
+		var uv_tr := Vector2(1, 1)
+		# segitiga 1: bl-br-tr; segitiga 2: bl-tr-tl (CCW dr depan; shader cull_disabled)
+		st.set_uv(uv_bl); st.add_vertex(bl)
+		st.set_uv(uv_br); st.add_vertex(br)
+		st.set_uv(uv_tr); st.add_vertex(tr)
+		st.set_uv(uv_bl); st.add_vertex(bl)
+		st.set_uv(uv_tr); st.add_vertex(tr)
+		st.set_uv(uv_tl); st.add_vertex(tl)
 	st.generate_normals()
 	return st.commit()
 
+## Tekstur kartu rumput digambar RUNTIME (nol aset repo): 128x128 RGBA,
+## ~7 helai putih melebar→meruncing dr pangkal tengah; rgb PUTIH polos
+## (warna wangi dr top/bottom/noise_color yg mengalikan di shader), alpha
+## = bentuk helai utk ALPHA_SCISSOR + dither fade. Deterministik (seed),
+## ~16 ribu piksel, <0.1 detik saat boot, lalu dipakai bersama semua
+## material/chunk.
+func _make_grass_card_texture() -> Texture2D:
+	const W := 128
+	var img := Image.create(W, W, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7462391
+	var blades: Array = []
+	for i in range(7):
+		var bx := 40.0 + 48.0 * rng.randf()               # posisi dasar x
+		var curve := rng.randf_range(-22.0, 22.0)         # keingkungan ujung
+		var wid := rng.randf_range(3.2, 5.2)              # ketebalan helai
+		var topy := rng.randf_range(0.0, 34.0)            # tinggi sym
+		blades.append([bx, curve, wid, topy])
+	for y in range(W):
+		var t := 1.0 - float(y) / float(W - 1)   # 0 di bawah (y=127) -> 1 di atas citra (y=0)
+		var uv_v := 1.0 - t                      # v kartu (0=akar; shader: v=1 di ujung -> y=0) — dihitung terbalik dr kenyataan UV.
+		for b in blades:
+			var topy_m := W - 1 - b[3]
+			var top_t := 1.0 - topy_m / float(W - 1)  # t maksimal (ujung)
+			if t > top_t:
+				continue
+			var arc := (t / maxf(top_t, 0.001))
+			var cx: float = b[0] + b[1] * arc * arc   # ujung melengkung
+			var wid: float = b[2] * (1.0 - arc * 0.82) + 0.35
+			for x in range(W):
+				var dx := absf(float(x) - cx)
+				if dx < wid:
+					var a := 255 if dx < wid * 0.72 else 200  # tepi sedikit lembut
+					img.set_pixel(x, y, Color(1, 1, 1, float(a) / 255.0))
+	var tex := ImageTexture.create_from_image(img)
+	return tex
+
+## Ramp toon 4-px (design 2 user: toon_ramp + rim light) — nilai disamakan
+## dgn lantai shading lama yg user-approved (bawah 0.66 = mid tanah): tak
+## ada lagi rumpun gosong; filter NEAREST-implisit dr kecilan gambar +
+## mipmatik membuatnya mulus membentuk step Toon.
+func _make_toon_ramp() -> Texture2D:
+	var img := Image.create(4, 1, false, Image.FORMAT_RGB8)
+	img.set_pixel(0, 0, Color(0.66, 0.66, 0.66))
+	img.set_pixel(1, 0, Color(0.78, 0.78, 0.78))
+	img.set_pixel(2, 0, Color(0.90, 0.90, 0.90))
+	img.set_pixel(3, 0, Color(1.00, 1.00, 1.00))
+	return ImageTexture.create_from_image(img)
+
+## Tekstur noise Perlin-FBM runtime utk angin/warna variaasi — teknik
+## @_Malido/design-1 user: gumpalan lembut besar, seamless supaya
+## repeat_enable tak menampilkan sambungan.
+func _make_grass_noise(freq: float, octaves: int) -> Texture2D:
+	var t := NoiseTexture2D.new()
+	t.width = 256
+	t.height = 256
+	var nl := FastNoiseLite.new()
+	nl.noise_type = FastNoiseLite.TYPE_PERLIN
+	nl.fractal_type = FastNoiseLite.FRACTAL_FBM
+	nl.fractal_octaves = octaves
+	nl.frequency = freq
+	t.noise = nl
+	t.seamless = true
+	return t
+
 ## Material batang rumput: goyangan angin + shading toon + varian warna per-
 ## instance (lihat grass_blade.gdshader). cull_disabled di shader itu
-## sendiri. player_pos/fade_* diperbarui tiap frame di _process.
+## sendiri. Tak ada lagi uniform pemain — fadeout full jarak-kamera (design user).
+## Material kartu rumput — TIGA tekstur digambar RUNTIME (nol aset repo):
+## foliage tuft + toon_ramp 4px + noise angin Perlin-FBM (design user).
 func _grass_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	mat.shader = GRASS_SHADER
 	var fade_end := (float(GRASS_RENDER_RADIUS_CHUNKS) + 0.5) * GRASS_CHUNK_SIZE
-	mat.set_shader_parameter("fade_start", fade_end - GRASS_CHUNK_SIZE)
-	mat.set_shader_parameter("fade_end", fade_end)
-	mat.set_shader_parameter("player_pos", Vector2.ZERO)
-	# Tekstur angin Perlin FBM (teknik shader @_Malido yg dikirim user ronde
-	# ini) — dibuat RUNTIME pakai NoiseTexture2D+FastNoiseLite, JADI NOL
-	# file aset/tekstur baru di repo; polanya gumpalan lembut besar (octave
-	# fbm rendah) persis rekomendasi "Perlin FBM looks best" di shader reff.
-	var wind_noise_tex := NoiseTexture2D.new()
-	wind_noise_tex.width = 256
-	wind_noise_tex.height = 256
-	var nl := FastNoiseLite.new()
-	nl.noise_type = FastNoiseLite.TYPE_PERLIN
-	nl.fractal_type = FastNoiseLite.FRACTAL_FBM
-	nl.fractal_octaves = 4
-	nl.frequency = 0.05
-	wind_noise_tex.noise = nl
-	wind_noise_tex.seamless = true  # repeat_enable di shader: tak boleh ada sambungan
-	mat.set_shader_parameter("wind_noise", wind_noise_tex)
+	# fadeout DITHER design-1: selesai sebelum petak terluar dibongkar.
+	mat.set_shader_parameter("fadeout_envelope",
+		Vector2(fade_end - GRASS_CHUNK_SIZE, fade_end))
+	mat.set_shader_parameter("foliage_texture", _make_grass_card_texture())
+	mat.set_shader_parameter("toon_ramp", _make_toon_ramp())
+	mat.set_shader_parameter("wind_noise", _make_grass_noise(0.05, 4))
+	mat.set_shader_parameter("color_noise", _make_grass_noise(0.35, 3))
 	return mat
 
 # ---------------- API kompatibel ----------------
@@ -1004,7 +1072,7 @@ func _process(delta: float) -> void:
 	# SIZE) — cuma dicek ULANG petak mana yg seharusnya aktif SAAT pemain
 	# betul2 PINDAH petak (bukan tiap frame, murah), tapi antrean
 	# pembangunan petak baru tetap dicicil tiap frame (budget kecil) biar
-	# tak menghentak. player_pos dikirim tiap frame spy fade jarak halus.
+	# tak menghentak. Fadeout jarak murni dr kamera (design user), tak ada lagi param tiap-frame.
 	if PROC_GRASS:
 		if player:
 			var pcx := int(floor(player.global_position.x / GRASS_CHUNK_SIZE))
@@ -1016,7 +1084,6 @@ func _process(delta: float) -> void:
 		_process_grass_chunk_queue()
 		_process_grass_fill_budget()
 		if _grass_mat:
-			_grass_mat.set_shader_parameter("player_pos", Vector2(player.global_position.x, player.global_position.z) if player else Vector2.ZERO)
 	# Posisi pemain jg utk riak gelombang air (shader tanah, uniform
 	# player_water_pos — pajangan balon gelombang kon-ver-tasi reff shader)
 	if _ground_mat:

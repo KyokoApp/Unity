@@ -1,86 +1,83 @@
-shader_type spatial;
-// Helai rumput 3D di sekitar pemain (ronde-46 bag. C: tanah rumput lebat).
-// Dipakai via MultiMeshInstance3D per PETAK (chunk streaming, lihat
-// world.gd _build_grass_chunk/_update_grass_chunks) — 1 material dipakai
-// bersama semua petak. cull_disabled supaya helai tipis tetap kelihatan
-// dari kedua sisi (segitiga bersilang).
+// Shader rumput BARU — sesuai permintaan user ronde ini ("pake design ini
+// ajh biar gampang, trus shader nya pake ini"): digabung dari DUA design
+// shader yg dikirim user secara verbatim-ish:
 //
-// PEROMBAKAN (user menunjuk referensi github.com/IcterusGames/
-// SimpleGrassTextured & komplain "kok malah jadi ngikutin" thd versi
-// sebelumnya): versi lama "membungkus" (wrap/modulo) posisi tiap helai ke
-// petak kecil DI SEKITAR PEMAIN tiap frame — scr visual itu bikin petak
-// rumput lebat SELALU persis nempel & seukuran sama di pemain kemanapun
-// jalan (spt gelembung ikut pemain). Yang DIPORT dari referensi (bukan
-// dipasang utuh — itu addon EDITOR yg dilukis manual, tak relevan dgn
-// generate_async() prosedural kita) cuma PRINSIPnya: helai skrg TETAP di
-// posisi dunia nyata (world.gd yg atur chunk mana dimuat/dibongkar), jadi
-// shader ini JAUH lbh sederhana — tak ada lagi wrap/modulo sama sekali,
-// cuma nyisa fade jarak biasa (spt kabut) berbasis player_pos supaya batas
-// radius-muat petak tak kelihatan nge-pop pas dimuat/dibongkar.
+//   DESIGN 1 (space-grass style, shader pertama user): dithered fadeout
+//   per-pixel (mat4 dither + FRAGCOORD), warna bertingkat top/bottom +
+//   noise_color kering bertekstur gol, foliage_texture (kartu silang,
+//   mesh kartu-nya dibangun di world.gd _build_grass_blade_mesh), fitur
+//   angin dari tekstur noise (wind_noise digulir TIME), wind_darken untuk
+//   permainan cahaya-bayangan angin di ladang, fadeout_envelope jarak-
+//   kamera. (Tinggi-heightmap TIDAK dipakai — dunia ASekai = pulau datar
+//   y=0 absolut, jd heightmap_normals/unpack_normal dihapus: normal cukup
+//   konstan ke atas spt kartu foliage klasik.)
+//
+//   DESIGN 2 (shader toon user: light() toon_ramp + rim): shading toon
+//   bertingkat STEP turun dr toon_ramp (digulir dg ATTENUATION) + rim
+//   light (shadow vs VIEW). Satu2nya perubahan: hint hint_albedo dihapus
+//   (sudah usang/rem-4.4, cuma warning noise) — fungsi light() identik
+//   100% dgn yg user kirim.
+//
+// Guardrail world-specific ASekai TETAP dipertahankan (hilang = bug
+// besar melawan keputusan user lama): rumput MENYUSUT nol sebelum garis
+// air (island/lake/river, rumus island_shape.gd disalin manual & WAJIB
+// disamakan), variasi warna per-rumpun INSTANCE_CUSTOM.x, peleburan satu
+// keluarga hijau dgn ground tanah (bottom_color = ground_color persis —
+// teknik user-approved 'satu warna mulus').
+//
+// Dipakai oleh chunk-streaming world.gd (GrassChunk_*), 1 kartu-silang
+// per rumpun; transform world_asli (node chunk diam di dunia).
+shader_type spatial;
 render_mode cull_disabled;
 
-uniform vec3 wind_dir = vec3(1.0, 0.0, 0.35);
-uniform float wind_speed = 1.7;
-// PERBAIKAN (laporan user: "rumput ... gk goyang yang kayak digithub" — msh
-// terlalu halus dr referensi 3d-grass-shader): dinaikkan ~1.8x + ditambah
-// gust sekunder (freq beda, lihat vertex()) spy goyangannya kelihatan jelas
-// di perangkat & tak terasa seragam/monoton spt gelombang tunggal.
-uniform float wind_strength = 0.29;
-// --- ANGIN TEKSTUR (ronde ini, user kirim shader rumput @_Malido "ini apa
-// kalo bagus pasang dah" — ditelaah: sebagian sudah ada di shader ini
-// sbg padanan (gradasi dasar->ujung, dorongan pemain=trample, normal
-// up-koreksi, AO dasar); yg BENER2 baru & bagus = angin dari TEKSTUR
-// noise: gelombang PERLIN organik melintasi ladang, jauh lbh hidup dr
-// sinus mekanis; dipasang di bawah dgn tekstur dibuat RUNTIME
-// NoiseTexture2D+FastNoiseLite di world.gd — NOL file aset baru) ---
-uniform sampler2D wind_noise : hint_default_black, repeat_enable;
-uniform float wind_tex_enabled : hint_range(0.0, 1.0) = 1.0;
-uniform float wind_noise_size : hint_range(0.0, 0.5, 0.0005) = 0.05;
-uniform float wind_noise_speed : hint_range(0.0, 1.0, 0.001) = 0.1;
-uniform float wind_tex_strength : hint_range(0.0, 1.0, 0.01) = 0.30;
-// SATU WARNA HIJAU MULUS v2 (permintaan user ronde ini: "buat tanah jadi
-// hijau lagi" + "tanah & rumput gabungin jadi 1 warna jadi kayak cuma liat
-// ujung2 rumput doang"): base_color kini SAMA PERSIS dgn ground_color
-// tanah pastel baru di world.gd (0.285,0.450,0.260) — pangkal helai LENYAP
-// mlebur ke tanah, yg terbaca cuma ujung2nya yg seporsi lebih terang
-// (0.375,0.545,0.335) spt sinar sore menyentuh mahkota rumput saja.
-uniform vec3 base_color : source_color = vec3(0.285, 0.450, 0.260);  // = ground_color tanah
-uniform vec3 tip_color : source_color = vec3(0.375, 0.545, 0.335);   // ujung: pastel lebih terang
-// "variasi kering" diperkecil jadi sisir tipis jerami-pastel hangat
-// (dibatasi cuma ke rumpun PALING kering — variant >= 0.90, lihat
-// fragment()) spy tetap ada aksen tanpa merusak kepaduan hijau.
-uniform vec3 dry_tip_color : source_color = vec3(0.46, 0.50, 0.28);
-// Lantai shading disamakan dgn tanah (keluhan user: ladang terlalu gelap,
-// "pencahayaannya biar lebih terlihat rerumputannya") — 0.48->0.66 &
-// 0.85->0.90, sama persis dgn shadow_tint/mid_tint tanah -> abu tak ada
-// lagi: ground & helarnya terang SENADA satu keluarga cahaya.
-uniform float shadow_tint : hint_range(0.0, 1.0) = 0.66;
-uniform float mid_tint : hint_range(0.0, 1.0) = 0.90;
-// Efek "backlight" (SSS palsu): ujung helai yg tipis tembus cahaya kalau
-// matahari ada di belakangnya -> nyala keemasan khas rumput asli kena
-// cahaya dr belakang, bukan flat-toon polos.
-uniform float translucency : hint_range(0.0, 2.0) = 0.75;
+group_uniforms properties;
+uniform float specular : hint_range(0.0, 1.0) = 0.0;
+uniform float roughness : hint_range(0.0, 1.0) = 1.0;
+uniform float metallic : hint_range(0.0, 1.0) = 0.0;
+// Jarak MULAI/TONAS pudar dither (meter dari kamera). Chunk render di
+// world.gd: fade diminta selesai PERSIS sebelum petak terluar dibongkar,
+// jd pembongkaran petak tak kelihatan nge-pop.
+uniform vec2 fadeout_envelope = vec2(33.0, 55.0);
 
-// Posisi pemain (dunia, diperbarui tiap frame dr world.gd _process) +
-// jarak mulai/selesai pudar. Petak yg dimuat streaming SELALU sedikit
-// lebih lebar dr fade_end (lihat GRASS_UNLOAD_RADIUS_CHUNKS di world.gd)
-// jadi helai SUDAH pudar tuntas ke nol SEBELUM petaknya benar2 dibongkar
-// -> pemuatan/pembongkaran petak jadi tak kelihatan nge-pop sama sekali.
-uniform vec2 player_pos = vec2(0.0, 0.0);
-uniform float fade_start = 33.0;
-uniform float fade_end = 55.0;
+group_uniforms color;
+// SATU KELUARGA HIJAU MULUS (teknik user-approved): bottom_color SAMA
+// PERSIS dgn ground ground_color (0.285,0.450,0.260) — pangkal kartu
+// lenyap mlebur ke tanah, yg terbaca cuma ujung (top) + aksen kering
+// noise_color bertekstur gol.
+uniform vec3 top_color : source_color = vec3(0.375, 0.545, 0.335);
+uniform vec3 bottom_color : source_color = vec3(0.285, 0.450, 0.260);
+uniform vec3 noise_color : source_color = vec3(0.46, 0.50, 0.28);
 
-// "Injak" rumput (ronde-46, ide diadaptasi dari gameidea-studio/3d-grass-
-// shader): helai menekuk MENJAUH dari pemain saat dilewati, di luar goyangan
-// angin biasa -> berasa "menerobos rumput" waktu jalan, bukan cuma statis.
-uniform float trample_power : hint_range(0.0, 3.0) = 1.1;
-uniform float trample_radius : hint_range(0.1, 5.0) = 1.3;
+group_uniforms maps;
+// Kartu rumput digambar RUNTIME (nol aset repo) di world.gd
+// _make_grass_card_texture(): helai-helai putih tipis melebar di atas
+// latar alpha-0; rgb putih polos — warna sesungguhnya dr sampel uniform.
+uniform sampler2D foliage_texture;
+uniform sampler2D color_noise;
+uniform float color_noise_scale = 6.0;
+uniform float color_noise_intensity : hint_range(0.0, 1.0) = 0;
 
-// Batas pulau (ronde-46 lanjutan bag. C, permintaan user "pulau 12km +
-// laut"; ronde ini: pulau diperkecil ke 3km + danau/sungai ditambah).
-// Rumput TAK BOLEH tumbuh di pasir/laut/danau/sungai. Rumus disalin manual
-// dr island_shape.gd (IslandShape) & dr shader tanah di world.gd — WAJIB
-// disamakan kalau salah satu diubah (lihat komentar di island_shape.gd).
+group_uniforms wind;
+uniform bool wind = true;
+uniform sampler2D wind_noise;
+uniform float wind_scale = 0.35;
+uniform float wind_intensity = 0.30;
+uniform float wind_speed = 0.25;
+uniform float wind_darken : hint_range(0.0, 1.0) = 0.22;
+
+group_uniforms toon_light;
+// Ramp toon 4px (design 2 user) & rim light yg melekat ke tepi terang.
+uniform sampler2D toon_ramp;
+uniform float rim_power : hint_range(1.0, 100.0) = 1.6;
+uniform float rim_size : hint_range(0.0, 1.0) = 0.35;
+
+varying vec3 hm_pos;      // posisi dunia vertex (ruang kartu model->dunia)
+varying float v_fade;     // hasil fadeout_envelope (0..1), utk dither discard
+varying float v_variant;  // keacakan kecil per rumpun (INSTANCE_CUSTOM.x)
+
+// ---- Batas air pulau (disalin MANUAL dr island_shape.gd & shader tanah —
+// WAJIB disamakan kalau salah satu diubah; syarat design user: rumput tak
+// boleh tumbuh di pasir/laut/danau/sungai) ----
 const float ISLAND_RADIUS = 460.0;
 const float BEACH_WIDTH = 55.0;
 float island_radius_at(float theta) {
@@ -95,9 +92,6 @@ float island_water_factor(vec2 p) {
 	float coast = island_radius_at(theta);
 	return clamp((r - (coast - BEACH_WIDTH)) / BEACH_WIDTH, 0.0, 1.0);
 }
-// Danau + sungai (IslandShape.lake_factor/river_factor, disalin manual —
-// permintaan user "ada aliran danau atau sungai"). WAJIB disamakan dgn
-// island_shape.gd & world.gd kalau salah satu diubah.
 const vec2 LAKE_CENTER = vec2(95.0, 75.0);
 const float LAKE_RADIUS = 60.0;
 const float LAKE_BANK = 14.0;
@@ -128,107 +122,107 @@ float any_water_factor(vec2 p) {
 	return max(island_water_factor(p), max(lake_factor(p), river_factor(p)));
 }
 
-varying float height_w;   // 0=akar, 1=ujung (dibaca dari COLOR.a mesh)
-varying float variant;    // keacakan warna per-instance (INSTANCE_CUSTOM.x)
+// ---- Design 1 user: matriks bayer dither 4x4 (verbatim) ----
+const mat4 dither = mat4(
+	vec4(0.0625, 0.5625, 0.1875,  0.6875),
+	vec4(0.8125, 0.3125, 0.9375,  0.4375),
+	vec4(0.25, 0.75, 0.125, 0.625),
+	vec4(1.0, 0.5, 0.875,  0.375));
+
+float getValue(int x, int y) {
+	return dither[x][y];
+}
+
+float remap(float value, float istart, float istop, float ostart, float ostop) {
+	return ostart + (ostop - ostart) * ((value - istart) / (istop - istart));
+}
 
 void vertex() {
-	height_w = COLOR.a;
-	variant = INSTANCE_CUSTOM.x;
+	v_variant = INSTANCE_CUSTOM.x;
+	// Posisi vertex DI DUNIA (instance chunk tetap diam, lihat world.gd) —
+	// UV.y kartu = 0 akar/1 ujung (dibangun demikian di world.gd).
+	vec3 world_pre = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 
-	// Posisi instance SKRG TETAP nyata di dunia (node petaknya diam persis
-	// di titik tengah chunk, lihat world.gd) — tinggal diukur jaraknya ke
-	// pemain buat fade, tak ada lagi wrap/modulo spt versi lama.
-	vec2 inst_xz = MODEL_MATRIX[3].xz;
-	float dist_edge = length(inst_xz - player_pos);
-	float edge_fade = 1.0 - smoothstep(fade_start, fade_end, dist_edge);
-	VERTEX *= edge_fade;
-
-	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-
-	// Rumput lenyap sblm garis air (laut/danau/sungai) — fade mulai SEBELUM
-	// pasir/tepi penuh (wf 0.0-0.3) spy transisinya alami, bukan terpotong
-	// tajam pas garis air. Pakai teknik shrink-ke-akar yg sama spt edge_fade
-	// di atas (aman digabung, tinggal dikali lagi).
-	float wf = any_water_factor(world_pos.xz);
+	// Guardrail #1: susutkan kartu ke nol sebelum air (laut/danau/sungai).
+	float wf = any_water_factor(world_pre.xz);
 	float island_fade = 1.0 - smoothstep(0.0, 0.3, wf);
 	VERTEX *= island_fade;
 
+	// Guardrail #2: fadeout dither jarak-kamera (design 1) — hitung dari
+	// kamera SEKARANG (INV_VIEW_MATRIX[3].xyz = posisi kamera dunia), dr
+	// vertex ASLI (bukan yg sudah disusutkan).
+	vec3 cam_pos = INV_VIEW_MATRIX[3].xyz;
+	float camera_distance = distance(world_pre, cam_pos);
+	float fadeout = clamp(remap(camera_distance, fadeout_envelope.x,
+		fadeout_envelope.y, 1.0, 0.0), 0.0, 1.0);
+	v_fade = fadeout;
+	// dan jg susutkan vertikal helai pd fade rendah (hemat fill-rate di
+	// radius terluar, efek dither lainnya di fragment). Fade 0 = nol.
+	VERTEX *= max(fadeout, 0.001);
 
-	// Tekukan injak: cuma dihitung (termasuk inverse(MODEL_MATRIX) yg agak
-	// mahal) utk helai yg BENAR2 dekat pemain — dibungkus if supaya ribuan
-	// helai jauh lainnya tak ikut nanggung biayanya (hemat GPU mobile).
-	vec2 to_player = world_pos.xz - player_pos;
-	float dist_p = length(to_player);
-	if (dist_p < trample_radius) {
-		vec2 away_w = dist_p > 0.0005 ? (to_player / dist_p) : vec2(0.0);
-		float trample = smoothstep(trample_radius, 0.0, dist_p) * height_w * height_w;
-		vec3 away_model = (inverse(MODEL_MATRIX) * vec4(away_w.x, 0.0, away_w.y, 0.0)).xyz;
-		VERTEX += away_model * trample * trample_power;
+	// Angin (design 1): sampling gumpalan besar di ruang dunia, digulir
+	// TIME; bobot UV.y^2 -> cuma ujung yg tertiup (akar diam menapak).
+	if (wind) {
+		float wind_at = texture(wind_noise,
+			world_pre.xz * wind_scale * 0.01 + vec2(TIME * wind_speed)).r;
+		float wind_offset = wind_at * wind_intensity * UV.y * UV.y;
+		// rakit di ruang dunia lalu balik ke model via transpose-matrix
+		// (basis rotasi-murni) — WAJIB krn tiap rumpun diputar yaw acak.
+		vec3 wind_world = vec3(0.943, 0.0, 0.331) * wind_offset;
+		VERTEX += (vec4(wind_world, 0.0) * MODEL_MATRIX).xyz;
 	}
 
-	float phase = INSTANCE_CUSTOM.y * TAU;
-	// Dua gelombang beda frekuensi+arah dijumlah (bukan satu sinus tunggal)
-	// spy goyangannya terasa spt "gust" angin sungguhan yg tak seragam antar
-	// rumpun, bukan gelombang mekanis berulang persis — lebih dekat ke kesan
-	// referensi 3d-grass-shader yg diminta user.
-	float sway = sin(TIME * wind_speed + world_pos.x * 0.6 + world_pos.z * 0.6 + phase);
-	float gust = sin(TIME * wind_speed * 0.37 + world_pos.x * 0.11 - world_pos.z * 0.08 + phase * 1.7);
-	// PITA GUST BERJALAN (tier-menengah, disetujui user ronde ini: "wind in
-	// grass"): gelombang besar lambat bergeser melintasi ladang sepanjang
-	// arah angin; di dalam pita goyangan diperkuat ~2x, di luarnya tetap
-	// lembut — efek "gelombang angin berjalan di atas rumput" khas film
-	// anime/Ghibli, bukan seluruh ladang goyang serentak.
-	float band = 0.5 + 0.5 * sin(dot(world_pos.xz, vec2(0.943, 0.331)) * 0.045
-		- TIME * wind_speed * 0.55);
-	band = band * band * band;
-	float sway_total = (sway * 0.7 + gust * 0.5) * (0.75 + 1.35 * band);
-	// rakit angin di RUANG DUNIA dulu (bukan langsung tambah lokal): sama
-	// teknik shader @_Malido — vektor dunia ditransform ke model lewat
-	// v * MODEL_MATRIX (kebalikan rotasi utk basis rotasi-murni). WAJIB
-	// krn tiap rumpun diputar yaw acak (world.gd blade_basis) — tanpa ini
-	// tiap rumpun tertiup ke ARAH BERBEDA (angin dunia tak seragam lagi).
-	vec3 wind_world = wind_dir * sway_total * wind_strength;
-	// angin TEKSTUR Perlin (teknik @_Malido): sampling di ruang dunia,
-	// digulir lawan arah angin; height_w/2.5 = ujung tertiup sedikit
-	// melambat dr akar -> konstruktur aliran organik, bukan sinus seragam.
-	if (wind_tex_enabled > 0.5) {
-		vec3 wt = texture(wind_noise, world_pos.xz * wind_noise_size
-			+ normalize(-wind_dir.xz) * (TIME + height_w / 2.5) * wind_noise_speed).rgb;
-		wind_world += wt * normalize(wind_dir) * wind_tex_strength;
-	}
-	// hanya bagian atas helai yg bergoyang (akar diam) -> height_w^2 sbg bobot
-	VERTEX += (vec4(wind_world * (height_w * height_w), 0.0) * MODEL_MATRIX).xyz;
-	// normal "palsu" dicondongkan ke atas biar cahaya tak terlihat pipih-datar
-	NORMAL = normalize(mix(NORMAL, vec3(0.0, 1.0, 0.0), 0.55));
+	hm_pos = world_pre;
+	// Normal kartu dicondongkan ke atas (foliage klasik) spy shading toon
+	// toon_ramp membacanya spt kanopi, bukan dinding tegak. CATAT: di
+	// vertex() NORMAL dinyatakan dlm RUANG MODEL (engine yg mentransform
+	// ke view-space setelahnya) — JANGAN kalikan VIEW/MODEL_MATRIX manual
+	// di sini (kesalahan double-transform pernah dibuat di putaran ini).
+	NORMAL = normalize(mix(normalize(NORMAL), vec3(0.0, 1.0, 0.0), 0.72));
 }
-
 
 void fragment() {
-	vec3 col = mix(base_color, tip_color, height_w);
-	// Sebagian kecil rumpun (variant PALING tinggi) condong ke warna kering
-	// — cuma di area dekat ujung (height_w) spy pangkalnya ttp hijau spt
-	// rumput nyata. RONDE INI: ambang dinaikkan 0.74->0.90 (cuma ~10%
-	// rumpun yg kena) demi kepaduan satu warna hijau dgn tanah.
-	float dryness = smoothstep(0.90, 0.99, variant);
-	col = mix(col, dry_tip_color, dryness * height_w);
-	// variasi terang/gelap ringan per rumpun DIPERSEMPIT (0.82-1.22 ->
-	// 0.90-1.10, permintaan user: tanah+rumput satu keluarga warna, tak
-	// ada lagi bercak rumpun gelap-vs-terang yg memecah hamparan).
-	col *= mix(0.90, 1.10, variant);
-	ALBEDO = col;
-	ROUGHNESS = 1.0;
-	SPECULAR = 0.0;
+	// ---- Design 1 user: dithered fadeout (verbatim) ----
+	float limit = getValue(int(FRAGCOORD.x) % 4, int(FRAGCOORD.y) % 4);
+	if (v_fade < limit - 0.001) {
+		discard;
+	}
+
+	vec4 card = texture(foliage_texture, UV);
+	ALPHA = card.a;
+	ALPHA_SCISSOR_THRESHOLD = 0.5;
+
+	// ---- Design 1 user: campur warna bertingkat + noise gersang ----
+	float color_noise_at_position = mix(0.0,
+		texture(color_noise, hm_pos.xz * color_noise_scale * 0.001).r,
+		color_noise_intensity);
+	vec3 base_color = mix(bottom_color, top_color, UV.y);
+	// aksen kering hanya di ujung + hanya rumpun variant TINGGI (sekema
+	// lama yg user approved: pangkal tetap satu warna dgn tanah).
+	float dryness = smoothstep(0.90, 0.99, v_variant) * UV.y;
+	vec3 mixed_color = mix(mix(base_color, noise_color, color_noise_at_position),
+		noise_color, dryness);
+
+	// ---- Design 1 user: permainan cahaya-bayangan angin di ladang ----
+	float wind_darkening = mix(1.0,
+		texture(wind_noise, hm_pos.xz * wind_scale * 0.01 + vec2(TIME * wind_speed)).r,
+		wind_darken);
+	if (!wind) { wind_darkening = 1.0; }
+
+	ALBEDO = mixed_color * card.rgb * wind_darkening
+		* mix(0.90, 1.10, v_variant);
+	SPECULAR = specular;
+	ROUGHNESS = roughness;
+	METALLIC = metallic;
 }
 
+// ---- Design 2 user: shading TOON via toon_ramp + rim light (verbatim,
+// hanya tanpa hint_albedo yg usang) ----
 void light() {
-	float l = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);
-	float b = shadow_tint + (mid_tint - shadow_tint) * smoothstep(0.15, 0.5, l)
-		+ (1.0 - mid_tint) * smoothstep(0.55, 0.85, l);
-	DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * b * ATTENUATION;
-	// Backlight/SSS palsu: makin dekat sudut pandang ke arah "lawan cahaya"
-	// (matahari di belakang helai relatif ke kamera), makin nyala keemasan
-	// tipis di ujung (height_w) — efek translusen khas daun/rumput tipis.
-	float back = pow(clamp(dot(-LIGHT, VIEW), 0.0, 1.0), 2.5) * height_w;
-	DIFFUSE_LIGHT += tip_color * LIGHT_COLOR * back * translucency * ATTENUATION;
-	SPECULAR_LIGHT = vec3(0.0);
+	float shadow = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);
+	float rim = (shadow * (clamp(dot(NORMAL, VIEW), 0.0, 1.0) < rim_size ? 1.0 : 0.0));
+
+	vec4 processed_shadow = texture(toon_ramp, ((shadow * ATTENUATION)).xy);
+
+	DIFFUSE_LIGHT += (processed_shadow.rgb + (rim * rim_power)) * ALBEDO * LIGHT_COLOR;
 }
