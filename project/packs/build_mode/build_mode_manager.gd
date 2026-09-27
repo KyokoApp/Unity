@@ -245,9 +245,9 @@ func _on_drag(e: InputEventScreenDrag) -> void:
 	# satu jari -> putar kamera (gestur look yg sama dgn gameplay)
 	if e.index == _look_index:
 		if float(_touches[e.index]["moved_px"]) > LOOK_DRAG_START_PX:
-			var p := _player()
-			if p and p.has_method("add_look_px"):
-				p.add_look_px(-e.relative.x, -e.relative.y)
+			var pl := _player()
+			if pl and pl.has_method("add_look_px"):
+				pl.add_look_px(-e.relative.x, -e.relative.y)
 
 ## dua sentuhan untuk pinch (dr event drag atau posisi yg disimpan)
 func _touch_pair_dist(current_drag: InputEventScreenDrag = null) -> float:
