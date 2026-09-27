@@ -642,19 +642,23 @@ func _check_world_ground_fog() -> void:
 ## (butir 6). Kisah buruk yg dicegah: salah API Godot 4 (GridMap/MeshLibrary
 ## /Curve3D/FileAccess) yg baru ketahuan di perangkat.
 func _check_build_mode() -> void:
-	var ws: PackedScene = load(WORLD_SCENE)
+	var ws: PackedScene = load("res://packs/world_terrain/world.tscn")
 	if ws == null:
-		_fail("scene world " + WORLD_SCENE + " tidak termuat (build-probe)")
+		_fail("scene world world.tscn tidak termuat (build-probe)")
 		return
 	var world: Node3D = ws.instantiate()
 	world.name = "ProbeBuildWorld"
-	add_child(world)
+	root.add_child(world)   # SceneTree-script: wajib pakai root, bukan self
+	# PENTING (sama dgn catatan fase 1e): JANGAN langsung generate_async —
+	# world belum masuk tree sebelum giliran await berikutnya (data.tree
+	# null -> crash). Satu frame dulu.
+	await process_frame
 	if world.get_script() == null:
 		_fail("skrip world tidak terpasang di build-probe")
 		return
 	var hud_node := Node.new()
 	hud_node.name = "ProbeBuildShim"
-	add_child(hud_node)
+	root.add_child(hud_node)
 	await world.generate_async(hud_node)
 	await process_frame
 	if world.get("terrain_mesh") == null or world.get("ground_body") == null:
