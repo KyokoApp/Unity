@@ -661,11 +661,10 @@ func _check_build_mode() -> void:
 	root.add_child(hud_node)
 	await world.generate_async(hud_node)
 	await process_frame
-	if world.get("terrain_mesh") == null or world.get("ground_body") == null:
-		_fail("build-probe: world tidak tergenerate lengkap")
-		world.queue_free()
-		hud_node.queue_free()
-		return
+	# Tak perlu cek-kelengkapan dunia terpisah di sini (fase 1e sudah
+	# mengaso world_env/fog/rumput): kalau generate_async gagal di tengah,
+	# BuildModeManager sederhana tak akan ada → cari-manager di bawah
+	# otomatis _fail dgn pesan yang tepat.
 	var bm: Node = null
 	for c in world.get_children():
 		if c.get_script() != null and String(c.get_script().get_path()).ends_with("build_mode_manager.gd"):

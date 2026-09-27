@@ -957,8 +957,13 @@ func _setup_vignette() -> void:
 	# layer 0: di atas dunia 3D tapi tegas DI BAWAH HUD permainan (hud.gd
 	# pakai layer 1) — tombol/joistik tetap tajam tak kena redup tepian.
 	layer.layer = 0
-	var cr := ColorRect.new()
+	# BUG ditemukan CI probe fase-1f: ColorRect TIDAK punya properti
+	# `texture` (assignment melempar SCRIPT ERROR tiap boot & vignette tak
+	# pernah tampil di device). Yang punya = TextureRect.
+	var cr := TextureRect.new()
 	cr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cr.stretch_mode = TextureRect.STRETCH_SCALE
 	cr.mouse_filter = Control.MOUSE_FILTER_IGNORE  # jangan sekali2 telan sentuhan
 	var g := Gradient.new()
 	g.set_color(0, Color(0.0, 0.0, 0.0, 0.0))
