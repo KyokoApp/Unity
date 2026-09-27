@@ -26,8 +26,13 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_toon, specular_schlick_ggx;
 // Nice Shader by @_Malido ^^
 
-uniform vec3 top_color: source_color = vec3(0.375, 0.545, 0.335);
-uniform vec3 bottom_color: source_color = vec3(0.285, 0.450, 0.260);
+// STYLE VISUAL merk (ronde ini — permintaan user "pake style ini ajh"):
+// PALET WARNA persis material ExampleScene merk (dari ExampleScene.tscn):
+// top veil lime terang (0.627,0.804,0.282), bottom hijau lush (0.416,
+// 0.616,0.224). (Ground tanah world.gd jg diringankan mendekati supaya
+// peleburan darat->rumput tetap halus, lihat komentar di _grass_material.)
+uniform vec3 top_color: source_color = vec3(0.627, 0.804, 0.282);
+uniform vec3 bottom_color: source_color = vec3(0.416, 0.616, 0.224);
 uniform float ambient_occlusion_factor: hint_range(0.0, 1.0, 0.01) = 0.3;
 uniform float specular_strength: hint_range(0.0, 1.0, 0.01) = 0.4;
 uniform float player_displacement_strength: hint_range(0.0, 1.0, 0.01) = 0.4;

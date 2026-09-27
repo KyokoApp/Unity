@@ -348,7 +348,11 @@ render_mode cull_disabled, depth_draw_opaque;
 // rerumputannya"): shadow 0.50 -> 0.66, mid 0.82 -> 0.90, krn dgn sore
 // elevasi rendah (sun 10-13°, dot(N,L) kecil) floor lama bikin ladang
 // terbaca gelap-mossman sekarang harus tetap cerah hangat.
-uniform vec3 ground_color : source_color = vec3(0.285, 0.450, 0.260);
+// RONDE INI (style Malidos penuh — permintaan user): diringankan mendekati
+// bottom_color rumput merk (0.416,0.616,0.224) biar peleburan pangkal
+// rumput->darat tetap halus (dl ground ini diset 0.285/0.450/0.260 "satu
+// keluarga" dgn palet gelap ASekai lama).
+uniform vec3 ground_color : source_color = vec3(0.345, 0.530, 0.245);
 uniform float shadow_tint : hint_range(0.0, 1.0) = 0.66;
 uniform float mid_tint : hint_range(0.0, 1.0) = 0.90;
 // --- Pulau/laut (IslandShape, disalin manual dr island_shape.gd) ---
@@ -767,9 +771,12 @@ func _grass_material() -> ShaderMaterial:
 	var fade_end := (float(GRASS_RENDER_RADIUS_CHUNKS) + 0.5) * GRASS_CHUNK_SIZE
 	mat.set_shader_parameter("fadeout_envelope",
 		Vector2(fade_end - GRASS_CHUNK_SIZE, fade_end))
-	mat.set_shader_parameter("top_color", Vector3(0.375, 0.545, 0.335))
-	mat.set_shader_parameter("bottom_color", Vector3(0.285, 0.450, 0.260))
-	mat.set_shader_parameter("player_displacement_strength", 0.4)
+	# STYLE VISUAL MERK (permintaan user ronde ini: "pake style ini ajh") —
+	# seluruh nilai dari contoh material di ExampleScene merk, termasuk
+	# player_displacement_strength 0.3 (bkn 0.4 custom).
+	mat.set_shader_parameter("top_color", Vector3(0.627, 0.804, 0.282))     # lime terang (~"lime grass" merk)
+	mat.set_shader_parameter("bottom_color", Vector3(0.416, 0.616, 0.224))  # hijau lush rimbun
+	mat.set_shader_parameter("player_displacement_strength", 0.3)
 	mat.set_shader_parameter("player_displacement_size", 0.94)
 	mat.set_shader_parameter("wind_direction", Vector3(1.0, -0.7, -0.5))
 	mat.set_shader_parameter("wind_strength", 0.23)
