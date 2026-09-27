@@ -746,7 +746,7 @@ func _check_build_mode() -> void:
 	placer.call("place", Vector3(4, 0, 0.5), "Grass_Common_Tall")
 	# pohon JAUH tu tetap utuh (bukan cover, jarak juga jauh)
 	placer.call("place", Vector3(100, 0, 100), "CommonTree_1")
-	var objs_pre := placer.get("objects").size()
+	var objs_pre: int = int(placer.get("objects").size())
 	bm.call("_on_finish_road")
 	if rb.get("roads").size() != 1:
 		_fail("finish_road: jalan tak terkunci saat memakai alur tombol manager")
