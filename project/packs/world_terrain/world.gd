@@ -36,10 +36,15 @@ var faceted := false          # stub: tak ada world lagi untuk di-facet
 var world_env: WorldEnvironment
 var sun: DirectionalLight3D
 var sky_mat: ShaderMaterial
-# Ronde-46 bag. C (permintaan pengguna): dunia SELALU malam sekarang — siklus
-# siang-malam otomatis DIMATIKAN (lihat _tick_daynight). time_of_day dikunci
-# di jam malam tetap; nilai ini juga menentukan posisi tetap bulan di langit.
-var time_of_day := 1.0
+# Ronde-46 bag. C dulu: dunia dikunci MALAM. RONDE INI (permintaan user:
+# "ubah jadi sore hari dengan suasana santai") — dikunci SORE (~17:12,
+# golden hour hangat): satu-satunya waktu yg aktif di _apply_daylight adalah
+# cabang SIANG (dayf≈0.21>0.15) yg warnanya kini diset utk sore keemasan
+# (matahari rendah hangat, langit krim-emas, bintang mati), siklus jalan
+# waktu tetap DIMATIKAN (lihat _tick_daynight). Masih pakai kurva
+# sin((t-6)/12*PI) yg sama, jd kalau besok mau balik malam/siang tinggal
+# ganti nilai angka ini saja.
+var time_of_day := 17.2
 
 var _root: Node
 var _ground: MeshInstance3D   # bidang raksasa yang menyentak mengikuti pemain
@@ -187,22 +192,23 @@ func _make_flat_ground() -> void:
 ## utk keduanya, tinggal warnanya yg beda tergantung posisi dunia absolut.
 ##
 ## FIX BUG (laporan user: "tanah warna hitam bukan hijau"): ground_color
-## sblmnya (0.05,0.16,0.06) HAMPIR SAMA GELAP dgn warna akar (paling gelap)
-## di grass_blade.gdshader, lalu masih dikalikan lg shadow_tint (0.50) di
-## sisi tak-menghadap-bulan + ambient malam yg memang sengaja diredupkan —
-## hasil akhirnya berada di bawah ambang persepsi warna (kelihatan nyaris
-## hitam polos, bukan salah render, cuma kegelapan menumpuk kebablasan).
-## Dinaikkan ke (0.13,0.33,0.12) -- setara area TENGAH gradasi hijau helai
-## rumput (bukan sekelam akarnya) shg tetap "tua"/tak neon tapi terang cukup
-## utk lolos ambang itu & jelas kebaca hijau di bawah pencahayaan malam yg
-## sama persis dgn yg dipakai rumput 3D di atasnya.
+## sblmnya (0.05,0.16,0.06) HAMPIR SAMA GELAP dgn warna akar di
+## grass_blade.gdshader, ditumpuk shadow_tint + ambient malam -> di bawah
+## ambang persepsi warna (kelihatan nyaris hitam polos, bukan salah render).
+## Sudah dinaikkan (lihat nilai uniform ground_color di bawah).
 ##
-## RONDE INI JUGA: danau+sungai (permintaan user "ada aliran danau atau
-## sungai") ditambah lewat any_water_factor() (gabungan laut ATAU danau
-## ATAU sungai, rumus lake_factor/river_factor disalin manual dr
-## island_shape.gd, WAJIB disamakan kalau salah satu diubah) — dipakai
-## gantikan water_factor() polos di fragment(), shg danau/sungai dapat
-## shading air+riak yg SAMA dgn laut tanpa kode terpisah.
+## SELARAS SATU WARNA (permintaan user ronde ini: "buat rumput dan tanah
+## satu warna hijau smooth"): ground_color kini SAMA-keluarga dgn warna
+## akar helai rumput di grass_blade.gdshader (base_color) & gradasi ujung
+## rumput dipendekkan jadi halus (lihat komentar di shader rumput) — tanah
+## polos + helai 3D melebur jadi satu hamparan hijau mulus (bukan lagi
+## helai kuning-terang di atas tanah gelap), senada suasana sore hangat.
+##
+## DANAU+SUNGAI (permintaan user): ditambah lewat any_water_factor()
+## (gabungan laut ATAU danau ATAU sungai, rumus lake_factor/river_factor
+## disalin manual dr island_shape.gd, WAJIB disamakan kalau salah satu
+## diubah) — dipakai gantikan water_factor() polos di fragment(), shg
+## danau/sungai dapat shading air+riak yg SAMA dgn laut tanpa kode terpisah.
 func _make_ground_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	var sh := Shader.new()
@@ -215,7 +221,7 @@ render_mode cull_back, depth_draw_opaque;
 // streaming yg SKRG jauh lebih tebal (world.gd GRASS_CHUNK_INSTANCES) yg
 // bertugas kasih detail/tekstur visual; tanah di baliknya cukup warna
 // solid senada spy menyatu, bukan malah "ramai" bersaing dgn tuft di atas.
-uniform vec3 ground_color : source_color = vec3(0.13, 0.33, 0.12);
+uniform vec3 ground_color : source_color = vec3(0.155, 0.345, 0.125);
 uniform float shadow_tint : hint_range(0.0, 1.0) = 0.50;
 uniform float mid_tint : hint_range(0.0, 1.0) = 0.82;
 // --- Pulau/laut (IslandShape, disalin manual dr island_shape.gd) ---
@@ -257,13 +263,13 @@ float water_factor(vec2 p) {
 // --- Danau + sungai (IslandShape.lake_factor/river_factor, disalin manual —
 // permintaan user "ada aliran danau atau sungai"). HARUS SAMA PERSIS dgn
 // island_shape.gd & grass_blade.gdshader kalau salah satu diubah.
-const vec2 LAKE_CENTER = vec2(350.0, 450.0);
-const float LAKE_RADIUS = 90.0;
+const vec2 LAKE_CENTER = vec2(95.0, 75.0);
+const float LAKE_RADIUS = 60.0;
 const float LAKE_BANK = 14.0;
-const vec2 RIVER_DIR = vec2(0.6, 0.8);
-const vec2 RIVER_START = vec2(404.0, 522.0);
-const float RIVER_LENGTH = 900.0;
-const float RIVER_HALF_WIDTH = 16.0;
+const vec2 RIVER_DIR = vec2(0.784, 0.621);
+const vec2 RIVER_START = vec2(142.04, 112.26);
+const float RIVER_LENGTH = 1600.0;
+const float RIVER_HALF_WIDTH = 18.0;
 const float RIVER_BANK = 10.0;
 const float RIVER_MEANDER_AMP = 55.0;
 const float RIVER_MEANDER_FREQ = 0.006;
@@ -630,8 +636,11 @@ func _setup_environment() -> void:
 	# FOG_MODE_DEPTH dipakai supaya fog_depth_begin/end jadi aktif: jernih
 	# total sampai fog_depth_begin meter, baru mulai menebal ke fog_depth_end.
 	env.fog_mode = Environment.FOG_MODE_DEPTH
-	env.fog_depth_begin = 45.0
-	env.fog_depth_end = 160.0
+	# SORE DIADEM (ronde ini: dunia skrg terang & pulau kecil 3km+air dekat
+	# spawn) — kabut dilonggarkan JAUH (dr 45/160 malam) shg pemandangan
+	# danau/sungai+laut jelas terbaca, sisanya cuma kabut tipis kejauhan.
+	env.fog_depth_begin = 70.0
+	env.fog_depth_end = 340.0
 	env.fog_depth_curve = 1.6
 	env.fog_density = 0.0026
 	env.fog_sky_affect = 0.3
@@ -763,22 +772,29 @@ func _apply_daylight() -> void:
 	var env := world_env.environment
 	if dayf > 0.15:
 		var k := smoothstep(0.15, 0.85, dayf)
-		sun.light_color = Color(1.0, 0.82, 0.62).lerp(Color(1.0, 0.90, 0.76), k)
-		sun.light_energy = 0.46 + 0.07 * k
+		# SORE HANGAT ("dikunci sore ~17:12", time_of_day di atas — satu2nya
+		# cabang yg aktif krn siklus mati): matahari rendah keemasan hangat
+		# (bukan siang putih-panas), ambient lembut hangat, langit teal-
+		# kehijauan lembut dgn cakrawala emas-krim + dasar cokelat-pasir
+		# hangat, matahari/bulan cakram tetap kecil wajar (0.035, lihat fix
+		# ukuran bulan), bintang MATI siang. Tenang & santai, tak ada sisa
+		# nuansa dingin malam tua.
+		sun.light_color = Color(1.0, 0.80, 0.55).lerp(Color(1.0, 0.88, 0.68), k)
+		sun.light_energy = 0.50 + 0.08 * k
 		sun.shadow_enabled = quality_ref.get_preset().shadows if quality_ref else true
-		sun.shadow_opacity = 0.40
-		env.ambient_light_color = Color(0.50, 0.57, 0.60)
-		env.ambient_light_energy = 0.50
-		env.fog_light_color = Color(0.54, 0.74, 0.68)
-		sky_mat.set_shader_parameter("zenith_color", Color(0.19, 0.42, 0.46))
-		sky_mat.set_shader_parameter("horizon_color", Color(0.62, 0.80, 0.66))
-		sky_mat.set_shader_parameter("ground_color", Color(0.42, 0.55, 0.50))
+		sun.shadow_opacity = 0.35
+		env.ambient_light_color = Color(0.56, 0.55, 0.52)
+		env.ambient_light_energy = 0.55
+		env.fog_light_color = Color(0.60, 0.68, 0.64)
+		sky_mat.set_shader_parameter("zenith_color", Color(0.22, 0.45, 0.50))
+		sky_mat.set_shader_parameter("horizon_color", Color(0.88, 0.74, 0.52))
+		sky_mat.set_shader_parameter("ground_color", Color(0.48, 0.46, 0.40))
 		# ground_bottom_color: titik gradasi ke-4 (lihat sky.gdshader) —
 		# diturunkan dari ground_color sendiri via darkened(), meniru cara
 		# plugin "day-and-night-cycle" (maetzemax) turunkan bbrp warna dari
 		# satu basis biar tetap harmonis (bukan warna acak baru).
-		sky_mat.set_shader_parameter("ground_bottom_color", Color(0.42, 0.55, 0.50).darkened(0.45))
-		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.90, 0.66))
+		sky_mat.set_shader_parameter("ground_bottom_color", Color(0.48, 0.46, 0.40).darkened(0.45))
+		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.88, 0.66))
 		sky_mat.set_shader_parameter("star_visibility", 0.0)
 		sky_mat.set_shader_parameter("sun_size", 0.035)
 		sky_mat.set_shader_parameter("halo", 0.22)
@@ -799,8 +815,11 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("sun_size", 0.035)
 		sky_mat.set_shader_parameter("halo", 0.22)
 	else:
-		# MALAM (bag. C: satu-satunya cabang yg dipakai sekarang krn dunia
-		# dikunci malam permanen) — DirectionalLight jadi "cahaya bulan" pucat
+		# MALAM — cabang ini skrg MENJADI DEAD-CODE (ronde sebelumnya
+		# satu-satunya yg dipakai krn kunci malam permanen; ronde ini: kunci
+		# dipindah ke sore, lihat time_of_day di atas) tapi DIJAGA UTUH, bisa
+		# diaktifkan lagi dgn ganti time_of_day (lihat komentarnya). Isinya:
+		# DirectionalLight jadi "cahaya bulan" pucat
 		# biru, cakram sky yg sama dipakai sbg BULAN (dibesarkan+dihalo lebih
 		# lembut drpd matahari), langit gelap dgn bintang bertaburan.
 		#
@@ -848,8 +867,9 @@ func _apply_daylight() -> void:
 	# spt sebelumnya (slider debug & preset kualitas).
 	env.fog_density = clampf(0.85 * float(_lo.fog) * _q_fog, 0.0, 1.0)
 	# jarak kabut menyusut sedikit di preset kualitas Rendah (_q_fog>1) —
-	# selain hemat gambar jauh, juga menyamarkan pop-in objek.
-	env.fog_depth_end = 160.0 / maxf(_q_fog, 0.4)
+	# selain hemat gambar jauh, juga menyamarkan pop-in objek. (Nilai dasar
+	# disamakan dgn inisial sore di _setup_environment: 340, bukan 160 malam.)
+	env.fog_depth_end = 340.0 / maxf(_q_fog, 0.4)
 	sun.light_energy *= float(_lo.sun)
 	env.ambient_light_energy *= float(_lo.ambient)
 	if int(_lo.sky) >= 0 and int(_lo.sky) < SKY_PRESETS.size():

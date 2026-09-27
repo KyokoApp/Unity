@@ -278,25 +278,62 @@ func _check_skin_switch(player: Node) -> void:
 	if String(player.get("_skin_id")) != "kanna":
 		_fail("ganti skin ke kanna gagal (_skin_id masih \"%s\")" % String(player.get("_skin_id")))
 		return
-	var skel: Skeleton3D = player.get("_skeleton")
-	if skel == null or not is_instance_valid(skel):
-		_fail("skin kanna: _skeleton null setelah cycle_skin")
+	# perbaikan ronde ini ("karakter vrm malah tidur ditanah"): Kanna BUKAN
+	# lagi menukar skeleton mannequin (nama tulang di-rename) — mannequin
+	# tetap penuh sbg "puppeteer" tersembunyi (AnimationPlayer tetap menganimasi
+	# _skeleton/_anim aslinya), node _kanna terpisah dgn skeleton asli VRM
+	# yg pose-nya dicopy per-frame oleh driver _retarget. Verifikasi KONTRAK
+	# BARU ini persis (bukan kontrak lama rename yg sudah dibuang).
+	var kskel: Skeleton3D = player.get("_kanna_skeleton")
+	if kskel == null or not is_instance_valid(kskel):
+		_fail("skin kanna: _kanna_skeleton null setelah cycle_skin (puppeteer/mannequin _skeleton tidak lagi ditukar!)")
 		return
-	if skel.get_bone_count() < 20:
-		_fail("skin kanna: skeleton jumlah tulang mencurigakan (%d, seharusnya >200)" % skel.get_bone_count())
+	if player.get("_retarget") == null:
+		_fail("skin kanna: node _retarget (SkinRetarget) tidak ada — pose kanna tak lagi tersambung ke mannequin")
 		return
-	for essential in ["pelvis", "spine_01", "Head", "thigh_l", "thigh_r", "hand_l", "hand_r"]:
-		if skel.find_bone(essential) < 0:
-			_fail("skin kanna: tulang \"%s\" tak ditemukan setelah rename (KANNA_BONE_MAP salah?)" % essential)
+	if kskel.get_bone_count() < 200:
+		_fail("skin kanna: skeleton jumlah tulang mencurigakan (%d, seharusnya >200, rig Kanna asli)" % kskel.get_bone_count())
+		return
+	# nama tulang DITAHAN ASLI (tak lagi di-rename): pasangan dst utk
+	# SkinRetarget adalah nama VRM Rigify ("root"/"DEF-Head"/...).
+	for essential in ["root", "DEF-Spine", "DEF-Head", "DEF-Left leg", "DEF-Right leg", "DEF-Left wrist", "DEF-Right wrist"]:
+		if kskel.find_bone(essential) < 0:
+			_fail("skin kanna: tulang asli \"%s\" tak ditemukan (KANNA_RETARGET_PAIRS salah?)" % essential)
 			return
 	var mdl: Node = player.get("_model")
 	if mdl == null or not is_instance_valid(mdl):
 		_fail("skin kanna: _model null setelah cycle_skin")
 		return
-	if mdl.find_children("*", "MeshInstance3D", true, false).is_empty():
-		_fail("skin kanna: tak ada MeshInstance3D tersisa (mesh gagal ditanam?)")
+	var mannequin_mesh_hidden := false
+	for mi in mdl.find_children("*", "MeshInstance3D", true, false):
+		if not (mi as MeshInstance3D).visible:
+			mannequin_mesh_hidden = true
+			break
+	if not mannequin_mesh_hidden:
+		_fail("skin kanna: mesh mannequin seharusnya DISEMBUNYIKAN (puppeteer tak terlihat), malah masih tampak")
 		return
-	print("[fire-check] fase 1f ✔ ganti ke skin kanna OK (tulang=", skel.get_bone_count(), ")")
+	var kanna_node: Node = player.get("_kanna")
+	if kanna_node == null or not is_instance_valid(kanna_node):
+		_fail("skin kanna: node _kanna hilang")
+		return
+	var kanna_meshes := kanna_node.find_children("*", "MeshInstance3D", true, false)
+	if kanna_meshes.is_empty():
+		_fail("skin kanna: tak ada MeshInstance3D di node _kanna")
+		return
+	# math post retarget (verifikasi strike kasus "tidur ditanah"): pose
+	# pelvis Kanna setelah driver jalan HARUS berdiri (bukan di tanah /
+	# bukan tertelungkup) — jalankan 0.5 detik spy SkinRetarget & klip
+	# idle sudah menyetir pose, baru ukur.
+	await create_timer(0.5).timeout
+	var kp: Transform3D = kskel.get_bone_global_pose(kskel.find_bone("root"))
+	var kh: Transform3D = kskel.get_bone_global_pose(kskel.find_bone("DEF-Head"))
+	if kp.origin.y < 0.45 or kh.origin.y < 0.85:
+		_fail("skin kanna: pose pasca-retarget TAKIK DI TANAH/TENGGELAM (pelvis y=%.2f, head y=%.2f) — kemungkinan besar math SkinRetarget salah (kasus 'tidur ditanah' yg diperbaiki ronde ini berulang)" % [kp.origin.y, kh.origin.y])
+		return
+	if kh.origin.y <= kp.origin.y + 0.25:
+		_fail("skin kanna: kepala tak berada jelas DI ATAS pelvis (head=%.2f pelvis=%.2f) — pose bukan berdiri tegak" % [kh.origin.y, kp.origin.y])
+		return
+	print("[fire-check] fase 1f ✔ ganti ke skin kanna OK (tulang=", kskel.get_bone_count(), ", mesh=", kanna_meshes.size(), ", pelvis y=", snappedf(kp.origin.y, 0.01), ")")
 
 	# ganti balik ke mannequin — pastikan jalur baliknya jg tak rusak
 	player.call("cycle_skin")
@@ -307,6 +344,16 @@ func _check_skin_switch(player: Node) -> void:
 	var anim: AnimationPlayer = player.get("_anim")
 	if anim == null or not anim.has_animation("Idle"):
 		_fail("skin mannequin (setelah ganti balik): AnimationPlayer/Idle hilang")
+		return
+	var mannequin_mesh_visible := false
+	var mdl2: Node = player.get("_model")
+	if mdl2 != null:
+		for mi in mdl2.find_children("*", "MeshInstance3D", true, false):
+			if (mi as MeshInstance3D).visible:
+				mannequin_mesh_visible = true
+				break
+	if not mannequin_mesh_visible:
+		_fail("skin mannequin (setelah ganti balik): mesh seharusnya KEMBALI TAMPAK, malah masih tersembunyi")
 		return
 	print("[fire-check] fase 1f ✔ ganti balik ke mannequin OK")
 
@@ -337,7 +384,8 @@ func _check_dash_effects(player: Node, world: Node) -> void:
 
 ## Jalankan World.generate_async() sungguhan (headless) lalu pastikan: kabut
 ## "jauh saja" aktif dgn benar (FOG_MODE_DEPTH, begin < end, begin cukup jauh
-## dari pemain), dunia terkunci malam (star_visibility=1), dan tumpuk rumput
+## dari pemain), dunia terkunci SORE hangat (star_visibility=0, ronde ini),
+## dan tumpuk rumput
 ## MultiMesh benar-benar terbentuk (instance_count > 0, material terpasang).
 func _check_world_ground_fog() -> void:
 	var ws: PackedScene = load("res://packs/world_terrain/world.tscn")
@@ -373,8 +421,16 @@ func _check_world_ground_fog() -> void:
 		world.queue_free()
 		return
 	var sky_mat: ShaderMaterial = world.get("sky_mat")
-	if sky_mat == null or float(sky_mat.get_shader_parameter("star_visibility")) < 0.99:
-		_fail("world: star_visibility bukan 1.0 — dunia seharusnya terkunci malam berbintang")
+	# RONDE INI: kunci waktu dipindah dari MALAM permanen ke SORE permanen
+	# (permintaan user) -> patokan dibalik: bintang HARUS mati (bukan nyala).
+	# plus OSOlakan suasana sore hangat: cahaya matahari masih energik.
+	if sky_mat == null or float(sky_mat.get_shader_parameter("star_visibility")) > 0.01:
+		_fail("world: star_visibility bukan 0.0 — dunia seharusnya terkunci sore hangat (bintang mati)")
+		world.queue_free()
+		return
+	var light_sun := world.get("sun") as DirectionalLight3D
+	if light_sun == null or light_sun.light_energy < 0.30:
+		_fail("world: energi matahari terlalu redup (%s) — dunia sore seharusnya masih terang terik hangat" % (("null" if light_sun == null else str(light_sun.light_energy))))
 		world.queue_free()
 		return
 	var kids: Array = []
@@ -411,7 +467,7 @@ func _check_world_ground_fog() -> void:
 		_fail("world: rumput tidak punya material (bakal tampil putih polos)")
 		world.queue_free()
 		return
-	print("[fire-check] fase 1e ✔ tanah rumput + kabut jauh (begin=%.0f end=%.0f) + malam berbintang OK (chunk %s, %d tuft rumput)" % [env.fog_depth_begin, env.fog_depth_end, grass.name, grass.multimesh.instance_count])
+	print("[fire-check] fase 1e ✔ tanah rumput + kabut jauh (begin=%.0f end=%.0f) + sore hangat OK (chunk %s, %d tuft rumput)" % [env.fog_depth_begin, env.fog_depth_end, grass.name, grass.multimesh.instance_count])
 	world.queue_free()
 	await process_frame
 

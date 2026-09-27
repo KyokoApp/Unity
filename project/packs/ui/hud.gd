@@ -88,6 +88,17 @@ class RpgButton:
 		var w := Color(1, 1, 1, 0.94)
 		var r := radius * 0.62
 		match icon:
+			"skin":  # ganti karakter: topan/cermin 2 wajah (ghost) — digambar
+				# canvas spt tombol lain (emoji mentah berisiko kotak tofu di
+				# font default Android, lihat komentar di _add_rpg BtnSkin).
+				var acc := Color(0.65, 0.85, 1.0, 0.9) if (_down or active) else w
+				draw_arc(c + Vector2(-0.18, -0.34) * r, r * 0.20, 0.0, TAU, 20, acc, 3.0, true)  # kepala kiri
+				draw_arc(c + Vector2(-0.18, 0.28) * r, r * 0.30, PI * 1.15, TAU - PI * 0.15, 16, acc, 3.0, true)  # bahu
+				draw_arc(c + Vector2(0.30, 0.06) * r, r * 0.42, -PI * 0.30, PI * 0.55, 16, w, 3.0, true)  # garis transisi melengkung
+				var a0 := -PI * 0.30
+				var atip: Vector2 = c + Vector2(0.30, 0.06) * r + Vector2(cos(a0), sin(a0)) * (r * 0.42)
+				draw_line(atip, atip + Vector2(-0.16, -0.04) * r, w, 3.0, true)
+				draw_line(atip, atip + Vector2(-0.02, 0.15) * r, w, 3.0, true)
 			"flame":
 				var outer := PackedVector2Array([
 					c + Vector2(0.02, -0.62) * r, c + Vector2(0.32, -0.22) * r,
@@ -387,7 +398,9 @@ func _build_layout() -> void:
 	# --- ganti karakter (permintaan user: "ada icon ganti karakter") ---
 	# sengaja TAK dimasukkan HIDDEN_BUTTONS (UI minimal) krn diminta eksplisit
 	# ronde ini — pojok kanan atas, jauh dr klaster tombol aksi kanan-bawah.
-	_add_rpg(root, "BtnSkin", "skin", 34.0, Vector2(vsz.x - mr - 34.0 * 2, mt), "🎭")
+	# Ikon digambar canvas ("skin", lihat RpgButton._draw match), BUKAN emoji
+	# mentah — glyph emoji warna kerap jadi kotak tofu di font default Android.
+	_add_rpg(root, "BtnSkin", "skin", 34.0, Vector2(vsz.x - mr - 34.0 * 2, mt))
 	_connect_rpg("BtnSkin", Callable(self, "_on_skin_switch"), false)
 	_connect_rpg("BtnJump", Callable(self, "_on_jump"), false)
 	_connect_rpg("BtnSprint", Callable(self, "_on_sprint"), true)

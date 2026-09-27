@@ -25,16 +25,23 @@ const BEACH_WIDTH := 55.0       # lebar pita pasir/transisi darat->air (pantai l
 const COAST_MARGIN := 30.0      # pemain berhenti sekian meter SEBELUM garis air penuh
 
 # --- Danau (bundar, dgn pita "pantai" kecil di tepinya spt laut tapi lbh sempit) ---
-const LAKE_CENTER := Vector2(350.0, 450.0)
-const LAKE_RADIUS := 90.0
+# PERGESERAN (laporan user ronde ini: "mana danau dan sungai nya keknya masih
+# world lama"): penempatan awal (350,450) r=90 TERNYATA 700m+ dr titik spawn
+# (0,0) — nyaris tak pernah tertemui jalan kaki, apalagi waktu itu masih
+# malam gelap+kabut 160m. Dekatkan BESAR-SEKALI: tepi danau sekarang ~60m dr
+# spawn shg langsung kelihatan begitu game dibuka (apalagi skrg sore terang
+# + kabut dilonggarkan, lihat world.gd).
+const LAKE_CENTER := Vector2(95.0, 75.0)
+const LAKE_RADIUS := 60.0
 const LAKE_BANK := 14.0
 
-# --- Sungai: mengalir dr tepi danau (arah RIVER_DIR) sampai keluar ke laut.
-# Berkelok lewat 1 sinus tegak lurus arah alirannya (v = offset menyamping).
-const RIVER_DIR := Vector2(0.6, 0.8)          # sudah satuan (0.6^2+0.8^2=1), arah keluar dr danau ke laut
-const RIVER_START := Vector2(404.0, 522.0)    # = LAKE_CENTER + RIVER_DIR*LAKE_RADIUS (tepi danau)
-const RIVER_LENGTH := 900.0                    # cukup jauh utk tembus garis pantai di arah ini
-const RIVER_HALF_WIDTH := 16.0
+# --- Sungai: mengalir dr tepi danau (arah RIVER_DIR, MENJAUHI spawn) sampai
+# keluar ke laut. Berkelok lewat 1 sinus tegak lurus arah alirannya
+# (v = offset menyamping).
+const RIVER_DIR := Vector2(0.784, 0.621)      # ~satuan, arah: dari danau menjauhi pusat spawn ke laut
+const RIVER_START := Vector2(142.04, 112.26)  # = LAKE_CENTER + RIVER_DIR*LAKE_RADIUS (tepi danau)
+const RIVER_LENGTH := 1600.0                   # lbh dr cukup utk tembus garis pantai (coast ~1.5km) di arah ini
+const RIVER_HALF_WIDTH := 18.0
 const RIVER_BANK := 10.0                       # lebar transisi tepi sungai
 const RIVER_MEANDER_AMP := 55.0                # sejauh apa sungai berkelok menyamping
 const RIVER_MEANDER_FREQ := 0.006              # makin kecil = kelokan makin lebar/landai

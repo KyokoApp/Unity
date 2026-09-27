@@ -57,47 +57,189 @@ const BOLT_LIFT := 1.8
 ## tambahan avatar) — disalin apa adanya jd .glb spy importer bawaan Godot
 ## mengenalinya sbg PackedScene normal, TANPA perlu plugin VRM apa pun.
 ##
-## PERINGATAN JUJUR (disampaikan jg ke pengguna): rig Kanna adalah rig
-## custom Blender (Rigify, 209 tulang "DEF-...") — SANGAT beda dr rig
-## mannequin (65 tulang gaya UE) yg jadi sumber 43 klip mocap game ini.
-## Tak ada cara utk memastikan hasil retarget di bawah ini 100% mulus tanpa
-## menjalankan Godot scr visual (sandbox ini tak py render Godot) — kalau
-## ada sendi yg kelihatan bengkok/aneh pas dites di HP, itu risiko yg sudah
-## diperkirakan, laporkan bagian mana yg salah biar bisa dikoreksi presisi.
+## PERBAIKAN BESAR (laporan user: "karakter vrm malah tidur ditanah"):
+## pendekatan RENAME-TULANG sebelumnya (komit aa919f4) SALAH BETUL secara
+## matematika — klip mocap menulis pose lokal tulang secara ABSOLUT dgn
+## konvensi ruang tulang Blender/UE (root mannequin punya rotasi rest
+## -90°X, lokal pelvis [0,0.05,0.92]), sedang rig Kanna (VRM) pakai
+## konvensi identity/Y-up — begitu pose absolut pelvis mannequin diterapkan
+## mentah ke Kanna, seluruh badan terbanting 90° ke tanah ("tidur"). Klip
+## TAK BISA dipakai lintas-rig dgn ganti nama; yg benar adalah RETARGET:
+## mannequin dibiarkan penuh (mesh disembunyikan, jadi "puppeteer" tak
+## kelihatan), AnimationPlayer memainkan skeleton-nya spt biasa, lalu TIAP
+## FRAME kelas SkinRetarget (di bawah) membaca pose global tiap tulang &
+## menerjemahkannya ke skeleton Kanna (delta rotasi dari rest + konjugasi
+## yaw 180°, lihat komentar konvensi cermin di bawah).
 const KANNA_SCENE := preload("res://packs/character_player/mannequin/kanna.glb")
 const SKIN_MANNEQUIN := "mannequin"
 const SKIN_KANNA := "kanna"
 
-## Peta ganti-nama tulang UTAMA Kanna (nama asli Rigify "DEF-...", diambil
-## dr extensions.VRM.humanoid.humanBones di file aslinya) -> nama tulang yg
-## SAMA PERSIS dipakai 43 klip animasi mocap mannequin (root/pelvis/
-## spine_0N/dst, lihat dump node UAL1_Standard.glb). Cuma tulang INTI (bukan
-## jari/tulang kembar Rigify per-segmen) yg dipetakan — cukup utk lokomosi
-## (jalan/lari/lompat); segmen anak yg tak dipetakan (mis. "DEF-Left
-## leg.001/.002") otomatis ikut kaku mengikuti induknya yg sudah dianimasi,
-## jadi scr visual tetap terlihat sbg SATU tulang paha/lengan yg menekuk.
-const KANNA_BONE_MAP := {
-	"root": "pelvis",
-	"DEF-Spine": "spine_01",
-	"DEF-Chest": "spine_02",
-	"DEF-Upper Chest": "spine_03",
-	"DEF-Neck": "neck_01",
-	"DEF-Head": "Head",
-	"DEF-Left leg": "thigh_l",
-	"DEF-Left knee": "calf_l",
-	"DEF-Left ankle": "foot_l",
-	"DEF-Left toe": "ball_l",
-	"DEF-Right leg": "thigh_r",
-	"DEF-Right knee": "calf_r",
-	"DEF-Right ankle": "foot_r",
-	"DEF-Right toe": "ball_r",
-	"DEF-Left arm": "upperarm_l",
-	"DEF-Left elbow": "lowerarm_l",
-	"DEF-Left wrist": "hand_l",
-	"DEF-Right arm": "upperarm_r",
-	"DEF-Right elbow": "lowerarm_r",
-	"DEF-Right wrist": "hand_r",
-}
+## Pasangan tulang INDUK->INDUK utk retarget: [nama tulang mannequin (sumber
+## pose), nama tulang asli Kanna (tujuan)]. Urutan WAJIB induk-dulu (pelvis
+## sebelum kaki/lengan/kepala) krn konversi global->lokal butuh pose induk
+## yg sudah ter-set di frame yg sama. Tulang yg tak dipetakan (jari, rambut,
+## segmen penolong Rigify "DEF-... .001/.002", clavicle) dibiarkan di rest —
+## otomatis ikut kaku mengikuti induknya yg teranimasi (cukup utk lokomosi).
+## (Nama tulang Kanna diambil dr extensions.VRM.humanoid.humanBones di file
+## VRM aslinya, diverifikasi silang dgn dump wrapper glTF-nya.)
+const KANNA_RETARGET_PAIRS := [
+	["pelvis", "root"],           # VRM "hips"
+	["spine_01", "DEF-Spine"],    # VRM "spine"
+	["spine_02", "DEF-Chest"],    # VRM "chest"
+	["spine_03", "DEF-Upper Chest"],
+	["neck_01", "DEF-Neck"],
+	["Head", "DEF-Head"],
+	["thigh_l", "DEF-Left leg"],
+	["calf_l", "DEF-Left knee"],
+	["foot_l", "DEF-Left ankle"],
+	["ball_l", "DEF-Left toe"],
+	["thigh_r", "DEF-Right leg"],
+	["calf_r", "DEF-Right knee"],
+	["foot_r", "DEF-Right ankle"],
+	["ball_r", "DEF-Right toe"],
+	["upperarm_l", "DEF-Left arm"],
+	["lowerarm_l", "DEF-Left elbow"],
+	["hand_l", "DEF-Left wrist"],
+	["upperarm_r", "DEF-Right arm"],
+	["lowerarm_r", "DEF-Right elbow"],
+	["hand_r", "DEF-Right wrist"],
+]
+
+## Driver retarget runtime (permintaan user: skin ke-2 pakai VRM lain & TETAP
+## bisa jalan/lari). Src = skeleton mannequin yg dimainkan AnimationPlayer
+## (mesh-nya disembunyikan spt puppeteer tak kelihatan); dst = skeleton
+## Kanna yg mesh-nya tampil. Tiap frame, utk tiap pasangan tulang:
+##   delta = pose_global_q(src) * inverse(rest_global_q(src))
+##   target_global_q(dst) = delta_dikonjugasi * rest_global_q(dst)
+##   lokal(dst) = inverse(pose_global_q(induk dst)) * target_global_q
+## Posisi hanya dipindah utk pelvis (selisih bob dari rest, diskala rasio
+## tinggi badan) — panjang tulang Kanna tetap miliknya sendiri (retarget
+## "non-global-pose": bentuk tubuh asli Kanna tak dirusak).
+##
+## KONVENSI CERMIN (diverifikasi numerik dr data GLB kedua file): tulang
+## "left" mannequin ada di sisi +X dgn badan menghadap +Z, sedang "DEF-Left"
+## Kanna ada di sisi -X (menghadap -Z) -> kedua rig BEDA 180° sumbu-Y. Tanpa
+## koreksi ini lengan kiri Kanna ayunannya jadi terbalik & muka belakang
+## arah jalan. Delta & pose pelvis dikonjugasi rotasi 180°-Y:
+##   q' = Q180y * q * Q180y^-1  ==  Quaternion(-x, y, -z, w)
+##   (dx,dy,dz)' = (-dx, dy, -dz)
+class SkinRetarget:
+	extends Node
+	var src: Skeleton3D
+	var dst: Skeleton3D
+	var pairs: Array = []          # [src_idx, dst_idx]
+	var src_pelvis: int = -1
+	var dst_pelvis: int = -1
+	var rest_src_q: Dictionary = {}    # src_idx -> Quaternion (global rest)
+	var rest_dst_q: Dictionary = {}    # dst_idx -> Quaternion (global rest)
+	var rest_src_pelvis_pos := Vector3.ZERO
+	var rest_dst_pelvis_pos := Vector3.ZERO
+	var height_ratio := 1.0
+
+	func _init() -> void:
+		# Jalan SETELAH AnimationPlayer (prioritas default 0) spy pose yg
+		# dibaca = pose frame INI (bukan 1 frame telat) jd hasilnya halus.
+		process_priority = 200
+
+	var _dst_rest_local_q: Array = []   # per dst bone: quaternion rest LOKAL
+
+	func configure(p_src: Skeleton3D, p_dst: Skeleton3D, p_pairs: Array) -> void:
+		src = p_src
+		dst = p_dst
+		for pp in p_pairs:
+			var si: int = src.find_bone(pp[0])
+			var di: int = dst.find_bone(pp[1])
+			if si < 0 or di < 0:
+				push_warning("SkinRetarget: pasangan tulang hilang: %s -> %s (si=%d di=%d)" % [pp[0], pp[1], si, di])
+				continue
+			pairs.append([si, di])
+			rest_src_q[si] = src.get_bone_global_rest(si).basis.get_rotation_quaternion()
+			rest_dst_q[di] = dst.get_bone_global_rest(di).basis.get_rotation_quaternion()
+			if pp[0] == "pelvis":
+				src_pelvis = si
+				dst_pelvis = di
+				rest_src_pelvis_pos = src.get_bone_global_rest(si).origin
+				rest_dst_pelvis_pos = dst.get_bone_global_rest(di).origin
+				if rest_src_pelvis_pos.y > 0.01:
+					height_ratio = rest_dst_pelvis_pos.y / rest_src_pelvis_pos.y
+		_dst_rest_local_q.resize(dst.get_bone_count())
+		for i in range(dst.get_bone_count()):
+			_dst_rest_local_q[i] = dst.get_bone_rest(i).basis.get_rotation_quaternion()
+		# langsung retarget SEKALI di sini (tdk nunggu frame) spy tak ada
+		# T-pose flash sekilas saat ganti skin.
+		transfer()
+
+	func _process(_delta: float) -> void:
+		transfer()
+
+	## Global-quaternion tulang dst `idx`, dihitung MURNI berantai top-down:
+	## tulang terpetakan = target global-nya; tak terpetakan = induk_global *
+	## rest_lokalnya. Tak membaca get_bone_global_pose dst sama sekali —
+	## sengaja, krn pose yg baru di-set belum tentu sudah terkomposisi engine
+	## (dibutuhkan utk turunkan pose lokal anak dr target globalnya sendiri
+	## dgn benar, tanpa _race_/stale satu frame antar-induk-anak).
+	func _dst_global_q(idx: int, target_gq: Dictionary, cache: Dictionary) -> Quaternion:
+		if idx < 0:
+			return Quaternion.IDENTITY
+		if cache.has(idx):
+			return cache[idx]
+		var p := dst.get_bone_parent(idx)
+		var pg := _dst_global_q(p, target_gq, cache)
+		var g: Quaternion
+		if target_gq.has(idx):
+			g = target_gq[idx]
+		else:
+			g = (pg * _dst_rest_local_q[idx]).normalized()
+		cache[idx] = g
+		return g
+
+	func transfer() -> void:
+		if src == null or dst == null or not is_instance_valid(src) or not is_instance_valid(dst):
+			return
+		# 1) target ROTASI global utk tiap pasangan: delta src (dr rest-nya),
+		#    dikonjugasi yaw-180 (konvensi cermin antar-rig, lihat komentar kelas)
+		var target_gq: Dictionary = {}   # dst_idx -> Quaternion
+		for pp in pairs:
+			var si: int = pp[0]
+			var di: int = pp[1]
+			var gq: Quaternion = src.get_bone_global_pose(si).basis.get_rotation_quaternion()
+			var dq: Quaternion = gq * rest_src_q[si].inverse()
+			var cdq := Quaternion(-dq.x, dq.y, -dq.z, dq.w)
+			target_gq[di] = (cdq * rest_dst_q[di]).normalized()
+		# 2) susun pose LOKAL Kanna. PENTING: bone "pose" Godot4 ADALAH DELTA
+		#    dari rest (bukan lokal absolut: final = rest * pose), makanya
+		#    faktor rest_lokal^-1 wajib dikali di depan. Utamanya tak berpengaruh
+		#    utk rig Kanna (semua 209 tulang rest rotasi = identity, dari dump
+		#    glb-nya) tapi tetap ditulis benar spy UMUM.
+		var cache: Dictionary = {}
+		for pp in pairs:
+			var di: int = pp[1]
+			var pidx: int = dst.get_bone_parent(di)
+			var pg := _dst_global_q(pidx, target_gq, cache)
+			var lq: Quaternion = (_dst_rest_local_q[di].inverse() * pg.inverse() * target_gq[di]).normalized()
+			dst.set_bone_pose_rotation(di, lq)
+		# 3) posisi: hanya pelvis (bob naik-turun/condong src diikuti, diskala).
+		#    Hitung via transform penuh: pose = (parent_global * rest_lokal)^-1
+		#    * target, spy hasil global pelvis = rest_pelvis_dst + delta_src
+		#    (utamanya: rest translation tulang Kanna (.81m) jangan sampai
+		#    KESEPA SEPERTI dua kali — pelvis "melayang" s/s kasus bug ronde ini).
+		if src_pelvis >= 0 and dst_pelvis >= 0:
+			var sdp: Vector3 = (src.get_bone_global_pose(src_pelvis).origin - rest_src_pelvis_pos) * height_ratio
+			sdp = Vector3(-sdp.x, sdp.y, -sdp.z)
+			var target_pos := rest_dst_pelvis_pos + sdp
+			var target_T := Transform3D(Basis(target_gq[dst_pelvis]), target_pos)
+			var parent_gT := Transform3D.IDENTITY
+			var ppar: int = dst.get_bone_parent(dst_pelvis)
+			if ppar >= 0:
+				# utk Kanna: pelvis ("root") adalah bone akar (parent=-1) jadi
+				# cabang ini mati-pijit; dijaga utk rig lain yg pelvis-nya nested.
+				var pgq: Quaternion = _dst_global_q(ppar, target_gq, cache)
+				var pgo: Vector3 = dst.get_bone_global_rest(ppar).origin
+				parent_gT = Transform3D(Basis(pgq), pgo)
+			var rest_lT: Transform3D = dst.get_bone_rest(dst_pelvis)
+			var pose_T := (parent_gT * rest_lT).affine_inverse() * target_T
+			dst.set_bone_pose_position(dst_pelvis, pose_T.origin)
+
 
 # Dua corak ungu: badan utama (permukaan besar) + aksen sendi (kontras
 # lebih gelap, mempertahankan "color-blocking" asli model sumber).
@@ -123,14 +265,12 @@ const CAST_HEIGHT := 1.32     # perkiraan tinggi tangan/dada utk titik lontar pe
 const MODEL_YAW_OFFSET := PI
 ## Koreksi yaw TAMBAHAN per-skin (di atas MODEL_YAW_OFFSET di atas, yg
 ## dikalibrasi KHUSUS utk rig mannequin). Skin lain (VRM dll) bisa saja py
-## konvensi hadap beda (VRM 0.x scr spec menghadap +Z, kebalikan konvensi
-## glTF biasa) — belum bisa dipastikan tanpa dites lgsg di HP, makanya
-## disiapkan sbg 1 angka gampang diubah per-skin, default 0.0 (asumsi sama
-## dgn mannequin dulu) drpd ubah MODEL_YAW_OFFSET global & berisiko balik
-## merusak arah hadap mannequin yg sudah terbukti benar.
+## konvensi hadap beda — Kanna: kedua rig beda 180° sumbu-Y (diverifikasi
+## numerik dr GLB: tulang "left" mannequin di +X, "DEF-Left" Kanna di -X,
+## lihat komentar KONVENSI CERMIN di kelas SkinRetarget) -> PI di sini.
 const SKIN_YAW_EXTRA := {
 	"mannequin": 0.0,
-	"kanna": 0.0,
+	"kanna": PI,
 }
 
 # --- nama klip animasi SETELAH import Godot (BUKAN nama asli di glTF!) ---
@@ -232,6 +372,9 @@ var _dust_dist_accum := 0.0
 var _dust_side := 1.0
 var _skin_id := SKIN_MANNEQUIN
 var _skin_switching := false
+var _kanna: Node3D            # skin Kanna aktif (null kalau lg mannequin)
+var _kanna_skeleton: Skeleton3D
+var _retarget: SkinRetarget   # driver pose mannequin->kanna (null kalau mannequin)
 
 func set_world(w: Node) -> void:
 	world = w
@@ -561,12 +704,21 @@ func _play_shoot_sound() -> void:
 
 ## Bangun/rakit ulang badan pemain sesuai `skin_id` (SKIN_MANNEQUIN/SKIN_KANNA)
 ## DI DALAM _visual yg sudah ada (lihat _ready()). SELALU instance mannequin
-## dulu (satu-satunya sumber Armature/AnimationPlayer/43 klip mocap yg valid)
-## — kalau skin_id==kanna, _apply_kanna_skin() lalu MENUKAR skeleton+mesh di
-## dalam Armature yg sama (nama node "Skeleton3D" dipertahankan persis) spy
-## semua NodePath track animasi yg sudah direkam ttp nyambung tanpa diubah.
+## penuh (satu-satunya sumber Armature/AnimationPlayer/43 klip mocap valid,
+## sekaligus jadi "puppeteer" tersembunyi utk retarget skin Kanna — baca
+## komentar KANNA_RETARGET_PAIRS). Skin kanna = mannequin (mesh disembunyikan)
+## + node Kanna terpisah yg pose-nya disalin per-frame oleh SkinRetarget.
 func _build_character(skin_id: String) -> void:
 	_skin_id = skin_id
+	# bereskan sisa skin sebelumnya (oke jg kalau belum ada apa2)
+	if is_instance_valid(_retarget):
+		_retarget.queue_free()
+	_retarget = null
+	if is_instance_valid(_kanna):
+		_kanna.queue_free()
+	_kanna = null
+	_kanna_skeleton = null
+
 	_model = MANNEQUIN_SCENE.instantiate()
 	_model.name = "Mannequin"
 	_visual.add_child(_model)
@@ -574,97 +726,69 @@ func _build_character(skin_id: String) -> void:
 	_anim = _model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	_skeleton = _model.find_child("Skeleton3D", true, false) as Skeleton3D
 
-	if skin_id == SKIN_KANNA:
-		_apply_kanna_skin()
-	else:
-		_paint_purple()
-
 	if _anim != null:
 		_anim.playback_default_blend_time = ANIM_BLEND
 		if _anim.has_animation(ANIM_IDLE):
 			_anim.play(ANIM_IDLE)
 			_anim_state = ANIM_IDLE
 
-## Kedua material sumber (M_Main oranye, M_Joints ungu) TANPA tekstur ->
-## override total aman, tak kehilangan detail UV apa pun.
-func _paint_purple() -> void:
-	var mats := [Materials.toon(BODY_COLOR, true, 0.012, 0.55), Materials.toon(JOINT_COLOR, false, 0.0, 0.35)]
+	if skin_id == SKIN_KANNA:
+		_build_kanna_skin()
+	else:
+		_set_mannequin_mesh_visible(true)
+		_paint_purple()
+
+## Tampilkan/sembunyikan mesh mannequin (skeleton+animasinya TETAP aktif —
+## AnimationPlayer tak peduli node terlihat/tidak, tulang tetap diupdate).
+func _set_mannequin_mesh_visible(v: bool) -> void:
 	for mi in _model.find_children("*", "MeshInstance3D", true, false):
-		var mesh_inst := mi as MeshInstance3D
-		if mesh_inst == null or mesh_inst.mesh == null:
-			continue
-		var surfaces := mesh_inst.mesh.get_surface_count()
-		for i in range(surfaces):
-			mesh_inst.set_surface_override_material(i, mats[i % mats.size()])
+		(mi as MeshInstance3D).visible = v
 
-## Pasang skin Kanna (VRM) menggantikan mesh+skeleton mannequin, TAPI tetap
-## di dalam Armature yg SAMA (posisi & nama node "Skeleton3D" dipertahankan
-## persis) — trik ini menghindari sama sekali risiko harus menebak NodePath
-## internal hasil-import Godot (yg tak bisa dipastikan tanpa render editor):
-## krn parent node ("Armature") & nama child ("Skeleton3D") tak berubah,
-## SEMUA track animasi mocap yg sudah ada otomatis tetap nyambung ke
-## skeleton BARU, asal nama tulang di dalamnya cocok (lihat KANNA_BONE_MAP).
-##
-## Warna/tekstur asli Kanna DIPERTAHANKAN (TAK dicat ungu spt mannequin) —
-## "pasang skin karakter ini" scr wajar berarti tampil sbg karakter itu
-## sendiri, bukan diseragamkan ungu.
-func _apply_kanna_skin() -> void:
-	var armature := _skeleton.get_parent() if is_instance_valid(_skeleton) else null
-	if armature == null:
-		push_warning("Kanna: Armature/Skeleton3D mannequin tak ditemukan, batal — pakai mannequin ungu")
+## Skin Kanna (VRM): mesh asli dgn warna/tekstur aslinya (TAK dicat ungu spt
+## mannequin — "pasang skin karakter ini" berarti tampil sbg karakter itu
+## sendiri), pose-nya digerakkan skeleton mannequin tersembunyi lewat
+## SkinRetarget (lihat komentar kelasnya utk matematika konjugasi yaw-180).
+func _build_kanna_skin() -> void:
+	if _skeleton == null or _anim == null:
+		push_warning("Kanna: skeleton/anim mannequin tak siap, batal — pakai mannequin ungu")
+		_skin_id = SKIN_MANNEQUIN
+		_set_mannequin_mesh_visible(true)
+		_paint_purple()
+		return
+	_kanna = KANNA_SCENE.instantiate() as Node3D
+	_kanna.name = "Kanna"
+	_visual.add_child(_kanna)
+	_kanna_skeleton = _kanna.find_child("Skeleton3D", true, false) as Skeleton3D
+	if _kanna_skeleton == null or _kanna.find_children("*", "MeshInstance3D", true, false).is_empty():
+		push_warning("Kanna: Skeleton3D/mesh tak ditemukan di kanna.glb, batal")
+		_kanna.queue_free()
+		_kanna = null
+		_kanna_skeleton = null
+		_skin_id = SKIN_MANNEQUIN
+		_set_mannequin_mesh_visible(true)
 		_paint_purple()
 		return
 
-	var kanna := KANNA_SCENE.instantiate()
-	var kanna_skel := kanna.find_child("Skeleton3D", true, false) as Skeleton3D
-	if kanna_skel == null:
-		push_warning("Kanna: Skeleton3D tak ditemukan di kanna.glb, batal — pakai mannequin ungu")
-		kanna.queue_free()
-		_paint_purple()
-		return
-	var kanna_meshes := kanna.find_children("*", "MeshInstance3D", true, false)
-
-	# ganti nama tulang inti Kanna spy cocok dgn nama yg dipakai track
-	# animasi mocap (lihat KANNA_BONE_MAP) SEBELUM diukur/ditanam.
-	for i in range(kanna_skel.get_bone_count()):
-		var nm := kanna_skel.get_bone_name(i)
-		if KANNA_BONE_MAP.has(nm):
-			kanna_skel.set_bone_name(i, KANNA_BONE_MAP[nm])
-
-	# skala tinggi Kanna spy sepadan dgn tinggi mannequin asli (kamera/hover/
-	# collider dikalibrasi utk tinggi itu) — diukur dr rest pose Head/kaki,
-	# bukan angka tebakan, jd otomatis pas walau proporsi badan beda.
+	## skala keseluruhan tinggi Kanna ke tinggi mannequin (kamera/hover/
+	## collider dikalibrasi utk tinggi mannequin) — diukur dr REST pose
+	## (Head vs kaki), bukan angka tebakan, jd otomatis pas walau proporsi
+	## badan beda jauh (chibi vs tinggi).
 	var mannequin_h := _standing_height(_skeleton, "Head", "foot_l", "foot_r")
-	var kanna_h := _standing_height(kanna_skel, "Head", "foot_l", "foot_r")
-
-	# buang mesh+skeleton mannequin lama, tanam skeleton+mesh Kanna PERSIS di
-	# posisi (parent=armature, nama="Skeleton3D") yg lama — lihat komentar fungsi.
-	for mi in _model.find_children("*", "MeshInstance3D", true, false):
-		mi.queue_free()
-	var old_skeleton := _skeleton
-	armature.remove_child(old_skeleton)
-	old_skeleton.queue_free()
-
-	kanna_skel.get_parent().remove_child(kanna_skel)
-	kanna_skel.name = "Skeleton3D"
-	armature.add_child(kanna_skel)
-	_skeleton = kanna_skel
-
-	for mi in kanna_meshes:
-		var mesh_inst := mi as MeshInstance3D
-		if mesh_inst == null:
-			continue
-		mesh_inst.get_parent().remove_child(mesh_inst)
-		armature.add_child(mesh_inst)
-		mesh_inst.skeleton = mesh_inst.get_path_to(kanna_skel)
-	kanna.queue_free()
-
+	var kanna_h := _standing_height(_kanna_skeleton, "DEF-Head", "DEF-Left ankle", "DEF-Right ankle")
 	if mannequin_h > 0.01 and kanna_h > 0.01:
 		var s: float = mannequin_h / kanna_h
-		_model.scale = Vector3(s, s, s)
+		_kanna.scale = Vector3(s, s, s)
+
+	_retarget = SkinRetarget.new()
+	_retarget.name = "SkinRetarget"
+	add_child(_retarget)
+	_retarget.configure(_skeleton, _kanna_skeleton, KANNA_RETARGET_PAIRS)
+
+	# barulah mannequin "puppeteer" disembunyikan (pose tetap jalan utk dicopy)
+	_set_mannequin_mesh_visible(false)
 
 ## Tinggi berdiri (Head - rata2 kaki) dari REST POSE sebuah skeleton, dipakai
-## _apply_kanna_skin() utk menyamakan skala tanpa perlu angka tebakan manual.
+## _build_kanna_skin() utk menyamakan skala tanpa perlu angka tebakan manual.
 func _standing_height(skel: Skeleton3D, head_name: String, foot_l_name: String, foot_r_name: String) -> float:
 	if skel == null:
 		return 0.0
@@ -682,6 +806,18 @@ func _standing_height(skel: Skeleton3D, head_name: String, foot_l_name: String, 
 	else:
 		foot_y = skel.get_bone_global_rest(fr_i).origin.y
 	return head_y - foot_y
+
+## Kedua material sumber (M_Main oranye, M_Joints ungu) TANPA tekstur ->
+## override total aman, tak kehilangan detail UV apa pun.
+func _paint_purple() -> void:
+	var mats := [Materials.toon(BODY_COLOR, true, 0.012, 0.55), Materials.toon(JOINT_COLOR, false, 0.0, 0.35)]
+	for mi in _model.find_children("*", "MeshInstance3D", true, false):
+		var mesh_inst := mi as MeshInstance3D
+		if mesh_inst == null or mesh_inst.mesh == null:
+			continue
+		var surfaces := mesh_inst.mesh.get_surface_count()
+		for i in range(surfaces):
+			mesh_inst.set_surface_override_material(i, mats[i % mats.size()])
 
 ## Ganti skin (permintaan user: "pake 2 karakter ada icon ganti karakter" +
 ## "setiap switch karakter kek ada efek sinar glitch") — dipanggil dari HUD
@@ -832,7 +968,16 @@ func _build_aura() -> void:
 ## posenya ikut pose lari saat itu, bukan T-pose) — cukup utk kesan "trail
 ## kecepatan" tanpa perlu membekukan pose tulang secara manual.
 func _spawn_afterimage() -> void:
-	if not is_instance_valid(_model) or not is_instance_valid(_skeleton):
+	# sumber mesh & skeleton = skin yg AKTIF (kanna: node kanna + skeletonnya;
+	# mannequin: _model + _skeleton spt biasa — jaringan mesh mannequin lg
+	# disembunyikan TERTUTUP krn di sini dipilih eksplisit per skin).
+	var src_root: Node3D = _model
+	var src_skel: Skeleton3D = _skeleton
+	if _skin_id == SKIN_KANNA:
+		src_root = _kanna
+		src_skel = _kanna_skeleton
+	# skeleton tak perlu valid utk mesm yg statis, tp tetap dicek utk skinned:
+	if not is_instance_valid(src_root):
 		return
 	var parent := get_parent()
 	if parent == null:
@@ -852,7 +997,7 @@ func _spawn_afterimage() -> void:
 	ghost_mat.disable_receive_shadows = true
 
 	var made_any := false
-	for mi in _model.find_children("*", "MeshInstance3D", true, false):
+	for mi in src_root.find_children("*", "MeshInstance3D", true, false):
 		var src := mi as MeshInstance3D
 		if src == null or src.mesh == null:
 			continue
@@ -861,7 +1006,8 @@ func _spawn_afterimage() -> void:
 		copy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		ghost.add_child(copy)
 		copy.global_transform = src.global_transform
-		copy.skeleton = copy.get_path_to(_skeleton)
+		if is_instance_valid(src_skel):
+			copy.skeleton = copy.get_path_to(src_skel)
 		for i in range(src.mesh.get_surface_count()):
 			copy.set_surface_override_material(i, ghost_mat)
 		made_any = true

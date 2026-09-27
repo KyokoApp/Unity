@@ -26,13 +26,19 @@ uniform float wind_speed = 1.7;
 // gust sekunder (freq beda, lihat vertex()) spy goyangannya kelihatan jelas
 // di perangkat & tak terasa seragam/monoton spt gelombang tunggal.
 uniform float wind_strength = 0.29;
-uniform vec3 base_color : source_color = vec3(0.09, 0.22, 0.08);  // dekat akar
-uniform vec3 tip_color : source_color = vec3(0.42, 0.62, 0.20);   // dekat ujung
-// PEROMBAKAN realisme (user: "kurang realistis"): sebagian kecil rumpun
-// (dipilih pakai `variant`, bukan acak per-frame) dicondongkan ke warna
-// agak kekuningan/kering, spt padang rumput asli yg tak pernah 100% hijau
-// seragam satu warna persis.
-uniform vec3 dry_tip_color : source_color = vec3(0.58, 0.52, 0.21);
+// SATU WARNA HIJAU MULUS (permintaan user ronde ini: "buat rumput dan tanah
+// satu warna hijau smooth"): gradasi akar->ujung diperpendek banget &
+// diselaraskan dgn ground_color tanah di world.gd _make_ground_material
+// (akar nyaris nyangkut dgn tanah, ujung cuma sepersekian lebih terang —
+// tak lagi kontras gelap-vs-kuning-terang), jadi helai+tanah melebur jadi
+// satu hamparan hijau halus ketimbang helai yg tampak "menempel" di atas
+// tanah gelap.
+uniform vec3 base_color : source_color = vec3(0.150, 0.340, 0.120);  // dekat akar
+uniform vec3 tip_color : source_color = vec3(0.185, 0.400, 0.150);   // dekat ujung
+// "variasi kering" tetap dipertahankan utk realisme, tp diperlemah jadi
+// cuma kehijauan-lumut-amber tipis (bukan lagi kuning-coklat tua yg
+// mencolok), senada dgn suasana sore hangat yg baru.
+uniform vec3 dry_tip_color : source_color = vec3(0.30, 0.40, 0.12);
 uniform float shadow_tint : hint_range(0.0, 1.0) = 0.48;
 uniform float mid_tint : hint_range(0.0, 1.0) = 0.85;
 // Efek "backlight" (SSS palsu): ujung helai yg tipis tembus cahaya kalau
@@ -77,13 +83,13 @@ float island_water_factor(vec2 p) {
 // Danau + sungai (IslandShape.lake_factor/river_factor, disalin manual —
 // permintaan user "ada aliran danau atau sungai"). WAJIB disamakan dgn
 // island_shape.gd & world.gd kalau salah satu diubah.
-const vec2 LAKE_CENTER = vec2(350.0, 450.0);
-const float LAKE_RADIUS = 90.0;
+const vec2 LAKE_CENTER = vec2(95.0, 75.0);
+const float LAKE_RADIUS = 60.0;
 const float LAKE_BANK = 14.0;
-const vec2 RIVER_DIR = vec2(0.6, 0.8);
-const vec2 RIVER_START = vec2(404.0, 522.0);
-const float RIVER_LENGTH = 900.0;
-const float RIVER_HALF_WIDTH = 16.0;
+const vec2 RIVER_DIR = vec2(0.784, 0.621);
+const vec2 RIVER_START = vec2(142.04, 112.26);
+const float RIVER_LENGTH = 1600.0;
+const float RIVER_HALF_WIDTH = 18.0;
 const float RIVER_BANK = 10.0;
 const float RIVER_MEANDER_AMP = 55.0;
 const float RIVER_MEANDER_FREQ = 0.006;
