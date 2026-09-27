@@ -930,18 +930,18 @@ func _polish_kanna_materials() -> void:
 			new_mat.albedo_color = Color(1.02, 0.99, 0.94)
 			new_mat.roughness = 0.82
 			new_mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-		new_mat.metallic = 0.0
-		new_mat.back_light = 0.0
-		new_mat.disable_receive_shadows = false
-		new_mat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
-		# HOTFIX "visual kurang rapih": mesh transparan VRM (rambut/alis/mata
-		# anime) digambar dgn urutan serampangan kalau polos ALPHA-biasa ->
-		# tampak tembus-tak-karuan. ALPHA_DEPTH_PRE_PASS menulis depth dulu
-		# sebelum blend, jadi siluet transparannya rapi stabil dr sudut mana
-		# pun (standar umum utk karakter anime/VRM di Godot).
-		if new_mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
-			new_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS
-		mesh_inst.set_surface_override_material(surf, new_mat)
+			new_mat.metallic = 0.0
+			new_mat.back_light = 0.0
+			new_mat.disable_receive_shadows = false
+			new_mat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+			# HOTFIX "visual kurang rapih": mesh transparan VRM (rambut/alis/
+			# mata anime) digambar dgn urutan serampangan kalau polos ALPHA-
+			# biasa -> tampak tembus-tak-karuan. ALPHA_DEPTH_PRE_PASS menulis
+			# depth dulu sebelum blend, jadi siluet transparannya rapi stabil
+			# dr sudut mana pun (standar umum utk karakter anime/VRM di Godot).
+			if new_mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+				new_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS
+			mesh_inst.set_surface_override_material(surf, new_mat)
 
 ## Tinggi berdiri (Head - rata2 kaki) dari REST POSE sebuah skeleton, dipakai
 ## _build_kanna_skin() utk menyamakan skala tanpa perlu angka tebakan manual.
