@@ -48,40 +48,54 @@ var wall_system: Node3D       # reruntuhan/dinding batu destructible — rintang
 const GROUND_SIZE := 1600.0
 var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 
-# ---------------- rumput lebat dekat pemain (ronde-46 bag. C) ----------------
-# Rumput 3D penuh sejauh 1600m tak mungkin (hemat mobile) — jadi HANYA area
-# dekat pemain dipenuhi tumpuk rumput (MultiMesh, satu draw call), sisanya
-# memakai tekstur rumput datar di material tanah.
+# ---------------- rumput lebat di sekitar pemain (ronde-46 bag. C) ----------------
+# RONDE INI: perombakan TOTAL cara rumput ditempatkan, sesudah user
+# menunjukkan referensi https://github.com/IcterusGames/SimpleGrassTextured
+# dan komplain "kok malah jadi ngikutin" thd pendekatan lama. VET dulu (bukan
+# instal utuh — addon itu berbasis EDITOR (dilukis manual node
+# SimpleGrassTextured di scene, butuh Godot editor GUI yg TAK ADA di jalur
+# generate_async() prosedural kita) & interaksinya pakai SubViewport render-
+# to-texture yg berat, tak relevan/tak cocok dipasang mentah2 di sini) —
+# yg DIPORT cuma INTI ARSITEKTURnya: rumput ditaruh di POSISI DUNIA NYATA
+# yg TETAP (bukan "dibungkus"/wrap muter2 spt versi lama), lalu di-STREAM
+# per PETAK (chunk) yg dimuat/dibongkar berdasar jarak ke pemain waktu
+# jalan — persis maksud user "buat setiap jalan ngerender rumput nya".
 #
-# PERBAIKAN (laporan user: "rumputnya ikut karakter jalan aneh"): versi awal
-# menempelkan posisi NODE MultiMesh persis ke pemain tiap frame (spt _ground)
-# — utk tekstur tanah itu aman (UV dihitung di ruang-dunia di shader), tapi
-# utk instance rumput DISKRIT itu bikin seluruh petak rumput ikut MENYERET
-# bersama pemain (nempel spt aura), bukan diam terpaku di tanah. Sekarang
-# posisi tiap helai DIKUNCI PERMANEN (dibuat sekali, node TAK PERNAH digeser)
-# dan grass_blade.gdshader sendiri yang "membungkus" (wrap) posisi tiap
-# instance ke petak selebar GRASS_RADIUS*2 di sekitar pemain (uniform
-# wrap_center, diperbarui tiap frame lewat _grass_mat). Efeknya: rumput
-# terlihat terpaku di tanah spt sungguhan, cuma helai yg pas di TEPI TERJAUH
-# yg "lompat" ke sisi berlawanan — disamarkan krn radiusnya sengaja SEDIKIT
-# LEBIH KECIL dari titik mulai kabut jauh (fog_depth_begin).
-# PERBAIKAN #2 (laporan user: "rumputnya masih kayak awal, gk sesuai
-# referensi github yg lebat"): versi sebelumnya cuma ~1.3 rumpun/m² (9000
-# tersebar di kotak 84x84m) — kelihatan jarang drpd referensi (karpet rumput
-# nyaris tanpa celah tanah). Dipadatkan: radius domain diperkecil (30, msh
-# nyaman di bawah fog_depth_begin=45 dgn buffer 15m) SEKALIGUS jumlah
-# instance dinaikkan >2.5x -> kepadatan efektif naik ~5x (~6.7 rumpun/m²),
-# dan tiap rumpun kini 5 helai bersilang (dari 3) jadi tampak lebih rimbun.
-# CATATAN JUJUR ke user: kepadatan super-rapat di GIF referensi itu demo
-# PATCH KECIL (bbrp meter persegi) yg di-zoom, bukan area terbuka seluas
-# ini — mereplikasi persis itu di seluruh radius 30m dunia terbuka mobile
-# tak realistis (bisa jutaan segitiga). Ini kompromi signifikan lbh padat
-# drpd sebelumnya, tetap ramah GPU mobile (quality preset masih memangkas
-# via grass_density spt biasa).
-const GRASS_RADIUS := 30.0
-const GRASS_COUNT := 24000
-var _grass_mmi: MultiMeshInstance3D
-var _grass_mat: ShaderMaterial   # wrap_center-nya diperbarui tiap frame (lihat _process)
+# Riwayat kenapa versi SEBELUMNYA (wrap around player, sudah dihapus)
+# bermasalah: petak rumput lebat SELALU berukuran & berpusat PERSIS di
+# pemain kemanapun dia jalan (posisi tiap helai "dibungkus" modulo relatif
+# ke pemain di GPU) — scr visual ini kelihatan spt gelembung/aura rumput yg
+# ikut nempel & meluncur bareng pemain, BUKAN rumput yg benar2 tumbuh diam
+# di tanahnya (laporan user paling akhir: "kok malah jadi ngikutin").
+#
+# Pendekatan BARU (chunk streaming, lihat _build_grass_chunk/_update_grass_
+# chunks): dunia dibagi petak GRASS_CHUNK_SIZE meter; petak dlm radius
+# GRASS_RENDER_RADIUS_CHUNKS dari pemain dibangun (RNG di-seed dari
+# KOORDINAT PETAK itu sendiri -> layout rumput di petak yg sama SELALU
+# identik tiap kali dimuat ulang, tak "mengocok ulang" & tak nge-pop beda
+# tiap kunjungan), petak yg sudah jauh (lewat GRASS_UNLOAD_RADIUS_CHUNKS,
+# sengaja lebih besar dr radius render biar tak "kedip" bolak-balik pas
+# pemain persis di tepi) dibongkar. Max GRASS_CHUNK_BUILD_PER_FRAME petak
+# baru dibangun tiap frame (bukan sekaligus semua) biar jalan diagonal yg
+# memasuki byk petak baru sekaligus tak bikin hentakan frame. Posisi tiap
+# helai skrg BENERAN tetap di dunia (node tiap chunk ditaruh di titik
+# tengah petaknya, TAK PERNAH digeser lagi) — grass_blade.gdshader jadi
+# jauh lbh sederhana (tak ada lagi logika wrap/modulo), cuma nyisain fade
+# jarak biasa (spt kabut) di uniform player_pos supaya batas radius-muat
+# tak kelihatan nge-pop, PERSIS spt referensi (optimization_by_distance +
+# smoothstep di grass.gdshaderinc mrk) walau implementasi detailnya beda.
+const GRASS_CHUNK_SIZE := 22.0
+const GRASS_CHUNK_INSTANCES := 900
+const GRASS_RENDER_RADIUS_CHUNKS := 2   # persegi (2*r+1)^2 petak selalu berusaha dimuat
+const GRASS_UNLOAD_RADIUS_CHUNKS := 3   # histeresis: dibongkar hanya kalau LEBIH jauh dr ini
+const GRASS_CHUNK_BUILD_PER_FRAME := 2  # cegah hentakan frame saat byk petak baru sekaligus
+var _grass_mesh: ArrayMesh                # 1 mesh tuft dipakai bersama semua chunk
+var _grass_mat: ShaderMaterial            # 1 material dipakai bersama semua chunk (player_pos diperbarui tiap frame)
+var _grass_chunks := {}                   # Vector2i koordinat petak -> MultiMeshInstance3D
+var _grass_pending: Array = []            # antrean koordinat petak menunggu dibangun
+var _grass_last_chunk := Vector2i(9999999, 9999999)  # paksa update pertama
+var _grass_density_frac := 1.0            # dari apply_quality() grass_density, diterapkan ke chunk baru & yg sudah ada
+
 
 func _ready() -> void:
 	name = "World"
@@ -156,13 +170,13 @@ shader_type spatial;
 render_mode cull_back, depth_draw_opaque;
 uniform sampler2D grass_tex : filter_linear_mipmap, repeat_enable;
 // PERBAIKAN (laporan user: rumput 3D tuft di sekitar pemain kelihatan
-// terang normal, tapi begitu lewat GRASS_RADIUS jadi HITAM PEKAT kayak
-// jurang — bukan bug culling/posisi spt dikira sebelumnya, ternyata cuma
-// tanah DATAR ini (dipakai di LUAR area tuft 3D) albedo-nya jauh lebih
-// gelap drpd material rumput 3D (grass_blade.gdshader) di bawah pencahayaan
-// malam yg sama -> beda kecerahan ~3-4x, kelihatan spt tebing tajam di
-// batas GRASS_RADIUS. tint_a/tint_b & pengali dinaikkan supaya kecerahan
-// tanah datar SEPADAN dgn tuft 3D, jurang gelapnya hilang.
+// terang normal, tapi begitu lewat radius muat petak rumput jadi HITAM
+// PEKAT kayak jurang — bukan bug culling/posisi spt dikira sebelumnya,
+// ternyata cuma tanah DATAR ini (dipakai di LUAR area tuft 3D) albedo-nya
+// jauh lebih gelap drpd material rumput 3D (grass_blade.gdshader) di bawah
+// pencahayaan malam yg sama -> beda kecerahan ~3-4x, kelihatan spt tebing
+// tajam di batas radius rumput. tint_a/tint_b & pengali dinaikkan supaya
+// kecerahan tanah datar SEPADAN dgn tuft 3D, jurang gelapnya hilang.
 uniform vec3 tint_a : source_color = vec3(0.17, 0.36, 0.16);  // corak gelap
 uniform vec3 tint_b : source_color = vec3(0.26, 0.48, 0.21);  // corak terang
 uniform float tex_scale = 0.35;    // kerapatan ulang tekstur foto (per meter)
@@ -243,60 +257,116 @@ void light() {
 
 ## Tumpuk rumput 3D dekat pemain (MultiMesh, 1 draw call) — bag. "lebat" dari
 ## permintaan user: tekstur datar saja terasa rata, tumpuk rumput kecil ini
-## memberi kedalaman/volume. Setiap instance = tuft 3 helai bersilang (murah,
-## 9 verts/3 tri) diputar+diskalakan acak, dgn goyangan angin & varian warna
-## per-instance di grass_blade.gdshader. Posisi NODE ini sendiri TAK PERNAH
-## digeser (diam di titik asal) — yang "mengejar" pemain adalah uniform
-## wrap_center di shader (lihat _process), bukan transform node ini, supaya
-## tiap helai tetap terpaku di tanahnya (lihat catatan GRASS_RADIUS di atas).
+## memberi kedalaman/volume. Setiap instance = tuft 5 helai bersilang, dgn
+## goyangan angin & varian warna per-instance di grass_blade.gdshader.
+## Inisialisasi sistem CHUNK STREAMING (lihat catatan arsitektur di atas):
+## mesh & material dibuat SEKALI (dipakai bersama semua petak), lalu petak
+## ASAL (0,0) dibangun SEKARANG JUGA (spawn pemain persis di situ, (0,0,0))
+## supaya rumput sudah ada dari detik pertama tanpa nunggu _process jalan &
+## tanpa perlu referensi `player` (blm tentu ada saat generate_async, lihat
+## jg dev_probe/fire_attack_check.gd yg menguji world sendirian tanpa
+## pemain) — petak lain menyusul otomatis begitu set_player() dipanggil &
+## pemain mulai jalan.
 func _build_grass() -> void:
+	_grass_mesh = _build_grass_blade_mesh()
+	_grass_mat = _grass_material()
+	_grass_chunks.clear()
+	_grass_pending.clear()
+	_grass_last_chunk = Vector2i(9999999, 9999999)
+	_build_grass_chunk(Vector2i.ZERO)
+
+## Hash spasial sederhana dr koordinat petak -> seed RNG DETERMINISTIK: petak
+## yg sama SELALU menghasilkan layout rumput identik tiap kali dibangun ulang
+## (pemain pulang-pergi lewat petak yg sama tak akan lihat rumput "mengocok
+## ulang"/beda posisi tiap kunjungan).
+func _chunk_seed(coord: Vector2i) -> int:
+	var h := (int(coord.x) * 73856093) ^ (int(coord.y) * 19349663) ^ 20460301
+	return absi(h)
+
+## Bangun 1 petak rumput di koordinat chunk (bukan meter) `coord` — node
+## MultiMeshInstance3D-nya ditaruh TEPAT di titik tengah petak itu di dunia
+## nyata & TAK PERNAH digeser lagi (beda total dr versi lama yg diam di
+## titik asal terus dibungkus GPU spy IKUT pemain — itu penyebab laporan
+## "kok malah jadi ngikutin"). Dipanggil lewat antrean _grass_pending
+## (lihat _process/_update_grass_chunks), maks GRASS_CHUNK_BUILD_PER_FRAME
+## per frame spy tak menghentak.
+func _build_grass_chunk(coord: Vector2i) -> void:
+	if _grass_chunks.has(coord):
+		return
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_custom_data = true
-	mm.mesh = _build_grass_blade_mesh()
-	mm.instance_count = GRASS_COUNT
-	# PERBAIKAN BUG NYATA (laporan user: "rumput masih gk kerender", makin
-	# parah stlh pulau 12km ditambah): node MultiMesh ini SENGAJA tak pernah
-	# digeser (lihat catatan di atas) — instance CPU-side-nya selalu berada
-	# dlm kotak kecil ±GRASS_RADIUS di sekitar TITIK ASAL (0,0,0), sedangkan
-	# grass_blade.gdshader "membungkusnya" scr visual ke sekitar pemain di
-	# GPU. Godot menghitung frustum-culling MultiMeshInstance3D dari AABB
-	# LOKAL (kotak kecil itu) + extra_cull_margin, TANPA tahu soal
-	# pembungkusan GPU tsb -- begitu pemain menjauh dari (0,0,0) lebih dari
-	# ~GRASS_RADIUS+margin, seluruh rumput di-cull mesin (dianggap "di luar
-	# layar" krn geometri aslinya jauh dr kamera), padahal SEHARUSNYA selalu
-	# terlihat di sekitar pemain di manapun ia berada di pulau. custom_aabb
-	# dipaksa mencakup SELURUH pulau (radius pulau + buffer) supaya engine
-	# tak pernah meng-cull-nya keliru, berapa pun jauhnya pemain berjalan.
-	var island_r := IslandShape.RADIUS * 1.3 + 200.0
-	mm.custom_aabb = AABB(Vector3(-island_r, -4.0, -island_r), Vector3(island_r * 2.0, 8.0, island_r * 2.0))
+	mm.mesh = _grass_mesh
+	mm.instance_count = GRASS_CHUNK_INSTANCES
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 20460301
-	# Domain KOTAK (bukan cakram) -1..+1 * GRASS_RADIUS: wrap di shader
-	# butuh petak persegi supaya nyambung mulus tanpa celah saat dibungkus.
-	for i in range(GRASS_COUNT):
-		var x := rng.randf_range(-GRASS_RADIUS, GRASS_RADIUS)
-		var z := rng.randf_range(-GRASS_RADIUS, GRASS_RADIUS)
+	rng.seed = _chunk_seed(coord)
+	var half := GRASS_CHUNK_SIZE * 0.5
+	for i in range(GRASS_CHUNK_INSTANCES):
+		var x := rng.randf_range(-half, half)
+		var z := rng.randf_range(-half, half)
 		var s := rng.randf_range(0.75, 1.35)
 		var blade_basis := Basis(Vector3.UP, rng.randf_range(0.0, TAU))
 		blade_basis = blade_basis.scaled(Vector3(s, s * rng.randf_range(0.8, 1.3), s))
 		mm.set_instance_transform(i, Transform3D(blade_basis, Vector3(x, 0.0, z)))
 		mm.set_instance_custom_data(i, Color(rng.randf(), rng.randf(), 0.0, 0.0))
+	mm.visible_instance_count = int(round(GRASS_CHUNK_INSTANCES * _grass_density_frac))
 	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "GrassBlades"
+	mmi.name = "GrassChunk_%d_%d" % [coord.x, coord.y]
 	mmi.multimesh = mm
-	_grass_mat = _grass_material()
 	mmi.material_override = _grass_mat
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mmi.extra_cull_margin = GRASS_RADIUS
+	mmi.position = Vector3((coord.x + 0.5) * GRASS_CHUNK_SIZE, 0.0, (coord.y + 0.5) * GRASS_CHUNK_SIZE)
 	add_child(mmi)
-	_grass_mmi = mmi
+	_grass_chunks[coord] = mmi
 
+## Dipanggil dari _process tiap kali pemain PINDAH PETAK (bukan tiap frame —
+## murah): tentukan set petak yg SEHARUSNYA aktif (persegi radius
+## GRASS_RENDER_RADIUS_CHUNKS), antre-kan yg blm ada, bongkar yg sudah lewat
+## GRASS_UNLOAD_RADIUS_CHUNKS (histeresis sengaja > radius render, cegah
+## bongkar-pasang bolak-balik pas pemain persis di tepi petak).
+func _update_grass_chunks(center: Vector2i) -> void:
+	var wanted := {}
+	for dx in range(-GRASS_RENDER_RADIUS_CHUNKS, GRASS_RENDER_RADIUS_CHUNKS + 1):
+		for dz in range(-GRASS_RENDER_RADIUS_CHUNKS, GRASS_RENDER_RADIUS_CHUNKS + 1):
+			wanted[Vector2i(center.x + dx, center.y + dz)] = true
+	for coord in wanted:
+		if not _grass_chunks.has(coord) and not _grass_pending.has(coord):
+			_grass_pending.append(coord)
+	var to_remove: Array = []
+	for coord in _grass_chunks:
+		if maxi(absi(coord.x - center.x), absi(coord.y - center.y)) > GRASS_UNLOAD_RADIUS_CHUNKS:
+			to_remove.append(coord)
+	for coord in to_remove:
+		var mmi = _grass_chunks[coord]
+		if is_instance_valid(mmi):
+			mmi.queue_free()
+		_grass_chunks.erase(coord)
+	var still_wanted: Array = []
+	for coord in _grass_pending:
+		if wanted.has(coord):
+			still_wanted.append(coord)
+	_grass_pending = still_wanted
 
-## Mesh 1 tuft rumput: 5 helai (segitiga, naik dari 3 — perbaikan "lebat" #2)
-## tersusun bersilang membentuk bintang dari atas, tiap helai punya sedikit
-## "condong" di ujung biar tak kaku lurus. Warna vertex.a dipakai
-## grass_blade.gdshader sbg bobot tinggi (0=akar,1=ujung).
+## Bangun maks GRASS_CHUNK_BUILD_PER_FRAME petak dari antrean tiap frame —
+## sebar biaya, cegah hentakan saat lari diagonal memasuki byk petak baru.
+func _process_grass_chunk_queue() -> void:
+	var budget := GRASS_CHUNK_BUILD_PER_FRAME
+	while budget > 0 and not _grass_pending.is_empty():
+		var coord: Vector2i = _grass_pending.pop_front()
+		if not _grass_chunks.has(coord):
+			_build_grass_chunk(coord)
+			budget -= 1
+
+func _apply_grass_density_all() -> void:
+	for coord in _grass_chunks:
+		var mmi = _grass_chunks[coord]
+		if is_instance_valid(mmi) and mmi.multimesh:
+			mmi.multimesh.visible_instance_count = int(round(GRASS_CHUNK_INSTANCES * _grass_density_frac))
+
+## Mesh 1 tuft rumput: 5 helai (segitiga) tersusun bersilang membentuk
+## bintang dari atas, tiap helai punya sedikit "condong" di ujung biar tak
+## kaku lurus. Warna vertex.a dipakai grass_blade.gdshader sbg bobot tinggi
+## (0=akar,1=ujung). Dipakai BERSAMA oleh semua petak (1 resource, hemat).
 func _build_grass_blade_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -319,12 +389,15 @@ func _build_grass_blade_mesh() -> ArrayMesh:
 	return st.commit()
 
 ## Material batang rumput: goyangan angin + shading toon + varian warna per-
-## instance (lihat grass_blade.gdshader). cull_disabled di shader itu sendiri.
+## instance (lihat grass_blade.gdshader). cull_disabled di shader itu
+## sendiri. player_pos/fade_* diperbarui tiap frame di _process.
 func _grass_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	mat.shader = GRASS_SHADER
-	mat.set_shader_parameter("wrap_size", GRASS_RADIUS * 2.0)
-	mat.set_shader_parameter("wrap_center", Vector2.ZERO)
+	var fade_end := (float(GRASS_RENDER_RADIUS_CHUNKS) + 0.5) * GRASS_CHUNK_SIZE
+	mat.set_shader_parameter("fade_start", fade_end - GRASS_CHUNK_SIZE)
+	mat.set_shader_parameter("fade_end", fade_end)
+	mat.set_shader_parameter("player_pos", Vector2.ZERO)
 	return mat
 
 # ---------------- API kompatibel ----------------
@@ -391,9 +464,8 @@ func apply_quality(p: Dictionary) -> void:
 		world_env.environment.glow_enabled = bool(p.get("glow", true))
 	if sun:
 		sun.shadow_enabled = bool(p.get("shadows", true))
-	if is_instance_valid(_grass_mmi) and _grass_mmi.multimesh:
-		var gd_frac := clampf(float(p.get("grass_density", 1.0)), 0.0, 1.0)
-		_grass_mmi.multimesh.visible_instance_count = int(round(GRASS_COUNT * gd_frac))
+	_grass_density_frac = clampf(float(p.get("grass_density", 1.0)), 0.0, 1.0)
+	_apply_grass_density_all()
 	_dl_last = -1.0
 	if world_env and sun:
 		_apply_daylight()
@@ -501,20 +573,22 @@ func _process(delta: float) -> void:
 	if player and _ground:
 		_ground.position.x = player.global_position.x
 		_ground.position.z = player.global_position.z
-	# Rumput TAK ikut digeser scr VISUAL (posisi blade ttp dihitung via
-	# wrap_center di shader, lihat catatan _build_grass) -- TAPI node
-	# MultiMeshInstance3D-nya sendiri SKRG jg ikut ditaruh dekat pemain tiap
-	# frame (pengaman ganda bareng custom_aabb di _build_grass): shader
-	# menimpa TOTAL posisi akhir tiap blade dari wrap_center + offset lokal
-	# yg sudah dibungkus modulo, jadi memindah node TIDAK mengubah hasil
-	# akhir sama sekali (dibuktikan aljabar: rel = mod(inst_xz-wrap_center)
-	# tetap sama persis baik node diam di origin maupun ikut pemain) --
-	# cuma bikin Godot pasti tak pernah keliru meng-cull objek ini krn
-	# AABB-nya kini SELALU dekat kamera, bukan cuma bergantung custom_aabb.
-	if player and _grass_mmi:
-		_grass_mmi.position = Vector3(player.global_position.x, 0.0, player.global_position.z)
-	if player and _grass_mat:
-		_grass_mat.set_shader_parameter("wrap_center", Vector2(player.global_position.x, player.global_position.z))
+	# Rumput: chunk streaming (lihat catatan arsitektur di dekat GRASS_CHUNK_
+	# SIZE) — cuma dicek ULANG petak mana yg seharusnya aktif SAAT pemain
+	# betul2 PINDAH petak (bukan tiap frame, murah), tapi antrean
+	# pembangunan petak baru tetap dicicil tiap frame (budget kecil) biar
+	# tak menghentak. player_pos dikirim tiap frame spy fade jarak halus.
+	if player:
+		var pcx := int(floor(player.global_position.x / GRASS_CHUNK_SIZE))
+		var pcz := int(floor(player.global_position.z / GRASS_CHUNK_SIZE))
+		var pchunk := Vector2i(pcx, pcz)
+		if pchunk != _grass_last_chunk:
+			_grass_last_chunk = pchunk
+			_update_grass_chunks(pchunk)
+	_process_grass_chunk_queue()
+	if _grass_mat:
+		_grass_mat.set_shader_parameter("player_pos", Vector2(player.global_position.x, player.global_position.z) if player else Vector2.ZERO)
+
 
 func _tick_daynight(_delta: float) -> void:
 	# Ronde-46 bag. C (permintaan pengguna): dunia SELALU malam sekarang —

@@ -323,26 +323,38 @@ func _check_world_ground_fog() -> void:
 	var kids: Array = []
 	for c in world.get_children():
 		kids.append(String(c.name))
-	var grass := world.find_child("GrassBlades", true, false) as MultiMeshInstance3D
+	# RONDE INI: rumput pindah dr 1 node "GrassBlades" tunggal (wrap around
+	# player, dihapus krn laporan user "kok malah jadi ngikutin") ke sistem
+	# CHUNK STREAMING (world.gd _build_grass_chunk) — tiap petak jadi node
+	# MultiMeshInstance3D terpisah bernama "GrassChunk_X_Z". generate_async()
+	# dipanggil TANPA pemain (world.player msh null) di cek ini, tapi
+	# _build_grass() sengaja membangun petak ASAL (0,0) SEKARANG JUGA (lihat
+	# komentarnya) — jadi minimal SATU chunk harus ada di sini walau tanpa
+	# pemain sama sekali, sama spt jaminan versi lama.
+	var grass: MultiMeshInstance3D = null
+	for c in world.get_children():
+		if c is MultiMeshInstance3D and String(c.name).begins_with("GrassChunk_"):
+			grass = c
+			break
 	if grass == null:
-		_fail("world: node GrassBlades tidak ditemukan sbg anak World. anak World skrg: [%s]" % ", ".join(kids))
+		_fail("world: tak ada node GrassChunk_* ditemukan sbg anak World (petak asal gagal dibangun?). anak World skrg: [%s]" % ", ".join(kids))
 		world.queue_free()
 		return
 	if grass.multimesh == null:
-		_fail("world: GrassBlades.multimesh null")
+		_fail("world: %s.multimesh null" % grass.name)
 		world.queue_free()
 		return
-	print("[fire-check] diag rumput: instance_count=", grass.multimesh.instance_count,
+	print("[fire-check] diag rumput: chunk=", grass.name, " instance_count=", grass.multimesh.instance_count,
 		" mesh_surfaces=", (grass.multimesh.mesh.get_surface_count() if grass.multimesh.mesh else -1))
 	if grass.multimesh.instance_count <= 0:
-		_fail("world: MultiMesh rumput (GrassBlades) instance_count<=0 (dpt %d)" % grass.multimesh.instance_count)
+		_fail("world: MultiMesh rumput (%s) instance_count<=0 (dpt %d)" % [grass.name, grass.multimesh.instance_count])
 		world.queue_free()
 		return
 	if grass.material_override == null:
 		_fail("world: rumput tidak punya material (bakal tampil putih polos)")
 		world.queue_free()
 		return
-	print("[fire-check] fase 1e ✔ tanah rumput + kabut jauh (begin=%.0f end=%.0f) + malam berbintang OK (%d tuft rumput)" % [env.fog_depth_begin, env.fog_depth_end, grass.multimesh.instance_count])
+	print("[fire-check] fase 1e ✔ tanah rumput + kabut jauh (begin=%.0f end=%.0f) + malam berbintang OK (chunk %s, %d tuft rumput)" % [env.fog_depth_begin, env.fog_depth_end, grass.name, grass.multimesh.instance_count])
 	world.queue_free()
 	await process_frame
 
