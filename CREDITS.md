@@ -1,5 +1,8 @@
 # CREDITS — Pulau Toon
 
+## Rumput (adopsi keseluruhan — permintaan user, ronde 2026-09-27):
+Grass-Shader-Example (@_Malido, Malidos) — CC0 — https://github.com/Malidos/Grass-Shader-Example — inti shader rumput baru: wind Perlin scroll + lag ujung UV.y/2.5, push-back pemain via instance-uniform player_position, NORMAL=up + FRONT_FACING flip, fake AO pangkal pow(UV.y,5), specular-toon; parameter material dari ExampleScene merk.
+
 ## Aset pihak ketiga (disertakan)
 
 ### (Dihapus) Female Mannequin + Universal Animation Library 1 & 2 (Quaternius, CC0)

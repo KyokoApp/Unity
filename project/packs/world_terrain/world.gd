@@ -326,11 +326,9 @@ func _tick_water_reflection() -> void:
 ## polos + helai 3D melebur jadi satu hamparan hijau mulus (bukan lagi
 ## helai kuning-terang di atas tanah gelap), senada suasana sore hangat.
 ##
-## DANAU+SUNGAI (permintaan user): ditambah lewat any_water_factor()
-## (gabungan laut ATAU danau ATAU sungai, rumus lake_factor/river_factor
-## disalin manual dr island_shape.gd, WAJIB disamakan kalau salah satu
-## diubah) — dipakai gantikan water_factor() polos di fragment(), shg
-## danau/sungai dapat shading air+riak yg SAMA dgn laut tanpa kode terpisah.
+## DANAU+SUNGAI DIHAPUS (ronde ini, permintaan user): air HANYA di tepi
+## pulau; any_water_factor() kini identik water_factor() (pantai laut),
+## salinan rumusnya tetap wajib disamakan manual dgn island_shape.gd.
 func _make_ground_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	var sh := Shader.new()
@@ -406,39 +404,12 @@ float water_factor(vec2 p) {
 	return clamp((r - (coast - BEACH_WIDTH)) / BEACH_WIDTH, 0.0, 1.0);
 }
 
-// --- Danau + sungai (IslandShape.lake_factor/river_factor, disalin manual —
-// permintaan user "ada aliran danau atau sungai"). HARUS SAMA PERSIS dgn
-// island_shape.gd & grass_blade.gdshader kalau salah satu diubah.
-const vec2 LAKE_CENTER = vec2(95.0, 75.0);
-const float LAKE_RADIUS = 60.0;
-const float LAKE_BANK = 14.0;
-const vec2 RIVER_DIR = vec2(0.784, 0.621);
-const vec2 RIVER_START = vec2(142.04, 112.26);
-const float RIVER_LENGTH = 620.0;
-const float RIVER_HALF_WIDTH = 18.0;
-const float RIVER_BANK = 10.0;
-const float RIVER_MEANDER_AMP = 16.0;
-const float RIVER_MEANDER_FREQ = 0.008;
-float lake_factor(vec2 p) {
-	float d = length(p - LAKE_CENTER);
-	return clamp((LAKE_RADIUS - d) / LAKE_BANK, 0.0, 1.0);
-}
-float river_factor(vec2 p) {
-	vec2 rp = p - RIVER_START;
-	vec2 perp = vec2(-RIVER_DIR.y, RIVER_DIR.x);
-	float u = dot(rp, RIVER_DIR);
-	float v = dot(rp, perp);
-	float meander = sin(u * RIVER_MEANDER_FREQ) * RIVER_MEANDER_AMP;
-	float dist = abs(v - meander);
-	float w = clamp((RIVER_HALF_WIDTH - dist) / RIVER_BANK, 0.0, 1.0);
-	float fade_in = clamp((u + RIVER_BANK) / (RIVER_BANK * 2.0), 0.0, 1.0);
-	float fade_out = 1.0 - clamp((u - (RIVER_LENGTH - RIVER_BANK)) / (RIVER_BANK * 2.0), 0.0, 1.0);
-	return w * fade_in * fade_out;
-}
-// Laut ATAU danau ATAU sungai — satu nilai gabungan dipakai fragment() shg
-// keduanya (bukan cuma laut) dapat shading air+riak yg sama.
+// RONDE INI (permintaan user: "hilangin juga danau nya biar bagian air
+// hanya ada disisi pulau"): DANAU & SUNGAI DIHILANGKAN — dirumuskan di
+// sini tdk ada kode lain selain garis pantai laut; any_water_factor()
+// kini identik water_factor() (dipakai menyatu nama tuignya).
 float any_water_factor(vec2 p) {
-	return max(water_factor(p), max(lake_factor(p), river_factor(p)));
+	return water_factor(p);
 }
 
 void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
@@ -452,7 +423,7 @@ void fragment() {
 	vec3 col = mix(land_col, sand_color, smoothstep(0.0, 0.5, wf));
 
 	// --- PASIR BASAH (tier-menengah): pita gelap+dingin tipis persis di
-	// garis air (sebelum benang air penuh) — ciri pantai/danau sungguhan ---
+	// garis air (sebelum benang air penuh) — ciri pantai sungguhan ---
 	float wet = smoothstep(0.02, 0.14, wf) * (1.0 - smoothstep(0.24, 0.44, wf));
 	float ripple = 0.0;
 
@@ -517,7 +488,7 @@ void fragment() {
 		col += vec3(1.0, 0.85, 0.60) * glint * wm * sun_glint;
 
 		// --- GELOMBANG PEMAIN (reff: PLAYER_WAVES) — cincin riak melebar
-		// dari posisi pemain saat masuk air (sungai/danau/laut dangkal);
+		// dari posisi pemain saat masuk air (laut dangkal tepi pulau);
 		// posisi diset tiap frame dr world.gd _process (uniform biasa, bukan
 		// global shader param spy tak perlu edit ProjectSettings) ---
 		if (wm > 0.001) {
@@ -731,99 +702,40 @@ func _apply_grass_density_all() -> void:
 ## GPU tetap terkendali: cuma 9 segitiga/rumpun, naik dari 5, bukan per-
 ## instance count yg jauh lbh mahal). Warna vertex.a dipakai grass_blade.
 ## gdshader sbg bobot tinggi (0=akar,1=ujung). Dipakai BERSAMA semua petak.
-## DESIGN BARU (ronde ini, permintaan user "pake design ini ajh biar
-## gampang"): geometri rumpun BUKAN segitiga-tipis lagi, melainkan KARTU
-## persegi bertekstur tuft (cara space-grass/design-1 user). Enam kartu
-## per rumpun dgn UV BERSIH (u 0..1 melintang, v 0=akar .. 1=ujung) supaya
-## pattern foliage_texture melekat sempurna & shader membaca UV.y sbg
-## bobot tinggi/angin/warna. Total 12 segitiga/rumpun (jd 54 tri/rotasi
-## instancing standar), tapi FAR lebih efektif: foliage_texture mengerjakan
-## tampilan helai per-piksel, bukan geometri. Mesh deterministik (seed
-## tetap) — dipakai bersama SEMUA chunk; keberagaman bentuk dtambahkan
-## oleh yaw/scaling per-instance di builder chunk.
+## Blade MURNI segitiga tipis mengikuti konvensi "Grass-Shader-Example"
+## karya @_Malido (CC0, adopsi keseluruhan ronde ini): Bukan kartu
+## bertekstur — warna dr gradien top/bottom_color di shader. KONVENSI
+## UV MERK: pada tiap blade, v=1 di AKAR & v=0 di UJUNG (1.0-UV.y di
+## shader = bobot ujung: angin & dingkusan pemain menggerakkan ujung
+## paling jauh, lag ujung UV.y/2.5). 9 helai/rumpun (5 primer + 4 pengisi)
+## — jumlah yg teruji di dua ronde sebelunya. Mesh deterministik (seed
+## tetap), dishare SEMUA chunk; keragamaan dr yaw/scaling per-instance.
 func _build_grass_blade_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 88172645  # tetap & deterministik, lihat komentar di atas
-	const CARDS_N := 6
-	for i in range(CARDS_N):
-		var base_angle: float = (TAU / float(CARDS_N)) * float(i) + rng.randf_range(-0.30, 0.30)
-		var h := rng.randf_range(0.34, 0.52)          # tinggi kartu
-		var w := rng.randf_range(0.15, 0.22)          # lebar kartu (gambar tuft berisi bbrp helai)
-		var tip_shrink := rng.randf_range(0.10, 0.25) # ujung menyempit
-		var lean := rng.randf_range(0.06, 0.16)       # kondangan ke depan
-		var base_shift := rng.randf_range(0.0, 0.05)
+	const PRIMARY_N := 5
+	const FILLER_N := 4
+	var total := PRIMARY_N + FILLER_N
+	for i in range(total):
+		var is_primary := i < PRIMARY_N
+		var base_angle: float = (TAU / float(total)) * float(i) + rng.randf_range(-0.32, 0.32)
+		var h: float = rng.randf_range(0.40, 0.58) if is_primary else rng.randf_range(0.20, 0.34)
+		var w: float = rng.randf_range(0.075, 0.098) if is_primary else rng.randf_range(0.045, 0.064)
+		var lean := rng.randf_range(0.07, 0.18)
+		var base_shift := rng.randf_range(0.0, 0.055)
 		var rot := Basis(Vector3.UP, base_angle)
 		var origin: Vector3 = rot * Vector3(0.0, 0.0, base_shift)
-		# kartu = quad 2 segitiga, akar tenggelam -0.06 biar tak mengambang.
-		var bl: Vector3 = origin + rot * Vector3(-w * 0.5, -0.06, 0.0)
-		var br: Vector3 = origin + rot * Vector3(w * 0.5, -0.06, 0.0)
-		var tl: Vector3 = origin + rot * Vector3(-w * 0.5 * tip_shrink, h, lean)
-		var tr: Vector3 = origin + rot * Vector3(w * 0.5 * tip_shrink, h, lean)
-		var uv_bl := Vector2(0, 0)
-		var uv_br := Vector2(1, 0)
-		var uv_tl := Vector2(0, 1)
-		var uv_tr := Vector2(1, 1)
-		# segitiga 1: bl-br-tr; segitiga 2: bl-tr-tl (CCW dr depan; shader cull_disabled)
-		st.set_uv(uv_bl); st.add_vertex(bl)
-		st.set_uv(uv_br); st.add_vertex(br)
-		st.set_uv(uv_tr); st.add_vertex(tr)
-		st.set_uv(uv_bl); st.add_vertex(bl)
-		st.set_uv(uv_tr); st.add_vertex(tr)
-		st.set_uv(uv_tl); st.add_vertex(tl)
+		var bl: Vector3 = origin + rot * Vector3(-w * 0.5, -0.04, 0.0)
+		var br: Vector3 = origin + rot * Vector3(w * 0.5, -0.04, 0.0)
+		var tip: Vector3 = origin + rot * Vector3(0.0, h, lean)
+		# Malidos-convention: v=1 di akar, v=0 di ujung.
+		st.set_uv(Vector2(0, 1)); st.add_vertex(bl)
+		st.set_uv(Vector2(1, 1)); st.add_vertex(br)
+		st.set_uv(Vector2(0.5, 0)); st.add_vertex(tip)
 	st.generate_normals()
 	return st.commit()
-
-## Tekstur kartu rumput digambar RUNTIME (nol aset repo): 128x128 RGBA,
-## ~7 helai putih melebar→meruncing dr pangkal tengah; rgb PUTIH polos
-## (warna wangi dr top/bottom/noise_color yg mengalikan di shader), alpha
-## = bentuk helai utk ALPHA_SCISSOR + dither fade. Deterministik (seed),
-## ~16 ribu piksel, <0.1 detik saat boot, lalu dipakai bersama semua
-## material/chunk.
-func _make_grass_card_texture() -> Texture2D:
-	const W := 128
-	var img := Image.create(W, W, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7462391
-	var blades: Array = []
-	for i in range(7):
-		var bx := 40.0 + 48.0 * rng.randf()               # posisi dasar x
-		var curve := rng.randf_range(-22.0, 22.0)         # keingkungan ujung
-		var wid := rng.randf_range(3.2, 5.2)              # ketebalan helai
-		var topy := rng.randf_range(0.0, 34.0)            # tinggi sym
-		blades.append([bx, curve, wid, topy])
-	for y in range(W):
-		var t := 1.0 - float(y) / float(W - 1)   # 0 di bawah (y=127) -> 1 di atas citra (y=0)
-		var uv_v := 1.0 - t                      # v kartu (0=akar; shader: v=1 di ujung -> y=0) — dihitung terbalik dr kenyataan UV.
-		for b in blades:
-			var topy_m: float = float(W - 1) - float(b[3])
-			var top_t: float = 1.0 - topy_m / float(W - 1)  # t maksimal (ujung)
-			if t > top_t:
-				continue
-			var arc := (t / maxf(top_t, 0.001))
-			var cx: float = b[0] + b[1] * arc * arc   # ujung melengkung
-			var wid: float = b[2] * (1.0 - arc * 0.82) + 0.35
-			for x in range(W):
-				var dx := absf(float(x) - cx)
-				if dx < wid:
-					var a := 255 if dx < wid * 0.72 else 200  # tepi sedikit lembut
-					img.set_pixel(x, y, Color(1, 1, 1, float(a) / 255.0))
-	var tex := ImageTexture.create_from_image(img)
-	return tex
-
-## Ramp toon 4-px (design 2 user: toon_ramp + rim light) — nilai disamakan
-## dgn lantai shading lama yg user-approved (bawah 0.66 = mid tanah): tak
-## ada lagi rumpun gosong; filter NEAREST-implisit dr kecilan gambar +
-## mipmatik membuatnya mulus membentuk step Toon.
-func _make_toon_ramp() -> Texture2D:
-	var img := Image.create(4, 1, false, Image.FORMAT_RGB8)
-	img.set_pixel(0, 0, Color(0.66, 0.66, 0.66))
-	img.set_pixel(1, 0, Color(0.78, 0.78, 0.78))
-	img.set_pixel(2, 0, Color(0.90, 0.90, 0.90))
-	img.set_pixel(3, 0, Color(1.00, 1.00, 1.00))
-	return ImageTexture.create_from_image(img)
 
 ## Tekstur noise Perlin-FBM runtime utk angin/warna variaasi — teknik
 ## @_Malido/design-1 user: gumpalan lembut besar, seamless supaya
@@ -844,20 +756,41 @@ func _make_grass_noise(freq: float, octaves: int) -> Texture2D:
 ## Material batang rumput: goyangan angin + shading toon + varian warna per-
 ## instance (lihat grass_blade.gdshader). cull_disabled di shader itu
 ## sendiri. Tak ada lagi uniform pemain — fadeout full jarak-kamera (design user).
-## Material kartu rumput — TIGA tekstur digambar RUNTIME (nol aset repo):
-## foliage tuft + toon_ramp 4px + noise angin Perlin-FBM (design user).
+## Material blade — parameter persis ExampleScene merk (_Malido, CC0):
+## wind_direction (1,-0.7,-0.5), strength 0.23, noise_size 0.03, speed
+## 0.13; konteks kolom pakai keluarga hijau tanah ASekai (ground-kawin),
+## player_displacement kuat 0.94 (karakter menyibak rumput saat lari).
+## Noise Perlin-FBM seamless digambar runtime (nol aset file).
 func _grass_material() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	mat.shader = GRASS_SHADER
 	var fade_end := (float(GRASS_RENDER_RADIUS_CHUNKS) + 0.5) * GRASS_CHUNK_SIZE
-	# fadeout DITHER design-1: selesai sebelum petak terluar dibongkar.
 	mat.set_shader_parameter("fadeout_envelope",
 		Vector2(fade_end - GRASS_CHUNK_SIZE, fade_end))
-	mat.set_shader_parameter("foliage_texture", _make_grass_card_texture())
-	mat.set_shader_parameter("toon_ramp", _make_toon_ramp())
-	mat.set_shader_parameter("wind_noise", _make_grass_noise(0.05, 4))
-	mat.set_shader_parameter("color_noise", _make_grass_noise(0.35, 3))
+	mat.set_shader_parameter("top_color", Vector3(0.375, 0.545, 0.335))
+	mat.set_shader_parameter("bottom_color", Vector3(0.285, 0.450, 0.260))
+	mat.set_shader_parameter("player_displacement_strength", 0.4)
+	mat.set_shader_parameter("player_displacement_size", 0.94)
+	mat.set_shader_parameter("wind_direction", Vector3(1.0, -0.7, -0.5))
+	mat.set_shader_parameter("wind_strength", 0.23)
+	mat.set_shader_parameter("wind_noise_size", 0.03)
+	mat.set_shader_parameter("wind_noise_speed", 0.13)
+	mat.set_shader_parameter("wind_noise", _make_grass_noise(0.05, 3))
 	return mat
+
+## Kirim posisi pemain ke INSTANCE-UNIFORM tiap chunk yang ada (persis
+## Character.gd dr ExampleScene merk: set_deferred via "instance_shader_
+## parameters/player_position") — dipakai utk push-back blade ("trample")
+## diskaik klase UV-ujung. Biaya: titik-titik node kecil (~max 25 chunk)
+## — sangat murah dibanding per-blade trample shader lama. Dipanggil
+## tiap _process oleh world (amalan murni G-ILE menurunkan gra. Merk).
+func _update_grass_player_uniform() -> void:
+	if not PROC_GRASS or _grass_mat == null:
+		return
+	var pp: Vector3 = player.global_position + Vector3(0.0, -0.1, 0.0) if player else Vector3(0.0, -5.0, 0.0)
+	for c in _grass_chunks.values():
+		if is_instance_valid(c):
+			c.set_instance_shader_parameter("player_position", pp)
 
 # ---------------- API kompatibel ----------------
 
@@ -953,7 +886,7 @@ func _setup_environment() -> void:
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	# SORE DIADEM (ronde ini: dunia skrg terang & pulau kecil 3km+air dekat
 	# spawn) — kabut dilonggarkan JAUH (dr 45/160 malam) shg pemandangan
-	# danau/sungai+laut jelas terbaca, sisanya cuma kabut tipis kejauhan.
+	# garis air laut tepi pulau jelas terbaca, sisanya cuma kabut tipis kejauhan.
 	env.fog_depth_begin = 70.0
 	env.fog_depth_end = 340.0
 	env.fog_depth_curve = 1.6
@@ -1081,6 +1014,10 @@ func _process(delta: float) -> void:
 			if pchunk != _grass_last_chunk:
 				_grass_last_chunk = pchunk
 				_update_grass_chunks(pchunk)
+		# instance-uniform player_position (gaya merk _Malido Character.gd):
+		# disetel tiap frame utk seluruh chunk-ada supaya rumput menyibak
+		# meles menginjaknya (player push-back di grass_blade.gdshader).
+		_update_grass_player_uniform()
 		_process_grass_chunk_queue()
 		_process_grass_fill_budget()
 	# Posisi pemain jg utk riak gelombang air (shader tanah, uniform
