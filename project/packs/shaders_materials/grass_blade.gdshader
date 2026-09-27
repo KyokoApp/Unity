@@ -28,8 +28,17 @@ uniform float wind_speed = 1.7;
 uniform float wind_strength = 0.29;
 uniform vec3 base_color : source_color = vec3(0.09, 0.22, 0.08);  // dekat akar
 uniform vec3 tip_color : source_color = vec3(0.42, 0.62, 0.20);   // dekat ujung
+// PEROMBAKAN realisme (user: "kurang realistis"): sebagian kecil rumpun
+// (dipilih pakai `variant`, bukan acak per-frame) dicondongkan ke warna
+// agak kekuningan/kering, spt padang rumput asli yg tak pernah 100% hijau
+// seragam satu warna persis.
+uniform vec3 dry_tip_color : source_color = vec3(0.58, 0.52, 0.21);
 uniform float shadow_tint : hint_range(0.0, 1.0) = 0.48;
 uniform float mid_tint : hint_range(0.0, 1.0) = 0.85;
+// Efek "backlight" (SSS palsu): ujung helai yg tipis tembus cahaya kalau
+// matahari ada di belakangnya -> nyala keemasan khas rumput asli kena
+// cahaya dr belakang, bukan flat-toon polos.
+uniform float translucency : hint_range(0.0, 2.0) = 0.75;
 
 // Posisi pemain (dunia, diperbarui tiap frame dr world.gd _process) +
 // jarak mulai/selesai pudar. Petak yg dimuat streaming SELALU sedikit
@@ -119,6 +128,10 @@ void vertex() {
 
 void fragment() {
 	vec3 col = mix(base_color, tip_color, height_w);
+	// Sebagian rumpun (variant tinggi) condong ke warna kering — cuma di
+	// area dekat ujung (height_w) spy pangkalnya ttp hijau spt rumput nyata.
+	float dryness = smoothstep(0.74, 0.97, variant);
+	col = mix(col, dry_tip_color, dryness * height_w);
 	// variasi terang/gelap ringan per rumpun biar tak seragam monoton ("lebat")
 	col *= mix(0.82, 1.22, variant);
 	ALBEDO = col;
@@ -131,5 +144,10 @@ void light() {
 	float b = shadow_tint + (mid_tint - shadow_tint) * smoothstep(0.15, 0.5, l)
 		+ (1.0 - mid_tint) * smoothstep(0.55, 0.85, l);
 	DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * b * ATTENUATION;
+	// Backlight/SSS palsu: makin dekat sudut pandang ke arah "lawan cahaya"
+	// (matahari di belakang helai relatif ke kamera), makin nyala keemasan
+	// tipis di ujung (height_w) — efek translusen khas daun/rumput tipis.
+	float back = pow(clamp(dot(-LIGHT, VIEW), 0.0, 1.0), 2.5) * height_w;
+	DIFFUSE_LIGHT += tip_color * LIGHT_COLOR * back * translucency * ATTENUATION;
 	SPECULAR_LIGHT = vec3(0.0);
 }

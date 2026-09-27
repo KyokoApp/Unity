@@ -84,14 +84,16 @@ var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 # tak kelihatan nge-pop, PERSIS spt referensi (optimization_by_distance +
 # smoothstep di grass.gdshaderinc mrk) walau implementasi detailnya beda.
 const GRASS_CHUNK_SIZE := 22.0
-# PERMINTAAN USER (ronde ini): "kurang tebel, harus bener2 tebel nutupin
-# tanah" — dinaikkan ~4.7x dr percobaan chunk streaming pertama (900,
-# ~1.9 rumpun/m², ternyata jauh lbh jarang drpd sistem lama sblm di-chunk)
-# jadi ~8.7 rumpun/m², SEDIKIT lebih padat dr rekor terpadat sebelumnya
-# (~6.7/m² di sistem "wrap around player" yg sudah dihapus) — kali ini
-# amanteap krn area yg dirender dibatasi radius chunk (bukan seluruh
-# pulau), jadi kepadatan tinggi tak sebanding mahal dgn dunia terbuka penuh.
-const GRASS_CHUNK_INSTANCES := 4200
+# PERMINTAAN USER (ronde ini, LANJUTAN — msh dibilang "kurang tebel" stlh
+# dinaikkan ke 4200/~8.7 rumpun/m² sblmnya): dinaikkan lagi ke ~11.2/m².
+# Kali ini kenaikan jumlah RUMPUN sengaja tak digandakan sebesar putaran
+# sblmnya krn tiap rumpun SKRG jauh lbh berisi (5 helai jd 9, lihat
+# _build_grass_blade_mesh) — total SEGITIGA per petak naik ~2.3x dr putaran
+# lalu (bkn cuma linear ikut jumlah instance), jd kepadatan visual naik
+# banyak tanpa membebani GPU sebanyak kalau instance-count-nya sendiri yg
+# digandakan sebesar itu. TETAP perlu dicek FPS di HP asli stlh ini —
+# kalau turun terlalu jauh, turunkan angka ini dulu (bkn detail helai).
+const GRASS_CHUNK_INSTANCES := 5400
 const GRASS_RENDER_RADIUS_CHUNKS := 2   # persegi (2*r+1)^2 petak selalu berusaha dimuat
 const GRASS_UNLOAD_RADIUS_CHUNKS := 3   # histeresis: dibongkar hanya kalau LEBIH jauh dr ini
 const GRASS_CHUNK_BUILD_PER_FRAME := 2  # cegah hentakan frame saat byk petak baru sekaligus
@@ -358,24 +360,42 @@ func _apply_grass_density_all() -> void:
 		if is_instance_valid(mmi) and mmi.multimesh:
 			mmi.multimesh.visible_instance_count = int(round(GRASS_CHUNK_INSTANCES * _grass_density_frac))
 
-## Mesh 1 tuft rumput: 5 helai (segitiga) tersusun bersilang membentuk
-## bintang dari atas, tiap helai punya sedikit "condong" di ujung biar tak
-## kaku lurus. Warna vertex.a dipakai grass_blade.gdshader sbg bobot tinggi
-## (0=akar,1=ujung). Dipakai BERSAMA oleh semua petak (1 resource, hemat).
+## Mesh 1 tuft rumput (PEROMBAKAN #2 — user: "kurang tebel dan kurang
+## realistis"). Versi lama: persis 5 helai simetris bintang 72° — dari atas
+## keliatan spt "bunga" kaku berulang, bukan rumpun alami. Versi baru:
+## 5 helai UTAMA (tinggi) + 4 helai PENGISI (lebih pendek/tipis) diselang-
+## seling, dan SEMUA sudut/tinggi/lebar/titik-tumbuh di-JITTER acak (RNG
+## seed TETAP supaya mesh hasilnya sama tiap build, tapi antar-helai dlm 1
+## rumpun tak lagi simetri sempurna) — kesan rumpun rimbun & organik, bukan
+## pola geometris berulang. Helai pengisi jg nambah "ketebalan" visual krn
+## mengisi celah siluet antar helai utama tanpa nambah instance/chunk (biaya
+## GPU tetap terkendali: cuma 9 segitiga/rumpun, naik dari 5, bukan per-
+## instance count yg jauh lbh mahal). Warna vertex.a dipakai grass_blade.
+## gdshader sbg bobot tinggi (0=akar,1=ujung). Dipakai BERSAMA semua petak.
 func _build_grass_blade_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var h := 0.46
-	# Lebar dinaikkan sedikit (permintaan "bener2 tebel nutupin tanah") biar
-	# celah antar rumpun makin tersamar sekalipun kepadatan sudah dinaikkan.
-	var w := 0.085
-	var lean := 0.10
-	const BLADE_N := 5
-	for i in range(BLADE_N):
-		var rot := Basis(Vector3.UP, deg_to_rad((360.0 / BLADE_N) * i))
-		var bl := rot * Vector3(-w * 0.5, 0.0, 0.0)
-		var br := rot * Vector3(w * 0.5, 0.0, 0.0)
-		var tip := rot * Vector3(0.0, h, lean)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 88172645  # tetap & deterministik, lihat komentar di atas
+	const PRIMARY_N := 5
+	const FILLER_N := 4
+	var total := PRIMARY_N + FILLER_N
+	for i in range(total):
+		var is_primary := i < PRIMARY_N
+		# Sebaran sudut dasarnya merata (360/total) tapi dijitter acak biar
+		# BUKAN simetri sempurna spt versi lama.
+		var base_angle: float = (TAU / float(total)) * float(i) + rng.randf_range(-0.32, 0.32)
+		var h: float = rng.randf_range(0.40, 0.58) if is_primary else rng.randf_range(0.20, 0.34)
+		var w: float = rng.randf_range(0.075, 0.098) if is_primary else rng.randf_range(0.045, 0.064)
+		var lean := rng.randf_range(0.07, 0.18)
+		# Titik tumbuh digeser sedikit dr pusat rumpun -> tak semua helai
+		# muncul dr 1 titik yg sama persis (spt rumpun asli, bukan payung).
+		var base_shift := rng.randf_range(0.0, 0.055)
+		var rot := Basis(Vector3.UP, base_angle)
+		var origin: Vector3 = rot * Vector3(0.0, 0.0, base_shift)
+		var bl: Vector3 = origin + rot * Vector3(-w * 0.5, 0.0, 0.0)
+		var br: Vector3 = origin + rot * Vector3(w * 0.5, 0.0, 0.0)
+		var tip: Vector3 = origin + rot * Vector3(0.0, h, lean)
 		st.set_color(Color(1, 1, 1, 0.0))
 		st.add_vertex(bl)
 		st.set_color(Color(1, 1, 1, 0.0))
