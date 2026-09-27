@@ -377,6 +377,7 @@ func _on_health_changed(current: float, maximum: float) -> void:
 func _build_layout() -> void:
 	var sa := DisplayServer.get_display_safe_area()
 	var root := Control.new()
+	_hud_root = root
 	root.name = "HudRoot"
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -599,11 +600,16 @@ func _on_emote(_down: bool) -> void:
 # ---------- input multi-touch ----------
 
 ## BUILD MODE (ronde ini, build_mode_manager.gd): kalau build mode aktif,
-## HUD menahan diri memakai gestur layar kosong (joystick melayang/look/
-## cubit) — build manager mengambil alih seluruh gestur (tap-taruh, drag
-## kamera, cubit zoom, joystick build sendiri) supaya tak bentrok & tap
-## utk menaruh objek tak ikut memunculkan joystick/putar kamera sekaligus.
-var build_suspended := false
+## HUD menahan diri TOTAL: gestur layar kosong ditahan (joystick melayang/
+## look/cubit digantikan gestur build) DAN seluruh kontrol permainan —
+## joystick, tombol skill/dash/pause, bar HP — DISEMBUNYIKAN (permintaan
+## user: "full layar gk ribet") sampai mode bangun ditutup lagi.
+var build_suspended := false:
+	set(v):
+		build_suspended = v
+		if _hud_root:
+			_hud_root.visible = not v
+var _hud_root: Control = null
 
 func _input(event: InputEvent) -> void:
 	if build_suspended:

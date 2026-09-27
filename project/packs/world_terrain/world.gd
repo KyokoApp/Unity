@@ -64,15 +64,15 @@ var _ground_mat: ShaderMaterial  # material tanah+air (dipakai set param refleks
 # besok mau dicoba lagi tinggal ubah const ini = true; shader sudah siap
 # pasang (reflect_strength/refl_tex diparametrikan dari _setup di bawah).
 const WATER_REFLECTION := false
-# RUMPUT PROSEDURAL DIMATIKAN (permintaan user, ronde ini: "buat tanpa
-# rumput Dunia nya, jadi kita bisa nambah rumput dari tambahan objek"):
-# tak ada lagi petak MultiMesh GrassChunk_*/tuft perlin live-render — dunia
-# "tandus hijau murni shader tanah" & rumput ditaruh MANUAL lewat katalog
-# Build Mode (Grass_Common_Tall dkk). Sebagai bonus: INI optimasi terbesar
-# ronde ini — chunk-streaming rumput ~5400 instans/petak tak lagi ada, HP
-# mid-range bernapas utk target 60fps. Arsitektur chunk DIBIARKAN utuh di
-# bawah (tinggal ubah const balik = true) karena jalannya sudah teruji.
-const PROC_GRASS := false
+# RUMPUT PROSEDURAL (dibalikin ke awal — permintaan user ronde ini:
+# "buat rumput nya balikin lagi ke awal"): petak chunk-streaming GrassChunk_*
+# + blade tuft wind FBM hidup lagi persis versi matang sebelumnya (lihat
+# blok _build_grass dkk di bawah). Pernah sempat OFF satu ronde (user minta
+# rumput manual via katalog); KEDUA jalur kini tersedia permanen: rumput
+# prosedural MENYALA di sini, & rumput manual tetap bisa ditanam tambahan
+# lewat katalog Build Mode kapan saja. Flag ini juga versi-aman: CI fase
+# 1e membaca `grass_enabled` & menolak flip diam-diam.
+const PROC_GRASS := true
 ## Bendera runtime dibaca probe CI (const tak bisa di-get() dari instance).
 var grass_enabled: bool = PROC_GRASS
 var _refl_vp: SubViewport
@@ -234,7 +234,7 @@ func _make_flat_ground() -> void:
 	body.add_child(col)
 	add_child(body)
 	if PROC_GRASS:
-		_build_grass()   # permintaan user: dunia tanpa rumput otomatis
+		_build_grass()   # rumput prosedural balik ke awal (permintaan user)
 
 ## Rig refleksi planar (dipanggil sekali dari _make_flat_ground). Bidang
 ## air DUNIA sama dgn darat (bidang y=0), jd cermin yg tepat = bidang y=0

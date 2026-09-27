@@ -23,7 +23,7 @@ var rot_label: Label
 var scale_label: Label
 var rot_slider: HSlider
 var scale_slider: HSlider
-var palette_box: HBoxContainer
+var palette_grid: GridContainer
 var palette_buttons := {}     # id katalog -> Button
 var tile_buttons := {}        # item -> Button
 var rotate_btn: Button
@@ -35,7 +35,7 @@ var joy_control: Control      # mini joystick khusus build (BuildJoyControl)
 var _clear_armed := false     # konfirmasi 2x-tap utk "Hapus SEMUA"
 var _status_t := 0.0
 
-const MIN_TOUCH := 64         # px hit-target minimum (spesifikasi mobile)
+const MIN_TOUCH := 76         # px hit-target minimum (ronde ini: permintaan user "sempit" → tata letak dilegakan)
 
 func _ready() -> void:
 	layer = 6
@@ -58,7 +58,7 @@ func _build_layout() -> void:
 	panel.visible = false
 	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	panel.offset_bottom = 0
-	panel.offset_top = -348
+	panel.offset_top = -500   # mode bangun = kanvas kerja: sheet dilegakan biar tak sempit (permintaan user)
 	var pstyle := StyleBoxFlat.new()
 	pstyle.bg_color = Color(0.09, 0.085, 0.12, 0.93)
 	pstyle.corner_radius_top_left = 22
@@ -71,12 +71,21 @@ func _build_layout() -> void:
 	add_child(panel)
 
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 8)
+	vb.add_theme_constant_override("separation", 10)
 	panel.add_child(vb)
+
+	# --- STATUS dipindah ke ATAS tabs: dl di bawah bar paling buncit
+	# (sering kena potong layar kecil; sempit ala screenshot user) ---
+	status_label = Label.new()
+	status_label.text = ""
+	status_label.add_theme_font_size_override("font_size", 17)
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.custom_minimum_size = Vector2(0, 30)
+	vb.add_child(status_label)
 
 	# --- bar tab sub-mode ---
 	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 8)
+	tabs.add_theme_constant_override("separation", 10)
 	vb.add_child(tabs)
 	for spec in [["place", "Objek"], ["terrain", "Terrain"], ["road", "Jalan"], ["delete", "Hapus"]]:
 		var tb := _make_button(spec[1], Color(0.22, 0.20, 0.28), Color(0.10, 0.09, 0.14))
@@ -89,7 +98,7 @@ func _build_layout() -> void:
 
 	# --- container konten tab (visible = hanya satu halaman) ---
 	var pages_root := Control.new()
-	pages_root.custom_minimum_size = Vector2(0, 200)
+	pages_root.custom_minimum_size = Vector2(0, 240)
 	vb.add_child(pages_root)
 	pages["place"] = _build_page_place(pages_root)
 	pages["terrain"] = _build_page_terrain(pages_root)
@@ -124,38 +133,52 @@ func _build_layout() -> void:
 	bclose.pressed.connect(func(): _call("toggle"))
 	bar.add_child(bclose)
 
-	status_label = Label.new()
-	status_label.text = ""
-	status_label.add_theme_font_size_override("font_size", 16)
-	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vb.add_child(status_label)
-
 	# Mini joystick kiri-bawah (hanya saat build aktif; hud normal
 	# ditahan manager). Di-extend di build_joy_control.gd — modular.
 	var joy_script := load("res://packs/build_mode/build_joy_control.gd")
 	joy_control = joy_script.new() as Control
 	joy_control.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	joy_control.position = Vector2(24, -358 - 150)   # tepat di atas sheet
+	joy_control.position = Vector2(24, -470 - 150)   # tepat di atas sheet
 	joy_control.visible = false
 	add_child(joy_control)
 
-## Halaman OBJEK: palette palette katalog (scroll horisontal) + slider
-## rotasi/scale + hint. Palette diisi ulang oleh manager (catalog dibuat
-## saat setup, bisa beda-beda tergantung aset yg tersedia).
+## Halaman OBJEK: palette katalog BENTUK KISI KOTAK (grid sel persegi,
+## permintaan user ronde ini: "buat kayak bentuk kisi kisi kotak gitu") —
+## scroll VERTIKAL bijb kaetika kolom kurang. Slider rotasi/scale + hint.
+## Palette diisi ulang oleh manager (catalog dibuat saat setup).
 func _build_page_place(root: Control) -> Control:
 	var page := VBoxContainer.new()
 	page.set_anchors_preset(Control.PRESET_FULL_RECT)
-	page.add_theme_constant_override("separation", 6)
+	page.add_theme_constant_override("separation", 8)
 	root.add_child(page)
 
+	# baris konfirmasi CALON di ATAS palette: paling gampang ditekan
+	# dari kanvas (dipakai dulu sebelum scroll pilih objek lain)
+	pending_row = HBoxContainer.new()
+	pending_row.add_theme_constant_override("separation", 8)
+	pending_row.visible = false
+	page.add_child(pending_row)
+	var bok := _make_button("✔ OK — Simpan Posisi", Color(0.30, 0.50, 0.30), Color(0.10, 0.16, 0.10))
+	bok.custom_minimum_size = Vector2(0, MIN_TOUCH)
+	bok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bok.pressed.connect(func(): _call("ok_pending"))
+	pending_row.add_child(bok)
+	var bno := _make_button("✖ BATAL", Color(0.48, 0.28, 0.24), Color(0.15, 0.08, 0.06))
+	bno.custom_minimum_size = Vector2(140, MIN_TOUCH)
+	bno.pressed.connect(func(): _call("cancel_pending"))
+	pending_row.add_child(bno)
+
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 92)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(0, 156)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	page.add_child(scroll)
-	palette_box = HBoxContainer.new()
-	palette_box.add_theme_constant_override("separation", 6)
-	scroll.add_child(palette_box)
+	palette_grid = GridContainer.new()
+	palette_grid.add_theme_constant_override("h_separation", 8)
+	palette_grid.add_theme_constant_override("v_separation", 8)
+	palette_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(palette_grid)
 
 	var row1 := HBoxContainer.new()
 	row1.add_theme_constant_override("separation", 10)
@@ -191,23 +214,6 @@ func _build_page_place(root: Control) -> Control:
 	scale_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scale_slider.value_changed.connect(func(v): _call("scale_changed", v))
 	row2.add_child(scale_slider)
-
-	# Baris konfirmasi CALON OBJEK: muncul hanya saat ada calon di lapangan
-	# (spawn dr tap / angkat dr tahan-lama) — geser pindah terus, pas udah
-	# pas baru tekan OK (permintaan user, ronde ini).
-	pending_row = HBoxContainer.new()
-	pending_row.add_theme_constant_override("separation", 8)
-	pending_row.visible = false
-	page.add_child(pending_row)
-	var bok := _make_button("✔ OK — Simpan Posisi", Color(0.30, 0.50, 0.30), Color(0.10, 0.16, 0.10))
-	bok.custom_minimum_size = Vector2(0, MIN_TOUCH)
-	bok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bok.pressed.connect(func(): _call("ok_pending"))
-	pending_row.add_child(bok)
-	var bno := _make_button("✖ BATAL", Color(0.48, 0.28, 0.24), Color(0.15, 0.08, 0.06))
-	bno.custom_minimum_size = Vector2(120, MIN_TOUCH)
-	bno.pressed.connect(func(): _call("cancel_pending"))
-	pending_row.add_child(bno)
 
 	var hint := Label.new()
 	hint.text = "Tap tanah = bikin calon • geser (tahan drag) • OK simpan • tombol ↶ Reverse: ambil aksi terakhir"
@@ -365,17 +371,23 @@ func _process(delta: float) -> void:
 			status_label.text = ""
 
 ## Isi palette objek dari katalog (dipanggil manager sehabis populate()).
-## Tiap tombol: blok warna accent + label pendek; target sentuh 84x64.
+## SEL KOTAK persegi di-GRID (permintaan user: bentuk kisi kotak): lebar
+## dihitung dr lebar layar supaya sel selulu pas ~96px persegi; sisanya
+## memenuhi kolom berikutnya. Tiap sel = blok accent + label pendek.
 func fill_palette(entries: Array) -> void:
-	for c in palette_box.get_children():
+	for c in palette_grid.get_children():
 		c.queue_free()
 	palette_buttons.clear()
+	# kolom responsif: sel ~104px (sel 96 + jarak8) — layar sempit: 4 kolom.
+	var vsz := get_viewport().get_visible_rect().size
+	palette_grid.columns = clampi(int(floor(vsz.x / 104.0)), 4, 10)
 	for e in entries:
 		var b := _make_button(String(e["label"]), Color(e["tint"]) * 0.55, Color(e["tint"]) * 0.3)
-		b.custom_minimum_size = Vector2(84, 84)
+		b.custom_minimum_size = Vector2(96, 96)
+		b.add_theme_font_size_override("font_size", 15)
 		var id: String = e["id"]
 		b.pressed.connect(func(): _call("select_catalog", id))
-		palette_box.add_child(b)
+		palette_grid.add_child(b)
 		palette_buttons[id] = b
 
 func highlight_palette(id: String) -> void:
