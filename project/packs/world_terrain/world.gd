@@ -27,6 +27,8 @@ signal gen_progress(p: float, t: String)
 const Materials := preload("res://packs/shaders_materials/materials.gd")
 const SKY_SHADER := preload("res://packs/shaders_materials/sky.gdshader")
 const GRASS_SHADER := preload("res://packs/shaders_materials/grass_blade.gdshader")
+# Build Mode (permintaan user butir 1-7): manager modular di packs/build_mode
+const BUILD_MODE := preload("res://packs/build_mode/build_mode_manager.gd")
 const WALL_SYSTEM := preload("res://packs/world_terrain/wall_system.gd")
 const IslandShape := preload("res://packs/world_terrain/island_shape.gd")
 
@@ -173,7 +175,30 @@ func generate_async(p_root: Node) -> void:
 	# rintangan destructible lagi.
 	wall_system = null
 	await get_tree().process_frame
+	# BUILD MODE (permintaan user): dibuat di AKIR generate supaya semua
+	# subsistem (catalog/placer/terrain/road + UI) siap sesudah tanah/
+	# rumput ada. player/hud BELUM ada di fase ini — manager mereferensinya
+	# LAZY tiap toggle (world.player di-set kemudian lewat set_player, hud
+	# lewat root.hud), seluruh gestur no-op aman di probe tanpa pemain.
+	_setup_build_mode()
+	await get_tree().process_frame
 	_report(1.0, "Medan tempur siap")
+
+## Instantiate BuildModeManager (packs/build_mode/) sebagai anak world.
+## DUCK-TYPED (Node): class_name BuildModeManager ada di pack LAIN —
+## export per-pack bisa compile terpisah, jadi jangan bergantung pd kelas
+## globalnya saat parse; cukup cek has_method saat dipakai.
+var build_mode: Node = null
+
+func _setup_build_mode() -> void:
+	if build_mode != null:
+		return
+	var bm = BUILD_MODE.new()
+	bm.name = "BuildMode"
+	add_child(bm)
+	if bm.has_method("setup"):
+		bm.setup(self, _root)
+	build_mode = bm
 
 ## Bidang datar tak berbatas: SATU collider WorldBoundary (bidang y=0, normal
 ## atas) — tak ada tepi, tak ada trimesh, is_on_floor() engine selalu konstan.

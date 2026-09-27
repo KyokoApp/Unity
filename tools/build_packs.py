@@ -23,6 +23,7 @@ PACK_DEFS = {
     "world_terrain": {"deps": ["shaders_materials"]},
     "world_props_forest": {"deps": ["shaders_materials", "world_terrain"]},
     "world_props_beach": {"deps": ["shaders_materials", "world_terrain"]},
+    "build_mode": {"deps": ["shaders_materials", "world_terrain"]},   # Build Mode (butir 1-7 user) + objek glTF Quaternius CC0
     "character_player": {"deps": ["shaders_materials"]},
     "ui": {"deps": []},
     "audio_sfx": {"deps": []},

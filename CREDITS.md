@@ -270,3 +270,19 @@
   Sketchfab (fan-made). Nama pembuat model BELUM terverifikasi — diminta ke
   pengguna; entri akan dilengkapi. Catat: ini kandidat yang perlu konfirmasi
   lisensi sebelum rilis publik (di luar paket CC0/CC-BY wajib).
+
+## Ronde-2026-09-27: Build Mode — Modul Maskul Dunia + Objek Quaternius (CC0)
+
+- **Stylized Nature MegaKit** oleh Quaternius — CC0 1.0
+  (https://quaternius.com/packs/stylizednaturemegakit.html, diunggah pengguna
+  via tautan Google Drive sebagai koleksi "object buat world"). Dipakai: 17
+  model glTF (CommonTree_1/2/3, Pine_1, TwistedTree_1, DeadTree_1,
+  Bush_Common, Bush_Common_Flowers, Rock_1..4, Grass_1..3, dst.) di
+  `project/packs/build_mode/objects/nature/` sebagai palette objek taruh
+  pada Build Mode (butir 2). Tekstur telah diperkecil 15 MB utk ram mobile.
+- **Fitur Build Mode** (kode baru, `project/packs/build_mode/`): Build Mode
+  toggle UI; Place Object (raycast kamera→tap tanah, palette, slider rotasi
+  & skala); Terrain modular via GridMap+MeshLibrary kustom (datar, miring 4
+  arah, sudut — BUKAN free-sculpt); Road Path3D/Curve3D + mesh prosedural
+  SurfaceTool dgn tombol Selesai/Kunci; Delete; Save/Load JSON di
+  `user://build_map.json` dgn auto-load + autosave-saat-keluar.

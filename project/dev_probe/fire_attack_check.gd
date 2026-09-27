@@ -117,6 +117,12 @@ func _run() -> void:
 		_finish()
 		return
 
+	# ---------- Fase 1f: Build Mode (ronde ini — butir 1-7 user) ----------
+	await _check_build_mode()
+	if _exit_code != 0:
+		_finish()
+		return
+
 	# ---------- Siapkan dunia uji ----------
 	var world := Node3D.new()
 	world.name = "TestWorld"
@@ -627,6 +633,109 @@ func _check_world_ground_fog() -> void:
 	print("[fire-check] fase 1e ✔ tanah rumput + kabut jauh (begin=%.0f end=%.0f) + sore hangat OK (chunk %s, %d tuft rumput)" % [env.fog_depth_begin, env.fog_depth_end, grass.name, grass.multimesh.instance_count])
 	world.queue_free()
 	await process_frame
+
+## ====== Fase 1f: Build Mode — runtime smoke-test (butir 1-7 user). ======
+## Menjalankan subsistem Build Mode SUNGGUHAN di dunia hasil generate_async:
+## (a) manager + katalog ada & entri glTF-nya valid, (b) place/delete objek,
+## (c) tile GridMap pasang/hapus (modular — butir 3), (d) road draft→Selesai
+## →hapus (butir 4), (e) save/load JSON round-trip via BuildSaveLoad
+## (butir 6). Kisah buruk yg dicegah: salah API Godot 4 (GridMap/MeshLibrary
+## /Curve3D/FileAccess) yg baru ketahuan di perangkat.
+func _check_build_mode() -> void:
+	var ws: PackedScene = load(WORLD_SCENE)
+	if ws == null:
+		_fail("scene world " + WORLD_SCENE + " tidak termuat (build-probe)")
+		return
+	var world: Node3D = ws.instantiate()
+	world.name = "ProbeBuildWorld"
+	add_child(world)
+	if world.get_script() == null:
+		_fail("skrip world tidak terpasang di build-probe")
+		return
+	var hud_node := Node.new()
+	hud_node.name = "ProbeBuildShim"
+	add_child(hud_node)
+	await world.generate_async(hud_node)
+	await process_frame
+	if world.get("terrain_mesh") == null or world.get("ground_body") == null:
+		_fail("build-probe: world tidak tergenerate lengkap")
+		world.queue_free()
+		hud_node.queue_free()
+		return
+	var bm: Node = null
+	for c in world.get_children():
+		if c.get_script() != null and String(c.get_script().get_path()).ends_with("build_mode_manager.gd"):
+			bm = c
+			break
+	if bm == null:
+		_fail("BuildModeManager tidak dibuat oleh world (butir 1)")
+		world.queue_free()
+		hud_node.queue_free()
+		return
+	var st: Dictionary = bm.call("debug_state")
+	if int(st.get("catalog_entries", 0)) < 2:
+		_fail("katalog Build Mode kosong (butir 2: palet objek)")
+	elif int(st.get("meshlib_items", 0)) < 3:
+		_fail("MeshLibrary modular Build Mode < 3 item (butir 3: flat/slope/corner)")
+	var cat = bm.get("catalog")
+	if cat != null and ResourceLoader.exists("res://packs/build_mode/objects/nature/CommonTree_1.gltf"):
+		var missing := 0
+		for e in cat.get("entries"):
+			if not ResourceLoader.exists(str(e.get("path", ""))):
+				missing += 1
+		if missing > 0:
+			_fail(str(missing) + " entri katalog menunjuk file yang tidak ada")
+	if _exit_code != 0:
+		world.queue_free()
+		hud_node.queue_free()
+		return
+	# (b) Place + Delete objek (butir 2 & 5) — id eksplisit supaya tak
+	# bergantung pada pilihan palette default.
+	var placer = bm.get("placer")
+	var placed: int = int(placer.call("place", Vector3(5, 0, 5), "CommonTree_1"))
+	if placed == 0 or placer.get("objects").size() != 1:
+		_fail("placer.place() gagal menaruh objek (butir 2)")
+	elif not bool(placer.call("delete_at", Vector3(5, 0, 5))) or placer.get("objects").size() != 0:
+		_fail("placer.delete_at() gagal menghapus objek (butir 5)")
+	# (c) tile GridMap pasang/hapus (butir 3 & 5)
+	var te = bm.get("terrain")
+	var cells: Dictionary = te.get("cells_changed")
+	te.call("place_at", Vector3(4, 0, 4))
+	if cells.size() != 1:
+		_fail("terrain place_at() tidak mencatat sel (butir 3: tap=set_cell_item)")
+	elif not bool(te.call("delete_at", Vector3(4, 0, 4))) or cells.size() != 0:
+		_fail("terrain delete_at() gagal menghapus tile (butir 5)")
+	# (d) road: titik → draft → Selesai → road terkunci → hapus (butir 4 & 5)
+	var rb = bm.get("road")
+	rb.call("add_point", Vector3(0, 0, 0))
+	rb.call("add_point", Vector3(6, 0, 0))
+	rb.call("add_point", Vector3(6, 0, 6))
+	if not bool(rb.call("finish")):
+		_fail("road finish() gagal mengunci curve (butir 4: tombol Selesai)")
+	elif rb.get("roads").size() != 1:
+		_fail("road terkunci tidak tercatat (butir 4)")
+	elif not bool(rb.call("delete_at", Vector3(6, 0, 3))) or rb.get("roads").size() != 0:
+		_fail("road delete_at() gagal menghapus jalan (butir 5)")
+	# (e) save/load round-trip via BuildSaveLoad static (butir 6) — pakai
+	# berkas uji terpisah (param path) supaya tak menyentuh save pemain.
+	placer.call("place", Vector3(3, 0, 3), "CommonTree_1")
+	te.call("place_at", Vector3(10, 0, 10))
+	var data: Dictionary = bm.call("collect_data")
+	var bsl = load("res://packs/build_mode/build_save_load.gd")
+	var probe_path := "user://probe_build_map.json"
+	var save_ok: bool = bsl != null and bsl.save_to(data, probe_path) == ""
+	var back: Dictionary = bsl.load_from(probe_path) if save_ok else {}
+	if not save_ok or int(back.get("version", 0)) != int(data.get("version", -1)):
+		_fail("round-trip save/load JSON Build Mode gagal (butir 6)")
+	elif back.get("objects", []).size() != data.get("objects", []).size():
+		_fail("jumlah objek hasil load ≠ yg disimpan (butir 6)")
+	elif back.get("roads", []).size() != data.get("roads", []).size():
+		_fail("jumlah road hasil load ≠ yg disimpan (butir 6)")
+	DirAccess.remove_absolute(probe_path)   # jangan bawa residu probe
+	world.queue_free()
+	hud_node.queue_free()
+	if _exit_code == 0:
+		print("[fire-check] fase 1f ✔ Build Mode: katalog+glTF ✔, place/delete ✔, tile GridMap ✔, road Selesai+hapus ✔, save/load JSON ✔")
 
 func _count_by_suffix(world: Node, suffix: String) -> int:
 	var n := 0

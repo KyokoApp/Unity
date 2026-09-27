@@ -598,7 +598,16 @@ func _on_emote(_down: bool) -> void:
 
 # ---------- input multi-touch ----------
 
+## BUILD MODE (ronde ini, build_mode_manager.gd): kalau build mode aktif,
+## HUD menahan diri memakai gestur layar kosong (joystick melayang/look/
+## cubit) — build manager mengambil alih seluruh gestur (tap-taruh, drag
+## kamera, cubit zoom, joystick build sendiri) supaya tak bentrok & tap
+## utk menaruh objek tak ikut memunculkan joystick/putar kamera sekaligus.
+var build_suspended := false
+
 func _input(event: InputEvent) -> void:
+	if build_suspended:
+		return
 	if event is InputEventScreenTouch:
 		_handle_touch(event)
 	elif event is InputEventScreenDrag:
