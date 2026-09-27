@@ -546,7 +546,7 @@ func set_open_world(on: bool) -> void:
 			toggle_shoulder_cam()
 		SHOULDER_DIST = SHOULDER_DIST_OW
 		# -- HUD/btu gerak disembunyikan + FAB handled world --
-		var hud_ui := get_hud_safe()
+		var hud_ui: Node = get_hud_safe()
 		if hud_ui and hud_ui.has_method("set_open_world_ui"):
 			hud_ui.set_open_world_ui(true)
 		_apply_grey_mannequin()
@@ -555,7 +555,7 @@ func set_open_world(on: bool) -> void:
 		SHOULDER_DIST = _ow_prev_dist
 		if _shoulder_cam != _ow_prev_cam:
 			toggle_shoulder_cam()
-		var hud_off := get_hud_safe()
+		var hud_off: Node = get_hud_safe()
 		if hud_off and hud_off.has_method("set_open_world_ui"):
 			hud_off.set_open_world_ui(false)
 		_clear_grey_mannequin()
