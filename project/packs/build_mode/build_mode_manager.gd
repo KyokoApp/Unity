@@ -98,6 +98,16 @@ func _load_initial() -> void:
 	if ui:
 		ui.set_status("Map bangunan dipulihkan dari save")
 
+## FAB build adalah milik WORLD CREATIVE saja — mode Open World (ronde ini,
+## "kampung hutan") diminta user utk MENIKMATI hutan, jd FAB disembunkurkan
+## oleh world.set_open_world_mode. Menutup build aktif terlebih dulu jika
+## kebetulan sedang terbuka (bekerja dengan invoker).
+func set_fab_visible(v: bool) -> void:
+	if ui and ui.fab:
+		ui.fab.visible = v
+	if not v and mode_active:
+		toggle()   # hiraukan aktif jadi off sebelum disembunyikan
+
 ## ---------------- toggle & sub-mode ----------------
 
 func toggle() -> void:

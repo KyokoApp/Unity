@@ -47,6 +47,16 @@ uniform float wind_noise_speed: hint_range(0.0, 1.0, 0.001) = 0.1;
 // Instance the Player Position through a GDScript in the _physics_process
 instance uniform vec3 player_position;
 
+// ---- additions ASekai: OPEN WORLD MODE + fadeout dither jarak-kamera ----
+// open_world=1 = hutan berkakikabut (tanpa pulau/batas): island shrink
+// dinolkan & blade menaiki terrain_wave milik tanah (1 rumus, sinkron
+// tiga titik: di sini & shader tanah & OpenWorldMode.terrain_wave() —
+// WAJIB disamakan kalau diubah).
+uniform float open_world = 0.0;
+float terrain_wave(vec2 p) {
+	return 0.34 * sin(p.x * 0.031 + 1.7) + 0.30 * sin(p.y * 0.036 + 0.3) * cos(p.x * 0.023);
+}
+
 // ---- additions ASekai: fadeout dither jarak-kamera (nilai dr world.gd) ----
 // Setara fungsi lama: [(start,end)] — selesai PERSIS sebelum petak
 // terluar dibongkar supaya pembongkaran chunk tak nge-pop.
@@ -87,9 +97,16 @@ void vertex() {
 	vec3 world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 
 	// Guardrail #1: susutkan blade ke nol sblm garis air laut (fade mulai
-	// wf 0.0-0.3 spy transisi pasir lembut, bukan garis potong).
+	// wf 0.0-0.3 spy transisi pasir lembut, bukan garis potong) — kecuali
+	// mode Open World (tanpa pulau/laut; hutan tanpa batas).
 	float wf = island_water_factor(world_position.xz);
-	VERTEX *= 1.0 - smoothstep(0.0, 0.3, wf);
+	VERTEX *= 1.0 - smoothstep(0.0, 0.3, wf) * (1.0 - open_world);
+	// Open World: blade menaiki gelombang tanah (rumus sinkron tiga titik —
+	// lihat komentar di terrain_wave di atas); diterapkan SEBELUM angin supaya
+	// goyangan tetap di ruang puncak lokal orangnya helai.
+	if (open_world > 0.5) {
+		VERTEX.y += terrain_wave(world_position.xz);
+	}
 
 	// Guardrail #2 (addition): fadeout dither jarak-kamera.
 	vec3 cam_pos = INV_VIEW_MATRIX[3].xyz;

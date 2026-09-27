@@ -31,6 +31,9 @@ const GRASS_SHADER := preload("res://packs/shaders_materials/grass_blade.gdshade
 const BUILD_MODE := preload("res://packs/build_mode/build_mode_manager.gd")
 const WALL_SYSTEM := preload("res://packs/world_terrain/wall_system.gd")
 const IslandShape := preload("res://packs/world_terrain/island_shape.gd")
+# OPEN WORLD MODE (permintaan user ronde ini): dunia tanpa batas bergelombang
+# + hutan acak + kabut dekat + rumput betis (lihat open_world_mode.gd).
+const OPEN_WORLD_MOD := preload("res://packs/world_terrain/open_world_mode.gd")
 
 var player: Node3D
 var quality_ref
@@ -75,6 +78,9 @@ const WATER_REFLECTION := false
 const PROC_GRASS := true
 ## Bendera runtime dibaca probe CI (const tak bisa di-get() dari instance).
 var grass_enabled: bool = PROC_GRASS
+var open_world_mode := false    # true = mode open world (tanpa batas, hutan); false = creative (pulau)
+var _ow: OpenWorldMode = null
+var _saved_env := {}            # nilai env preset normal (dipulihkan balik saat exit OW)
 var _refl_vp: SubViewport
 var _refl_cam: Camera3D
 var _refl_ground: MeshInstance3D
@@ -120,6 +126,16 @@ var interactables := []       # kosong; dipertahankan utk kompatibilitas API
 # tak kelihatan nge-pop, PERSIS spt referensi (optimization_by_distance +
 # smoothstep di grass.gdshaderinc mrk) walau implementasi detailnya beda.
 const GRASS_CHUNK_SIZE := 22.0
+## Params grass dipindah ke var runtime supaya mode OW (rumput lebih tebal
+## sedekat betis + kabut hutan) bisa memakai geometri lain TANPA duplikasi
+## kode. Nilai-nilai ini nilai default creative; OW menggantinya (lihat
+## set_open_world_mode) & ditukar kembalinya saat keluar.
+var _g_chunk_size: float = GRASS_CHUNK_SIZE
+var _g_instances: int = 5400
+var _g_render_r: int = 2
+var _g_unload_r: int = 3
+var _g_fill_per_frame: int = 1800
+var _g_blade_h: float = 1.0          # multiplikator tinggi helai (OW: 1.5 = se-betis/keatas)
 # PERMINTAAN USER (ronde ini, LANJUTAN — msh dibilang "kurang tebel" stlh
 # dinaikkan ke 4200/~8.7 rumpun/m² sblmnya): dinaikkan lagi ke ~11.2/m².
 # Kali ini kenaikan jumlah RUMPUN sengaja tak digandakan sebesar putaran
@@ -219,6 +235,11 @@ func _make_flat_ground() -> void:
 	_ground = MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(GROUND_SIZE, GROUND_SIZE)
+	# subdivide utk deformasi gelombang vertex (Open World): 64 sel per
+	# sisi ~21.9m/vert (gelombang dominan ~180-290m, interpolasi mulus —
+	# mesh ini statis & tunggal jd 4225 vert = trivial).
+	pm.subdivide_width = 64
+	pm.subdivide_depth = 64
 	pm.material = _make_ground_material()
 	_ground_mat = pm.material  # disimpan: _apply_daylight & refleksi nanti
 	# arah MENUJU matahari utk kilaun air (bukan default guess uniform);
@@ -390,6 +411,15 @@ float gnoise(vec2 p) {
 	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
+// --- OPEN WORLD MODE (ronde ini): open_world=1 = tanpa pulau/batas:
+// air laut di-nolkan (hutan kabut), dan tanah dideformasi "datar
+// bergelombang". Rumus terrain_wave DISYNC dgn grass_blade.gdshader &
+// OpenWorldMode.terrain_wave() — WAJIB disamakan kalau diubah.
+uniform float open_world = 0.0;
+float terrain_wave_of(vec2 p) {
+	return 0.34 * sin(p.x * 0.031 + 1.7) + 0.30 * sin(p.y * 0.036 + 0.3) * cos(p.x * 0.023);
+}
+
 // island_shape.gd IslandShape.radius_at() -- HARUS SAMA PERSIS (lihat
 // komentar di island_shape.gd kalau ubah salah satu, ubah keduanya).
 const float ISLAND_RADIUS = 460.0;
@@ -401,7 +431,9 @@ float island_radius_at(float theta) {
 		+ 0.06 * sin(theta * 11.0 + 2.4));
 }
 // 0=darat, 1=laut penuh (dipita BEACH_WIDTH), spt IslandShape.water_factor()
+// MODE OW: dinolkan menyeluruh (hutan tanpa pulau) via open_world.
 float water_factor(vec2 p) {
+	if (open_world > 0.5) { return 0.0; }
 	float theta = atan(p.y, p.x);
 	float r = length(p);
 	float coast = island_radius_at(theta);
@@ -416,7 +448,16 @@ float any_water_factor(vec2 p) {
 	return water_factor(p);
 }
 
-void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void vertex() {
+	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	// Mode Open World: bukit-gelombang landai (deformasi vertex mesh tanah
+	// subdivide 64x64); pemain+pohon+rumput menapak gelombang yg sama
+	// (rumus sinkron tiga titik — lihat komentar terrain_wave_of di atas).
+	if (open_world > 0.5) {
+		VERTEX.y += terrain_wave_of(wp.xz);
+		wp.y += terrain_wave_of(wp.xz);
+	}
+}
 
 void fragment() {
 	vec3 land_col = ground_color;
@@ -579,14 +620,14 @@ func _build_grass_chunk(coord: Vector2i) -> void:
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_custom_data = true
 	mm.mesh = _grass_mesh
-	mm.instance_count = GRASS_CHUNK_INSTANCES
+	mm.instance_count = _g_instances
 	mm.visible_instance_count = 0  # belum ada instance terisi, lihat _process_grass_fill_budget
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "GrassChunk_%d_%d" % [coord.x, coord.y]
 	mmi.multimesh = mm
 	mmi.material_override = _grass_mat
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mmi.position = Vector3((coord.x + 0.5) * GRASS_CHUNK_SIZE, 0.0, (coord.y + 0.5) * GRASS_CHUNK_SIZE)
+	mmi.position = Vector3((coord.x + 0.5) * _g_chunk_size, 0.0, (coord.y + 0.5) * _g_chunk_size)
 	add_child(mmi)
 	_grass_chunks[coord] = mmi
 	# Node & buffer kosong sudah ada (murah) — pengisian GRASS_CHUNK_INSTANCES
@@ -605,8 +646,8 @@ func _build_grass_chunk(coord: Vector2i) -> void:
 ## jadi TOTAL & KEPADATAN rumput tak berkurang sama sekali dibanding
 ## sebelumnya — cuma cara ngisinya yg disebar biar smooth.
 func _process_grass_fill_budget() -> void:
-	var budget := GRASS_FILL_INSTANCES_PER_FRAME
-	var half := GRASS_CHUNK_SIZE * 0.5
+	var budget: int = _g_fill_per_frame
+	var half: float = _g_chunk_size * 0.5
 	var done: Array = []
 	for coord in _grass_building.keys():
 		if budget <= 0:
@@ -619,7 +660,7 @@ func _process_grass_fill_budget() -> void:
 		var st: Dictionary = _grass_building[coord]
 		var rng: RandomNumberGenerator = st["rng"]
 		var filled: int = st["filled"]
-		var n: int = mini(budget, GRASS_CHUNK_INSTANCES - filled)
+		var n: int = mini(budget, _g_instances - filled)
 		for j in range(n):
 			var i := filled + j
 			var x := rng.randf_range(-half, half)
@@ -632,9 +673,9 @@ func _process_grass_fill_budget() -> void:
 		filled += n
 		budget -= n
 		st["filled"] = filled
-		var target_visible := int(round(GRASS_CHUNK_INSTANCES * _grass_density_frac))
+		var target_visible := int(round(_g_instances * _grass_density_frac))
 		mm.visible_instance_count = mini(filled, target_visible)
-		if filled >= GRASS_CHUNK_INSTANCES:
+		if filled >= _g_instances:
 			done.append(coord)
 	for coord in done:
 		_grass_building.erase(coord)
@@ -646,15 +687,15 @@ func _process_grass_fill_budget() -> void:
 ## bongkar-pasang bolak-balik pas pemain persis di tepi petak).
 func _update_grass_chunks(center: Vector2i) -> void:
 	var wanted := {}
-	for dx in range(-GRASS_RENDER_RADIUS_CHUNKS, GRASS_RENDER_RADIUS_CHUNKS + 1):
-		for dz in range(-GRASS_RENDER_RADIUS_CHUNKS, GRASS_RENDER_RADIUS_CHUNKS + 1):
+	for dx in range(-_g_render_r, _g_render_r + 1):
+		for dz in range(-_g_render_r, _g_render_r + 1):
 			wanted[Vector2i(center.x + dx, center.y + dz)] = true
 	for coord in wanted:
 		if not _grass_chunks.has(coord) and not _grass_pending.has(coord):
 			_grass_pending.append(coord)
 	var to_remove: Array = []
 	for coord in _grass_chunks:
-		if maxi(absi(coord.x - center.x), absi(coord.y - center.y)) > GRASS_UNLOAD_RADIUS_CHUNKS:
+		if maxi(absi(coord.x - center.x), absi(coord.y - center.y)) > _g_unload_r:
 			to_remove.append(coord)
 	for coord in to_remove:
 		var mmi = _grass_chunks[coord]
@@ -682,7 +723,7 @@ func _process_grass_chunk_queue() -> void:
 			budget -= 1
 
 func _apply_grass_density_all() -> void:
-	var target := int(round(GRASS_CHUNK_INSTANCES * _grass_density_frac))
+	var target := int(round(_g_instances * _grass_density_frac))
 	for coord in _grass_chunks:
 		var mmi = _grass_chunks[coord]
 		if is_instance_valid(mmi) and mmi.multimesh:
@@ -725,7 +766,7 @@ func _build_grass_blade_mesh() -> ArrayMesh:
 	for i in range(total):
 		var is_primary := i < PRIMARY_N
 		var base_angle: float = (TAU / float(total)) * float(i) + rng.randf_range(-0.32, 0.32)
-		var h: float = rng.randf_range(0.40, 0.58) if is_primary else rng.randf_range(0.20, 0.34)
+		var h: float = (rng.randf_range(0.40, 0.58) if is_primary else rng.randf_range(0.20, 0.34)) * _g_blade_h
 		var w: float = rng.randf_range(0.075, 0.098) if is_primary else rng.randf_range(0.045, 0.064)
 		var lean := rng.randf_range(0.07, 0.18)
 		var base_shift := rng.randf_range(0.0, 0.055)
@@ -799,10 +840,162 @@ func _update_grass_player_uniform() -> void:
 		if is_instance_valid(c):
 			c.set_instance_shader_parameter("player_position", pp)
 
-# ---------------- API kompatibel ----------------
+## ---------------- MODE OPEN WORLD (ronde ini, permintaan user) ----------------
+## Satu orkestrator utk seluruh fitur "Open World" dr user: tanah datar-
+## bergelombang tanpa pulau/batas, rumput lbh tebal & setinggi betis (angin
+## sepoi smooth + dorong saat dilewati), aksen veg acak (pohon banyak, batu,
+## semak, jamur) via OpenWorldMode, kabut hutan beberapa meter, warning
+## render otomatis ikut-tersembunyi (optimasi take-over: radius petak grass
+## menyusut, jarak bayangan pendek, fog langit menutup), karakter mannequin
+## abu-pastel, outline tipis, kamera bahu dekat, gerak jalan+lari saja.
+## Mode Creative = state bimodatesmo dunia lain (pulau sampuligi bangunan) —
+## dipulihkan UTUH timerilisasi utgk menutup.
+func set_open_world_mode(v: bool) -> void:
+	if v == open_world_mode:
+		return
+	open_world_mode = v
+	# 1) MODUL SCATTER / hutan
+	if _ow == null:
+		_ow = OPEN_WORLD_MOD.new()
+		_ow.name = "OpenWorldMode"
+		add_child(_ow)
+		_ow.set_actors(self, player)
+	if player:
+		_ow.set_actors(self, player)
+	if v:
+		_ow.enable()
+	else:
+		_ow.disable()
 
-## Tanah datar murni: lantai SELALU y=0 di mana pun (tak ketemu = tak mungkin).
-func height_at(_x: float, _z: float) -> float:
+	# 2) GEOMETRI GRASS dual-mode — OW: kecil + padat + dekat saja (fog
+	# menutup sisanya: 9 petak x 6200 = 55.8k jauh lebih ringan dr preset
+	# 25x5400, tp kepadatan LOKAL ~2x) dan udara-sepoi dijaga di shader.
+	if v:
+		_g_chunk_size = 16.0
+		_g_instances = 6200
+		_g_render_r = 1
+		_g_unload_r = 2
+		_g_fill_per_frame = 2200
+		_g_blade_h = 1.5     # "rumput nya keatas... nyampai betis" (nilai ujung ~ 0.58*1.5*~1.2 ≈ 1.05m utk helai paling tinggi; mayoritas 0.40-0.60)
+		_grass_mesh = _build_grass_blade_mesh()
+	else:
+		_g_chunk_size = float(GRASS_CHUNK_SIZE)
+		_g_instances = 5400
+		_g_render_r = 2
+		_g_unload_r = 3
+		_g_fill_per_frame = 1800
+		_g_blade_h = 1.0
+		_grass_mesh = _build_grass_blade_mesh()
+	if PROC_GRASS:
+		# bongkar semua & bangun ulang dgn geometri baru (toggle = langka,
+		# biaya rebuild ringan krn fill dicicil seperti biasa).
+		for c in _grass_chunks.values():
+			if is_instance_valid(c):
+				c.queue_free()
+		_grass_chunks.clear()
+		_grass_building.clear()
+		_grass_pending.clear()
+		_grass_last_chunk = Vector2i(9999999, 9999999)
+	# geometri blade dipakai semua state; yg berubah = uniform kamera/fade
+	if _grass_mat:
+		var fe1 := 24.0 if v else (float(_g_render_r) + 0.5) * _g_chunk_size - _g_chunk_size
+		var fe2 := 44.0 if v else (float(_g_render_r) + 0.5) * _g_chunk_size
+		_grass_mat.set_shader_parameter("fadeout_envelope", Vector2(fe1, fe2))
+		# OW config tambahan di shader: mode terrain-wave + satu-keluarga
+		# hijau / dorong-dodge pemain lbh kuat (menghindari karakter) —
+		# lihat pass uniform di _grass_material; seragam OW masih digeser:
+		_apply_grass_mode_uniforms(v)
+
+	# 3) TANAH (uniform open_world): wave vertex + laut dinolkan.
+	if _ground_mat:
+		_ground_mat.set_shader_parameter("open_world", 1.0 if v else 0.0)
+	# lepas/refleksi air: cuma repikirkan saat diaktifkan balik (OW=off)
+	if not v:
+		_apply_daylight()
+
+	# 4) ENV: kabut hutan pendek vs preset normal (simpan & pulihkan).
+	_apply_open_world_env(v)
+
+	# 5) PEMAIN: mannequin abu-pastel + kamera bahu dekat + jalan/lari saja.
+	if player and player.has_method("set_open_world"):
+		player.set_open_world(v)
+
+	# 6) PULAU-bound clamp di payer: nonaktif segera via flag (lihat
+	# _clamp_to_island di player.gd — kini guard open_world_mode).
+	# (dipantulkan balik saat non-OW dgn clamp yg sama.)
+
+	# 7) FAB build: hanya berlaku di Creative; OW = menikmati hutan saja.
+	if build_mode and build_mode.has_method("set_fab_visible"):
+		build_mode.set_fab_visible(not v)
+	# keluar OW: visual pemain kembalikan ke lantai badan (bukan wave)
+	if not v and player and player.get("_visual"):
+		player.get("_visual").position.y = 0.0
+
+func _apply_grass_mode_uniforms(ow: bool) -> void:
+	if _grass_mat == null:
+		return
+	_grass_mat.set_shader_parameter("open_world", 1.0 if ow else 0.0)
+	# OW "menghindari karakter rumput nya logic fisika" + angin sepoi: dorong
+	# menjauh dipertegas (displacement 0.5 / radius 1.35 thd default 0.3/0.94).
+	_grass_mat.set_shader_parameter("player_displacement_strength", 0.5 if ow else 0.3)
+	_grass_mat.set_shader_parameter("player_displacement_size", 1.35 if ow else 0.94)
+	if ow:
+		# "rumput warna hijau nyatu ketanah ... kliatan seolah hanya bagian
+		# tengah rumput hingga ke atas": bottom warna-nilai GROUND vs top
+		# hanya ringan-terang-bercampur (dr GROUND yg sama, bukan lime cerah).
+		_grass_mat.set_shader_parameter("bottom_color", Vector3(0.345, 0.530, 0.245))
+		_grass_mat.set_shader_parameter("top_color", Vector3(0.455, 0.655, 0.315))
+		_grass_mat.set_shader_parameter("ambient_occlusion_factor", 0.42)
+	else:
+		# creative = style Malidos lime-lush yg komit-terakhir user-approved
+		_grass_mat.set_shader_parameter("bottom_color", Vector3(0.416, 0.616, 0.224))
+		_grass_mat.set_shader_parameter("top_color", Vector3(0.627, 0.804, 0.282))
+		_grass_mat.set_shader_parameter("ambient_occlusion_factor", 0.30)
+
+func _apply_open_world_env(on: bool) -> void:
+	if world_env == null or world_env.environment == null:
+		return
+	var env := world_env.environment
+	if on:
+		if _saved_env.is_empty():
+			_saved_env = {
+				"fog_begin": env.fog_depth_begin, "fog_end": env.fog_depth_end,
+				"fog_curve": env.fog_depth_curve, "fog_density": env.fog_density,
+				"fog_light_color": env.fog_light_color, "fog_sky": env.fog_sky_affect,
+				"shadow_max": sun.directional_shadow_max_distance if sun else 70.0,
+			}
+		# "pandangan nya terbatas ... bebetapa meter ajh depannya kabut jadi
+		# kayak sensasi dalam hutan": jernih 14m, fog menutup penuh ~46m.
+		env.fog_depth_begin = 14.0
+		env.fog_depth_end = 46.0
+		env.fog_depth_curve = 1.15
+		env.fog_light_color = Color(0.40, 0.485, 0.42)   # kabut hijau-kabut hutan
+		env.fog_sky_affect = 1.0                          # langit tertutup kabut penuh (kanopi rasa)
+		if sun:
+			sun.directional_shadow_max_distance = 45.0   # OPTIMASI: bayangan sепандang saja
+	else:
+		if not _saved_env.is_empty():
+			env.fog_depth_begin = _saved_env["fog_begin"]
+			env.fog_depth_end = _saved_env["fog_end"]
+			env.fog_depth_curve = _saved_env["fog_curve"]
+			env.fog_density = _saved_env["fog_density"]
+			env.fog_light_color = _saved_env["fog_light_color"]
+			env.fog_sky_affect = _saved_env["fog_sky"]
+			if sun:
+				sun.directional_shadow_max_distance = _saved_env["shadow_max"]
+			_saved_env = {}
+		_apply_daylight()   # re-assert rincian rinci preset creative
+
+## ---------------- API kompatibel ----------------
+
+## Tanah datar murni: lantai SELALU y=0 di mana pun (tak ketemu = tak
+## mungkin) — KECUALI mode Open World: mengembalikan OpenWorldMode.terrain
+## _wave (gelombang landai), persis rumus SAMA dg vertex-shader tanah &
+## grass sehingga pemain & rumput & hutan Selalu pas menapak gelombang yg
+## sama (tak ada kaki melayang/menembus bukit visual).
+func height_at(x: float, z: float) -> float:
+	if open_world_mode:
+		return OpenWorldMode.terrain_wave(x, z)
 	return 0.0
 
 func find_spawn_point() -> Vector3:
@@ -1004,6 +1197,20 @@ const DAY_LENGTH := 420.0
 func _process(delta: float) -> void:
 	_tick_daynight(delta)
 	_tick_water_reflection()
+	if open_world_mode:
+		if _ow:
+			_ow.tick_stream()
+		# PENTING: tubuh fisik pemain DIBIARKAN di lantai datar y=0 (collider
+		# WorldBoundary tak berhingga — pindah body-nya = jitter dst collider
+		# turf belakang setiap lembah visual!). Yang digeser hanya VISUAL
+		# badan (_visual.position.y = offset gelombang-nya) — kaki TETAP
+		# menapak permukaan bergelombang scr gambar tanpa berkelahi dgn fisika.
+		# Rumus tunggal (terrain_wave) = permukaan visual tanah = posisi
+		# rumput kaki = posisi pohon, jd selalu konsisten.
+		if player and player.get("_visual"):
+			var ty: float = height_at(player.global_position.x, player.global_position.z)
+			var vis: Node3D = player.get("_visual")
+			vis.position.y = lerpf(vis.position.y, ty, 1.0 - exp(-14.0 * delta))
 	# bidang visual mengikuti pemain (collider-nya sudah tak berujung)
 	if player and _ground:
 		_ground.position.x = player.global_position.x
@@ -1015,8 +1222,8 @@ func _process(delta: float) -> void:
 	# tak menghentak. Fadeout jarak murni dr kamera (design user), tak ada lagi param tiap-frame.
 	if PROC_GRASS:
 		if player:
-			var pcx := int(floor(player.global_position.x / GRASS_CHUNK_SIZE))
-			var pcz := int(floor(player.global_position.z / GRASS_CHUNK_SIZE))
+			var pcx := int(floor(player.global_position.x / _g_chunk_size))
+			var pcz := int(floor(player.global_position.z / _g_chunk_size))
 			var pchunk := Vector2i(pcx, pcz)
 			if pchunk != _grass_last_chunk:
 				_grass_last_chunk = pchunk

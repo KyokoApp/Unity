@@ -72,6 +72,7 @@ const BOLT_LIFT := 1.8
 ## menerjemahkannya ke skeleton Kanna (delta rotasi dari rest + konjugasi
 ## yaw 180°, lihat komentar konvensi cermin di bawah).
 const KANNA_SCENE := preload("res://packs/char_assets/mannequin/kanna.glb")
+const OUTLINE_GDSHADER := preload("res://packs/shaders_materials/outline.gdshader")
 const SKIN_MANNEQUIN := "mannequin"
 const SKIN_KANNA := "kanna"
 
@@ -506,7 +507,8 @@ const BUILD_PAN_SPEED := 26.0             # m/dtk pan dari joystick build
 # mendatar supaya latar menjadi bagian gambar, dan spirit api di bahu
 # kanan menyeimbangkan frame (lihat fire_spirit.gd anchor).
 var _shoulder_cam := false
-const SHOULDER_DIST := 1.30          # jarak spring-arm dekat (m)
+var SHOULDER_DIST := 1.30          # jarak spring-arm dekat (m) — VAR supaya mode OW bisa mengetat lagi (lihat set_open_world)
+const SHOULDER_DIST_OW := 1.12      # "third person deketin banget" (mode hutan, permintaan user)
 const SHOULDER_FOCUS_H := 1.30       # bidik torso atas: kepala→paha masuk frame
 const SHOULDER_PITCH := -0.10        # menunduk dikiri (mentatap depan-datar)
 const SHOULDER_PITCH_MIN := -0.70
@@ -514,6 +516,90 @@ const SHOULDER_PITCH_MAX := 0.35
 const SHOULDER_H_OFF_PCT := 0.185    # porsi layar geser ke-kanan (karakter → kiri)
 const SHOULDER_FOV := 64.0
 const SHOULDER_ZOOM_K := 0.35        # pinch di mode ini dijinakkan (biar kompo tak rusak)
+
+## MODE OPEN WORLD khusus pemain (dipanggil world.set_open_world_mode):
+## (a) karakter dipaksa mannequin warna abu-pastel penuh + outline tipis;
+## (b) kamera bahu paksa aktif & DEKETIN BANGET (1.12m);
+## (c) gerak "hanya jalan dan lari": jump/dash/speed-skill/crouch dinonaktif
+##     (_simple_move); sprint-hold = lari tetap jalan (permemintaan user);
+## (d) tombol-tombol gerak disembunyikan hud (set_open_world di hud). State
+## creative sebelunnya dicadangkan & dipulihkan saat keluar.
+var _simple_move := false
+var _ow_prev_cam := false
+var _ow_prev_dist := 1.30
+var _ow_prev_skin := ""
+var _ow_greyed: Array = []            # MeshInstance3D yg diberi override (pulihkan saat keluar)
+var _ow_grey_mat: StandardMaterial3D = null
+var _ow_outline_mat: ShaderMaterial = null
+
+func set_open_world(on: bool) -> void:
+	if on:
+		_simple_move = true
+		# -- skin: paksa mannequin --
+		_ow_prev_skin = _skin_id
+		if _skin_id != SKIN_MANNEQUIN:
+			cycle_skin()   # saklar ke mannequin; pulihkan kanna nanti saat exit
+		# -- kamera: bahu dekat banget (kompo sinematik hutan) --
+		_ow_prev_cam = _shoulder_cam
+		_ow_prev_dist = SHOULDER_DIST
+		if not _shoulder_cam:
+			toggle_shoulder_cam()
+		SHOULDER_DIST = SHOULDER_DIST_OW
+		# -- HUD/btu gerak disembunyikan + FAB handled world --
+		var hud_ui := get_hud_safe()
+		if hud_ui and hud_ui.has_method("set_open_world_ui"):
+			hud_ui.set_open_world_ui(true)
+		_apply_grey_mannequin()
+	else:
+		_simple_move = false
+		SHOULDER_DIST = _ow_prev_dist
+		if _shoulder_cam != _ow_prev_cam:
+			toggle_shoulder_cam()
+		var hud_off := get_hud_safe()
+		if hud_off and hud_off.has_method("set_open_world_ui"):
+			hud_off.set_open_world_ui(false)
+		_clear_grey_mannequin()
+		if _ow_prev_skin == SKIN_KANNA and _skin_id != SKIN_KANNA:
+			cycle_skin()
+		_ow_prev_skin = ""
+
+## hud didapat ulang dari dalam struktur root (player tak berhiv.dependencies
+## langsung; get("hud") di root game aman — ada var hud di game_root).
+func get_hud_safe():
+	var r := get_parent()
+	if r != null and is_instance_valid(r):
+		return r.get("hud")
+	return null
+
+## Mannequin full abu-pastel (permintaan user: "pakennya karakter manequin
+## only tapi warnanya full abu pastel") — material_override tunggal (bukan
+## percobaan array material per-surface) = MERATA SEMUA bagian. Outline
+## tipis inverted-hull di next_pass (permintaan: "setiap objek kasih outline
+## tipis" — diterapkan ke karakter + semua objek hutan (lht OpenWorldMode)).
+func _apply_grey_mannequin() -> void:
+	if _ow_grey_mat == null:
+		_ow_grey_mat = StandardMaterial3D.new()
+		_ow_grey_mat.albedo_color = Color(0.62, 0.64, 0.70)   # abu pastel lembut
+		_ow_grey_mat.roughness = 0.82
+		_ow_grey_mat.metallic = 0.0
+		_ow_outline_mat = ShaderMaterial.new()
+		_ow_outline_mat.shader = OUTLINE_GDSHADER
+		_ow_outline_mat.set_shader_parameter("outline_color", Color(0.17, 0.16, 0.15, 1.0))
+		_ow_outline_mat.set_shader_parameter("thickness", 0.008)
+		_ow_grey_mat.next_pass = _ow_outline_mat
+	_ow_greyed.clear()
+	var t: Node = _model if is_instance_valid(_model) else _visual
+	if t == null:
+		return
+	for mi in t.find_children("*", "MeshInstance3D", true, false):
+		mi.material_override = _ow_grey_mat
+		_ow_greyed.append(mi)
+
+func _clear_grey_mannequin() -> void:
+	for mi in _ow_greyed:
+		if is_instance_valid(mi):
+			mi.material_override = null
+	_ow_greyed.clear()
 
 ## Toggle mode kamera bahu; dipanggil hud.gd BtnCam. Return true bila ON
 ## (utk indikator set_active di tombol).
@@ -579,6 +665,8 @@ func add_shake(amount: float) -> void:
 	_shake = minf(_shake + maxf(0.0, amount), 0.9)
 
 func press_jump() -> void:
+	if _simple_move:
+		return   # mode Open World: gerak hanya jalan & lari (permintaan user)
 	pass
 
 func press_sprint(_down: bool) -> void:
@@ -595,6 +683,8 @@ func set_attack_held(down: bool) -> void:
 		_try_fire()
 
 func press_speed_skill(down: bool) -> void:
+	if _simple_move:
+		return   # mode Open World: skill kecepatan nonaktif (hanya jalan & lari)
 	if not is_ready:
 		return
 	_speed_skill = down
@@ -636,6 +726,8 @@ func _spawn_speed_boost_fx() -> void:
 	_cam_boost_arm = CAM_BOOST_PULL
 
 func press_dash() -> void:
+	if _simple_move:
+		return   # mode Open World: dash nonaktif (hanya jalan & lari)
 	if not is_ready or _dash_cooldown > 0.0 or _dash_left > 0.0:
 		return
 	var wish := joy
@@ -750,6 +842,9 @@ func _move(delta: float) -> void:
 ## melewati COAST_MARGIN sblm garis air — dari sudut pandang pemain terasa
 ## spt nabrak air/pantai, padahal implementasinya cuma clamp radial simpel.
 func _clamp_to_island() -> void:
+	# Mode Open World: tak ada pulau/garis air — dunia tanpa batas (hutan).
+	if world and world.get("open_world_mode"):
+		return
 	var x := global_position.x
 	var z := global_position.z
 	var theta := atan2(z, x)

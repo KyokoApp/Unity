@@ -98,6 +98,16 @@ class RpgButton:
 		var w := Color(1, 1, 1, 0.94)
 		var r := radius * 0.62
 		match icon:
+			"forest":  # TOGGLE MODE DUNIA (ronde ini): siluet pohon pinus (hutan)
+				var acc_f := Color(0.70, 0.94, 0.62, 0.95) if (_down or active) else w
+				# tiga segitiga menumpuk (kanopi berlapis "hutan")
+				var t1 := PackedVector2Array([c + Vector2(0,-0.55)*r, c + Vector2(0.30,-0.14)*r, c + Vector2(-0.30,-0.14)*r, c + Vector2(0,-0.55)*r])
+				draw_polyline(t1, acc_f, 3.0, true)
+				var t2 := PackedVector2Array([c + Vector2(0,-0.28)*r, c + Vector2(0.38,0.10)*r, c + Vector2(-0.38,0.10)*r, c + Vector2(0,-0.28)*r])
+				draw_polyline(t2, acc_f, 3.0, true)
+				var t3 := PackedVector2Array([c + Vector2(0,-0.02)*r, c + Vector2(0.46,0.36)*r, c + Vector2(-0.46,0.36)*r, c + Vector2(0,-0.02)*r])
+				draw_polyline(t3, acc_f, 3.0, true)
+				draw_line(c + Vector2(0,0.36)*r, c + Vector2(0,0.56)*r, acc_f, 3.0, true)   # batang
 			"cam":  # MODE KAMERA BAHU (ronde ini): bodi kamera + lensa + indikator
 				# orang-di-kiri — komposisi over-shoulder (lihat player.gd).
 				var acc_c := Color(0.65, 0.85, 1.0, 0.9) if (_down or active) else w
@@ -451,6 +461,12 @@ func _build_layout() -> void:
 	# Toggle: indikator aktif dari balikan player.toggle_shoulder_cam().
 	_add_rpg(root, "BtnCam", "cam", 34.0, Vector2(vsz.x - mr - 34.0 * 4 - 10.0, mt))
 	_connect_rpg("BtnCam", Callable(self, "_on_cam_switch"), false)
+	# --- TOGGLE MODE DUNIA (ronde ini, permintaan user "buat mode world
+	# creative yg sekarang dan mode open world") — pojok kanan atas berderet
+	# kiri dari BtnCam; indikator hijau saat Open World aktif. FAB bangun
+	# tetap eksklusif milik creative (manager menetapkan visible-nya).
+	_add_rpg(root, "BtnMode", "forest", 34.0, Vector2(vsz.x - mr - 34.0 * 6 - 20.0, mt))
+	_connect_rpg("BtnMode", Callable(self, "_on_world_mode_toggle"), false)
 	_connect_rpg("BtnJump", Callable(self, "_on_jump"), false)
 	_connect_rpg("BtnSprint", Callable(self, "_on_sprint"), true)
 	_connect_rpg("BtnCrouch", Callable(self, "_on_crouch_toggle"), false)
@@ -566,6 +582,33 @@ var _speed_skill_on := false   # state toggle skill gerak-cepat (lihat BtnSpeed)
 func _on_skin_switch(_down: bool) -> void:
 	if player and player.has_method("cycle_skin"):
 		player.cycle_skin()
+
+## TOGGLE MODE OPEN WORLD (ronde ini): memanggil world.set_open_world_mode
+## — seluruh orkestrasi ada di sana (hutan acak, fog, grass besar-betis,
+## kabut 14-46m, mannequin abu-pastel, kamera bahu deketin banget, jalan
+## lari saja). Indikator hijau di ikon "forest" = aktif.
+func _on_world_mode_toggle(_down: bool) -> void:
+	if root_node == null:
+		return
+	var w = root_node.get("world")
+	if w != null and w.has_method("set_open_world_mode"):
+		var target: bool = not bool(w.get("open_world_mode"))
+		w.set_open_world_mode(target)
+		if _buttons.has("BtnMode"):
+			_buttons["BtnMode"].set_active(target)
+
+## MODE OPEN WORLD (permintaan user: "gerakan hanya jalan dan lari pake
+## karakter mannequin only"): tombol gerak yg BKN jalan/lari DISEMBUNYIKAN —
+## jump/dash/speed-skill/crouch TIDAK ada lagi di sini (guard tf player jg
+## menolak inputnya). Tombol ganti-karakter disembunyikan (mannequin only,
+## warnanya full abu pastel di mode tsb). Seluruhnya dipulihkan saat
+## keluar mode (creative = dunia & kontrol penuh seperti semula).
+func set_open_world_ui(on: bool) -> void:
+	for key in ["BtnJump", "BtnDash", "BtnSpeed", "BtnCrouch", "BtnAction", "BtnSkin"]:
+		if _buttons.has(key):
+			_buttons[key].visible = not on
+	# tombol kamera tetap (boleh keluar mode bahu kapanpun), ~serang jg tetap
+	# (membidik api bahu-kanan tidak bagian "gerakan").
 
 ## Tombol MODE KAMERA BAHU (ronde ini): toggle over-shoulder sinematik di
 ## player.gd; indikator aktif (accent biru di ikon "cam") mengikuti balikan.
