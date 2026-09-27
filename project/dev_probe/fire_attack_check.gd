@@ -544,6 +544,34 @@ func _check_world_ground_fog() -> void:
 		_fail("world: energi matahari terlalu redup (%s) — dunia sore seharusnya masih terang terik hangat" % (("null" if light_sun == null else str(light_sun.light_energy))))
 		world.queue_free()
 		return
+	# RONDE INI (keluhan user: "mataharinya kebesaran") — cakram sore WAJIB
+	# kecil mendekati kesan matahari nyata: nilai lama 0.035 (~15° garis
+	# tengah, raksasa) → kini 0.0065; probe mengunci agar tak balik diam2.
+	var sun_sz := float(sky_mat.get_shader_parameter("sun_size"))
+	if sun_sz > 0.012:
+		_fail("world: sun_size sky masih raksasa (%.4f) — seharusnya ~0.0065, matahari mendekati ukuran nyata" % sun_sz)
+		world.queue_free()
+		return
+	# RONDE INI (keluhan user: "sky juga biar gk polos2 amat") — shader
+	# langit wajib membawa uniform awan (cloud_amount) & kabut aeri
+	# (haze_strength); kalau paramnya hilang berarti langit polos lagi.
+	var sky_src: String = sky_mat.shader.code
+	if not (sky_src.contains("cloud_amount") and sky_src.contains("haze_strength")):
+		_fail("world: sky.gdshader tak lagi punya awan/haze (cloud_amount/haze_strength) — langit kembali polos?")
+		world.queue_free()
+		return
+	# RONDE INI (saran tier-menengah disetujui user): refleksi planar air —
+	# rig SubViewport kamera cermin y=0 (world.gd _setup_water_reflection)
+	# harus terbentuk bila WATER_REFLECTION aktif (default true).
+	var has_refl_vp := false
+	for c in world.get_children():
+		if c is SubViewport:
+			has_refl_vp = true
+			break
+	if not has_refl_vp:
+		_fail("world: SubViewport refleksi air hilang (WATER_REFLECTION dimatikan? rig _setup_water_reflection gagal?)")
+		world.queue_free()
+		return
 	var kids: Array = []
 	for c in world.get_children():
 		kids.append(String(c.name))

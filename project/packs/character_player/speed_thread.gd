@@ -14,13 +14,22 @@ extends MeshInstance3D
 ## ketika benang sedang tampak (_alpha > kecil), satu ImmediateMesh dipakai
 ## ulang tiap frame, buffer posisi adalah array statis.
 
-@export var width := 0.055          # lebar pita penuh (dimerutinkan ke ujung)
+@export var width := 0.022          # lebar pita penuh (dimerutinkan ke ujung)
 @export var points := 22            # banyak sampel histori (lebih = lebih halus/panjang)
 @export var sample_interval := 0.016 # detik antar sampel
-@export var wobble_amp := 0.05      # amplitudo goyangan maks di ujung belakang
+@export var wobble_amp := 0.038     # amplitudo goyangan maks di ujung belakang
 @export var wobble_freq := 7.0      # laju goyangan
 @export var phase := 0.0            # fase antar-benang supaya tak serempak
-@export var tint := Color(0.62, 0.78, 1.0)
+@export var tint := Color(1.50, 0.35, 2.00)   # "ungu menyala" HDR (>1.0)
+
+# Warna vertex (RGBA8) meng-CLAMP nilai > 1.0, jadi bagian HDR tint
+# (permintaan user ronde ini: benang "tipis ungu MENYALA" spt sinar sihir)
+# dipindah ke albedo material shg hasil akhir menembus glow_hdr_threshold
+# -> bloom berpendar. _vtint = tint dinormal ke 0-1 utk diputar per-vertex,
+# pelipat kecerahannya masuk albedo_color material (unshaded -> albedo IS
+# warna final, HDR utuh tak di-clamp).
+const HDR_GAIN := 2.3
+var _vtint := tint
 
 var _alpha := 0.0        # opasitas efektif sekarang (dierap ke _target)
 var _target := 0.0       # 0 = padam, 1 = menyala penuh
@@ -37,6 +46,17 @@ func setup(anchor: Node3D, offset: Vector3, p_tint: Color, p_width: float, p_pha
 	tint = p_tint
 	width = p_width
 	phase = p_phase
+	# Pecah tint HDR: komponen warna per-vertex dinormalisasi (RGBA8 clamp),
+	# lipatan kecerahannya jadi albedo material (HDR-capable) -> hue "ungu
+	# menyala" presisi TANPA distorsi clamp (lihat komentar di deklarasi).
+	var m := maxf(tint.r, maxf(tint.g, tint.b))
+	if m > 1.0:
+		_vtint = Color(tint.r / m, tint.g / m, tint.b / m, 1.0)
+	else:
+		_vtint = Color(tint.r, tint.g, tint.b, 1.0)
+	var boost := HDR_GAIN * maxf(m, 1.0)
+	if material_override is StandardMaterial3D:
+		(material_override as StandardMaterial3D).albedo_color = Color(boost, boost, boost)
 
 func set_target(t: float) -> void:
 	_target = clampf(t, 0.0, 1.0)
@@ -105,8 +125,8 @@ func _process(delta: float) -> void:
 		var w := width * (1.0 - age * age * 0.65)   # ekor sedikit mengerut
 		var a := _alpha * (1.0 - age) * (1.0 - age) # alpha memudar ke ekor
 		var c := p + side * sway + Vector3.UP * lift
-		_imm.surface_set_color(Color(tint.r, tint.g, tint.b, a))
+		_imm.surface_set_color(Color(_vtint.r, _vtint.g, _vtint.b, a))
 		_imm.surface_add_vertex(c + side * w)
-		_imm.surface_set_color(Color(tint.r, tint.g, tint.b, a))
+		_imm.surface_set_color(Color(_vtint.r, _vtint.g, _vtint.b, a))
 		_imm.surface_add_vertex(c - side * w)
 	_imm.surface_end()

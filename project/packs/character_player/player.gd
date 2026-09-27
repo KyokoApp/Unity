@@ -690,11 +690,34 @@ func _advance_footsteps(speed: float, delta: float) -> void:
 		_dust_dist_accum = 0.0
 		return
 	_dust_dist_accum += speed * delta
-	var stride := 0.75 if speed < MAX_SPEED * 0.45 else 0.55
+	# RONDE INI (permintaan user: debu jejak harus "nyesuain gerakan kaki
+	# pas nyentuh ke tanah tepat", bukan konstanta asal): klip lari/jog/
+	# jalan mocap punya DUA kontak kaki per siklus -> laju kontak =
+	# 2*speed_scale/panjang_klip, jadi stride (m per tapak) = speed/laju —
+	# debu kiri/kanan muncul betul2 berimpit dgn tiap telapak menyentuh
+	# tanah animasi yg TERLIHAT, termasuk saat speed_scale skill=1.4.
+	var stride := _footstep_stride(speed)
 	if _dust_dist_accum >= stride:
 		_dust_dist_accum = fmod(_dust_dist_accum, stride)
 		_dust_side = -_dust_side
 		_spawn_footstep_dust(_dust_side)
+
+var _stride_anim_len := {}   # cache panjang klip animasi per-nama state
+
+## stride (meter per tapak) dari klip yg SEDANG diputar (lihat komentar
+## _advance_footsteps). Fallback: konstanta lama bila klip tak tersedia.
+func _footstep_stride(speed: float) -> float:
+	if _anim == null or _anim_state.is_empty():
+		return 0.55
+	var clip_len: float = _stride_anim_len.get(_anim_state, -1.0)
+	if clip_len < 0.0:
+		var res := _anim.get_animation(_anim_state)
+		clip_len = res.length if res else 0.0
+		_stride_anim_len[_anim_state] = clip_len
+	var ss := maxf(_anim.speed_scale, 0.001)
+	if clip_len <= 0.0:
+		return 0.75 if speed < MAX_SPEED * 0.45 else 0.55
+	return clampf(speed * clip_len / (2.0 * ss), 0.35, 5.0)
 
 func _apply_camera(delta: float) -> void:
 	var sens := 1.0
@@ -751,11 +774,15 @@ func _animate_character(delta: float) -> void:
 			_anim_state = ANIM_SPRINT
 		_anim.speed_scale = DASH_ANIM_SPEED_SCALE
 		return
-	## speed_scale dasar state non-dash: 1.0 biasa; 2.8 selagi skill
-	## gerak-cepat ×5 ON (kaki klip mocap ~9m/s akan "ban selip" dibanding
-	## laju fisik 45m/s kalau tetap tempo asli — butuh tempat cukup tinggi
-	## spy gerakannya TERASA 5×, sejalan efek trail-smooth yg diminta user).
-	var baseline_scale := 2.8 if _speed_skill else 1.0
+	## speed_scale dasar state non-dash: 1.0 biasa; 1.4 selagi skill
+	## gerak-cepat ×5 ON. RONDE INI (keluhan user: "animasi pas pake move
+	## speed geraknya lambat aja walaupun geraknya cepat kayak yelan pas
+	## pake skill; tapi nyesuain gerakan kaki pas nyentuh ke tanah tepat" —
+	## versi bhs kasarnya: gerakan kaki di-2.8x terlihat PANIK/ngibrit tak
+	## elegan): ala Yelan sprint = animasi mulus tenang MESKI tubuh melaju
+	## super — 1.4 cukup utk kaki tak terasa "gliding", debu jejak di-
+	## sinkronkan pula dgn kontak tanah animasi (lihat _advance_footsteps).
+	var baseline_scale := 1.4 if _speed_skill else 1.0
 	if not is_equal_approx(_anim.speed_scale, baseline_scale):
 		_anim.speed_scale = baseline_scale
 
@@ -1110,12 +1137,17 @@ func _build_fire_spirit() -> void:
 ## per-frame dari _process (lihat bawah) — benang mengaum hanya saat skill
 ## speed AKTIF dan gerakan benar2 cepat.
 func _build_speed_threads() -> void:
+	# RONDE INI (keluhan user: "speed trailnya masih jelek ... benang itu
+	# kan tipis ungu menyala"): BENANG SUNGGUHAN sekarang — lebar DIPANGKAS
+	# habis (0.060->0.022 dst; benang, bukan pita) & warnanya UNGU MENYALA
+	# HDR (komponen > 1.0 supaya tembus glow_hdr_threshold 1.35 -> berpendar
+	# bercahaya via bloom; bukan lagi biru-pastel matte yg terasa hambar).
 	var specs: Array = [
-		# [anchor, offset lokal anchor, tint pastel, lebar, fase goyang]
-		[_visual, Vector3(0.00, 1.08, 0.00), Color(0.60, 0.78, 1.00), 0.060, 0.0],
-		[_visual, Vector3(0.13, 1.30, 0.00), Color(0.72, 0.85, 1.00), 0.044, 2.1],
-		[_visual, Vector3(-0.13, 0.84, 0.00), Color(0.66, 0.80, 1.00), 0.038, 4.2],
-		[_fire_spirit, Vector3.ZERO,        Color(0.76, 0.64, 1.00), 0.034, 1.3],
+		# [anchor, offset lokal anchor, tint HDR ungu-menyala, lebar, fase]
+		[_visual, Vector3(0.00, 1.08, 0.00), Color(1.50, 0.35, 2.00), 0.022, 0.0],
+		[_visual, Vector3(0.13, 1.30, 0.00), Color(1.75, 0.55, 2.10), 0.018, 2.1],
+		[_visual, Vector3(-0.13, 0.84, 0.00), Color(1.35, 0.30, 2.20), 0.016, 4.2],
+		[_fire_spirit, Vector3.ZERO,        Color(1.70, 0.55, 2.20), 0.016, 1.3],
 	]
 	for spec in specs:
 		var t := SPEED_THREAD.new()

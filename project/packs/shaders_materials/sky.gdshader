@@ -29,10 +29,44 @@ uniform float halo = 0.22;
 uniform float star_visibility : hint_range(0.0, 1.0) = 0.0;
 uniform float star_density = 16.0;   // diperkecil jauh dari versi awal (55) -> jauh lebih jarang/sedikit
 
+// --- AWAN SORE MELAYANG (permintaan user ronde ini: "sky juga biar gk
+// polos2 amat" + saran tier-menengah yg disetujui) — bank awan FBM 3-oktaf
+// murni di shader langit (nol node/tekstur tambahan): bermain di atas
+// cakrawala, bergerak pelan searah angin timur-laut, diwarnai krim-hangat
+// supaya NYAMBUNG dgn palet sore (bukan putih kelabu kubus polos).
+uniform float cloud_amount : hint_range(0.0, 1.0) = 0.72;
+uniform vec3 cloud_color : source_color = vec3(1.0, 0.90, 0.78);
+uniform vec3 cloud_shadow : source_color = vec3(0.55, 0.50, 0.52);
+uniform vec2 cloud_drift = vec2(0.008, 0.0025);
+// --- AERIAL HAZE (saran tier-menengah yg disetujui): pita kabut-hangat
+// tipis persis di garis cakrawala (menyambungkan darat ke langit spt di
+// foto senja beneran, darat jauh "meleleh" ke langit) ---
+uniform vec3 haze_color : source_color = vec3(0.98, 0.86, 0.64);
+uniform float haze_strength : hint_range(0.0, 1.0) = 0.34;
+
 float star_hash(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
 	p3 += dot(p3, p3.yzx + 33.33);
 	return fract((p3.x + p3.y) * p3.z);
+}
+
+// value-noise 2D utk awan (murni dr star_hash di atas — tak butuh rand2 baru)
+float cloud_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = star_hash(i);
+	float b = star_hash(i + vec2(1.0, 0.0));
+	float c = star_hash(i + vec2(0.0, 1.0));
+	float d = star_hash(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float cloud_fbm(vec2 p) {
+	float s = cloud_noise(p) * 0.55;
+	s += cloud_noise(p * 2.13 + 17.1) * 0.28;
+	s += cloud_noise(p * 4.31 + 39.7) * 0.17;
+	return s;
 }
 
 void sky() {
@@ -49,6 +83,32 @@ void sky() {
 		base = mix(lower, ground_bottom_color, smoothstep(-0.35, -1.0, y));
 	}
 	COLOR = base;
+
+	// --- taburan awan (permintaan user: langit gak polos) — diproyeksikan
+	// ke "atap langit" lewat pembagian y, hanya di ATAS cakrawala, pudar
+	// pelan menuju persis horizon (supaya tak memotong matahari/pohon,
+	// dan tak menghalangi pita haze di bawahnya) ---
+	if (cloud_amount > 0.003 && y > 0.012) {
+		vec2 cuv = EYEDIR.xz / (y + 0.32);
+		float n = cloud_fbm(cuv * 1.15 + TIME * cloud_drift * 22.0 + vec2(13.7, 3.1));
+		// dua jenis bentuk: puffy lembut + sil-sir stratus memanjang
+		float puffy = smoothstep(0.55, 0.80, cloud_fbm(cuv * 1.35 + TIME * cloud_drift * 22.0 + vec2(-7.7, 11.3)));
+		float band = smoothstep(0.50, 0.74, n);
+		float shape_ = max(puffy * 0.9, band * 0.85);
+		float horizon_fade = smoothstep(0.012, 0.18, y);
+		float zenith_fade = 1.0 - smoothstep(0.62, 0.98, y);
+		float cl = shape_ * horizon_fade * zenith_fade * cloud_amount;
+		// volume murah: inti awan sedikit lbh gelap ke bawah (n2 daerah
+		// tebal/bawah antara cloud_shadow & cloud_color)
+		float vol = cloud_fbm(cuv * 2.9 + TIME * cloud_drift * 18.0);
+		vec3 ccol = mix(cloud_shadow, cloud_color, clamp(vol * 0.9 + 0.55, 0.0, 1.0));
+		COLOR = mix(COLOR, ccol, cl * 0.55);
+	}
+
+	// --- pita kabut aeri tepat di horizon (darat bawah "meleleh" ke langit
+	// krim, seperti fotografi sore) — lembut di atas & bawah horizon ---
+	float haze_m = (1.0 - smoothstep(0.0, 0.20, abs(y))) * haze_strength;
+	COLOR = mix(COLOR, haze_color, haze_m);
 
 	// Bintang: proyeksi sederhana arah pandang ke petak-petak, hanya di atas
 	// cakrawala & memudar mendekati horizon (bukan hard cutoff yg aneh).

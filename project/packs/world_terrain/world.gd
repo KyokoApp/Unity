@@ -48,6 +48,19 @@ var time_of_day := 17.2
 
 var _root: Node
 var _ground: MeshInstance3D   # bidang raksasa yang menyentak mengikuti pemain
+var _ground_mat: ShaderMaterial  # material tanah+air (dipakai set param refleksi/matahari-air)
+# --- REFLEKSI PLANAR DI AIR (ronde ini, saran tier-menengah user yg
+# disetujui "pasangin sekalian": pantulan langit&turan ke permukaan danau/
+# laut lewat kamera cermin y=0 + SubViewport kecil 384x216 murah).
+# Update ditutulkan 1-dari-3 frame (hemat mobile) — air beriak jadi
+# latensi 3 frame nyaris tak terbaca. SATU BARIS toggle di bawah utk
+# mematikan cepat bila bermasalah di device: ubah ke false, tak perlu
+# sentuh kode lain (shader tetap skip sampling krn reflect_strength 0). ---
+const WATER_REFLECTION := true
+var _refl_vp: SubViewport
+var _refl_cam: Camera3D
+var _refl_ground: MeshInstance3D
+var _refl_tick := 0
 var wall_system: Node3D       # reruntuhan/dinding batu destructible — rintangan & pemandangan dunia
 const GROUND_SIZE := 1600.0
 var interactables := []       # kosong; dipertahankan utk kompatibilitas API
@@ -166,14 +179,81 @@ func _make_flat_ground() -> void:
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(GROUND_SIZE, GROUND_SIZE)
 	pm.material = _make_ground_material()
+	_ground_mat = pm.material  # disimpan: _apply_daylight & refleksi nanti
+	# arah MENUJU matahari utk kilaun air (bukan default guess uniform);
+	# rotation sun sdh final-rkunci sore di sini (_apply_daylight sdh jalan)
+	if sun:
+		_ground_mat.set_shader_parameter("water_sun_dir", sun.global_transform.basis.z.normalized())
 	_ground.mesh = pm
 	add_child(_ground)
+	_setup_water_reflection()
 	var body := StaticBody3D.new()
 	var col := CollisionShape3D.new()
 	col.shape = WorldBoundaryShape3D.new()  # bidang tak terbatas y=0, normal +Y
 	body.add_child(col)
 	add_child(body)
 	_build_grass()
+
+## Rig refleksi planar (dipanggil sekali dari _make_flat_ground). Bidang
+## air DUNIA sama dgn darat (bidang y=0), jd cermin yg tepat = bidang y=0
+## itu sendiri: kamera utama dicerminkan (pos.y->-y, basis M·B·M) & meng-
+## gambar BIDANG TIRUAN yg sama (mesh PlaneMesh dibagi, -0.02 di bawah spy
+## kamera utama tak render-ganda/z-fighting) ke SubViewport 384x216 lalu
+## disampel shader air via SCREEN_UV terbalik (ronde ini, tier-menengah).
+func _setup_water_reflection() -> void:
+	if not WATER_REFLECTION or _refl_vp != null or _ground == null:
+		return
+	_refl_vp = SubViewport.new()
+	_refl_vp.size = Vector2i(384, 216)
+	_refl_vp.msaa_3d = Viewport.MSAA_DISABLED
+	# world_3d default DIBAGI dgn scene utama (own_3d=false) -> matahari,
+	# langit & bidang tanah yg sama tampak dr kamera cermin tanpa duplikasi.
+	_refl_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_refl_cam = Camera3D.new()
+	# Kamera cermin HANYA menggambar layer-2 (bidang tiruan) — pohon/rumput/
+	# pemain ada di layer-1 & sengaja TIDAK dipantulkan (biaya mobile; toh
+	# yg tampak dominan di pantulan air = tanah/langit yg mana hamparan).
+	# Tanpa layer-2 geometri di viewport mungil ini, ruangan kosong (sky
+	# environment tetap ikut dirender -> pantulan LANGIT tetap ada! bagus).
+	_refl_cam.cull_mask = 2
+	_refl_cam.far = 240.0   # cukup utk tanah+langit dekat kejauhan
+	_refl_vp.add_child(_refl_cam)
+	add_child(_refl_vp)
+	_refl_ground = MeshInstance3D.new()
+	_refl_ground.mesh = _ground.mesh
+	_refl_ground.position.y = -0.02
+	_refl_ground.layers = 2
+	add_child(_refl_ground)
+	if _ground_mat:
+		_ground_mat.set_shader_parameter("reflect_tex", _refl_vp.get_texture())
+		_ground_mat.set_shader_parameter("reflect_strength", 0.38)
+
+## Dipanggil dari _process tiap frame: cerminkan kamera aktif & minta
+## viewport update 1-dr-3 frame (hemat; air beriak tak perlu 60fps).
+func _tick_water_reflection() -> void:
+	if not WATER_REFLECTION or _refl_cam == null:
+		return
+	var mc := get_viewport().get_camera_3d()
+	if mc == null:
+		return
+	_refl_tick += 1
+	if _refl_tick % 3 != 0:
+		return
+	var mt := mc.global_transform
+	# cermin thd bidang y=0: basis M·B·M (M=skala(1,-1,1); determinan ttp
+	# +1 dgn konjugasi ini, jd tetap rotasi murni — winding OK, & dgn
+	# cull_disabled di shader tanah sisi bawah jg tergambar benar), pos
+	# y negatifkan.
+	var p := mt.origin
+	var m := Basis.from_scale(Vector3(1.0, -1.0, 1.0))
+	var nb : Basis = m * mt.basis * m
+	_refl_cam.global_transform = Transform3D(nb.orthonormalized(), Vector3(p.x, -p.y, p.z))
+	_refl_cam.fov = mc.fov
+	_refl_cam.near = mc.near
+	if _refl_ground and _ground:
+		_refl_ground.position.x = _ground.position.x
+		_refl_ground.position.z = _ground.position.z
+	_refl_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 ## Lantai tanah (ronde-46 bag. C — ganti dari grid biru-putih ala blueprint
 ## sebelumnya). PERMINTAAN USER (ronde ini): warna diganti HIJAU TUA POLOS
@@ -215,19 +295,37 @@ func _make_ground_material() -> ShaderMaterial:
 
 	sh.code = """
 shader_type spatial;
-render_mode cull_back, depth_draw_opaque;
-// PERMINTAAN USER (ronde ini): tanah jadi HIJAU TUA POLOS (bukan lagi
-// tekstur foto rumput + noise petak dua-corak) — rumput 3D tuft chunk
-// streaming yg SKRG jauh lebih tebal (world.gd GRASS_CHUNK_INSTANCES) yg
-// bertugas kasih detail/tekstur visual; tanah di baliknya cukup warna
-// solid senada spy menyatu, bukan malah "ramai" bersaing dgn tuft di atas.
-uniform vec3 ground_color : source_color = vec3(0.155, 0.345, 0.125);
-uniform float shadow_tint : hint_range(0.0, 1.0) = 0.50;
-uniform float mid_tint : hint_range(0.0, 1.0) = 0.82;
+// RONDE INI: cull_disabled — HARUS, supaya bidang ini tetap KELIHATAN dari
+// kamera cermin refleksi air yg berada DI BAWAH bidang (permintaan user:
+// pasang planar-reflection di air, saran tier-menengah). Tanah dilihat
+// kamera utama dari atas saja, jd double-sided tak menambah beban nyata.
+render_mode cull_disabled, depth_draw_opaque;
+// PERMINTAAN USER (ronde ini): "buat tanah jadi hijau lagi" + "tanah &
+// rumput satu warna, kayak cuma liat ujung2 rumput doang" → ground_color
+// kini HIJAU PASTEL yg SAMA PERSIS dgn base_color akar di grass_blade
+// (dasar rumput = tanah; yg terbaca cuma ujung2 helai lbh terang di atas).
+// Lantai shading jg dinaikkan (keluhan "pencahayaannya biar lebih terlihat
+// rerumputannya"): shadow 0.50 -> 0.66, mid 0.82 -> 0.90, krn dgn sore
+// elevasi rendah (sun 10-13°, dot(N,L) kecil) floor lama bikin ladang
+// terbaca gelap-mossman sekarang harus tetap cerah hangat.
+uniform vec3 ground_color : source_color = vec3(0.285, 0.450, 0.260);
+uniform float shadow_tint : hint_range(0.0, 1.0) = 0.66;
+uniform float mid_tint : hint_range(0.0, 1.0) = 0.90;
 // --- Pulau/laut (IslandShape, disalin manual dr island_shape.gd) ---
 uniform vec3 sand_color : source_color = vec3(0.62, 0.56, 0.38);
 uniform vec3 water_shallow : source_color = vec3(0.10, 0.28, 0.34);
 uniform vec3 water_deep : source_color = vec3(0.03, 0.10, 0.16);
+// --- TIER-MENENGAH (disetujui user ronde ini): refleksi planar air ---
+// Viewport kamera cermin (world.gd _setup_water_reflection) di-pass ke
+// sampler ini; reflect_strength 0 -> shader SKIP sampling (aman saat
+// viewport belum siap / fitur dimatikan lewat WATER_REFLECTION=false).
+uniform sampler2D reflect_tex : filter_linear, repeat_disable;
+uniform float reflect_strength : hint_range(0.0, 1.0) = 0.0;
+// --- TIER-MENENGAH: kilaun matahari di air (fake sun-glare) + pasir basah
+// + kilau kaustik dangkal --- arah MENUJU matahari di-set ulang tiap
+// _apply_daylight (sun.global_basis.z), default = sore 13deg di barat.
+uniform vec3 water_sun_dir = vec3(-0.628, 0.225, -0.362);
+uniform float sun_glint : hint_range(0.0, 2.0) = 0.55;
 varying vec3 wp;
 
 float gh(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
@@ -305,15 +403,56 @@ void fragment() {
 	// simulasi gelombang sungguhan) -- cukup utk kesan "air hidup" mobile.
 	float ripple = gnoise(wp.xz * 0.05 + vec2(TIME * 0.06, TIME * 0.04))
 		+ gnoise(wp.xz * 0.13 - vec2(TIME * 0.03, TIME * 0.05)) * 0.5;
+	// variasi arah riak (dipakai distorsi kaca & jitter kilaun, tambahan
+	// normal air "palsu" — jauh lbh murah dr dalam normal-maps sungguhan)
+	float rx = gnoise(wp.xz * 0.09 + vec2(TIME * 0.10, 0.0)) - 0.5;
+	float rz = gnoise(wp.xz * 0.09 + vec2(0.0, TIME * 0.11)) - 0.5;
 	vec3 water_col = mix(water_shallow, water_deep, smoothstep(0.0, 1.0, (wf - 0.35) / 0.65));
 	water_col += ripple * 0.03;
 
 	// darat -> pasir -> air, transisi mulus di pita BEACH_WIDTH
 	vec3 col = mix(land_col, sand_color, smoothstep(0.0, 0.5, wf));
 	col = mix(col, water_col, smoothstep(0.35, 1.0, wf));
+
+	// --- PASIR BASAH (tier-menengah): pita gelap+dingin tipis persis di
+	// garis air (sebelum benang air penuh) — ciri pantai/danau sungguhan ---
+	float wet = smoothstep(0.02, 0.14, wf) * (1.0 - smoothstep(0.24, 0.44, wf));
+	col = mix(col, col * vec3(0.60, 0.66, 0.70), wet);
+
+	// mask air penuh (dipakai refleksi/kilaun/kaustik di bawah)
+	float wm = smoothstep(0.50, 0.90, wf);
+	vec3 vdir = normalize(CAMERA_POSITION_WORLD - wp);
+
+	// --- KAUSTIK DANGKAL murah: dua irisan noise digeser TIME berlawanan,
+	// dipotong tajam (pita dangkal saja spy danau dalam tak berkilau heboh) ---
+	float c1 = gnoise(wp.xz * 0.30 + vec2(TIME * 0.11, -TIME * 0.08));
+	float c2 = gnoise(wp.xz * 0.30 - vec2(TIME * 0.09,  TIME * 0.10));
+	float caust = pow(clamp(c1 * c2 * 3.2 - 1.05, 0.0, 1.0), 4.0);
+	float shall = smoothstep(0.40, 0.55, wf) * (1.0 - smoothstep(0.60, 0.90, wf));
+	col += vec3(0.82, 0.92, 0.82) * caust * shall * 0.50;
+
+	// --- KILAUN MATAHARI di permukaan air (fake spec streak): pantulkan
+	// arah pandang + jitter riak, pangkatkan tajam ke arah matahari ---
+	vec3 Rj = normalize(reflect(-vdir, vec3(0.0, 1.0, 0.0)) + vec3(rx, 0.0, rz) * 2.4);
+	float glint = pow(clamp(dot(Rj, normalize(water_sun_dir)), 0.0, 1.0), 64.0)
+		* (0.55 + 0.45 * gnoise(wp.xz * 0.9 + vec2(TIME * 0.35, -TIME * 0.28)));
+	col += vec3(1.0, 0.85, 0.60) * glint * wm * sun_glint;
+
+	// --- REFLEKSI PLANAR (tier-menengah; viewport kamera cermin y=0).
+	// Sampel dilayar: balik sumbu-Y (kamera cermin), distorsi riak, campur
+	// fresnel (makin mendatar sudut pandang makin reflektif, khas air) ---
+	if (reflect_strength > 0.001 && wm > 0.001) {
+		vec2 suv = clamp(vec2(SCREEN_UV.x + rx * 0.06 * wm,
+			(1.0 - SCREEN_UV.y) + (rx + rz) * 0.05 * wm), 0.0, 1.0);
+		vec3 refl = texture(reflect_tex, suv).rgb;
+		float fres = pow(1.0 - clamp(dot(vdir, vec3(0.0, 1.0, 0.0)), 0.0, 1.0), 2.0) * 0.75 + 0.25;
+		col = mix(col, refl, wm * fres * reflect_strength);
+	}
+
 	ALBEDO = col;
-	ROUGHNESS = mix(0.95, 0.18, smoothstep(0.6, 1.0, wf));   // air lbh mengkilap
-	SPECULAR = mix(0.0, 0.5, smoothstep(0.6, 1.0, wf));
+	// pasir basah jg mengkilap (specular lembut), air tetap paling licin
+	ROUGHNESS = mix(mix(0.95, 0.45, wet), 0.18, smoothstep(0.6, 1.0, wf));
+	SPECULAR = mix(max(0.0, wet * 0.25), 0.5, smoothstep(0.6, 1.0, wf));
 }
 
 void light() {
@@ -711,11 +850,39 @@ func _setup_environment() -> void:
 	_apply_daylight()
 	if quality_ref:
 		quality_ref.sun = sun
+	_setup_vignette()
+
+## VIGNETE halus + layar (tier-menengah, disetujui user): tepi layar
+## diredupkan perlahan konsentrasi otomatis jatuh ke tengah (pemain) —
+## trik foto/animasi, murah total (1 ColorRect + tekstur gradien radial
+## 256x256, nol tambahan pass post-process, di bawah layer HUD).
+func _setup_vignette() -> void:
+	var layer := CanvasLayer.new()
+	# layer 0: di atas dunia 3D tapi tegas DI BAWAH HUD permainan (hud.gd
+	# pakai layer 1) — tombol/joistik tetap tajam tak kena redup tepian.
+	layer.layer = 0
+	var cr := ColorRect.new()
+	cr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cr.mouse_filter = Control.MOUSE_FILTER_IGNORE  # jangan sekali2 telan sentuhan
+	var g := Gradient.new()
+	g.set_color(0, Color(0.0, 0.0, 0.0, 0.0))
+	g.set_color(1, Color(0.05, 0.03, 0.07, 0.34))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.width = 256
+	gt.height = 256
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(0.66, 0.66)   # aromanya cuma mulai jauh ke sudut
+	cr.texture = gt
+	layer.add_child(cr)
+	add_child(layer)
 
 const DAY_LENGTH := 420.0
 
 func _process(delta: float) -> void:
 	_tick_daynight(delta)
+	_tick_water_reflection()
 	# bidang visual mengikuti pemain (collider-nya sudah tak berujung)
 	if player and _ground:
 		_ground.position.x = player.global_position.x
@@ -780,11 +947,17 @@ func _apply_daylight() -> void:
 		# ukuran bulan), bintang MATI siang. Tenang & santai, tak ada sisa
 		# nuansa dingin malam tua.
 		sun.light_color = Color(1.0, 0.80, 0.55).lerp(Color(1.0, 0.88, 0.68), k)
-		sun.light_energy = 0.50 + 0.08 * k
+		# RONDE INI (permintaan user: "pencahayaannya biar lebih terlihat
+		# rerumputannya"): matahari dinaikkan (0.58 -> ~0.72) dan ambient
+		# ikut disokong: permukaan datar rumput/tanah yg normal-nya ke atas
+		# memperoleh cahaya sore-rendah ganda-bantu, jadi ladang hijau
+		# akhirnya KELIHATAN hijau, bukan lagi petak gelap. Gambar masih
+		# hangat sore hangat.
+		sun.light_energy = 0.62 + 0.10 * k
 		sun.shadow_enabled = quality_ref.get_preset().shadows if quality_ref else true
 		sun.shadow_opacity = 0.35
 		env.ambient_light_color = Color(0.56, 0.55, 0.52)
-		env.ambient_light_energy = 0.55
+		env.ambient_light_energy = 0.68
 		env.fog_light_color = Color(0.60, 0.68, 0.64)
 		sky_mat.set_shader_parameter("zenith_color", Color(0.22, 0.45, 0.50))
 		sky_mat.set_shader_parameter("horizon_color", Color(0.88, 0.74, 0.52))
@@ -796,8 +969,14 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("ground_bottom_color", Color(0.48, 0.46, 0.40).darkened(0.45))
 		sky_mat.set_shader_parameter("sun_color", Color(1.0, 0.88, 0.66))
 		sky_mat.set_shader_parameter("star_visibility", 0.0)
-		sky_mat.set_shader_parameter("sun_size", 0.035)
-		sky_mat.set_shader_parameter("halo", 0.22)
+		# RONDE INI (keluhan user: "mataharinya kebesaran"): disc jauh
+		# lebih kecil (0.035 -> 0.0065) mendekati kesan matahari asli yg
+		# sebenarnya cuma ~0.5 derajat — versi lama = kalau diukur di
+		# layar jd semacam matahari "15 derajat" yg super raksasa; sekarang
+		# hanya berupa bulatan terang kecil tbp.  Dan halonya dipangkas
+		# supaya tak nympy GEGLEDOK putih besar di tengah langit lagi.
+		sky_mat.set_shader_parameter("sun_size", 0.0065)
+		sky_mat.set_shader_parameter("halo", 0.10)
 	elif dayf > -0.12:
 		var k2 := smoothstep(-0.12, 0.15, dayf)
 		sun.light_color = Color(1.0, 0.52, 0.32).lerp(Color(1.0, 0.90, 0.74), k2)
@@ -812,8 +991,10 @@ func _apply_daylight() -> void:
 		sky_mat.set_shader_parameter("ground_color", Color(0.55, 0.40, 0.34).lerp(Color(0.42, 0.55, 0.50), k2))
 		sky_mat.set_shader_parameter("ground_bottom_color", (Color(0.55, 0.40, 0.34).lerp(Color(0.42, 0.55, 0.50), k2)).darkened(0.45))
 		sky_mat.set_shader_parameter("star_visibility", 0.0)
-		sky_mat.set_shader_parameter("sun_size", 0.035)
-		sky_mat.set_shader_parameter("halo", 0.22)
+		# senada dgn cabang sore di atas: matahari sbrk senja tak lagi
+		# raksasa (0.035 -> 0.010; halo dipangkas senada)
+		sky_mat.set_shader_parameter("sun_size", 0.010)
+		sky_mat.set_shader_parameter("halo", 0.14)
 	else:
 		# MALAM — cabang ini skrg MENJADI DEAD-CODE (ronde sebelumnya
 		# satu-satunya yg dipakai krn kunci malam permanen; ronde ini: kunci

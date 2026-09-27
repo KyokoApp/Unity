@@ -26,21 +26,24 @@ uniform float wind_speed = 1.7;
 // gust sekunder (freq beda, lihat vertex()) spy goyangannya kelihatan jelas
 // di perangkat & tak terasa seragam/monoton spt gelombang tunggal.
 uniform float wind_strength = 0.29;
-// SATU WARNA HIJAU MULUS (permintaan user ronde ini: "buat rumput dan tanah
-// satu warna hijau smooth"): gradasi akar->ujung diperpendek banget &
-// diselaraskan dgn ground_color tanah di world.gd _make_ground_material
-// (akar nyaris nyangkut dgn tanah, ujung cuma sepersekian lebih terang —
-// tak lagi kontras gelap-vs-kuning-terang), jadi helai+tanah melebur jadi
-// satu hamparan hijau halus ketimbang helai yg tampak "menempel" di atas
-// tanah gelap.
-uniform vec3 base_color : source_color = vec3(0.150, 0.340, 0.120);  // dekat akar
-uniform vec3 tip_color : source_color = vec3(0.185, 0.400, 0.150);   // dekat ujung
-// "variasi kering" tetap dipertahankan utk realisme, tp diperlemah jadi
-// cuma kehijauan-lumut-amber tipis (bukan lagi kuning-coklat tua yg
-// mencolok), senada dgn suasana sore hangat yg baru.
-uniform vec3 dry_tip_color : source_color = vec3(0.30, 0.40, 0.12);
-uniform float shadow_tint : hint_range(0.0, 1.0) = 0.48;
-uniform float mid_tint : hint_range(0.0, 1.0) = 0.85;
+// SATU WARNA HIJAU MULUS v2 (permintaan user ronde ini: "buat tanah jadi
+// hijau lagi" + "tanah & rumput gabungin jadi 1 warna jadi kayak cuma liat
+// ujung2 rumput doang"): base_color kini SAMA PERSIS dgn ground_color
+// tanah pastel baru di world.gd (0.285,0.450,0.260) — pangkal helai LENYAP
+// mlebur ke tanah, yg terbaca cuma ujung2nya yg seporsi lebih terang
+// (0.375,0.545,0.335) spt sinar sore menyentuh mahkota rumput saja.
+uniform vec3 base_color : source_color = vec3(0.285, 0.450, 0.260);  // = ground_color tanah
+uniform vec3 tip_color : source_color = vec3(0.375, 0.545, 0.335);   // ujung: pastel lebih terang
+// "variasi kering" diperkecil jadi sisir tipis jerami-pastel hangat
+// (dibatasi cuma ke rumpun PALING kering — variant >= 0.90, lihat
+// fragment()) spy tetap ada aksen tanpa merusak kepaduan hijau.
+uniform vec3 dry_tip_color : source_color = vec3(0.46, 0.50, 0.28);
+// Lantai shading disamakan dgn tanah (keluhan user: ladang terlalu gelap,
+// "pencahayaannya biar lebih terlihat rerumputannya") — 0.48->0.66 &
+// 0.85->0.90, sama persis dgn shadow_tint/mid_tint tanah -> abu tak ada
+// lagi: ground & helarnya terang SENADA satu keluarga cahaya.
+uniform float shadow_tint : hint_range(0.0, 1.0) = 0.66;
+uniform float mid_tint : hint_range(0.0, 1.0) = 0.90;
 // Efek "backlight" (SSS palsu): ujung helai yg tipis tembus cahaya kalau
 // matahari ada di belakangnya -> nyala keemasan khas rumput asli kena
 // cahaya dr belakang, bukan flat-toon polos.
@@ -158,7 +161,15 @@ void vertex() {
 	// referensi 3d-grass-shader yg diminta user.
 	float sway = sin(TIME * wind_speed + world_pos.x * 0.6 + world_pos.z * 0.6 + phase);
 	float gust = sin(TIME * wind_speed * 0.37 + world_pos.x * 0.11 - world_pos.z * 0.08 + phase * 1.7);
-	float sway_total = sway * 0.7 + gust * 0.5;
+	// PITA GUST BERJALAN (tier-menengah, disetujui user ronde ini: "wind in
+	// grass"): gelombang besar lambat bergeser melintasi ladang sepanjang
+	// arah angin; di dalam pita goyangan diperkuat ~2x, di luarnya tetap
+	// lembut — efek "gelombang angin berjalan di atas rumput" khas film
+	// anime/Ghibli, bukan seluruh ladang goyang serentak.
+	float band = 0.5 + 0.5 * sin(dot(world_pos.xz, vec2(0.943, 0.331)) * 0.045
+		- TIME * wind_speed * 0.55);
+	band = band * band * band;
+	float sway_total = (sway * 0.7 + gust * 0.5) * (0.75 + 1.35 * band);
 	// hanya bagian atas helai yg bergoyang (akar diam) -> height_w^2 sbg bobot
 	VERTEX += wind_dir * sway_total * wind_strength * height_w * height_w;
 	// normal "palsu" dicondongkan ke atas biar cahaya tak terlihat pipih-datar
@@ -168,12 +179,16 @@ void vertex() {
 
 void fragment() {
 	vec3 col = mix(base_color, tip_color, height_w);
-	// Sebagian rumpun (variant tinggi) condong ke warna kering — cuma di
-	// area dekat ujung (height_w) spy pangkalnya ttp hijau spt rumput nyata.
-	float dryness = smoothstep(0.74, 0.97, variant);
+	// Sebagian kecil rumpun (variant PALING tinggi) condong ke warna kering
+	// — cuma di area dekat ujung (height_w) spy pangkalnya ttp hijau spt
+	// rumput nyata. RONDE INI: ambang dinaikkan 0.74->0.90 (cuma ~10%
+	// rumpun yg kena) demi kepaduan satu warna hijau dgn tanah.
+	float dryness = smoothstep(0.90, 0.99, variant);
 	col = mix(col, dry_tip_color, dryness * height_w);
-	// variasi terang/gelap ringan per rumpun biar tak seragam monoton ("lebat")
-	col *= mix(0.82, 1.22, variant);
+	// variasi terang/gelap ringan per rumpun DIPERSEMPIT (0.82-1.22 ->
+	// 0.90-1.10, permintaan user: tanah+rumput satu keluarga warna, tak
+	// ada lagi bercak rumpun gelap-vs-terang yg memecah hamparan).
+	col *= mix(0.90, 1.10, variant);
 	ALBEDO = col;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
