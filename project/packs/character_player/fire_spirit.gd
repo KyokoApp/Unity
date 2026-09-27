@@ -24,7 +24,14 @@ const SHELL_SHADER := preload("res://packs/character_player/fireball_shell.gdsha
 
 ## Titik jangkar relatif ke induk (Visual) — di samping bahu kanan, sedikit
 ## di depan spy kelihatan dari kamera belakang-atas.
-var anchor := Vector3(0.30, 1.40, 0.09)
+## Bahu KANAN pemain (permintaan user ronde ini: "spirit api taro di bahu
+## kanan"): x +0.30 = sisi kanan badan (model menghadap -Z), y 1.42 pas
+## atas bahu mannequin/Kanna, z sedikit ke DEPAN tubuh supaya ikut terlihat
+## jelas framing kamera bahu (player.gd SHOULDER_*). Melayangnya sengaja
+## diperkecil (±2cm) supaya ia BAJAKTAN di bahu, bukan orbit ke tas.
+## Di Mode Kamera Bahu, konfigurasi ini jadi "pelengkap frame kanan"
+## komposisi sinematik (player kiri + spirit bahu kanan + pemandangan).
+var anchor := Vector3(0.30, 1.42, -0.05)
 
 ## Disetel player.gd tiap frame (kecepatan horizontal pemain, ruang dunia) —
 ## dipakai utk menggerakkan lidah api (bkn kecepatan node ini sendiri, yg
@@ -49,9 +56,10 @@ func _process(delta: float) -> void:
 	# Melayang: naik-turun + orbit kecil dua-sumbu beda frekuensi (Lissajous)
 	# spy lintasannya TAK melingkar sempurna/monoton -> kesan lbh hidup
 	# drpd benda mekanis presisi. Amplitudo kecil (peliharaan MUNGIL).
-	var bob := sin(_t * 1.7) * 0.035 + sin(_t * 3.1 + 1.2) * 0.014
-	var ox := sin(_t * 1.3 + 0.4) * 0.035
-	var oz := cos(_t * 1.05 + 2.1) * 0.03
+	# amplitudo ~setengah dr semula: hug bahu rapat (permintaan user).
+	var bob := sin(_t * 1.7) * 0.018 + sin(_t * 3.1 + 1.2) * 0.007
+	var ox := sin(_t * 1.3 + 0.4) * 0.018
+	var oz := cos(_t * 1.05 + 2.1) * 0.015
 	position = anchor + Vector3(ox, bob, oz)
 
 	rotation.y = sin(_t * 0.6) * 0.4

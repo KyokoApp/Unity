@@ -492,9 +492,34 @@ var _build_pan := Vector3.ZERO            # offset kamera XZ relatif posisi pema
 var _build_joy := Vector2.ZERO            # joystick build → pan, bukan langkah
 const BUILD_CAM_PITCH := -1.40            # rad ≈ -80°, menatap hampir tegak
 const BUILD_CAM_DIST := 24.0              # jarak pandang default top-down (m)
-const BUILD_CAM_ZOOM_MAX := 45.0          # jangkau pinch zoom-out mode bangun
+const BUILD_CAM_ZOOM_MAX := 85.0          # jangkau pinch zoom-out mode bangun (ronde ini: permintaan "bisa zoom out" — +35, seluruh pulau bisa keliatan dr udara)
 const BUILD_PAN_LIMIT := 220.0            # pan maks (bidang tanah visual ikut pemain!)
 const BUILD_PAN_SPEED := 26.0             # m/dtk pan dari joystick build
+
+# ===== KAMERA THIRD-PERSON "over-the-shoulder" (permintaan user ronde
+# ini) =====
+# Tombol kamera baru di samping tombol ganti-karakter (hud.gd BtnCam)→
+# toggle_shoulder_cam(). Versi KOMPOSISI SINEMA bkn sekadar zoom: karakter
+# dibawa dekat kamera, terpotong KEPALA→PAHA dipinggirkan di sisi KIRI
+# (tak kiri banget — 0.185 lebar layar, di kanan strok kompo pemandangan;
+# numericnya: h_offset positif menggeser konten ke kiri), pitch hampir
+# mendatar supaya latar menjadi bagian gambar, dan spirit api di bahu
+# kanan menyeimbangkan frame (lihat fire_spirit.gd anchor).
+var _shoulder_cam := false
+const SHOULDER_DIST := 1.30          # jarak spring-arm dekat (m)
+const SHOULDER_FOCUS_H := 1.30       # bidik torso atas: kepala→paha masuk frame
+const SHOULDER_PITCH := -0.10        # menunduk dikiri (mentatap depan-datar)
+const SHOULDER_PITCH_MIN := -0.70
+const SHOULDER_PITCH_MAX := 0.35
+const SHOULDER_H_OFF_PCT := 0.185    # porsi layar geser ke-kanan (karakter → kiri)
+const SHOULDER_FOV := 64.0
+const SHOULDER_ZOOM_K := 0.35        # pinch di mode ini dijinakkan (biar kompo tak rusak)
+
+## Toggle mode kamera bahu; dipanggil hud.gd BtnCam. Return true bila ON
+## (utk indikator set_active di tombol).
+func toggle_shoulder_cam() -> bool:
+	_shoulder_cam = not _shoulder_cam
+	return _shoulder_cam
 
 ## Dipanggil BuildModeManager.toggle() saat MASUK build mode.
 func enter_build_cam() -> void:
@@ -792,6 +817,35 @@ func _apply_camera(delta: float) -> void:
 		cam_pivot.rotation = Vector3(pitch, yaw, 0.0)
 		var want_len := maxf(6.0, BUILD_CAM_DIST + _cam_zoom)
 		cam_arm.spring_length = lerpf(cam_arm.spring_length, want_len, 1.0 - exp(-5.0 * delta))
+		return
+	# --------- CABANG KAMERA BAHU (toggle BtnCam hud, lihat blok SHOULDER_*
+	# di atas): dekat & komposit — karakter kiri, pemandangan kanan, pitch
+	# menetap; look-drag masih bebas (yaw/pitch user) tapi pitch dijinakkan
+	# balik pelan-pelan supaya framing tetap sinematik. Tidak ada auto-
+	# balik zoom paksa di sini (beda dr gameplay biasa) — user eksplisit
+	# diutamakan. ---------
+	if _shoulder_cam:
+		var sens_s := 1.0
+		if settings:
+			sens_s = clampf(settings.camera_sens, 0.3, 2.5)
+		yaw -= _look_vel.x * LOOK_K * sens_s * delta * 60.0 * 0.016
+		var inv_s := -1.0 if (settings and settings.invert_y) else 1.0
+		pitch = clampf(pitch + _look_vel.y * LOOK_K * sens_s * delta * 60.0 * 0.016 * inv_s,
+			SHOULDER_PITCH_MIN, SHOULDER_PITCH_MAX)
+		_look_vel = _look_vel.lerp(Vector2.ZERO, 1.0 - exp(-12.0 * delta))
+		# bujukan lembut balik ke pitch komposisi sinematik
+		pitch = lerpf(pitch, SHOULDER_PITCH, 1.0 - exp(-1.7 * delta))
+		var focus_s := global_position + Vector3(0.0, SHOULDER_FOCUS_H, 0.0)
+		cam_pivot.global_position = cam_pivot.global_position.lerp(focus_s, 1.0 - exp(-CAM_FOLLOW * delta))
+		cam_pivot.rotation = Vector3(pitch, yaw, 0.0)
+		var want_len_s := maxf(0.80, SHOULDER_DIST + _cam_zoom * SHOULDER_ZOOM_K)
+		cam_arm.spring_length = lerpf(cam_arm.spring_length, want_len_s, 1.0 - exp(-8.0 * delta))
+		var cam_s: Camera3D = $CameraPivot/CamArm/Cam
+		# h_offset positif = konten tergeser KIRI — "karakter … di area sisi
+		# kiri bukan kiri banget"; sisi kanan jadi panggung pemandangan.
+		cam_s.h_offset = get_viewport().get_visible_rect().size.x * SHOULDER_H_OFF_PCT
+		cam_s.v_offset = 0.0
+		cam_s.fov = lerpf(cam_s.fov, SHOULDER_FOV, 1.0 - exp(-6.0 * delta))
 		return
 	var sens := 1.0
 	if settings:

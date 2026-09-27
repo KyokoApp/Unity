@@ -45,7 +45,15 @@ func _ready() -> void:
 ## ---------- konstruksi tampilan ----------
 
 func _build_layout() -> void:
-	# FAB kanan-bawah (selalu tampak, juga di luar build mode)
+	# Panel RAIL DI SISI KANAN (permintaan user ronde ini, screenshot UI bawah
+	# dinilai "makin sempit": pindah ke samping, ikon GEDE GEDE, palet scroll
+	# VERTIKAL geser atas-bawah, kategori chips di ATAS geser kanan-kiri,
+	# aksi fixed di bawah) — sebelah kiri layar UTUH = pemandangan/kanvas.
+	var vsz := get_viewport().get_visible_rect().size
+	var rail_w := minf(400.0, vsz.x * 0.44)
+
+	# FAB (selalu tampak, juga di luar build mode; bergeser keluar jalur
+	# rail saat rail terbuka — lihat show_panel()).
 	fab = _make_button("BANGUN", Color(0.95, 0.72, 0.32), Color(0.28, 0.20, 0.08))
 	fab.custom_minimum_size = Vector2(112, 64)
 	fab.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -53,65 +61,67 @@ func _build_layout() -> void:
 	fab.pressed.connect(func(): _call("toggle"))
 	add_child(fab)
 
-	# Panel sheet di bawah: tersembunyi sampai build di-toggle
 	panel = PanelContainer.new()
 	panel.visible = false
-	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	panel.offset_bottom = 0
-	panel.offset_top = -500   # mode bangun = kanvas kerja: sheet dilegakan biar tak sempit (permintaan user)
+	panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+	panel.offset_left = -rail_w
 	var pstyle := StyleBoxFlat.new()
-	pstyle.bg_color = Color(0.09, 0.085, 0.12, 0.93)
+	pstyle.bg_color = Color(0.09, 0.085, 0.12, 0.92)
 	pstyle.corner_radius_top_left = 22
-	pstyle.corner_radius_top_right = 22
-	pstyle.content_margin_left = 14
-	pstyle.content_margin_right = 14
-	pstyle.content_margin_top = 10
+	pstyle.corner_radius_bottom_left = 22
+	pstyle.content_margin_left = 12
+	pstyle.content_margin_right = 10
+	pstyle.content_margin_top = 12
 	pstyle.content_margin_bottom = 10
 	panel.add_theme_stylebox_override("panel", pstyle)
 	add_child(panel)
 
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 10)
+	vb.add_theme_constant_override("separation", 8)
 	panel.add_child(vb)
 
-	# --- STATUS dipindah ke ATAS tabs: dl di bawah bar paling buncit
-	# (sering kena potong layar kecil; sempit ala screenshot user) ---
-	status_label = Label.new()
-	status_label.text = ""
-	status_label.add_theme_font_size_override("font_size", 17)
-	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.custom_minimum_size = Vector2(0, 30)
-	vb.add_child(status_label)
-
-	# --- bar tab sub-mode ---
+	# --- BAR KATEGORI: chips besar di ATAS rail, geser KANAN-KIRI saat sempit
+	var chip_scroll := ScrollContainer.new()
+	chip_scroll.custom_minimum_size = Vector2(0, MIN_TOUCH + 14)
+	chip_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	chip_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	chip_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	vb.add_child(chip_scroll)
 	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 10)
-	vb.add_child(tabs)
+	tabs.add_theme_constant_override("separation", 8)
+	chip_scroll.add_child(tabs)
 	for spec in [["place", "Objek"], ["terrain", "Terrain"], ["road", "Jalan"], ["delete", "Hapus"]]:
 		var tb := _make_button(spec[1], Color(0.22, 0.20, 0.28), Color(0.10, 0.09, 0.14))
-		tb.custom_minimum_size = Vector2(0, MIN_TOUCH)
-		tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tb.custom_minimum_size = Vector2(96, MIN_TOUCH)
 		var key: String = spec[0]
 		tb.pressed.connect(func(): _call("set_submode", key))
 		tabs.add_child(tb)
 		tab_buttons[key] = tb
 
-	# --- container konten tab (visible = hanya satu halaman) ---
+	# --- status tipis (di bawah chips, tidak menumpuk kanvas lagi) ---
+	status_label = Label.new()
+	status_label.text = ""
+	status_label.add_theme_font_size_override("font_size", 15)
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.custom_minimum_size = Vector2(0, 24)
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(status_label)
+
+	# --- ISI halaman: mengisi seluruh sisa rail (expand) ---
 	var pages_root := Control.new()
-	pages_root.custom_minimum_size = Vector2(0, 240)
+	pages_root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vb.add_child(pages_root)
 	pages["place"] = _build_page_place(pages_root)
 	pages["terrain"] = _build_page_terrain(pages_root)
 	pages["road"] = _build_page_road(pages_root)
 	pages["delete"] = _build_page_delete(pages_root)
 
-	# --- baris aksi bawah: Reverse / Simpan / Muat / Tutup ---
-	var bar := HBoxContainer.new()
-	bar.add_theme_constant_override("separation", 8)
+	# --- baris aksi fixed DI BAWAH rail: grid 2x2 lega ---
+	var bar := GridContainer.new()
+	bar.columns = 2
+	bar.add_theme_constant_override("h_separation", 8)
+	bar.add_theme_constant_override("v_separation", 8)
 	vb.add_child(bar)
-	# Tombol REVERSE (permintaan user): mengambil kembali aksi terakhir —
-	# objek yang sdh ditaruh bisa diambil lagi lewat ini (utuh 1 tumpukan
-	# LIFO utk semua aksi bangun: taruh objs, tile, jalan, hapus, dsb).
 	var bundo := _make_button("↶ Reverse", Color(0.46, 0.38, 0.26), Color(0.16, 0.13, 0.07))
 	bundo.custom_minimum_size = Vector2(0, MIN_TOUCH)
 	bundo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -133,12 +143,12 @@ func _build_layout() -> void:
 	bclose.pressed.connect(func(): _call("toggle"))
 	bar.add_child(bclose)
 
-	# Mini joystick kiri-bawah (hanya saat build aktif; hud normal
-	# ditahan manager). Di-extend di build_joy_control.gd — modular.
+	# Mini joystick kiri-bawah: kini rail di kanan — joystick bebas duduk di
+	# tepi kiri-bawah (lega utk thumb kiri; tak lagi digeser dr sheet lama).
 	var joy_script := load("res://packs/build_mode/build_joy_control.gd")
 	joy_control = joy_script.new() as Control
 	joy_control.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	joy_control.position = Vector2(24, -470 - 150)   # tepat di atas sheet
+	joy_control.position = Vector2(24, -200)
 	joy_control.visible = false
 	add_child(joy_control)
 
@@ -351,6 +361,12 @@ func show_panel(v: bool) -> void:
 	panel.visible = v
 	if joy_control:
 		joy_control.visible = v
+	# FAB bergeser keluar jalur rail saat rail terbuka supaya tetap terjangkau
+	# (rail sendiri menelannya kalau dibiarkan di pojok kanan-bawah).
+	if v:
+		fab.position = Vector2(-minf(400.0, get_viewport().get_visible_rect().size.x * 0.44) - 128.0, -84.0)
+	else:
+		fab.position = Vector2(-128, -84)
 	# sedikit pembeda FAB saat mode aktif
 	fab.text = "TUTUP" if v else "BANGUN"
 
@@ -378,13 +394,13 @@ func fill_palette(entries: Array) -> void:
 	for c in palette_grid.get_children():
 		c.queue_free()
 	palette_buttons.clear()
-	# kolom responsif: sel ~104px (sel 96 + jarak8) — layar sempit: 4 kolom.
-	var vsz := get_viewport().get_visible_rect().size
-	palette_grid.columns = clampi(int(floor(vsz.x / 104.0)), 4, 10)
+	# Rail samping: 2 KOLOM sel BESAR (permintaan user: "icon nta gede gede"),
+	# bergulir atas-bawah karena panel scroll vertikal.
+	palette_grid.columns = 2
 	for e in entries:
 		var b := _make_button(String(e["label"]), Color(e["tint"]) * 0.55, Color(e["tint"]) * 0.3)
-		b.custom_minimum_size = Vector2(96, 96)
-		b.add_theme_font_size_override("font_size", 15)
+		b.custom_minimum_size = Vector2(170, 150)
+		b.add_theme_font_size_override("font_size", 19)
 		var id: String = e["id"]
 		b.pressed.connect(func(): _call("select_catalog", id))
 		palette_grid.add_child(b)

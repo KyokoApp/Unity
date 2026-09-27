@@ -98,6 +98,19 @@ class RpgButton:
 		var w := Color(1, 1, 1, 0.94)
 		var r := radius * 0.62
 		match icon:
+			"cam":  # MODE KAMERA BAHU (ronde ini): bodi kamera + lensa + indikator
+				# orang-di-kiri — komposisi over-shoulder (lihat player.gd).
+				var acc_c := Color(0.65, 0.85, 1.0, 0.9) if (_down or active) else w
+				# bodi kamera (kotak rounded-implisit)
+				draw_rect(Rect2(c + Vector2(-0.52, -0.30) * r, Vector2(0.80, 0.55) * r), w, false, 3.0)
+				# jendela bidik di atas
+				draw_rect(Rect2(c + Vector2(-0.44, -0.40) * r, Vector2(0.28, 0.12) * r), w, false, 3.0)
+				# lensa bulat
+				draw_arc(c + Vector2(-0.12, -0.02) * r, r * 0.16, 0.0, TAU, 24, acc_c, 3.0, true)
+				# siluet orang di KIRI (karakter disisir kiri = pemandangan kanan)
+				draw_arc(c + Vector2(0.34, -0.06) * r, r * 0.14, 0.0, TAU, 16, acc_c, 2.5, true)  # kepala
+				draw_line(c + Vector2(0.34, 0.08) * r, c + Vector2(0.34, 0.30) * r, acc_c, 2.5, true)  # badan
+				draw_line(c + Vector2(0.22, 0.30) * r, c + Vector2(0.46, 0.30) * r, acc_c, 2.5, true)  # bahu
 			"skin":  # ganti karakter: topan/cermin 2 wajah (ghost) — digambar
 				# canvas spt tombol lain (emoji mentah berisiko kotak tofu di
 				# font default Android, lihat komentar di _add_rpg BtnSkin).
@@ -433,6 +446,11 @@ func _build_layout() -> void:
 	# mentah — glyph emoji warna kerap jadi kotak tofu di font default Android.
 	_add_rpg(root, "BtnSkin", "skin", 34.0, Vector2(vsz.x - mr - 34.0 * 2, mt))
 	_connect_rpg("BtnSkin", Callable(self, "_on_skin_switch"), false)
+	# --- MODE KAMERA BAHU (permintaan user: "buatkan button kamera disamping
+	# mode switch karakter") — pojok-kanan-atas berderet kiri dr BtnSkin.
+	# Toggle: indikator aktif dari balikan player.toggle_shoulder_cam().
+	_add_rpg(root, "BtnCam", "cam", 34.0, Vector2(vsz.x - mr - 34.0 * 4 - 10.0, mt))
+	_connect_rpg("BtnCam", Callable(self, "_on_cam_switch"), false)
 	_connect_rpg("BtnJump", Callable(self, "_on_jump"), false)
 	_connect_rpg("BtnSprint", Callable(self, "_on_sprint"), true)
 	_connect_rpg("BtnCrouch", Callable(self, "_on_crouch_toggle"), false)
@@ -548,6 +566,14 @@ var _speed_skill_on := false   # state toggle skill gerak-cepat (lihat BtnSpeed)
 func _on_skin_switch(_down: bool) -> void:
 	if player and player.has_method("cycle_skin"):
 		player.cycle_skin()
+
+## Tombol MODE KAMERA BAHU (ronde ini): toggle over-shoulder sinematik di
+## player.gd; indikator aktif (accent biru di ikon "cam") mengikuti balikan.
+func _on_cam_switch(_down: bool) -> void:
+	if player and player.has_method("toggle_shoulder_cam"):
+		var on: bool = player.toggle_shoulder_cam()
+		if _buttons.has("BtnCam"):
+			_buttons["BtnCam"].set_active(on)
 
 func _on_speed_toggle() -> void:
 	_speed_skill_on = not _speed_skill_on
