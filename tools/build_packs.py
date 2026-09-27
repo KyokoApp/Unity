@@ -24,7 +24,11 @@ PACK_DEFS = {
     "world_props_forest": {"deps": ["shaders_materials", "world_terrain"]},
     "world_props_beach": {"deps": ["shaders_materials", "world_terrain"]},
     "build_mode": {"deps": ["shaders_materials", "world_terrain"]},   # Build Mode (butir 1-7 user) + objek glTF Quaternius CC0
-    "character_player": {"deps": ["shaders_materials"]},
+    # char_assets (ronde ini): GLB animasi mannequin 52MB dipisah dr skrip —
+    # tanpa ini, TIAP edit player.gd memaksa unduh-ulang 58.9MB utk semua.
+    # Kini pack besar ini jarang berubah; update skrip brp KB saja (delta).
+    "char_assets": {"deps": []},
+    "character_player": {"deps": ["shaders_materials", "char_assets"]},
     "ui": {"deps": []},
     "audio_sfx": {"deps": []},
     "audio_music": {"deps": []},

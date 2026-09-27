@@ -9,7 +9,7 @@ extends CharacterBody3D
 ## setelah semua jalur unduh URL/lampiran-chat gagal di ronde-ronde
 ## sebelumnya (lihat CREDITS.md).
 ##
-## Model: project/packs/character_player/mannequin/UAL1_Standard.glb
+## Model: project/packs/char_assets/mannequin/UAL1_Standard.glb
 ##   - 1 mesh berskin "Mannequin" (2 material, tanpa tekstur) + 43 klip
 ##     animasi full-body siap pakai (mocap asli, bukan buatan tangan).
 ##   - Tinggi bind-pose asli ~1.83 m; skala 1:1 (meter), tak perlu koreksi.
@@ -47,7 +47,7 @@ const SHOOT_SFX := "res://packs/audio_sfx/fire_shoot.wav"
 const ARCANE_BOLT := preload("res://packs/character_player/arcane_bolt.gd")
 const FIRE_SPIRIT := preload("res://packs/character_player/fire_spirit.gd")
 const SPEED_THREAD := preload("res://packs/character_player/speed_thread.gd")  # benang trail smooth ala Yelan
-const MANNEQUIN_SCENE := preload("res://packs/character_player/mannequin/UAL1_Standard.glb")
+const MANNEQUIN_SCENE := preload("res://packs/char_assets/mannequin/UAL1_Standard.glb")
 const FIRE_COOLDOWN := 0.3
 const BOLT_SPEED := 21.0
 const BOLT_LIFT := 1.8
@@ -71,7 +71,7 @@ const BOLT_LIFT := 1.8
 ## FRAME kelas SkinRetarget (di bawah) membaca pose global tiap tulang &
 ## menerjemahkannya ke skeleton Kanna (delta rotasi dari rest + konjugasi
 ## yaw 180°, lihat komentar konvensi cermin di bawah).
-const KANNA_SCENE := preload("res://packs/character_player/mannequin/kanna.glb")
+const KANNA_SCENE := preload("res://packs/char_assets/mannequin/kanna.glb")
 const SKIN_MANNEQUIN := "mannequin"
 const SKIN_KANNA := "kanna"
 
