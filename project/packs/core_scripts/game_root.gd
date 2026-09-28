@@ -151,7 +151,8 @@ func _boot_world(progress_cb: Callable) -> void:
 	# mendaftarkan `sun` ke quality di _setup_environment(). Dulu tak pernah
 	# disambung → preset Rendah tetap ber-shadow, blob shadow tak pernah
 	# tampil, kabut preset diabaikan.
-	world.set("quality_ref", quality)
+	# (var quality_ref memang dideklarasi di world.gd, jadi set() aman.)
+	world.quality_ref = quality
 	quality.world = world
 	add_child(world)
 	if world.has_signal("gen_progress"):

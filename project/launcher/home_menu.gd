@@ -172,6 +172,11 @@ func _build() -> void:
 	left_col.add_child(prof_row)
 	var disc := Control.new()
 	disc.custom_minimum_size = Vector2(64, 64)
+	# FIX BUG: var disc2 DULU dideklarasikan SETELAH draw.connect -> di
+	# GDScript strict lambda pakai referensi variabel yg BELUM terdefinisi
+	# (Unidentified identifier 'disc2') saat scene menu dimuat. Bind dulu
+	# baru connect supaya closure menangkap referensi yang benar.
+	var disc2: Control = disc
 	disc.draw.connect(func():
 		var c := Vector2(32, 32)
 		disc2.draw_circle(c, 30.0, Color(0.85, 0.85, 0.85, 1.0))
@@ -179,7 +184,6 @@ func _build() -> void:
 		disc2.draw_arc(c + Vector2(0, -8), 8.5, 0, TAU, 24, C_TXT, 3.5, true)   # kepala
 		disc2.draw_arc(c + Vector2(0, 30), 13.0, PI, TAU, 24, C_TXT, 3.5, true)  # bahu
 	)
-	var disc2: Control = disc   # bind final-value utk lambda draw.connect
 	prof_row.add_child(disc)
 	var prof_txt := VBoxContainer.new()
 	prof_txt.add_theme_constant_override("separation", 2)
@@ -196,10 +200,12 @@ func _build() -> void:
 	prof_txt.add_child(_profile_last)
 	_sync_profile_note()
 
-	# ---- KOLOM tombol miring (kiri) ----
+	# ---- KOLOM tombol miring (kiri, di bawah logo+profile di left_col) ----
+	# FIX BUG: dulunya _menu_col di-add ke hb_top DAN left_col -> di Godot
+	# add_child ke node lain melempar error "already has a parent" -> menu
+	# jadi rusak / tak tampil & game bisa macet sebelum masuk dunia.
 	_menu_col = VBoxContainer.new()
 	_menu_col.add_theme_constant_override("separation", 8)
-	hb_top.add_child(_menu_col)
 	left_col.add_child(_menu_col)
 
 	_btn_open = SlantedButton.new("OPEN WORLD", "hutan tanpa-batas · kabut dekat · rumput setinggi betis")

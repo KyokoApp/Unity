@@ -14,6 +14,7 @@ on:
       - arena/01a0ba2f-unity
       - arena/01a0dc65-unity
       - arena/01a0dca7-unity
+      - arena/01a0e380-unity
     paths:
       - "project/**"
       - "tools/**"
@@ -33,7 +34,7 @@ permissions:
 env:
   GVER: 4.5.2
   GDIR: export_templates/4.5.2.stable
-  TAG: apk-20260920-2302
+  TAG: apk-20260928-fixloading
 
 jobs:
   build-apk:
@@ -242,6 +243,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          # 0) pastikan release sudah ada (kalau tag/rel baru, gh release edit gagal)
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "Pulau Toon — APK debug ($TAG)" --notes "Build sedang berjalan..."
+            echo "::notice::release $TAG dibuat"
+          fi
           # 1) simpan diagnostik ke release notes (terbaca via API)
           if gh release edit "$TAG" --notes-file "$GITHUB_WORKSPACE/exports/android/diag.txt"; then
             echo "::notice::diagnostik tersimpan di release notes"

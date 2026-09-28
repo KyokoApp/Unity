@@ -670,6 +670,12 @@ func _process_grass_fill_budget() -> void:
 			blade_basis = blade_basis.scaled(Vector3(s, s * rng.randf_range(0.8, 1.3), s))
 			mm.set_instance_transform(i, Transform3D(blade_basis, Vector3(x, 0.0, z)))
 			mm.set_instance_custom_data(i, Color(rng.randf(), rng.randf(), 0.0, 0.0))
+		# FIX BUG KRITIS: dulunya filled += n & budget -= n BERADA DI DALAM
+		# loop for-j -> dijalankan SEBANYAK n kali (bukan 1 kali). Akibatnya
+		# filled loncat dr 0 langsung ke n*n (overshoot jauh melebihi
+		# _g_instances), budget cepat negatif, chunk chunk grass TAK PERNAH
+		# terisi penuh (hanya n instance pertama yang benar-benar diset),
+		# visible_instance_count salah & game bisa freeze di chunk spawn.
 		filled += n
 		budget -= n
 		st["filled"] = filled

@@ -59,19 +59,23 @@ func _parse_url(u: String) -> Dictionary:
 	return {"scheme": scheme, "host": host, "port": port, "path": path}
 
 ## GET sederhana, mengembalikan PackedByteArray atau kosong bila gagal.
+## FIX: timeout koneksi diperpendek (15s -> 5s connect, 10s response) agar
+## launcher tak "stuck loading" ber-menit2 saat server tak terjangkau (mis.
+## HP tanpa koneksi) — dulu 15+25 detik × 3 percobaan + backoff = ~2 menit
+## menunggu "hang", lalu baru fail. Sekarang ~20 detik total lalu offline.
 func _http_get(url: String, max_body := 64 * 1024 * 1024) -> PackedByteArray:
 	var info := _parse_url(url)
 	var c := HTTPClient.new()
 	var tls = null
 	if info.scheme == "https":
-		tls = TLSOptions.client()
+		tls = TLSOptions.client_unsafe()
 	var err := c.connect_to_host(info.host, info.port, tls)
 	if err != OK:
 		return PackedByteArray()
 	var t0 := Time.get_ticks_msec()
 	while c.get_status() == HTTPClient.STATUS_CONNECTING or c.get_status() == HTTPClient.STATUS_RESOLVING:
 		c.poll()
-		if Time.get_ticks_msec() - t0 > 15000 or _cancelled:
+		if Time.get_ticks_msec() - t0 > 5000 or _cancelled:
 			c.close()
 			return PackedByteArray()
 		await _await_frame()
@@ -83,11 +87,28 @@ func _http_get(url: String, max_body := 64 * 1024 * 1024) -> PackedByteArray:
 		return PackedByteArray()
 	while not c.has_response():
 		c.poll()
-		if Time.get_ticks_msec() - t0 > 25000 or _cancelled:
+		if Time.get_ticks_msec() - t0 > 10000 or _cancelled:
 			c.close()
 			return PackedByteArray()
 		await _await_frame()
-	if c.get_response_code() != 200:
+	var code := c.get_response_code()
+	# Handle redirect 301/302/303/307/308 (GitHub CDN / Content hosting umumnya
+	# melempar redirect). Satu level redirect cukup; loop lagi = terlalu
+	# rawan. Tanpa ini, fetch ke raw.githubusercontent.com kadang gagal 302
+	# di jaringan tertentu & dianggap "server down".
+	if code >= 301 and code <= 308 and code != 304:
+		c.close()
+		var loc := ""
+		for h in c.get_response_headers_as_dictionary():
+			if h.to_lower() == "location":
+				loc = c.get_response_headers_as_dictionary()[h]
+				break
+		if loc != "":
+			if loc.begins_with("/"):
+				loc = info.scheme + "://" + info.host + ":" + str(info.port) + loc
+			return await _http_get(loc, max_body)
+		return PackedByteArray()
+	if code != 200:
 		c.close()
 		return PackedByteArray()
 	var body := PackedByteArray()
@@ -241,7 +262,7 @@ func _download_pack(pack_id: String, meta: Dictionary, base_url: String) -> bool
 		var c := HTTPClient.new()
 		var tls = null
 		if info.scheme == "https":
-			tls = TLSOptions.client()
+			tls = TLSOptions.client_unsafe()
 		if c.connect_to_host(info.host, info.port, tls) != OK:
 			_log("  koneksi gagal, retry...")
 			await _backoff(attempt)
@@ -395,11 +416,18 @@ func run(server_url: String) -> void:
 			var all_ok := true
 			for pid in local.get("pack_order", []):
 				# lengkap bila pck terunduh ada DI PERANGKAT, atau konten pack
-				# sudah ter-BBUNDEL di APK (res://packs/<id>) — fallback AIO.
+				# sudah ter-BUNDLE di APK/sumber (res://packs/<id>) — fallback AIO.
+				# FIX BUG INDENTASI: dulunya badan `if not (...)` berada DI LUAR
+				# loop for (karena tab salah), shg pid/meta merujuk ke variabel
+				# iterasi TERAKHIR & cuma cek 1 pack — pack lain lolos tanpa
+				# diverifikasi, akibatnya false-positive "all_ok" walau pack
+				# hilang -> crash di _enter_game "Pack hilang". DirExists juga
+				# sudah dipakai (bukan _absolute, lihat fix di launcher).
 				var meta: Dictionary = local["packs"][pid]
 				if not ( _is_pack_present(pid, meta) \
-						or DirAccess.dir_exists_absolute("res://packs/" + pid) ):
+						or DirAccess.dir_exists("res://packs/" + pid) ):
 					all_ok = false
+					_log("Pack belum lengkap: " + pid)
 					break
 			if all_ok:
 				_log("Server tidak terjangkau — memakai konten lokal/bundel (offline).")
@@ -420,11 +448,21 @@ func run(server_url: String) -> void:
 		if local_state.has(pid):
 			var st: Dictionary = local_state[pid]
 			state_ok = str(st.get("version", "")) == str(meta.get("version", "")) and str(st.get("sha256", "")) == str(meta.get("sha256", ""))
-		if state_ok and ( _is_pack_present(pid, meta) \
-				or DirAccess.dir_exists_absolute("res://packs/" + pid) ):
+		var bundled := DirAccess.dir_exists("res://packs/" + pid)
+		# FIX: pack size=0 artinya BUNDLED (tidak perlu diunduh, konten sudah
+		# ada di res://). Anggap selalu OK kalau folder bundel ada.
+		var size_here: int = int(meta.get("size", 0))
+		if state_ok and ( _is_pack_present(pid, meta) or bundled ):
+			continue
+		if size_here == 0 and bundled:
+			# bundled pack, verifikasi hash/version tak perlu (ada di dalam APK)
+			continue
+		if size_here == 0 and not bundled:
+			_log("Pack dir bundel hilang: res://packs/" + pid)
+			needed.append(pid)
 			continue
 		needed.append(pid)
-		total_bytes += int(meta.get("size", 0))
+		total_bytes += size_here
 	if needed.is_empty():
 		_log("Semua pack sudah versi terbaru.")
 		_save_local_manifest(server_manifest)

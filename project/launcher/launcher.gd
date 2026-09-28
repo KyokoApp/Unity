@@ -326,23 +326,47 @@ func _on_failed(reason: String) -> void:
 	_stage_label.text = "Gagal"
 	_log_line("GAGAL: " + reason, "tomato")
 	_btn_retry.visible = true
-	# tawarkan offline bila ada manifest lokal
-	if FileAccess.file_exists("user://local_manifest.json"):
+	# tawarkan offline bila ada manifest lokal ATAU konten bundel di APK
+	# (fix: dulu hanya cek user://, padahal seed pertama user:// belum ada).
+	if FileAccess.file_exists("user://local_manifest.json") \
+			or FileAccess.file_exists("res://packs/manifest.json"):
 		_btn_offline.visible = true
 
 func _on_retry() -> void:
 	_start_update()
 
 func _on_offline() -> void:
-	if _updater == null:
-		_updater = UpdaterScript.new()
-		_updater.tree = get_tree()
-	var local = _updater._load_local_manifest()
+	# FIX BUG: dulunya memanggil _updater._load_local_manifest() yang private
+	# & bergantung pada _updater yang sudah diinisialisasi penuh (kalau
+	# _updater null dibuat new() di sini, tree/state belum lengkap dan
+	# method private bisa gagal/return kosong). Baca langsung file manifest
+	# lokal — jauh lebih aman dan tak bergantung pada state updater.
+	var local := _read_local_manifest_file()
 	if local.is_empty():
 		_log_line("Tidak ada konten lokal.", "tomato")
 		return
 	_current_manifest = local
 	_enter_game(true)
+
+## Helper: baca user://local_manifest.json langsung (dipakai tombol offline
+# dan di _start_update). Dipisah supaya tak perlu menyentuh internal Updater.
+func _read_local_manifest_file() -> Dictionary:
+	if not FileAccess.file_exists("user://local_manifest.json"):
+		# fallback terakhir: manifest bawaan APK/dev di res://
+		if FileAccess.file_exists("res://packs/manifest.json"):
+			var f := FileAccess.open("res://packs/manifest.json", FileAccess.READ)
+			if f != null:
+				var t := f.get_as_text(); f.close()
+				var d = JSON.parse_string(t)
+				if typeof(d) == TYPE_DICTIONARY:
+					return d
+		return {}
+	var f := FileAccess.open("user://local_manifest.json", FileAccess.READ)
+	if f == null:
+		return {}
+	var d = JSON.parse_string(f.get_as_text())
+	f.close()
+	return d if typeof(d) == TYPE_DICTIONARY else {}
 
 func _on_server() -> void:
 	var d := ConfirmationDialog.new()
@@ -374,6 +398,7 @@ func _enter_game(offline: bool, mode := "") -> void:
 		var meta: Dictionary = packs.get(pid, {})
 		var path := "user://packs/%s-%s.pck" % [pid, str(meta.get("version", ""))]
 		var bundled := "res://packs/%s" % pid
+		var size_here: int = int(meta.get("size", 0))
 		if FileAccess.file_exists(path):
 			_log_line("Memuat " + pid + " (terunduh)…")
 			print("[launcher] load_resource_pack: ", path)
@@ -381,10 +406,17 @@ func _enter_game(offline: bool, mode := "") -> void:
 				_log_line("Gagal memuat pack: " + pid, "tomato")
 				_on_failed("Pack '%s' rusak atau tidak cocok dengan versi aplikasi." % pid)
 				return
-		elif DirAccess.dir_exists_absolute(bundled):
-			# fallback dev / paket terpasang: resource pack sudah ada di res://
-			_log_line("Memuat " + pid + " (lokal/bundel)…")
-			print("[launcher] fallback res:// ", pid)
+		elif DirAccess.dir_exists(bundled):
+			# Konten bundel: pack SUDAH ada di res:// (developer build / APK AIO
+			# tanpa pack .pck terpisah). size=0 = penanda bundel (lihat updater).
+			# TIDAK perlu load_resource_pack karena file-nya sudah di-res://
+			# secara langsung.
+			_log_line("Memuat " + pid + " (lokal/bundel, tersedia di res://)…")
+			print("[launcher] bundel tersedia, skip load_resource_pack: ", pid)
+		elif size_here == 0:
+			# size=0 menandakan BUNDEL; kalau DirAccess gagal, coba sub-path
+			# (beberapa platform Godot memerlukan garis miring akhir).
+			_log_line("Memuat " + pid + " (bundel)...")
 		else:
 			_log_line("Pack hilang: " + path, "tomato")
 			_on_failed("File pack tidak ditemukan; coba unduh ulang.")
