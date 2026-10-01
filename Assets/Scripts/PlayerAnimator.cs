@@ -16,12 +16,18 @@ public class PlayerAnimator : MonoBehaviour
     readonly AnimationClipPlayable[] slot = new AnimationClipPlayable[2];
     readonly AnimationClip[] slotClip = new AnimationClip[2];
     readonly bool[] slotLoop = new bool[2];
+    readonly bool[] slotFootIK = new bool[2];
 
     int cur = -1;
     float fadeT = 1f;
     float fadeDur = 0.15f;
 
     public AnimationClip CurrentClip { get { return cur >= 0 ? slotClip[cur] : null; } }
+    public bool CurrentApplyFootIK { get { return cur >= 0 && slotFootIK[cur]; } }
+    public float CurrentPlaybackSpeed
+    {
+        get { return cur >= 0 && slot[cur].IsValid() ? (float)slot[cur].GetSpeed() : 0f; }
+    }
 
     public void Bind(Animator animator)
     {
@@ -47,6 +53,7 @@ public class PlayerAnimator : MonoBehaviour
         {
             slot[cur].SetSpeed(speed);
             slot[cur].SetApplyFootIK(applyFootIK);
+            slotFootIK[cur] = applyFootIK;
             return;
         }
 
@@ -69,6 +76,7 @@ public class PlayerAnimator : MonoBehaviour
         slot[next] = p;
         slotClip[next] = clip;
         slotLoop[next] = loop;
+        slotFootIK[next] = applyFootIK;
 
         if (cur < 0 || fade <= 0f)
         {
@@ -159,6 +167,8 @@ public class PlayerAnimator : MonoBehaviour
         {
             slot[i] = default(AnimationClipPlayable);
             slotClip[i] = null;
+            slotLoop[i] = false;
+            slotFootIK[i] = false;
         }
         cur = -1;
     }

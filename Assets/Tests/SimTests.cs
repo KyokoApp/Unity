@@ -271,20 +271,36 @@ public class SimTests
 
         player.MoveInput = new Vector2(0f, 0.45f);
         yield return new WaitForSeconds(0.7f);
-        Debug.Log("[SIM] tier walk clip=" + Clip());
+        Debug.Log("[SIM] tier walk clip=" + Clip() + ", ik=" + panim.CurrentApplyFootIK
+            + ", rate=" + panim.CurrentPlaybackSpeed.ToString("F2"));
         Assert.AreSame(walk, panim.CurrentClip, "kecepatan rendah harus memilih Walk");
+        Assert.IsTrue(panim.CurrentApplyFootIK, "Walk seharusnya tetap memakai Foot IK");
 
         player.MoveInput = new Vector2(0f, 0.8f);
         yield return new WaitForSeconds(0.7f);
-        Debug.Log("[SIM] tier jog clip=" + Clip());
-        if (jog != null) Assert.AreSame(jog, panim.CurrentClip, "kecepatan menengah harus memilih Jog");
+        Debug.Log("[SIM] tier jog clip=" + Clip() + ", ik=" + panim.CurrentApplyFootIK
+            + ", rate=" + panim.CurrentPlaybackSpeed.ToString("F2"));
+        if (jog != null)
+        {
+            Assert.AreSame(jog, panim.CurrentClip, "kecepatan menengah harus memilih Jog");
+            Assert.IsFalse(panim.CurrentApplyFootIK, "Jog tidak boleh memakai Foot IK agar stride mocap tidak terdistorsi");
+            Assert.That(panim.CurrentPlaybackSpeed, Is.EqualTo(1f).Within(0.12f),
+                "Jog 4 m/s harus mendekati playback asli 1x");
+        }
         else Debug.LogWarning("[SIM] UAL1 Jog belum diekstrak; tahap Jog dilewati.");
 
         player.SetSprint(true);
         player.MoveInput = Vector2.up;
         yield return new WaitForSeconds(0.7f);
-        Debug.Log("[SIM] tier sprint clip=" + Clip());
-        if (sprint != null) Assert.AreSame(sprint, panim.CurrentClip, "sprint harus memilih Sprint_Loop");
+        Debug.Log("[SIM] tier sprint clip=" + Clip() + ", ik=" + panim.CurrentApplyFootIK
+            + ", rate=" + panim.CurrentPlaybackSpeed.ToString("F2"));
+        if (sprint != null)
+        {
+            Assert.AreSame(sprint, panim.CurrentClip, "sprint harus memilih Sprint_Loop");
+            Assert.IsFalse(panim.CurrentApplyFootIK, "Sprint tidak boleh memakai Foot IK");
+            Assert.That(panim.CurrentPlaybackSpeed, Is.EqualTo(1.25f).Within(0.12f),
+                "sprint 6.25 m/s harus memutar Sprint_Loop mendekati 1.25x");
+        }
         else Debug.LogWarning("[SIM] UAL1 Sprint belum diekstrak; tahap Sprint dilewati.");
 
         // LARI adalah toggle; mematikannya saat analog tetap penuh harus
@@ -295,7 +311,11 @@ public class SimTests
         if (sprint != null)
             Assert.AreNotSame(sprint, panim.CurrentClip, "clip Sprint tetap aktif setelah toggle LARI dimatikan");
         if (jog != null)
+        {
             Assert.AreSame(jog, panim.CurrentClip, "setelah sprint dilepas, kecepatan normal harus memilih Jog");
+            Assert.That(panim.CurrentPlaybackSpeed, Is.EqualTo(1.25f).Within(0.12f),
+                "lari normal 5 m/s harus memakai cadence referensi Godot 1.25x");
+        }
 
         player.MoveInput = Vector2.zero;
         yield return new WaitForSeconds(0.7f);

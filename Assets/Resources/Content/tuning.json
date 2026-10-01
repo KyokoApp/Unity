@@ -1,8 +1,8 @@
 {
   "motd": "🏝️ Pulau 200 m live-tuning: rumput & hutan bisa disetel tanpa instal ulang (grassDensity/treeDensity). Kabari kalau mau dirapatkan/direnggangkan!",
   "walkSpeed": 2.1,
-  "runSpeed": 4.6,
-  "sprintMul": 1.35,
+  "runSpeed": 5.0,
+  "sprintMul": 1.25,
   "jumpVel": 9.0,
   "gridBase": "#6B9454",
   "gridLine": "#61874C",

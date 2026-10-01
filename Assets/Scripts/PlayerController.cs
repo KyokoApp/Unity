@@ -31,8 +31,8 @@ public class PlayerController : MonoBehaviour
 
     // ---- tuning (bisa di-update live oleh ContentUpdater tanpa instal ulang) ----
     public static float WalkSpeed = 2.1f;
-    public static float RunSpeed = 4.6f;
-    public static float SprintMul = 1.35f;
+    public static float RunSpeed = 5.0f; // sama dengan MOVE_SPEED pada referensi Godot
+    public static float SprintMul = 1.25f;
     public static float RotSpeed = 14f;
     public static float Gravity = -30f;
     public static float JumpVel = 9f;
@@ -440,7 +440,10 @@ public class PlayerController : MonoBehaviour
 
         if (clip == null) return;
         float playbackRate = Mathf.Clamp(actualSpeed / refSpeed, minRate, maxRate);
-        anim.Play(clip, true, playbackRate, 0.18f, true);
+        // Referensi Godot memainkan Jog_Fwd langsung tanpa foot IK. Matikan IK
+        // pada gait cepat agar pose kaki UAL1 tidak terdistorsi saat cadence naik.
+        bool applyFootIK = locomotionTier == LocomotionTier.Walk;
+        anim.Play(clip, true, playbackRate, 0.18f, applyFootIK);
     }
 
     void UpdateAir(float dt, Vector3 dir, float mag)
