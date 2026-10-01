@@ -1,0 +1,87 @@
+name: apk-release
+## Auto-build APK Unity + paket konten di GitHub Actions (pola sama seperti
+## repo Godot lama): push konten game -> langsung build -> terbit ke Release.
+##  - APK            -> release `apk-latest`   (instal sekali)
+##  - manifest+konten -> release `content-latest` (diunduh in-game, tanpa instal ulang)
+##
+## WAJIB: isi secrets UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD terlebih dulu.
+## Lihat docs/CARA_SETUP_CI.md (lisensi Unity Personal gratis).
+
+on:
+  push:
+    branches:
+      - main
+      - arena/01a0f56e-unity
+    paths:
+      - "Assets/**"
+      - "Packages/**"
+      - "ProjectSettings/**"
+      - ".github/workflows/apk_release.yml"
+  workflow_dispatch:
+
+concurrency: apk-release
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Cek secrets lisensi Unity
+        run: |
+          if [ -z "${{ secrets.UNITY_LICENSE }}" ]; then
+            echo "::error::Secret UNITY_LICENSE belum diisi. Jalankan workflow 'unity-activation' lalu ikuti docs/CARA_SETUP_CI.md"
+            exit 1
+          fi
+          echo "lisensi ok"
+
+      - uses: actions/checkout@v4
+
+      - name: Cache Library (percepat build berikutnya)
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Android-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-Android-
+
+      - name: Build APK + paket konten (Unity 2022.3, Android, IL2CPP)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: Android
+          buildMethod: CiBuild.BuildAll
+          versioning: None
+          allowDirtyBuild: true
+
+      - name: Pastikan hasil build ada
+        run: |
+          ls -laR build || true
+          test -f build/Android/UAL2Playground.apk
+          test -f build/content/manifest.json
+
+      - name: Terbitkan APK -> release apk-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="Build otomatis #${{ github.run_number }} dari commit ${{ github.sha }}.
+          Instal APK ini SEKALI saja — update konten berikutnya diunduh otomatis dari dalam game (release content-latest)."
+          gh release view apk-latest >/dev/null 2>&1 || \
+            gh release create apk-latest --title "APK Terbaru (auto-build)" --notes "$NOTES"
+          gh release edit apk-latest --notes "$NOTES"
+          gh release upload apk-latest build/Android/UAL2Playground.apk --clobber
+
+      - name: Terbitkan konten -> release content-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="Konten in-game v${{ github.run_number }} (diunduh otomatis oleh aplikasi saat start — tidak perlu instal ulang APK)."
+          gh release view content-latest >/dev/null 2>&1 || \
+            gh release create content-latest --title "Konten In-Game (auto-update)" --notes "$NOTES"
+          gh release edit content-latest --notes "$NOTES"
+          gh release upload content-latest build/content/* --clobber

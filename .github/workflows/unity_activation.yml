@@ -1,0 +1,22 @@
+name: unity-activation
+## Jalankan SEKALI secara manual (tab Actions -> unity-activation -> Run workflow)
+## untuk mendapat file .alf. Lalu ikuti docs/CARA_SETUP_CI.md untuk menukarnya
+## menjadi lisensi .ulf dan mengisi secrets repo.
+
+on: workflow_dispatch
+
+jobs:
+  activation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Minta file aktivasi Unity (.alf)
+        id: request
+        uses: game-ci/request-activation-file@v2
+        with:
+          unityVersion: 2022.3.45f1
+
+      - name: Unggah .alf sebagai artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-activation-file
+          path: ${{ steps.request.outputs.filePath }}

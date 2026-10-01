@@ -14,6 +14,17 @@ Game Unity yang dibangun ulang dari nol:
   - **GANTI MODEL** — tukar mannequin UAL2 ↔ Mannequin F (retarget Humanoid).
   - **Geser layar kanan** — memutar kamera orbit.
 
+## Auto-build APK + update in-game (seperti launcher Godot lama)
+
+- Push ke repo → GitHub Actions build otomatis → **Releases**:
+  - **`apk-latest`** → `UAL2Playground.apk` — **instal sekali saja**.
+  - **`content-latest`** → manifest + tuning + asset bundle — **diunduh otomatis
+    dari dalam game** saat dibuka (offline-safe, incremental SHA-256). Update
+    konten (MOTD, kecepatan, warna world, asset pack) **tanpa instal ulang APK**.
+- ⚠️ **Setup sekali**: CI Unity butuh lisensi (Personal gratis). Isi secrets
+  `UNITY_LICENSE`, `UNITY_EMAIL`, `UNITY_PASSWORD` — panduan lengkap di
+  [`docs/CARA_SETUP_CI.md`](docs/CARA_SETUP_CI.md).
+
 ## Cara buka
 
 1. Install **Unity Hub** + editor **2022.3 LTS** (atau lebih baru) dengan modul **Android Build Support (SDK/NDK/OpenJDK)**.

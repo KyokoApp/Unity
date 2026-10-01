@@ -1,0 +1,11 @@
+{
+  "motd": "Selamat datang di UAL2 Playground!",
+  "walkSpeed": 2.1,
+  "runSpeed": 4.6,
+  "sprintMul": 1.35,
+  "jumpVel": 9.0,
+  "gridBase": "#EDF1F6",
+  "gridLine": "#A1AEC0",
+  "gridMajor": "#61738F",
+  "fog": "#BFD1E6"
+}

@@ -9,6 +9,25 @@ public class WorldGrid : MonoBehaviour
 {
     public Transform target;
 
+    static Material gridMat;
+
+    /// <summary>Ganti warna grid + fog secara live (dipakai ContentUpdater).</summary>
+    public static void ApplyLook(Color baseCol, Color lineCol, Color majorCol, Color? fogCol)
+    {
+        if (gridMat != null)
+        {
+            gridMat.SetColor("_BaseColor", baseCol);
+            gridMat.SetColor("_LineColor", lineCol);
+            gridMat.SetColor("_MajorColor", majorCol);
+        }
+        if (fogCol.HasValue)
+        {
+            RenderSettings.fogColor = fogCol.Value;
+            var cam = Camera.main;
+            if (cam != null) cam.backgroundColor = fogCol.Value;
+        }
+    }
+
     public static WorldGrid Create()
     {
         var root = new GameObject("World");
@@ -30,6 +49,7 @@ public class WorldGrid : MonoBehaviour
         var shader = Resources.Load<Shader>("Shaders/InfiniteGrid");
         if (shader == null) shader = Shader.Find("UAL2/InfiniteGrid");
         var mat = new Material(shader);
+        gridMat = mat;
         var mr = plane.GetComponent<MeshRenderer>();
         mr.sharedMaterial = mat;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;

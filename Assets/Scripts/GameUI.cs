@@ -19,6 +19,8 @@ public class GameUI : MonoBehaviour
     GameObject animPanel;
     PressButton sprintBtn;
     Text modelLabel;
+    Text statusText;
+    float statusUntil;
     bool sprintOn;
 
     static readonly Color BtnDark = new Color(0.07f, 0.08f, 0.11f, 0.55f);
@@ -38,6 +40,18 @@ public class GameUI : MonoBehaviour
     {
         if (player != null && joystick != null)
             player.MoveInput = joystick.Value;
+
+        if (statusText != null && statusText.enabled && Time.unscaledTime > statusUntil)
+            statusText.enabled = false;
+    }
+
+    /// <summary>Tampilkan pesan status (update konten, MOTD, dsb) di tengah-atas layar.</summary>
+    public void SetStatus(string msg, float seconds)
+    {
+        if (statusText == null) return;
+        statusText.text = msg;
+        statusText.enabled = true;
+        statusUntil = Time.unscaledTime + seconds;
     }
 
     // =====================================================================
@@ -70,6 +84,11 @@ public class GameUI : MonoBehaviour
         BuildActionButtons(safe);
         BuildTopBar(safe);
         BuildAnimPanel(safe);
+
+        // ---- Status updater / MOTD (tengah-atas) ----
+        statusText = UiKit.NewText("Status", safe, "", 26, new Color(1f, 0.95f, 0.6f, 0.95f));
+        UiKit.Anchor((RectTransform)statusText.transform, new Vector2(0.5f, 1f), new Vector2(0, -60), new Vector2(1200, 44));
+        statusText.enabled = false;
 
         // ---- Petunjuk ----
         var hint = UiKit.NewText("Hint", safe,

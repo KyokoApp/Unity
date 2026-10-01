@@ -11,13 +11,13 @@ public class PlayerController : MonoBehaviour
     public Vector2 MoveInput { get; set; }
     public Transform CameraTarget { get; private set; }
 
-    // ---- tuning ----
-    const float WalkSpeed = 2.1f;
-    const float RunSpeed = 4.6f;
-    const float SprintMul = 1.35f;
-    const float RotSpeed = 14f;
-    const float Gravity = -30f;
-    const float JumpVel = 9f;
+    // ---- tuning (bisa di-update live oleh ContentUpdater tanpa instal ulang) ----
+    public static float WalkSpeed = 2.1f;
+    public static float RunSpeed = 4.6f;
+    public static float SprintMul = 1.35f;
+    public static float RotSpeed = 14f;
+    public static float Gravity = -30f;
+    public static float JumpVel = 9f;
 
     CharacterController cc;
     PlayerAnimator anim;

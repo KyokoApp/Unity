@@ -65,6 +65,10 @@ public class GameBootstrap : MonoBehaviour
         var ui = uiGO.AddComponent<GameUI>();
         ui.Init(player, lib, orbit);
 
+        // ---- Updater konten in-game (APK = peluncur; konten diunduh live) ----
+        var updater = gameObject.AddComponent<ContentUpdater>();
+        updater.Init(player, ui);
+
         // ---- EventSystem untuk input sentuh ----
         if (FindObjectOfType<EventSystem>() == null)
         {
