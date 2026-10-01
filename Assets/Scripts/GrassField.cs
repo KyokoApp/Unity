@@ -161,7 +161,7 @@ public class GrassField : MonoBehaviour
 
         if (verts.Count == 0)
         {
-            if (tiles.TryGetValue(key, out var old) && old != null) Destroy(old);
+            if (tiles.TryGetValue(key, out var emptyTile) && emptyTile != null) Destroy(emptyTile);
             tiles[key] = null;
             tileGrids[key] = grid;
             return;
