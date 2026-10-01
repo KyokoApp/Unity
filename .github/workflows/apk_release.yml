@@ -86,24 +86,33 @@ jobs:
           fi
 
           echo "Jalankan aktivasi Personal (kredensial lewat env container, log disaring)…"
+          # Runner memakai `bash -e`; errexit dimatikan sementara karena
+          # unity-editor sering exit != 0 meski aktivasi LISENSI-nya sukses
+          # (mis. editor lalu gagal membuka project kosong) — patokan = file .ulf.
+          set +e
           docker run --name unity-activate \
             -e UNITY_EMAIL -e UNITY_PASSWORD \
             "$IMAGE" \
             bash -c 'unity-editor -batchmode -nographics -quit -logFile /dev/stdout -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD"' \
             2>&1 | saring_log
           EDITOR_STATUS=${PIPESTATUS[0]}
+          set -e
 
-          # Unity bisa exit != 0 meski aktivasi sukses — patokan hasil = file .ulf.
-          echo "unity-editor selesai (exit code $EDITOR_STATUS) — periksa $ULF_IN_CONTAINER di container."
+          echo "unity-editor selesai (exit code $EDITOR_STATUS) — ambil isi direktori lisensi dari container."
           TMP_DIR="$(mktemp -d)"
-          if ! docker cp "unity-activate:$ULF_IN_CONTAINER" "$TMP_DIR/Unity_lic.ulf" 2>/dev/null || [ ! -s "$TMP_DIR/Unity_lic.ulf" ]; then
+          if docker cp "unity-activate:/root/.local/share/unity3d/Unity" "$TMP_DIR/UnityLicDir" 2>/dev/null; then
+            ls -la "$TMP_DIR/UnityLicDir" | sed 's/^/[license-dir] /' || true
+          else
+            echo "[license-dir] direktori /root/.local/share/unity3d/Unity tidak ada di container"
+          fi
+          if [ ! -s "$TMP_DIR/UnityLicDir/Unity_lic.ulf" ]; then
             echo "::error::Aktivasi Personal otomatis GAGAL: $ULF_IN_CONTAINER tidak ada/kosong di container (exit code editor: $EDITOR_STATUS). Penyebab umum: UNITY_EMAIL/UNITY_PASSWORD salah, 2FA masih aktif di akun Unity, atau gangguan server Unity. Coba lagi nanti, atau pakai fallback UNITY_LICENSE (.ulf dari Unity Hub) — lihat docs/CARA_SETUP_CI.md."
             docker rm -f unity-activate >/dev/null 2>&1 || true
             rm -rf "$TMP_DIR"
             exit 1
           fi
 
-          tulis_lisensi_ke_env "$TMP_DIR/Unity_lic.ulf"
+          tulis_lisensi_ke_env "$TMP_DIR/UnityLicDir/Unity_lic.ulf"
           rm -rf "$TMP_DIR"
           docker rm -f unity-activate >/dev/null 2>&1 || true
           echo "Aktivasi Personal berhasil — UNITY_LICENSE siap di \$GITHUB_ENV."
