@@ -145,7 +145,9 @@ jobs:
               assert hashlib.sha256(asset.read_bytes()).hexdigest() == pack['sha256'], 'SHA bundle tidak cocok: ' + pack['id']
           print('APK, dua AssetBundle, dan SHA-256 manifest valid.')
           PY
-          cp build/Android/Arpg.apk "build/Android/Arpg-1.0.${{ github.run_number }}.apk"
+          # Unity Builder writes build/Android as root inside its container; keep
+          # the versioned copy in runner-owned build/ so GitHub Actions can create it.
+          cp build/Android/Arpg.apk "build/Arpg-1.0.${{ github.run_number }}.apk"
 
       - name: Terbitkan APK -> release apk-latest
         env:
@@ -157,7 +159,7 @@ jobs:
           gh release view apk-latest >/dev/null 2>&1 || \
             gh release create apk-latest --title "APK Arpg Terbaru" --notes "$NOTES"
           gh release edit apk-latest --notes "$NOTES"
-          gh release upload apk-latest build/Android/Arpg.apk "build/Android/Arpg-1.0.${{ github.run_number }}.apk" --clobber
+          gh release upload apk-latest build/Android/Arpg.apk "build/Arpg-1.0.${{ github.run_number }}.apk" --clobber
 
       - name: Terbitkan konten -> release content-latest
         env:
