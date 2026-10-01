@@ -37,8 +37,12 @@ unduh hasil       ←   Releases / Artifacts   ←──────────
 
 1. Tab **Actions** → pilih **AnimeStudio — Ekstrak Asset Unity** (kiri) → **Run workflow** (kanan)
 2. Isi minimal dua kolom: **game** (mis. `GI`) dan **bundle_url** (tempel link tadi)
-3. **Run workflow** → tunggu **1–5 menit**. Klik run-nya untuk lihat log hidup
+3. **Run workflow** → tunggu. Klik run-nya untuk melihat log hidup
    (`[12/340] Exporting Texture2D: …`)
+
+   ⏱️ *Realistis:* bundle kecil **di bawah 1 menit** (diuji: seluruh pipeline selesai dalam
+   21 detik — runner sudah menyiapkan Windows-nya, CLI-nya sendiri hanya 14 MB). Bundle
+   ratusan MB–GB bisa beberapa menit sampai puluhan menit.
 
 ### 3. Ambil hasilnya
 
@@ -49,6 +53,18 @@ unduh hasil       ←   Releases / Artifacts   ←──────────
 > Karena itu default `publish_release = no` (hasil hanya jadi artifact, tersimpan 3 hari).
 > Kalau mau dipakai rutin untuk asset game lain, **pindahkan workflow ini ke repo PRIVATE** —
 > sekaligus lebih aman dari sisi hak cipta.
+
+### ✅ Sudah diuji di repo ini
+
+| # | Uji | Hasil |
+| --- | --- | --- |
+| 1 | Kick lewat `trigger.json` (dry-run) | ✔ input terbaca, langkah berat di-skip sesuai desain |
+| 2 | Kick lewat `anime.py kick` (eksekusi penuh, input file contoh di repo) | ✔ CLI resmi terunduh, .NET siap, CLI jalan (`Found 1 files → Process Assets → exit 0`), ringkasan + artifact terunggah |
+| 3 | `anime.py pull --run 2` | ✔ artifact terunduh & otomatis dibuka (menghasilkan `cli-log.txt`) |
+| 4 | Guard `bundle_url` kosong | ✔ hanya memberi peringatan, tidak error |
+
+> Uji #2 memakai file teks biasa sebagai "bundle" (bukan bundle Unity sungguhan), jadi hasilnya
+> 0 file — itu wajar. Yang terbukti adalah seluruh rantai pipeline-nya bekerja.
 
 ---
 
@@ -142,7 +158,7 @@ dan hapus/revoke kalau sudah tidak dipakai.
 | Runner Windows | repo **publik** = 4 core / 16 GB / disk 14 GB, **menit gratis tanpa batas** |
 | Lama satu job | maks 6 jam (workflow di-set 300 menit) |
 | Simpan artifact | 3 hari + kuota artifact 500 MB (hasil > 450 MB otomatis lewat Releases) |
-| Waktu tipikal | 1–5 menit per ekstraksi (bundle kecil), bundel GB bisa 20+ menit |
+| Waktu tipikal | < 1 menit untuk bundle kecil (terukur 21 detik), puluhan menit untuk bundle GB |
 
 Disk 14 GB adalah batas paling nyata: bundle 3 GB + hasil 5 GB sudah ketat. Pakai filter `types`
 kalau hasilnya membengkak.
