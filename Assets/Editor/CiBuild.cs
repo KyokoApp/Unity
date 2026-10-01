@@ -23,6 +23,9 @@ public static class CiBuild
     {
         string root = Directory.GetParent(Application.dataPath).FullName;
 
+        // ---- 0) clip lokomosi UAL1 (walk/jog/sprint) -> Resources/UAL1Loco ----
+        ExtractLocomotion.Run();
+
         // ---- versi dari nomor run CI ----
         // unity-builder TIDAK meneruskan GITHUB_RUN_NUMBER ke dalam container,
         // jadi workflow apk-release mengirimnya lewat input customParameters:

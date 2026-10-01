@@ -17,7 +17,8 @@ using UnityEngine;
 ///   -3) + transisi jatuh (fall → Air) → slide tidak lagi "terbang
 ///   melayang"; tidak ada lompat/dobel-lompat di udara; aksi tidak bisa
 ///   dimulai saat tidak menyentuh tanah.
-/// - Lokomosi memakai Walk_Fwd_Loop (bukan walk-carry-box) dengan skala
+/// - Lokomosi 3 tingkat dari UAL1 (Walk/Jog/Sprint_Loop, diekstrak saat build
+///   oleh ExtractLocomotion; fallback Walk_Fwd_Loop UAL2) dengan skala
 ///   kecepatan wajar → animasi kaki sesuai kecepatan gerak.
 /// </summary>
 public class PlayerController : MonoBehaviour
@@ -44,7 +45,11 @@ public class PlayerController : MonoBehaviour
     const int MaxSubSteps = 16;
     const float FallAirTime = 0.12f;  // detik di udara sebelum dianggap jatuh
     const float MaxDelta = 0.1f;      // clamp dt (frame spike)
-    const float AnimWalkRef = 2.7f;   // kecepatan referensi skala animasi walk
+
+    // ---- referensi kecepatan clip lokomosi UAL1 (m/s, perkiraan Quaternius) ----
+    const float WalkRefSpeed = 1.5f;
+    const float JogRefSpeed = 3.2f;
+    const float SprintRefSpeed = 5.0f;
 
     CharacterController cc;
     PlayerAnimator anim;
@@ -304,17 +309,55 @@ public class PlayerController : MonoBehaviour
 
         if (!grounded && CheckFallTransition()) return;   // baru saja jatuh → state Air
 
-        // animasi locomotion (hanya relevan saat membumi)
+        UpdateLocomotionAnim();
+    }
+
+    /// <summary>
+    /// Pilih clip lokomosi sesuai kecepatan: idle → walk → jog → sprint.
+    /// Clip diambil dari UAL1 (diekstrak saat build CI). Bila tidak ada
+    /// (mis. Play di editor tanpa ekstraksi), fallback ke Walk_Fwd_Loop UAL2.
+    /// Kecepatan putar clip diskalakan agar langkah kaki cocok dengan
+    /// kecepatan gerak (tidak "menggosok" lantai / berputar liar).
+    /// </summary>
+    void UpdateLocomotionAnim()
+    {
         if (speedSm < 0.25f)
         {
             anim.Play(lib.Get("Idle_FoldArms_Loop"), true, 1f, 0.2f);
+            return;
+        }
+
+        AnimationClip walk = FirstNotNull(lib.Find("UAL1_Walk_Loop"), lib.Get("Walk_Fwd_Loop"));
+        AnimationClip jog = lib.Find("UAL1_Jog_Loop");
+        AnimationClip sprint = lib.Find("UAL1_Sprint_Loop");
+
+        // Ambang: di atas RunSpeed → sprint (jika ada), di atas ~1.5x WalkSpeed → jog.
+        float jogThreshold = WalkSpeed * 1.5f;
+
+        AnimationClip clip;
+        float refSpeed;
+
+        if (sprint != null && speedSm > RunSpeed)
+        {
+            clip = sprint; refSpeed = SprintRefSpeed;
+        }
+        else if (jog != null && speedSm > jogThreshold)
+        {
+            clip = jog; refSpeed = JogRefSpeed;
         }
         else
         {
-            anim.Play(lib.Get("Walk_Fwd_Loop"), true, 1f, 0.15f);
-            // skala kecepatan wajar: langkah tidak "menggosok" lantai maupun berputar liar
-            anim.SetSpeed(Mathf.Clamp(speedSm / AnimWalkRef, 0.75f, 1.7f));
+            clip = walk; refSpeed = WalkRefSpeed;
         }
+
+        if (clip == null) return;
+        anim.Play(clip, true, 1f, 0.18f);
+        anim.SetSpeed(Mathf.Clamp(speedSm / refSpeed, 0.7f, 1.6f));
+    }
+
+    static AnimationClip FirstNotNull(AnimationClip a, AnimationClip b)
+    {
+        return a != null ? a : b;
     }
 
     void UpdateAir(float dt, Vector3 dir, float mag)

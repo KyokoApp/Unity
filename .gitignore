@@ -41,3 +41,6 @@ Thumbs.db
 *.unitypackage
 *.app
 ExportedObj/
+
+# Clip lokomosi UAL1 hasil ekstraksi saat build (ExtractLocomotion) — jangan di-commit
+/[Aa]ssets/Resources/UAL1Loco/
