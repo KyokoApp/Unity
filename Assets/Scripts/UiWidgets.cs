@@ -6,6 +6,8 @@ using UnityEngine.UI;
 /// <summary>Analog stick virtual: zona sentuh tetap di kiri-bawah, knob mengikuti jari.</summary>
 public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
 {
+    const float DeadZone = 0.15f; // samme ambang sentuh seperti joystick di Godot
+
     public RectTransform knob;
     public float radius = 120f;
     public Vector2 Value { get; private set; }
@@ -28,8 +30,14 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
         Vector2 lp;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, e.position, e.pressEventCamera, out lp))
             return;
-        Value = Vector2.ClampMagnitude(lp / radius, 1f);
-        if (knob != null) knob.anchoredPosition = Value * radius;
+        float safeRadius = Mathf.Max(1f, radius);
+        Vector2 raw = Vector2.ClampMagnitude(lp / safeRadius, 1f);
+        float strength = raw.magnitude;
+        Value = strength <= DeadZone
+            ? Vector2.zero
+            : raw.normalized * ((strength - DeadZone) / (1f - DeadZone));
+        // Knob mengikuti posisi jari; hanya nilai input yang dipotong deadzone.
+        if (knob != null) knob.anchoredPosition = raw * safeRadius;
     }
 }
 

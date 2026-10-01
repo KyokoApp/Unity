@@ -47,8 +47,11 @@ public class PlayerController : MonoBehaviour
     const float MaxDelta = 0.1f;      // clamp dt (frame spike)
 
     // ---- referensi kecepatan clip lokomosi UAL1 (m/s, perkiraan Quaternius) ----
-    const float WalkRefSpeed = 1.5f;
-    const float JogRefSpeed = 3.2f;
+    const float MoveInputThreshold = 0.03f; // joystick sudah punya deadzone 15%; sisa untuk noise numerik
+    const float IdleEnterSpeed = 0.14f;
+    const float IdleExitSpeed = 0.06f;
+    const float WalkRefSpeed = 1.8f;
+    const float JogRefSpeed = 4.0f;
     const float SprintRefSpeed = 5.0f;
 
     CharacterController cc;
@@ -59,7 +62,9 @@ public class PlayerController : MonoBehaviour
     int modelIndex;
 
     enum State { Loco, Air, Land, Action, Slide }
+    enum LocomotionTier { Idle, Walk, Jog, Sprint }
     State state = State.Loco;
+    LocomotionTier locomotionTier = LocomotionTier.Idle;
 
     float vy;
     float airTime;        // lama tidak menyentuh tanah (untuk deteksi jatuh)
@@ -139,6 +144,7 @@ public class PlayerController : MonoBehaviour
         anim.Bind(animator);
         if (sword != null) sword.Attach(animator);
         state = State.Loco;
+        locomotionTier = LocomotionTier.Idle;
         vy = 0f; airTime = 0f; speedSm = 0f;
         anim.Play(lib.Get("Idle_FoldArms_Loop"), true, 1f, 0f);
     }
@@ -314,7 +320,7 @@ public class PlayerController : MonoBehaviour
         Vector2 inp = Vector2.ClampMagnitude(MoveInput, 1f);
         float mag = inp.magnitude;
         Vector3 dir = CamRelative(inp);
-        if (mag > 0.08f) lastMoveDir = dir;
+        if (mag > MoveInputThreshold) lastMoveDir = dir;
 
         // titik aman = membumi di air dangkal/darat (untuk dorongan air dalam)
         if (IslandTerrain.I != null && IsGrounded())
@@ -342,10 +348,11 @@ public class PlayerController : MonoBehaviour
     void UpdateLoco(float dt, Vector2 inp, Vector3 dir, float mag)
     {
         float targetSpeed = 0f;
-        if (mag > 0.08f)
+        if (mag > MoveInputThreshold)
         {
-            float t = Mathf.InverseLerp(0.08f, 1f, mag); // analog: miring dikit = jalan, penuh = lari
-            targetSpeed = Mathf.Lerp(WalkSpeed * 0.55f, RunSpeed, t);
+            // Joystick sudah mengeluarkan besar input 0..1 setelah deadzone;
+            // skala linear menjaga langkah kecil tetap pelan, seperti di Godot.
+            targetSpeed = RunSpeed * mag;
             if (sprint) targetSpeed *= SprintMul;
             RotateToward(dir, dt);
         }
@@ -353,65 +360,88 @@ public class PlayerController : MonoBehaviour
 
         float extra = vy < 0f ? Mathf.Min(0.5f, -vy * dt) : 0f;
         bool grounded = IsGrounded(extra);
-        Vector3 moveDir = mag > 0.08f ? dir : lastMoveDir;
+        Vector3 moveDir = mag > MoveInputThreshold ? dir : lastMoveDir;
+        Vector3 beforeMove = transform.position;
         PhysicsMove(moveDir * speedSm, dt, grounded);
 
         if (!grounded && CheckFallTransition()) return;   // baru saja jatuh → state Air
 
-        UpdateLocomotionAnim();
+        // Sinkronkan irama kaki ke jarak yang benar-benar ditempuh, bukan ke
+        // kecepatan yang diminta joystick (yang bisa beda saat terbentur/di lereng).
+        Vector3 travelled = transform.position - beforeMove;
+        travelled.y = 0f;
+        float actualSpeed = travelled.magnitude / Mathf.Max(dt, 0.0001f);
+        float speedCap = Mathf.Max(RunSpeed, RunSpeed * Mathf.Max(1f, SprintMul)) + 1f;
+        UpdateLocomotionAnim(Mathf.Min(actualSpeed, speedCap));
     }
 
     /// <summary>
-    /// Pilih clip lokomosi sesuai kecepatan: idle → walk → jog → sprint.
-    /// Clip diambil dari UAL1 (diekstrak saat build CI). Bila tidak ada
-    /// (mis. Play di editor tanpa ekstraksi), fallback ke Walk_Fwd_Loop UAL2.
-    /// Kecepatan putar clip diskalakan agar langkah kaki cocok dengan
-    /// kecepatan gerak (tidak "menggosok" lantai / berputar liar).
+    /// Pilih idle/walk/jog/sprint dari kecepatan horizontal aktual. Ambang
+    /// jog memakai hysteresis agar animasi tidak bolak-balik ketika analog
+    /// berada dekat batas; playback rate mengikuti pola Godot dan UAL1.
     /// </summary>
-    void UpdateLocomotionAnim()
+    void UpdateLocomotionAnim(float actualSpeed)
     {
-        if (speedSm < 0.25f)
+        bool shouldIdle = locomotionTier == LocomotionTier.Idle
+            ? actualSpeed < IdleEnterSpeed
+            : actualSpeed < IdleExitSpeed;
+        if (shouldIdle)
         {
-            anim.Play(lib.Get("Idle_FoldArms_Loop"), true, 1f, 0.2f);
+            locomotionTier = LocomotionTier.Idle;
+            AnimationClip idle = lib.Find("Idle_FoldArms_Loop");
+            if (idle != null) anim.Play(idle, true, 1f, 0.18f);
             return;
         }
 
-        AnimationClip walk = FirstNotNull(lib.Find("UAL1_Walk_Loop"), lib.Get("Walk_Fwd_Loop"));
+        AnimationClip walk = lib.Find("UAL1_Walk_Loop");
+        if (walk == null) walk = lib.Find("Walk_Fwd_Loop");
         AnimationClip jog = lib.Find("UAL1_Jog_Loop");
-        AnimationClip sprint = lib.Find("UAL1_Sprint_Loop");
+        AnimationClip sprintClip = lib.Find("UAL1_Sprint_Loop");
+        if (walk == null) return;
 
-        // Ambang: di atas RunSpeed → sprint (jika ada), di atas ~1.5x WalkSpeed → jog.
-        float jogThreshold = WalkSpeed * 1.5f;
+        float jogEnter = Mathf.Max(2.8f, WalkSpeed * 1.33f);
+        float jogExit = Mathf.Max(2.4f, WalkSpeed * 1.14f);
+        float sprintEnter = Mathf.Max(RunSpeed, jogEnter + 0.1f);
+        float sprintExit = Mathf.Max(jogExit, sprintEnter * 0.9f);
+        bool wasJogging = locomotionTier == LocomotionTier.Jog
+            || locomotionTier == LocomotionTier.Sprint;
+        bool keepSprinting = sprintClip != null
+            && locomotionTier == LocomotionTier.Sprint
+            && actualSpeed >= sprintExit;
+        bool beginSprinting = sprintClip != null && sprint && actualSpeed >= sprintEnter;
+
+        if (keepSprinting || beginSprinting)
+            locomotionTier = LocomotionTier.Sprint;
+        else if (jog != null && (wasJogging ? actualSpeed >= jogExit : actualSpeed >= jogEnter))
+            locomotionTier = LocomotionTier.Jog;
+        else
+            locomotionTier = LocomotionTier.Walk;
 
         AnimationClip clip;
         float refSpeed;
-
-        if (sprint != null && speedSm > RunSpeed)
+        float minRate;
+        float maxRate;
+        switch (locomotionTier)
         {
-            clip = sprint; refSpeed = SprintRefSpeed;
-        }
-        else if (jog != null && speedSm > jogThreshold)
-        {
-            clip = jog; refSpeed = JogRefSpeed;
-        }
-        else
-        {
-            clip = walk; refSpeed = WalkRefSpeed;
+            case LocomotionTier.Sprint:
+                clip = sprintClip; refSpeed = SprintRefSpeed; minRate = 0.6f; maxRate = 1.3f;
+                break;
+            case LocomotionTier.Jog:
+                clip = jog; refSpeed = JogRefSpeed; minRate = 0.6f; maxRate = 1.3f;
+                break;
+            default:
+                clip = walk; refSpeed = WalkRefSpeed; minRate = 0.25f; maxRate = 1.5f;
+                break;
         }
 
         if (clip == null) return;
-        anim.Play(clip, true, 1f, 0.18f);
-        anim.SetSpeed(Mathf.Clamp(speedSm / refSpeed, 0.7f, 1.6f));
-    }
-
-    static AnimationClip FirstNotNull(AnimationClip a, AnimationClip b)
-    {
-        return a != null ? a : b;
+        float playbackRate = Mathf.Clamp(actualSpeed / refSpeed, minRate, maxRate);
+        anim.Play(clip, true, playbackRate, 0.18f);
     }
 
     void UpdateAir(float dt, Vector3 dir, float mag)
     {
-        if (mag > 0.08f) RotateToward(dir, dt * 0.6f);
+        if (mag > MoveInputThreshold) RotateToward(dir, dt * 0.6f);
         Vector3 move = dir * (mag * Mathf.Max(speedSm, RunSpeed * 0.75f));
         PhysicsMove(move, dt, false);   // di udara gravitasi penuh, tanpa stick
 
