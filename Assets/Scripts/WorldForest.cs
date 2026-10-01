@@ -64,7 +64,7 @@ public class WorldForest : MonoBehaviour
         foreach (var kv in tiles)
         {
             int x = (int)(kv.Key >> 32), z = (int)(kv.Key & 0xFFFFFFFF);
-            if (Mathf.Max(Mathf.Abs(x - c.x), Mathf.Abs(z - c.z)) > Radius) dead.Add(kv.Key);
+            if (Mathf.Max(Mathf.Abs(x - c.x), Mathf.Abs(z - c.y)) > Radius) dead.Add(kv.Key);
         }
         for (int i = 0; i < dead.Count; i++)
         {
@@ -74,7 +74,7 @@ public class WorldForest : MonoBehaviour
             tileCounts.Remove(dead[i]);
         }
         var order = new List<long>();
-        for (int z = c.z - Radius; z <= c.z + Radius; z++)
+        for (int z = c.y - Radius; z <= c.y + Radius; z++)
             for (int x = c.x - Radius; x <= c.x + Radius; x++)
                 if (!tiles.ContainsKey(Key(x, z))) order.Add(Key(x, z));
         order.Sort((a, b) => Dist(a, c).CompareTo(Dist(b, c)));
@@ -84,7 +84,7 @@ public class WorldForest : MonoBehaviour
     static float Dist(long key, Vector2Int c)
     {
         int x = (int)(key >> 32), z = (int)(key & 0xFFFFFFFF);
-        return (x - c.x) * (x - c.x) + (z - c.z) * (z - c.z);
+        return (x - c.x) * (x - c.x) + (z - c.y) * (z - c.y);
     }
 
     bool CanPlace(float x, float z, bool tree)

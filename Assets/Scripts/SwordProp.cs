@@ -61,7 +61,7 @@ public class SwordProp : MonoBehaviour
         var hand = animator.GetBoneTransform(HumanBodyBones.RightHand);
         if (hand == null) return;
         var fwd = transform.forward;
-        root.position = hand.position + fwd * 0.09f;
-        root.rotation = Quaternion.LookRotation(fwd, Vector3.up) * Quaternion.Euler(6f, 0f, 0f);
+        root.transform.position = hand.position + fwd * 0.09f;
+        root.transform.rotation = Quaternion.LookRotation(fwd, Vector3.up) * Quaternion.Euler(6f, 0f, 0f);
     }
 }
