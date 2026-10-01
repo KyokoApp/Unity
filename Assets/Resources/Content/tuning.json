@@ -1,11 +1,11 @@
 {
-  "motd": "✅ Updater in-game AKTIF — tuning ini diunduh otomatis dari release content-latest, tanpa instal ulang APK!",
+  "motd": "🌳 World nature AKTIF — hutan, semak, batu & padang rumput (CC0 Kenney). Tuning ini diunduh otomatis dari release content-latest, tanpa instal ulang APK!",
   "walkSpeed": 2.1,
   "runSpeed": 4.6,
   "sprintMul": 1.35,
   "jumpVel": 9.0,
-  "gridBase": "#EDF1F6",
-  "gridLine": "#A1AEC0",
-  "gridMajor": "#61738F",
-  "fog": "#BFD1E6"
+  "gridBase": "#6B9454",
+  "gridLine": "#61874C",
+  "gridMajor": "#547842",
+  "fog": "#B8D1B3"
 }
