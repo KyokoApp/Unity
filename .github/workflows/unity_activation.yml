@@ -3,7 +3,11 @@ name: unity-activation
 ## untuk mendapat file .alf. Lalu ikuti docs/CARA_SETUP_CI.md untuk menukarnya
 ## menjadi lisensi .ulf dan mengisi secrets repo.
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/unity_activation.yml"
 
 jobs:
   activation:
