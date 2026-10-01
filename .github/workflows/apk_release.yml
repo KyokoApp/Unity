@@ -38,13 +38,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      - uses: actions/checkout@v4
+
       - name: Siapkan lisensi Unity
         env:
           UNITY_LICENSE_SECRET: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: bash .github/unity-builder-steps/prepare_license.sh
-      - uses: actions/checkout@v4
 
       - name: Cache Library (percepat build berikutnya)
         uses: actions/cache@v4
