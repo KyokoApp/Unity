@@ -182,7 +182,7 @@ jobs:
           if [ "${SIM_LIC_MODE:-ulf}" = ulf ]; then
             LIC=(-v /tmp/ulf/Unity_lic.ulf:/root/.local/share/unity3d/Unity/Unity_lic.ulf:ro); AUTH=()
           else
-            LIC=(); AUTH=(-serial "$UNITY_SERIAL" -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD")
+            LIC=(); AUTH=(-username "$UNITY_EMAIL" -password "$UNITY_PASSWORD")  # login Personal => entitlement aktif otomatis; JANGAN pakai -serial
           fi
           docker run --rm "${LIC[@]}" -v "$PWD":/project "$IMG" \
             unity-editor -batchmode -nographics -buildTarget StandaloneLinux64 \
@@ -202,7 +202,7 @@ jobs:
           if [ "${SIM_LIC_MODE:-ulf}" = ulf ]; then
             LIC=(-v /tmp/ulf/Unity_lic.ulf:/root/.local/share/unity3d/Unity/Unity_lic.ulf:ro); AUTH=()
           else
-            LIC=(); AUTH=(-serial "$UNITY_SERIAL" -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD")
+            LIC=(); AUTH=(-username "$UNITY_EMAIL" -password "$UNITY_PASSWORD")  # login Personal => entitlement aktif otomatis; JANGAN pakai -serial
           fi
           docker run --rm \
             -e DISPLAY=:99 \
