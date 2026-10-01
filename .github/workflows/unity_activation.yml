@@ -1,7 +1,8 @@
 name: unity-activation
-## Jalankan SEKALI secara manual (tab Actions -> unity-activation -> Run workflow)
-## untuk mendapat file .alf. Lalu ikuti docs/CARA_SETUP_CI.md untuk menukarnya
-## menjadi lisensi .ulf dan mengisi secrets repo.
+## Membuat file aktivasi Unity (.alf) memakai image resmi unityci/editor,
+## lalu meng-commit .alf ke branch ini agar mudah diambil.
+## Tukarkan .alf -> .ulf di https://license.unity3d.com/manual
+## lalu isi secrets repo (lihat docs/CARA_SETUP_CI.md).
 
 on:
   workflow_dispatch:
@@ -9,18 +10,35 @@ on:
     paths:
       - ".github/workflows/unity_activation.yml"
 
+permissions:
+  contents: write
+
 jobs:
   activation:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Minta file aktivasi Unity (.alf)
-        id: request
-        uses: game-ci/unity-request-activation-file@v2
-        with:
-          unityVersion: 2022.3.45f1
+      - uses: actions/checkout@v4
+
+      - name: Buat .alf via unityci/editor (2022.3.45f1)
+        run: |
+          docker run --rm -v "$PWD:/project" -w /project \
+            unityci/editor:ubuntu-2022.3.45f1-base-3 \
+            unity-editor -batchmode -nographics -quit \
+            -createManualActivationFile -logFile /dev/stdout || true
+          ls -la *.alf
+          test -f Unity_v2022.3.45f1.alf
 
       - name: Unggah .alf sebagai artifact
         uses: actions/upload-artifact@v4
         with:
           name: unity-activation-file
-          path: ${{ steps.request.outputs.filePath }}
+          path: "*.alf"
+
+      - name: Commit .alf ke branch (agar mudah disalin)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f Unity_v2022.3.45f1.alf
+          git commit -m "ci: file aktivasi Unity (.alf) — tukar ke .ulf di license.unity3d.com"
+          git push
