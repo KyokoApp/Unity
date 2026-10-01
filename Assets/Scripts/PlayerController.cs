@@ -4,6 +4,21 @@ using UnityEngine;
 /// Kontrol karakter untuk Android: analog kiri untuk gerak (walk -> run sesuai
 /// kemiringan analog), tombol LOMPAT / SERANG (combo pedang) / SLIDE / LARI,
 /// plus pemutaran semua animasi UAL2 dari panel ANIMASI.
+///
+/// Perbaikan fisika & state machine (laporan lapangan: lompat kadang stuck,
+/// slide malah terbang, animasi tidak sesuai, kadang tembus tanah):
+/// - Gerakan di-substep (maks 0.25 m per cc.Move) + kecepatan jatuh dibatasi
+///   (terminal velocity) + dt di-clamp → tidak bisa lagi menembus lantai
+///   walau frame spike.
+/// - Probe tanah raycast (bukan hanya cc.isGrounded yang bisa flicker) →
+///   landing terdeteksi pasti; ada failsafe: bila player sampai di bawah
+///   lantai (y &lt; -0.4) langsung dikembalikan ke permukaan.
+/// - Gravitasi nyata di SEMUA state (Slide/Action/Land ikut vy, bukan konstan
+///   -3) + transisi jatuh (fall → Air) → slide tidak lagi "terbang
+///   melayang"; tidak ada lompat/dobel-lompat di udara; aksi tidak bisa
+///   dimulai saat tidak menyentuh tanah.
+/// - Lokomosi memakai Walk_Fwd_Loop (bukan walk-carry-box) dengan skala
+///   kecepatan wajar → animasi kaki sesuai kecepatan gerak.
 /// </summary>
 public class PlayerController : MonoBehaviour
 {
@@ -19,6 +34,18 @@ public class PlayerController : MonoBehaviour
     public static float Gravity = -30f;
     public static float JumpVel = 9f;
 
+    // ---- konstanta fisika ----
+    const float GroundY = 0f;         // puncak lantai selalu y=0 (WorldGrid)
+    const float TerminalVel = -18f;   // batas kecepatan jatuh (m/s)
+    const float GroundStick = -3f;    // dorongan ke bawah saat membumi
+    const float ProbeLen = 0.28f;     // panjang sinar probe tanah
+    const float ProbeMargin = 0.10f;
+    const float MaxStepDist = 0.25f;  // perpindahan maks per substep cc.Move
+    const int MaxSubSteps = 16;
+    const float FallAirTime = 0.12f;  // detik di udara sebelum dianggap jatuh
+    const float MaxDelta = 0.1f;      // clamp dt (frame spike)
+    const float AnimWalkRef = 2.7f;   // kecepatan referensi skala animasi walk
+
     CharacterController cc;
     PlayerAnimator anim;
     AnimLibrary lib;
@@ -30,6 +57,7 @@ public class PlayerController : MonoBehaviour
     State state = State.Loco;
 
     float vy;
+    float airTime;        // lama tidak menyentuh tanah (untuk deteksi jatuh)
     float speedSm;
     bool sprint;
     Vector3 lastMoveDir = Vector3.forward;
@@ -99,6 +127,7 @@ public class PlayerController : MonoBehaviour
 
         anim.Bind(animator);
         state = State.Loco;
+        vy = 0f; airTime = 0f; speedSm = 0f;
         anim.Play(lib.Get("Idle_FoldArms_Loop"), true, 1f, 0f);
     }
 
@@ -109,7 +138,9 @@ public class PlayerController : MonoBehaviour
     public void OnJump()
     {
         if (state == State.Air) return;
+        if (!IsGrounded()) return;   // tidak ada "dobel lompat" saat jatuh
         vy = JumpVel;
+        airTime = 0f;
         state = State.Air;
         anim.Play(lib.Get("NinjaJump_Start"), false, 1.25f, 0.08f);
     }
@@ -117,6 +148,7 @@ public class PlayerController : MonoBehaviour
     public void OnAttack()
     {
         if (state == State.Air) return;
+        if (!IsGrounded()) return;
         if (state == State.Action && IsComboKey(actionKey))
         {
             comboQueued = true; // lanjut combo A -> B -> C
@@ -130,8 +162,10 @@ public class PlayerController : MonoBehaviour
     public void OnSlide()
     {
         if (state == State.Air || state == State.Slide) return;
+        if (!IsGrounded()) return;   // tidak ada slide "melayang" di udara
         state = State.Slide;
         slidePhase = 0;
+        airTime = 0f;
         slideDir = lastMoveDir.sqrMagnitude > 0.01f ? lastMoveDir : transform.forward;
         slideDir.y = 0f; slideDir.Normalize();
         transform.rotation = Quaternion.LookRotation(slideDir);
@@ -142,6 +176,7 @@ public class PlayerController : MonoBehaviour
     public void PlayLibraryClip(string key)
     {
         if (state == State.Air) return;
+        if (!IsGrounded()) return;
         comboQueued = false;
         StartAction(key, AnimLibrary.IsLoop(key), 1f);
     }
@@ -164,12 +199,76 @@ public class PlayerController : MonoBehaviour
         return false;
     }
 
+    // ================= FISIKA: TANAH & GERAK =================
+
+    /// <summary>
+    /// Menyentuh tanah? Kombinasi cc.isGrounded (kadang flicker) + raycast
+    /// pendek ke bawah. `extra` = jarak tambahan saat jatuh cepat supaya
+    /// landing terdeteksi dalam frame yang sama (anti tunneling).
+    /// </summary>
+    bool IsGrounded(float extra = 0f)
+    {
+        if (cc.isGrounded) return true;
+        float bottom = cc.center.y - cc.height * 0.5f;
+        Vector3 origin = transform.position + Vector3.up * (bottom + ProbeLen);
+        return Physics.Raycast(origin, Vector3.down, ProbeLen + ProbeMargin + extra);
+    }
+
+    /// <summary>
+    /// Integrasi gravitasi + cc.Move di-substep (perpindahan per step ≤ 0.25 m)
+    /// supaya tidak pernah menembus lantai walau dt besar, lalu failsafe
+    /// absolut: dunia datar di y=0, bila player berada di bawahnya → pulihkan.
+    /// </summary>
+    void PhysicsMove(Vector3 horizontal, float dt, bool grounded)
+    {
+        if (grounded) { vy = GroundStick; airTime = 0f; }
+        else { vy = Mathf.Max(vy + Gravity * dt, TerminalVel); airTime += dt; }
+
+        Vector3 d = (horizontal + Vector3.up * vy) * dt;
+        float dist = d.magnitude;
+        int steps = dist > MaxStepDist ? Mathf.CeilToInt(dist / MaxStepDist) : 1;
+        if (steps > MaxSubSteps) steps = MaxSubSteps;
+        Vector3 sd = d / steps;
+        for (int i = 0; i < steps; i++) cc.Move(sd);
+
+        if (transform.position.y < GroundY - 0.4f)
+        {
+            Debug.LogWarning("[UAL2] Failsafe: player tembus lantai — dikembalikan ke permukaan.");
+            transform.position = new Vector3(transform.position.x, GroundY + 0.05f, transform.position.z);
+            vy = 0f; airTime = 0f;
+            EnterLand();
+        }
+    }
+
+    /// <summary>Masuk state jatuh (bukan lompat): langsung pose udara loop.</summary>
+    void EnterFall()
+    {
+        state = State.Air;
+        anim.Play(lib.Get("NinjaJump_Idle_Loop"), true, 1f, 0.12f);
+    }
+
+    void EnterLand()
+    {
+        state = State.Land;
+        landTimer = 0.28f;
+        vy = 0f; airTime = 0f;
+        anim.Play(lib.Get("NinjaJump_Land"), false, 1.35f, 0.05f);
+    }
+
+    /// <summary>Bila sedang tidak membumi cukup lama dan menurun → jatuh.</summary>
+    bool CheckFallTransition()
+    {
+        if (airTime > FallAirTime && vy < 0f) { EnterFall(); return true; }
+        return false;
+    }
+
     // ================= UPDATE =================
 
     void Update()
     {
         float dt = Time.deltaTime;
         if (dt <= 0f) return;
+        if (dt > MaxDelta) dt = MaxDelta;   // frame spike: clamp, substep menangani sisanya
 
         Vector2 inp = Vector2.ClampMagnitude(MoveInput, 1f);
         float mag = inp.magnitude;
@@ -198,47 +297,49 @@ public class PlayerController : MonoBehaviour
         }
         speedSm = Mathf.MoveTowards(speedSm, targetSpeed, 20f * dt);
 
-        vy = cc.isGrounded ? -3f : vy + Gravity * dt;
+        float extra = vy < 0f ? Mathf.Min(0.5f, -vy * dt) : 0f;
+        bool grounded = IsGrounded(extra);
         Vector3 moveDir = mag > 0.08f ? dir : lastMoveDir;
-        cc.Move((moveDir * speedSm + Vector3.up * vy) * dt);
+        PhysicsMove(moveDir * speedSm, dt, grounded);
 
-        // animasi locomotion
+        if (!grounded && CheckFallTransition()) return;   // baru saja jatuh → state Air
+
+        // animasi locomotion (hanya relevan saat membumi)
         if (speedSm < 0.25f)
         {
             anim.Play(lib.Get("Idle_FoldArms_Loop"), true, 1f, 0.2f);
         }
         else
         {
-            anim.Play(lib.Get("Walk_Carry_Loop"), true, 1f, 0.15f);
-            anim.SetSpeed(Mathf.Clamp(speedSm / 2.0f, 0.7f, 2.6f));
+            anim.Play(lib.Get("Walk_Fwd_Loop"), true, 1f, 0.15f);
+            // skala kecepatan wajar: langkah tidak "menggosok" lantai maupun berputar liar
+            anim.SetSpeed(Mathf.Clamp(speedSm / AnimWalkRef, 0.75f, 1.7f));
         }
     }
 
     void UpdateAir(float dt, Vector3 dir, float mag)
     {
-        vy += Gravity * dt;
         if (mag > 0.08f) RotateToward(dir, dt * 0.6f);
         Vector3 move = dir * (mag * Mathf.Max(speedSm, RunSpeed * 0.75f));
-        cc.Move((move + Vector3.up * vy) * dt);
+        PhysicsMove(move, dt, false);   // di udara gravitasi penuh, tanpa stick
 
         if (anim.IsDone())
             anim.Play(lib.Get("NinjaJump_Idle_Loop"), true, 1f, 0.12f);
 
-        if (cc.isGrounded && vy <= 0f)
-        {
-            vy = -3f;
-            state = State.Land;
-            landTimer = 0.3f;
-            anim.Play(lib.Get("NinjaJump_Land"), false, 1.35f, 0.05f);
-        }
+        if (vy <= 0f && IsGrounded(0.06f))
+            EnterLand();
     }
 
     void UpdateLand(float dt, float mag)
     {
         landTimer -= dt;
         speedSm = Mathf.MoveTowards(speedSm, 0f, 10f * dt);
-        cc.Move((lastMoveDir * speedSm + Vector3.up * -3f) * dt);
-        if (landTimer <= 0f || (mag > 0.4f && landTimer < 0.18f))
+
+        bool grounded = IsGrounded();
+        PhysicsMove(lastMoveDir * speedSm, dt, grounded);
+        if (!grounded && CheckFallTransition()) return;
+
+        if (landTimer <= 0f || (mag > 0.4f && landTimer < 0.16f))
             state = State.Loco;
     }
 
@@ -246,7 +347,10 @@ public class PlayerController : MonoBehaviour
     {
         actionTime += dt;
         speedSm = Mathf.MoveTowards(speedSm, 0f, 14f * dt);
-        cc.Move((lastMoveDir * speedSm + Vector3.up * -3f) * dt);
+
+        bool grounded = IsGrounded();
+        PhysicsMove(lastMoveDir * speedSm, dt, grounded);
+        if (!grounded && CheckFallTransition()) return;   // aksi dibatalkan oleh jatuh
 
         if (!actionLoop && anim.IsDone())
         {
@@ -300,7 +404,10 @@ public class PlayerController : MonoBehaviour
                 }
                 break;
         }
-        cc.Move((slideDir * spd + Vector3.up * -3f) * dt);
+
+        bool grounded = IsGrounded();
+        PhysicsMove(slideDir * spd, dt, grounded);   // gravitasi nyata: tidak melayang lagi
+        if (!grounded) CheckFallTransition();
     }
 
     // ================= UTIL =================
