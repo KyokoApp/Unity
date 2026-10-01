@@ -247,6 +247,11 @@ jobs:
           buildMethod: CiBuild.BuildAll
           versioning: None
           allowDirtyBuild: true
+          # unity-builder tidak meneruskan GITHUB_RUN_NUMBER ke dalam container;
+          # CiBuild.BuildAll membaca "-runNumber <n>" dari argumen CLI editor
+          # (build.sh meneruskan $CUSTOM_PARAMETERS ke unity-editor) supaya
+          # contentVersion/appVersion/versionCode naik tiap build.
+          customParameters: '-runNumber ${{ github.run_number }}'
 
       - name: Pastikan hasil build ada
         run: |

@@ -24,8 +24,25 @@ public static class CiBuild
         string root = Directory.GetParent(Application.dataPath).FullName;
 
         // ---- versi dari nomor run CI ----
+        // unity-builder TIDAK meneruskan GITHUB_RUN_NUMBER ke dalam container,
+        // jadi workflow apk-release mengirimnya lewat input customParameters:
+        // "-runNumber <n>" (build.sh meneruskannya sebagai argumen CLI editor).
+        // Fallback: env GITHUB_RUN_NUMBER (build manual/lokal) lalu 0.
         int run = 0;
-        int.TryParse(Environment.GetEnvironmentVariable("GITHUB_RUN_NUMBER") ?? "0", out run);
+        string[] cliArgs = Environment.GetCommandLineArgs();
+        for (int i = 0; i < cliArgs.Length - 1; i++)
+        {
+            int parsedRun;
+            if (cliArgs[i] == "-runNumber" && int.TryParse(cliArgs[i + 1], out parsedRun) && parsedRun > 0)
+            {
+                run = parsedRun;
+            }
+        }
+        if (run <= 0)
+        {
+            int.TryParse(Environment.GetEnvironmentVariable("GITHUB_RUN_NUMBER") ?? "0", out run);
+        }
+        if (run < 0) run = 0;
         string appVersion = "1.0." + run;
         PlayerSettings.bundleVersion = appVersion;
         PlayerSettings.Android.bundleVersionCode = Mathf.Max(1, run);

@@ -91,6 +91,13 @@ APK (peluncur, instal sekali)
        └─ gagal/offline?              → pakai cache / bawaan APK, game tetap jalan
 ```
 
+`contentVersion` (dan `appVersion`/`versionCode` APK) = **nomor run CI**
+(`github.run_number`). Catatan teknis: unity-builder tidak meneruskan
+`GITHUB_RUN_NUMBER` ke dalam container build, jadi workflow mengirimnya lewat
+input `customParameters: '-runNumber <n>'` yang diteruskan `build.sh` sebagai
+argumen CLI editor dan dibaca `CiBuild.BuildAll`. Tanpa ini, `contentVersion`
+stuck di 0 dan updater in-game tidak akan pernah mengunduh apa pun.
+
 Yang bisa di-update tanpa instal ulang APK:
 
 - `Assets/Resources/Content/tuning.json` — MOTD, kecepatan jalan/lari/lompat,
