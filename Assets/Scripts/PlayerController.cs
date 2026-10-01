@@ -51,8 +51,8 @@ public class PlayerController : MonoBehaviour
 
     // ---- referensi kecepatan clip lokomosi UAL1 (m/s, perkiraan Quaternius) ----
     const float MoveInputThreshold = 0.03f; // joystick sudah punya deadzone 15%; sisa untuk noise numerik
-    const float IdleEnterSpeed = 0.14f;
-    const float IdleExitSpeed = 0.06f;
+    const float IdleEnterSpeed = 0.06f; // locomotion -> idle
+    const float IdleExitSpeed = 0.14f;  // idle -> locomotion
     const float WalkRefSpeed = 1.8f;
     const float JogRefSpeed = 4.0f;
     const float SprintRefSpeed = 5.0f;
@@ -386,8 +386,8 @@ public class PlayerController : MonoBehaviour
     void UpdateLocomotionAnim(float actualSpeed)
     {
         bool shouldIdle = locomotionTier == LocomotionTier.Idle
-            ? actualSpeed < IdleEnterSpeed
-            : actualSpeed < IdleExitSpeed;
+            ? actualSpeed < IdleExitSpeed
+            : actualSpeed < IdleEnterSpeed;
         if (shouldIdle)
         {
             locomotionTier = LocomotionTier.Idle;
@@ -409,6 +409,7 @@ public class PlayerController : MonoBehaviour
         bool wasJogging = locomotionTier == LocomotionTier.Jog
             || locomotionTier == LocomotionTier.Sprint;
         bool keepSprinting = sprintClip != null
+            && sprint
             && locomotionTier == LocomotionTier.Sprint
             && actualSpeed >= sprintExit;
         bool beginSprinting = sprintClip != null && sprint && actualSpeed >= sprintEnter;

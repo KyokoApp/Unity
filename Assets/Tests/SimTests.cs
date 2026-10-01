@@ -287,10 +287,19 @@ public class SimTests
         if (sprint != null) Assert.AreSame(sprint, panim.CurrentClip, "sprint harus memilih Sprint_Loop");
         else Debug.LogWarning("[SIM] UAL1 Sprint belum diekstrak; tahap Sprint dilewati.");
 
+        // LARI adalah toggle; mematikannya saat analog tetap penuh harus
+        // beralih dari Sprint ke Jog/Walk, bukan tertahan di clip Sprint.
         player.SetSprint(false);
+        yield return new WaitForSeconds(0.35f);
+        Debug.Log("[SIM] sprint dilepas clip=" + Clip());
+        if (sprint != null)
+            Assert.AreNotSame(sprint, panim.CurrentClip, "clip Sprint tetap aktif setelah toggle LARI dimatikan");
+        if (jog != null)
+            Assert.AreSame(jog, panim.CurrentClip, "setelah sprint dilepas, kecepatan normal harus memilih Jog");
+
         player.MoveInput = Vector2.zero;
+        yield return new WaitForSeconds(0.7f);
         Shot("08_lokomosi_bertingkat");
-        yield return null;
     }
 
     [UnityTest]
