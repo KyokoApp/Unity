@@ -142,12 +142,25 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: bash .github/unity-builder-steps/prepare_license.sh
 
-      - name: Tulis .ulf untuk mount ke container
+      - name: Siapkan lisensi container (ulf mount ATAU serial)
+        env:
+          UNITY_LICENSE: ${{ env.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ env.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/ulf
-          printf '%s\n' "$UNITY_LICENSE" > /tmp/ulf/Unity_lic.ulf
-          ls -la /tmp/ulf
+          if [ -n "${UNITY_LICENSE:-}" ]; then
+            printf '%s\n' "$UNITY_LICENSE" > /tmp/ulf/Unity_lic.ulf
+            echo "SIM_LIC_MODE=ulf" >> "$GITHUB_ENV"
+            echo "Lisensi sim: mount Unity_lic.ulf"
+          else
+            echo "SIM_LIC_MODE=serial" >> "$GITHUB_ENV"
+            echo "::add-mask::${UNITY_SERIAL:-}"
+            echo "::add-mask::${UNITY_PASSWORD:-}"
+            echo "Lisensi sim: aktivasi -serial di dalam container"
+          fi
 
       - name: Cache Library (sim)
         uses: actions/cache@v4
@@ -159,30 +172,45 @@ jobs:
             Library-Android-
 
       - name: Prep aset generated (ExtractLocomotion + ImportWorld)
+        env:
+          UNITY_SERIAL: ${{ env.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: |
           set -euo pipefail
-          docker run --rm \
-            -v "$PWD":/project \
-            -v /tmp/ulf/Unity_lic.ulf:/root/.local/share/unity3d/Unity/Unity_lic.ulf:ro \
-            unityci/editor:ubuntu-2022.3.45f1-base-3 \
+          IMG=unityci/editor:ubuntu-2022.3.45f1-base-3
+          if [ "${SIM_LIC_MODE:-ulf}" = ulf ]; then
+            LIC=(-v /tmp/ulf/Unity_lic.ulf:/root/.local/share/unity3d/Unity/Unity_lic.ulf:ro); AUTH=()
+          else
+            LIC=(); AUTH=(-serial "$UNITY_SERIAL" -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD")
+          fi
+          docker run --rm "${LIC[@]}" -v "$PWD":/project "$IMG" \
             unity-editor -batchmode -nographics -buildTarget StandaloneLinux64 \
-              -projectPath /project -executeMethod CiBuild.PrepSim -logFile -
+              -projectPath /project "${AUTH[@]}" -executeMethod CiBuild.PrepSim -logFile -
 
       - name: Jalankan tes PlayMode headless (xvfb) + screenshot
+        env:
+          UNITY_SERIAL: ${{ env.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: |
           set -uo pipefail
           mkdir -p build/simshots
           Xvfb :99 -screen 0 1280x720x24 >/tmp/xvfb.log 2>&1 &
           sleep 3
+          IMG=unityci/editor:ubuntu-2022.3.45f1-base-3
+          if [ "${SIM_LIC_MODE:-ulf}" = ulf ]; then
+            LIC=(-v /tmp/ulf/Unity_lic.ulf:/root/.local/share/unity3d/Unity/Unity_lic.ulf:ro); AUTH=()
+          else
+            LIC=(); AUTH=(-serial "$UNITY_SERIAL" -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD")
+          fi
           docker run --rm \
             -e DISPLAY=:99 \
             -v /tmp/.X11-unix:/tmp/.X11-unix \
-            -v "$PWD":/project \
-            -v /tmp/ulf/Unity_lic.ulf:/root/.local/share/unity3d/Unity/Unity_lic.ulf:ro \
-            unityci/editor:ubuntu-2022.3.45f1-base-3 \
+            -v "$PWD":/project "${LIC[@]}" "$IMG" \
             unity-editor -batchmode -buildTarget StandaloneLinux64 -projectPath /project \
-              -testPlatform PlayMode -runTests -testResults /project/build/sim-results.xml \
-              -logFile - | tail -40
+              "${AUTH[@]}" -testPlatform PlayMode -runTests \
+              -testResults /project/build/sim-results.xml -logFile - | tail -40
           true
 
       - name: Evaluasi hasil tes
