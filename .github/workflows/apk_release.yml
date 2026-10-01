@@ -105,7 +105,6 @@ jobs:
           buildMethod: CiBuild.BuildAll
           versioning: None
           allowDirtyBuild: true
-          androidAppBundle: false
           androidKeystoreName: arpg-release.keystore
           androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
