@@ -1,21 +1,43 @@
-# Godot
-.godot/
-*.import
-*.translation
+# ===== Unity =====
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]serSettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Crashlytics / addressables / dll
+/[Aa]ssets/AddressableAssetsData/*/*.bin*
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+sysinfo.txt
+crashlytics-build.properties
+
+# IDE / OS
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.DS_Store
+Thumbs.db
+
 # Build output
-*.pck
 *.apk
 *.aab
-*.keystore
-server/packs/
-artifacts/
-# Tools / scratch
-__pycache__/
-assets_src/
-*.log
-.DS_Store
-dev_probe/
-!project/dev_probe/
-project/dev_probe/*
-!project/dev_probe/fire_attack_check.gd
-!project/dev_probe/visual_proof.gd
+*.unitypackage
+*.app
+ExportedObj/
