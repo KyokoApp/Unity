@@ -40,6 +40,19 @@ public class GameBootstrap : MonoBehaviour
 
         world.target = playerGO.transform;
 
+        // ---- hutan prosedural: nature CC0 (Kenney) dari repo Godot, dikonversi saat build ----
+        var forestGO = new GameObject("WorldForest");
+        var forest = forestGO.AddComponent<WorldForest>();
+        forest.target = playerGO.transform;
+        forest.LoadAssets();
+
+        // ---- look ground: padang rumput stylized (bukan grid abu-abu) ----
+        WorldGrid.ApplyLook(
+            new Color(0.42f, 0.58f, 0.33f),  // base rumput
+            new Color(0.38f, 0.53f, 0.30f),  // garis grid halus
+            new Color(0.33f, 0.47f, 0.26f),  // garis utama
+            new Color(0.72f, 0.82f, 0.70f)); // fog/cakrawala lembut
+
         // ---- Kamera orbit (third person) ----
         var cam = Camera.main;
         if (cam == null)

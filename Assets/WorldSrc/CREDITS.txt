@@ -1,0 +1,7 @@
+World nature assets (pohon, bush, batu, pakis, bunga, tekstur):
+  Kenney Nature Kit — CC0 1.0 Universal
+  https://creativecommons.org/publicdomain/zero/1.0/
+  Diambil dari repo KyokoApp/Godot branch arena/01a0f421-godot
+  (folder project/assets/nature, format glTF ekspor Godot).
+  Konversi ke Unity (Mesh/Material/Prefab) dilakukan saat build CI
+  oleh Assets/Editor/ImportWorld.cs; hasil di Assets/Resources/WorldGen/ (gitignored).

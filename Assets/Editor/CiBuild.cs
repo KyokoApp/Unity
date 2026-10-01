@@ -26,6 +26,9 @@ public static class CiBuild
         // ---- 0) clip lokomosi UAL1 (walk/jog/sprint) -> Resources/UAL1Loco ----
         ExtractLocomotion.Run();
 
+        // ---- 0b) world nature glTF (Kenney CC0) -> Mesh/Material/Prefab ----
+        ImportWorld.Run();
+
         // ---- versi dari nomor run CI ----
         // unity-builder TIDAK meneruskan GITHUB_RUN_NUMBER ke dalam container,
         // jadi workflow apk-release mengirimnya lewat input customParameters:
