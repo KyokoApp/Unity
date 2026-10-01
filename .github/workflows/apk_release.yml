@@ -3,6 +3,7 @@ name: apk-release
 ## repo Godot lama): push konten game -> langsung build -> terbit ke Release.
 ##  - APK            -> release `apk-latest`   (instal sekali)
 ##  - manifest+konten -> release `content-latest` (diunduh in-game, tanpa instal ulang)
+##  - sim-test       -> audit PlayMode sesudah push; manual mode `sim-test` tidak build APK
 ##
 ## Lisensi: cukup secrets UNITY_EMAIL + UNITY_PASSWORD (akun Unity biasa, 2FA
 ## nonaktif) — step "Siapkan lisensi Unity" mengaktivasi Personal otomatis lewat
@@ -27,8 +28,16 @@ on:
       - "Assets/**"
       - "Packages/**"
       - "ProjectSettings/**"
-      - ".github/workflows/apk_release.yml"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "Pilih build APK atau jalankan audit PlayMode saja"
+        required: true
+        type: choice
+        default: apk
+        options:
+          - apk
+          - sim-test
 
 concurrency: apk-release
 
@@ -37,6 +46,7 @@ permissions:
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode != 'sim-test' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -175,4 +185,53 @@ jobs:
           # agar klien lama tidak melihat kombinasi manifest/bundle yang setengah terbit.
           gh release upload content-latest build/content/*.bundle build/content/tuning-*.json --clobber
           gh release upload content-latest build/content/manifest.json --clobber
+
+  sim-test:
+    needs: build
+    if: ${{ always() && ((github.event_name == 'push' && needs.build.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.mode == 'sim-test')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Siapkan lisensi Unity
+        env:
+          UNITY_LICENSE_SECRET: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: bash .github/unity-builder-steps/prepare_license.sh
+
+      - name: Cache Library PlayMode
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-PlayMode-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-PlayMode-
+            Library-Android-
+
+      - name: Uji gameplay PlayMode (Unity 2022.3)
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ env.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: .
+          unityVersion: auto
+          testMode: playmode
+          artifactsPath: artifacts/sim-tests
+          customParameters: -executeMethod CiBuild.PrepSim
+
+      - name: Unggah laporan dan screenshot simulasi
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arpg-sim-test-results
+          path: |
+            artifacts/sim-tests
+            build/simshots
+          if-no-files-found: warn
 

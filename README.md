@@ -40,8 +40,11 @@ backup keystore, dan catatan kompatibilitas APK lama.
 
 ## CI dan release GitHub
 
-Push ke `main` atau `arena/01a0f7e5-unity`, atau jalankan workflow
-**apk-release** secara manual. Workflow menerbitkan APK ke `apk-latest` terlebih dahulu, kemudian manifest dan AssetBundle ke `content-latest`.
+Push ke `main` atau `arena/01a0f7e5-unity` untuk menerbitkan APK ke
+`apk-latest`, lalu manifest dan AssetBundle ke `content-latest`; sesudah build,
+workflow menjalankan audit PlayMode. Dari tab Actions, workflow **apk-release**
+juga bisa dijalankan manual dengan mode `sim-test` untuk audit saja (tanpa
+menerbitkan APK). Screenshot dan laporan tes diunggah sebagai artifact.
 
 Application ID tidak diubah. Untuk memperbarui APK lama, sertifikat signing
 harus sama; jika instalasi lama memakai sertifikat berbeda, Android tidak bisa
