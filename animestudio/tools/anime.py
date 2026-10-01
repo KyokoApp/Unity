@@ -1,29 +1,31 @@
 #!/usr/bin/env python3
 """
-anime.py — alat bantu AnimeStudio untuk repo ini (tanpa dependensi, stdlib saja).
+anime.py — alat bantu AnimeStudio untuk repo ini (stdlib Python saja, tanpa dependensi).
 
-Fungsi:
-  kick    : jalankan workflow AnimeStudio lewat API (tanpa buka browser)
+Perintah:
+  kick    : jalankan workflow AnimeStudio (coba tombol Run workflow dulu; kalau belum
+            aktif, otomatis lewat file pemicu animestudio/trigger.json)
   status  : lihat riwayat jalan + kesimpulannya
-  pull    : unduh hasil ekstraksi (artifact atau release) lalu buka zip-nya
-  games   : tampilkan daftar kode game yang dikenal workflow ini
+  pull    : unduh hasil ekstraksi (artifact / release) lalu buka zip-nya
+  games   : tampilkan daftar kode game yang dikenal
 
-Semua perintah butuh token GitHub di environment:
+Token GitHub lewat environment variable:
 
-    export GITHUB_TOKEN=ghp_xxx          # Linux/macOS/Termux
+    export GITHUB_TOKEN=ghp_xxx          # Linux / macOS / Termux
     set GITHUB_TOKEN=ghp_xxx             # Windows CMD
     $env:GITHUB_TOKEN="ghp_xxx"          # PowerShell
 
-Token cukup classik dengan scope `repo` + `workflow` (kalau repo private),
-atau fine-grained: Contents read/write + Actions read/write.
+Scope yang dibutuhkan: `repo` + `workflow` (classic), atau fine-grained:
+Contents read/write + Actions read/write. JANGAN taruh token di dalam repo.
 
 Contoh:
     python3 animestudio/tools/anime.py status
-    python3 animestudio/tools/anime.py kick --game GI --url "https://github.com/.../releases/download/v1/bundle.zip" --types Texture2D,TextAsset
+    python3 animestudio/tools/anime.py kick --game GI --url "https://github.com/.../bundle.zip" --watch
     python3 animestudio/tools/anime.py pull --latest --out hasil
 """
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -34,9 +36,10 @@ import zipfile
 
 API = "https://api.github.com"
 DEFAULT_REPO = os.environ.get("ANIME_REPO", "KyokoApp/Unity")
-WORKFLOW_FILE = "animestudio.yml"
+WORKFLOW_PATH = ".github/workflows/animestudio.yml"
+TRIGGER_PATH = "animestudio/trigger.json"
 
-KODE_GAME = """Normal GI GI_Pack GI_CB1 GI_CB2 GI_CB3 GI_CB3Pre BH3 BH3Pre BH3PrePre
+KODE_GAME = """Normal UnityCN GI GI_Pack GI_CB1 GI_CB2 GI_CB3 GI_CB3Pre BH3 BH3Pre BH3PrePre
 SR SR_CB2 ZZZ ZZZ_CB1 ZZZ_CB2 HNA_CB1 HYG_CB1 TOT Naraka EnsembleStars OPFP FakeHeader
 FantasyOfWind ShiningNikki HelixWaltz2 NetEase AnchorPanic DreamscapeAlbireo ImaginaryFest
 AliceGearAegis ProjectSekai CodenameJump GirlsFrontline Reverse1999 ArknightsEndfield
@@ -46,7 +49,22 @@ RewindingCadence AzurPromiliaCBT2 AFKJourney PGR_GLB_KR PGR_CN_JP_TW PGR_CN_JP_T
 Archeland_KalpaOfUniverse Archeland_1114 NeuralCloud NeuralCloudCN HiganEruthyll WhiteCord
 Mecharashi CastlevaniaMoonNightFantasy HYSXZY DoulaContinent BlessGlobal Starside
 ResonanceSoltice OblivionOverride Dawnlands BB DynastyLegends2 EvernightCN XintianlongBabu
-FrostpunkBeyondTheIce CatFantasy""".split()
+FrostpunkBeyondTheIce CatFantasy UnityCNCustomKey""".split()
+
+
+# ------------------------------------------------------------------ HTTP dasar
+class ApiError(Exception):
+    def __init__(self, code, body):
+        super().__init__(f"HTTP {code}: {body[:300]}")
+        self.code = code
+        self.body = body
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Jangan ikut redirect otomatis — supaya token tidak ikut terkirim ke host lain."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def token():
@@ -61,8 +79,7 @@ def token():
     return tok.strip()
 
 
-def api(path, method="GET", body=None, repo=None, raw=False, follow=True):
-    """Panggil REST API GitHub. follow=False dipakai untuk unduhan yang redirect."""
+def api(path, method="GET", body=None, raw=False, follow=True):
     url = path if path.startswith("http") else API + path
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method)
@@ -73,77 +90,133 @@ def api(path, method="GET", body=None, repo=None, raw=False, follow=True):
     if data is not None:
         req.add_header("Content-Type", "application/json")
 
-    if not follow:
-        opener = urllib.request.build_opener(NoRedirect())
-    else:
-        opener = urllib.request.build_opener()
+    opener = urllib.request.build_opener(NoRedirect() if not follow else urllib.request.HTTPRedirectHandler())
     try:
-        with opener.open(req, timeout=120) as r:
+        with opener.open(req, timeout=180) as r:
             payload = r.read()
             if raw:
                 return payload
             if not payload:
                 return {}
-            ctype = r.headers.get("Content-Type", "")
-            if "json" in ctype:
-                return json.loads(payload)
-            return payload
+            return json.loads(payload) if "json" in r.headers.get("Content-Type", "") else payload
     except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", "replace")[:400]
-        if e.code == 302 and not follow:  # redirect bukan error di sini
-            return {"location": e.headers.get("Location")}
-        sys.exit(f"HTTP {e.code} untuk {method} {url}\n{detail}")
+        detail = e.read().decode("utf-8", "replace")
+        if e.code == 302 and e.headers.get("Location"):
+            return {"location": e.headers["Location"]}
+        raise ApiError(e.code, detail) from None
     except urllib.error.URLError as e:
         sys.exit(f"Gagal konek ke GitHub: {e.reason}")
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Jangan ikut redirect otomatis — supaya token GitHub tidak ikut terkirim ke host lain."""
+def list_runs(repo, limit=10):
+    """Run workflow terbaru (difilter dari daftar run repo, jadi tetap jalan walau
+    file workflow belum ada di branch default)."""
+    data = api(f"/repos/{repo}/actions/runs?per_page=100")
+    runs = [r for r in data.get("workflow_runs", []) if r.get("path") == WORKFLOW_PATH]
+    return runs[:limit]
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+
+def cari_run(repo, nomor):
+    for r in list_runs(repo, limit=100):
+        if r["run_number"] == nomor:
+            return r
+    return None
 
 
-def rupiah_bytes(n):
+def fmt_bytes(n):
+    n = float(n)
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if n < 1024 or unit == "TB":
             return f"{n:.1f} {unit}" if unit != "B" else f"{int(n)} B"
         n /= 1024
 
 
-# --------------------------------------------------------------------------- kick
-def cmd_kick(args):
-    body = {
-        "ref": args.branch,
-        "inputs": {
-            "game": args.game,
-            "bundle_url": args.url,
-            "types": args.types,
-            "export_type": args.export,
-            "group_assets": args.group,
-            "map_op": "None",
-            "cli_build": args.build,
-            "publish_release": args.publish,
-        },
+# ----------------------------------------------------------------------- kick
+def input_dari_args(args):
+    return {
+        "game": args.game,
+        "bundle_url": args.url,
+        "types": args.types,
+        "export_type": args.export,
+        "group_assets": args.group,
+        "map_op": args.map_op,
+        "unity_version": args.unity,
+        "cli_build": args.build,
+        "publish_release": args.publish,
+        "dry_run": args.dry_run,
     }
-    if args.unity:
-        body["inputs"]["unity_version"] = args.unity
 
-    api(f"/repos/{args.repo}/actions/workflows/{WORKFLOW_FILE}/dispatches", "POST", body)
-    print(f"✅ Workflow dikirim ke {args.repo} (branch {args.branch})")
-    print(f"   game={args.game} types={args.types or '(semua)'} export={args.export} publish_release={args.publish}")
-    time.sleep(4)
 
-    runs = api(f"/repos/{args.repo}/actions/workflows/{WORKFLOW_FILE}/runs?per_page=1")
-    if not runs.get("workflow_runs"):
-        print("   (belum ada run yang muncul, cek sebentar lagi dengan: anime.py status)")
+def kick_lewat_tombol(repo, branch, inputs):
+    api(
+        f"/repos/{repo}/actions/workflows/animestudio.yml/dispatches",
+        "POST",
+        {"ref": branch, "inputs": {k: v for k, v in inputs.items() if k != "dry_run"}},
+    )
+
+
+def kick_lewat_file(repo, branch, inputs, pesan=None):
+    """Tulis animestudio/trigger.json di branch -> push event -> workflow jalan."""
+    sha = None
+    try:
+        info = api(f"/repos/{repo}/contents/{TRIGGER_PATH}?ref={branch}")
+        sha = info.get("sha")
+    except ApiError as e:
+        if e.code != 404:
+            raise
+
+    isi = {
+        "_catatan": "Dibuat oleh animestudio/tools/anime.py — mengubah file ini memicu workflow AnimeStudio.",
+        **inputs,
+    }
+    body = {
+        "message": pesan or f"chore(animestudio): kick {inputs['game']} ({inputs['types'] or 'semua jenis'})",
+        "content": base64.b64encode(
+            (json.dumps(isi, indent=2, ensure_ascii=False) + "\n").encode()
+        ).decode(),
+        "branch": branch,
+    }
+    if sha:
+        body["sha"] = sha
+    api(f"/repos/{repo}/contents/{TRIGGER_PATH}", "PUT", body)
+
+
+def cmd_kick(args):
+    inputs = input_dari_args(args)
+    print(f"→ repo {args.repo} | branch {args.branch}")
+    print(f"  game={inputs['game']}  types={inputs['types'] or '(semua)'}  "
+          f"export={inputs['export_type']}  publish_release={inputs['publish_release']}"
+          + ("  [dry_run]" if args.dry_run == "true" else ""))
+
+    jalur = "tombol Run workflow"
+    try:
+        kick_lewat_tombol(args.repo, args.branch, inputs)
+    except ApiError as e:
+        if e.code not in (404, 422):
+            raise
+        jalur = "file pemicu (trigger.json)"
+        print("  tombol Run workflow belum aktif (workflow belum ada di branch default)")
+        print("  → pakai jalur kick file:", TRIGGER_PATH)
+        kick_lewat_file(args.repo, args.branch, inputs)
+    print(f"✅ dikirim lewat {jalur}")
+
+    if args.dry_run == "true" and jalur.startswith("file"):
+        print("   (dry_run: hanya menguji input, ekstraksi tidak dijalankan)")
+
+    # tunggu run-nya muncul
+    run = None
+    for _ in range(10):
+        time.sleep(4)
+        kandidat = [r for r in list_runs(args.repo, limit=5) if r.get("head_branch") == args.branch]
+        if kandidat:
+            run = kandidat[0]
+            break
+    if not run:
+        print("   (run belum muncul; cek sebentar lagi: anime.py status)")
         return 0
-    run = runs["workflow_runs"][0]
     print(f"   Run #{run['run_number']} — {run['html_url']}")
 
     if args.watch:
-        if args.no_browser:
-            print(f"   Tonton log di HP/browser: {run['html_url']}")
         return cmd_watch(args, run["id"], run["run_number"])
     return 0
 
@@ -157,90 +230,69 @@ def cmd_watch(args, run_id, run_number):
             print(f"   [#{run_number}] {st}")
             terakhir = st
         if r["status"] == "completed":
-            concl = r.get("conclusion")
-            print(f"   Selesai: {concl}")
-            if concl != "success":
-                print("   ⚠️  Bukan sukses — buka halaman run untuk lihat log/ringkasan:")
+            print(f"   Selesai: {r.get('conclusion')}")
             print(f"   Ringkasan & log: {r['html_url']}")
             if args.pull_saat_selesai:
                 print()
-                pull_results(args.repo, run_number=run_number, out=args.out or "hasil")
+                pull_results(args.repo, run_number, args.out)
             return 0
-        time.sleep(12)
+        time.sleep(15)
 
 
-# ------------------------------------------------------------------------- status
+# --------------------------------------------------------------------- status
 def cmd_status(args):
-    data = api(
-        f"/repos/{args.repo}/actions/workflows/{WORKFLOW_FILE}/runs?per_page={args.limit}"
-    )
-    runs = data.get("workflow_runs", [])
+    runs = list_runs(args.repo, args.limit)
     if not runs:
-        print("Belum ada riwayat jalan untuk workflow ini.")
+        print(f"Belum ada riwayat AnimeStudio di {args.repo}.")
         return 0
     print(f"Riwayat AnimeStudio di {args.repo}:\n")
     for r in runs:
-        inputs = ""
-        try:
-            payload = api(f"/repos/{args.repo}/actions/runs/{r['id']}")
-            # inputs tidak ada di API v3; pakai ringkasan dari nama run
-        except SystemExit:
-            pass
+        judul = (r.get("display_title") or "")[:44]
         print(f"  #{r['run_number']:<4} {r['created_at'][:16].replace('T', ' ')}  "
-              f"{r['status']:<11} {r.get('conclusion') or '-':<10} {r['display_title'][:44]}")
-    terbaru = runs[0]
-    print(f"\nRun terbaru: {terbaru['html_url']}")
-    print(f"Ambil hasilnya: python3 {os.path.basename(__file__)} pull --run {terbaru['run_number']}")
+              f"{r['status']:<11} {r.get('conclusion') or '-':<10} {judul}")
+    b = runs[0]
+    print(f"\nTerbaru: {b['html_url']}")
+    print(f"Ambil hasilnya: python3 {os.path.relpath(__file__)} pull --run {b['run_number']}")
     return 0
 
 
-# --------------------------------------------------------------------------- pull
+# ----------------------------------------------------------------------- pull
 def pull_results(repo, run_number=None, out="hasil", keep_zip=False):
-    if run_number is None:
-        runs = api(f"/repos/{repo}/actions/workflows/{WORKFLOW_FILE}/runs?per_page=1")
-        if not runs.get("workflow_runs"):
-            sys.exit("Belum ada run.")
-        run = runs["workflow_runs"][0]
-        run_number = run["run_number"]
-    else:
-        runs = api(f"/repos/{repo}/actions/workflows/{WORKFLOW_FILE}/runs?per_page=30")
-        cocok = [r for r in runs.get("workflow_runs", []) if r["run_number"] == run_number]
-        if not cocok:
-            sys.exit(f"Run #{run_number} tidak ketemu (cek: anime.py status)")
-        run = cocok[0]
+    run = cari_run(repo, run_number) if run_number else (list_runs(repo, 1) or [None])[0]
+    if not run:
+        sys.exit(f"Run #{run_number} tidak ketemu (lihat: anime.py status)")
 
-    print(f"Run #{run_number} — status {run['status']} / {run.get('conclusion') or '-'}")
+    run_number = run["run_number"]
+    print(f"Run #{run_number} — {run['status']} / {run.get('conclusion') or '-'}")
     os.makedirs(out, exist_ok=True)
     dibuat = []
 
-    # 1) artifact (kalau ada)
-    arts = api(f"/repos/{repo}/actions/runs/{run['id']}/artifacts")
-    for a in arts.get("artifacts", []):
+    atas = "Authorization"
+    for a in api(f"/repos/{repo}/actions/runs/{run['id']}/artifacts").get("artifacts", []):
         if a["expired"]:
             print(f"  artifact {a['name']} sudah kedaluwarsa (lewat masa simpan)")
             continue
-        print(f"  mengunduh artifact {a['name']} ({rupiah_bytes(a['size_in_bytes'])}) ...")
+        print(f"  mengunduh artifact {a['name']} ({fmt_bytes(a['size_in_bytes'])}) ...")
         target = os.path.join(out, f"{a['name']}.zip")
-        unduh_artifact(repo, a["id"], target)
+        unduh_beredirect(f"/repos/{repo}/actions/artifacts/{a['id']}/zip", target)
         dibuat.append(target)
 
-    # 2) release (kalau publish_release=yes atau hasilnya besar)
-    tag = f"extract-{run_number}"
     try:
-        rel = api(f"/repos/{repo}/releases/tags/{tag}")
+        rel = api(f"/repos/{repo}/releases/tags/extract-{run_number}")
         for asset in rel.get("assets", []):
-            print(f"  mengunduh release asset {asset['name']} ({rupiah_bytes(asset['size'])}) ...")
+            print(f"  mengunduh release asset {asset['name']} ({fmt_bytes(asset['size'])}) ...")
             target = os.path.join(out, asset["name"])
-            unduh_asset(repo, asset["id"], target)
+            unduh_beredirect(f"/repos/{repo}/releases/assets/{asset['id']}", target,
+                             {"Accept": "application/octet-stream"})
             dibuat.append(target)
-    except SystemExit:
-        pass
+    except ApiError as e:
+        if e.code != 404:
+            raise
 
     if not dibuat:
-        print("  Tidak ada artifact/release untuk run ini (mungkin hasilnya kosong).")
+        print("  Tidak ada artifact/release untuk run ini (mungkin hasilnya kosong / dry_run).")
         return 1
 
-    # buka zip-nya
     for z in list(dibuat):
         if not z.lower().endswith(".zip"):
             continue
@@ -253,107 +305,85 @@ def pull_results(repo, run_number=None, out="hasil", keep_zip=False):
             if not keep_zip:
                 os.remove(z)
         except zipfile.BadZipFile:
-            print(f"  ⚠️  {z} bukan zip valid (mungkin bagian .001 dari pecahan — buka dengan 7z/ZArchiver)")
+            print(f"  ⚠️  {z} bukan zip utuh (bisa jadi bagian .001 dari pecahan — buka dengan 7z/ZArchiver)")
 
     total = 0
     for root, _, files in os.walk(out):
         for f in files:
             total += os.path.getsize(os.path.join(root, f))
-    print(f"\nSelesai. Isi {out}/ = {rupiah_bytes(total)}")
+    print(f"\nSelesai. Isi {out}/ = {fmt_bytes(total)}")
     return 0
 
 
-def unduh_artifact(repo, artifact_id, target):
-    """Artifact GitHub: request pertama redirect ke blob storage — token jangan ikut."""
-    req = urllib.request.Request(
-        f"{API}/repos/{repo}/actions/artifacts/{artifact_id}/zip"
-    )
+def unduh_beredirect(path, target, extra_headers=None):
+    """Unduhan GitHub biasanya 302 ke blob storage; token hanya dikirim ke api.github.com."""
+    req = urllib.request.Request(API + path, headers=extra_headers or {})
     req.add_header("Authorization", "Bearer " + token())
     req.add_header("User-Agent", "animestudio-helper")
     opener = urllib.request.build_opener(NoRedirect())
     try:
-        with opener.open(req, timeout=60) as r:
-            _simpan(r, target)
+        with opener.open(req, timeout=180) as r:
+            simpan_ke(r, target)
     except urllib.error.HTTPError as e:
         if e.code != 302:
-            sys.exit(f"Gagal ambil artifact: HTTP {e.code}")
+            raise ApiError(e.code, e.read().decode("utf-8", "replace")) from None
         url = e.headers.get("Location")
         req2 = urllib.request.Request(url)
         req2.add_header("User-Agent", "animestudio-helper")
-        with urllib.request.urlopen(req2, timeout=600) as r2:
-            _simpan(r2, target)
+        with urllib.request.urlopen(req2, timeout=900) as r2:
+            simpan_ke(r2, target)
 
 
-def unduh_asset(repo, asset_id, target):
-    req = urllib.request.Request(
-        f"{API}/repos/{repo}/releases/assets/{asset_id}",
-        headers={"Accept": "application/octet-stream"},
-    )
-    req.add_header("Authorization", "Bearer " + token())
-    req.add_header("User-Agent", "animestudio-helper")
-    opener = urllib.request.build_opener(NoRedirect())
-    try:
-        with opener.open(req, timeout=600) as r:
-            _simpan(r, target)
-    except urllib.error.HTTPError as e:
-        if e.code != 302:
-            sys.exit(f"Gagal ambil asset: HTTP {e.code}")
-        url = e.headers.get("Location")
-        req2 = urllib.request.Request(url)
-        req2.add_header("User-Agent", "animestudio-helper")
-        with urllib.request.urlopen(req2, timeout=600) as r2:
-            _simpan(r2, target)
-
-
-def _simpan(response, target):
+def simpan_ke(response, target):
+    panjang = response.headers.get("Content-Length")
+    panjang = int(panjang) if panjang else None
+    sudah = 0
     with open(target, "wb") as f:
-        sisa = response.headers.get("Content-Length")
-        sisa = int(sisa) if sisa else None
-        sudah = 0
         while True:
             chunk = response.read(1 << 20)
             if not chunk:
                 break
             f.write(chunk)
             sudah += len(chunk)
-            if sisa:
-                print(f"\r    {rupiah_bytes(sudah)} / {rupiah_bytes(sisa)}", end="")
-        if sisa:
-            print()
+            if panjang:
+                print(f"\r    {fmt_bytes(sudah)} / {fmt_bytes(panjang)}", end="")
+    if panjang:
+        print()
 
 
-def cmd_games(args):
+def cmd_games(_args):
     print("Kode game yang dikenal workflow AnimeStudio:\n")
     for i in range(0, len(KODE_GAME), 4):
         print("  " + "".join(f"{k:<26}" for k in KODE_GAME[i:i + 4]).rstrip())
-    print("\nSelain itu ada pula puluhan game Unity CN (PGR, Neural Cloud, Mecharashi, dll).")
+    print("\n(Lihat animestudio/README.md untuk tabel per game.)")
     return 0
 
 
-# -------------------------------------------------------------------------- main
+# ----------------------------------------------------------------------- main
 def main():
     p = argparse.ArgumentParser(
-        description="Alat bantu AnimeStudio (jalan di runner Windows GitHub).",
+        description="Alat bantu AnimeStudio (ekstraksi jalan di runner Windows GitHub).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
     p.add_argument("--repo", default=DEFAULT_REPO, help=f"owner/repo (default: {DEFAULT_REPO})")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    k = sub.add_parser("kick", help="jalankan workflow lewat API")
-    k.add_argument("--game", required=True, help="kode game, mis. GI")
-    k.add_argument("--url", required=True, help="link bundle (release GitHub / http / path di repo)")
-    k.add_argument("--types", default="Texture2D,Sprite,TextAsset", help="jenis asset, kosong = semua")
+    k = sub.add_parser("kick", help="jalankan workflow")
+    k.add_argument("--game", required=True)
+    k.add_argument("--url", required=True, help="link bundle / path file di repo")
+    k.add_argument("--types", default="Texture2D,Sprite,TextAsset", help="kosong = semua jenis")
     k.add_argument("--export", default="Convert", choices=["Convert", "Raw", "Dump", "JSON"])
     k.add_argument("--group", default="ByType", choices=["ByType", "ByContainer", "BySource", "None"])
-    k.add_argument("--unity", default="", help="versi Unity, mis. 2020.3.30f1")
+    k.add_argument("--map-op", default="None", choices=["None", "CABMap", "AssetMap", "Both", "All"])
+    k.add_argument("--unity", default="")
     k.add_argument("--build", default="net10", choices=["net10", "net9"])
-    k.add_argument("--publish", default="no", choices=["no", "yes"], help="taruh hasil di Releases juga?")
-    k.add_argument("--branch", default="main", help="branch tempat workflow dijalankan")
+    k.add_argument("--publish", default="no", choices=["no", "yes"])
+    k.add_argument("--dry-run", default="false", choices=["false", "true"], help="uji input saja")
+    k.add_argument("--branch", default="main", help="branch kerja (default main)")
     k.add_argument("--watch", action="store_true", help="pantau sampai selesai")
-    k.add_argument("--pull-saat-selesai", action="store_true", help="langsung unduh hasilnya")
-    k.add_argument("--out", default="hasil", help="folder tujuan kalau --pull-saat-selesai")
-    k.add_argument("--no-browser", action="store_true", help="jangan cetak link browser (hemat output)")
+    k.add_argument("--pull-saat-selesai", action="store_true", help="langsung unduh hasil")
+    k.add_argument("--out", default="hasil")
     k.set_defaults(func=cmd_kick)
 
     s = sub.add_parser("status", help="riwayat jalan")
@@ -362,9 +392,9 @@ def main():
 
     u = sub.add_parser("pull", help="unduh hasil ekstraksi")
     u.add_argument("--run", type=int, default=None, help="nomor run (default: terbaru)")
-    u.add_argument("--latest", action="store_true", help="pakai run terbaru (default)")
+    u.add_argument("--latest", action="store_true")
     u.add_argument("--out", default="hasil")
-    u.add_argument("--keep-zip", action="store_true", help="jangan hapus zip setelah dibuka")
+    u.add_argument("--keep-zip", action="store_true")
     u.set_defaults(func=lambda a: pull_results(a.repo, a.run, a.out, a.keep_zip))
 
     g = sub.add_parser("games", help="daftar kode game")
@@ -380,3 +410,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\ndibatalkan")
         sys.exit(130)
+    except ApiError as e:
+        sys.exit(f"GitHub API error — {e}")

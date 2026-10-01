@@ -1,19 +1,20 @@
 # =============================================================================
 #  AnimeStudio — Ekstrak Asset Unity (jalan di runner Windows GitHub, tanpa PC)
 #
-#  Dipakai dari HP:  Actions -> "AnimeStudio — Ekstrak Asset Unity" -> Run workflow
-#  Panduan lengkap:  animestudio/README.md
+#  DUA cara memicu:
+#   1) Tombol  : Actions -> "AnimeStudio" -> Run workflow   (butuh file ini ada di main)
+#   2) Kick    : commit/ubah animestudio/trigger.json       (bisa dari branch mana pun,
+#                dipakai oleh animestudio/tools/anime.py atau sesi agent/sandbox)
 #
+#  Panduan lengkap: animestudio/README.md
 #  Mesin: windows-latest (repo publik = 4 core/16 GB, menit Actions gratis tanpa batas)
 #  AnimeStudio (c) Escartem — MIT. Workflow ini cuma pembungkus tipis.
 #
-#  Catatan penting: repo ini PUBLIK, jadi artifact & release-nya bisa dilihat siapa
-#  pun. Default publish_release = 'no' supaya hasil tidak otomatis terbit sebagai
-#  release publik. Kalau mau rajin dipakai untuk asset game lain, pindahkan
-#  workflow ini ke repo PRIVATE terpisah.
+#  Catatan: repo ini PUBLIK -> artifact & release bisa diunduh siapa pun. Karena itu
+#  default publish_release = 'no'. Mau dipakai rutin? pindahkan ke repo PRIVATE.
 # =============================================================================
 
-name: AnimeStudio — Ekstrak Asset Unity
+name: AnimeStudio
 
 on:
   workflow_dispatch:
@@ -34,32 +35,19 @@ on:
         required: true
         type: choice
         default: 'Convert'
-        options:
-          - Convert
-          - Raw
-          - Dump
-          - JSON
+        options: [Convert, Raw, Dump, JSON]
       group_assets:
         description: 'Struktur folder hasil'
         required: true
         type: choice
         default: 'ByType'
-        options:
-          - ByType
-          - ByContainer
-          - BySource
-          - None
+        options: [ByType, ByContainer, BySource, None]
       map_op:
         description: 'Buat/pakai asset map (opsional)'
         required: true
         type: choice
         default: 'None'
-        options:
-          - None
-          - CABMap
-          - AssetMap
-          - Both
-          - All
+        options: [None, CABMap, AssetMap, Both, All]
       unity_version:
         description: 'Versi Unity, mis. 2020.3.30f1 (kosongi = deteksi otomatis)'
         required: false
@@ -68,17 +56,18 @@ on:
         required: true
         type: choice
         default: 'net10'
-        options:
-          - net10
-          - net9
+        options: [net10, net9]
       publish_release:
         description: 'Taruh hasil di tab Releases? (publik! default: artifact saja)'
         required: true
         type: choice
         default: 'no'
-        options:
-          - 'no'
-          - 'yes'
+        options: ['no', 'yes']
+  # "kick" — ubah file ini (atau commit apa pun yang menyentuh file ini) untuk menjalankan.
+  # Ambil contoh isi di animestudio/trigger.example.json
+  push:
+    paths:
+      - 'animestudio/trigger.json'
 
 permissions:
   contents: write
@@ -89,26 +78,73 @@ concurrency:
 
 jobs:
   extract:
-    name: Ekstraksi ${{ inputs.game }}
+    name: Ekstraksi ${{ github.event_name == 'push' && 'kick' || inputs.game }}
     runs-on: windows-latest
     timeout-minutes: 300
 
     steps:
-      - name: Info awal
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Tentukan input (tombol / kick file)
         shell: pwsh
         run: |
-          Write-Host "Game        : ${{ inputs.game }}"
-          Write-Host "Bundle      : ${{ inputs.bundle_url }}"
-          Write-Host "Jenis asset : ${{ inputs.types }}"
-          Write-Host "Runner      : $env:RUNNER_OS $env:RUNNER_ARCH"
-          Write-Host "Repo        : ${{ github.repository }} (public = menit Windows gratis tanpa batas)"
-          $d = Get-PSDrive -Name D -ErrorAction SilentlyContinue
-          if ($d) { Write-Host ("Disk bebas  : {0:N1} GB" -f ($d.Free / 1GB)) }
+          $game = ''; $bundle = ''; $types = ''; $export = ''; $group = ''
+          $mapOp = ''; $unity = ''; $build = ''; $publish = ''; $dryRun = 'false'
+
+          if ('${{ github.event_name }}' -eq 'push') {
+            $f = 'animestudio/trigger.json'
+            if (-not (Test-Path $f)) { throw "push memicu workflow tapi $f tidak ada." }
+            $t = Get-Content $f -Raw | ConvertFrom-Json
+            $game    = "$($t.game)".Trim()
+            $bundle  = "$($t.bundle_url)".Trim()
+            $types   = "$($t.types)".Trim()
+            $export  = if ($t.export_type) { "$($t.export_type)" } else { 'Convert' }
+            $group   = if ($t.group_assets) { "$($t.group_assets)" } else { 'ByType' }
+            $mapOp   = if ($t.map_op) { "$($t.map_op)" } else { 'None' }
+            $unity   = "$($t.unity_version)".Trim()
+            $build   = if ($t.cli_build) { "$($t.cli_build)" } else { 'net10' }
+            $publish = if ($t.publish_release) { "$($t.publish_release)" } else { 'no' }
+            $dryRun  = if ($t.dry_run) { 'true' } else { 'false' }
+            Write-Host "Dipicu oleh push ke $f"
+          }
+          else {
+            $game    = '${{ inputs.game }}'.Trim()
+            $bundle  = '${{ inputs.bundle_url }}'.Trim()
+            $types   = '${{ inputs.types }}'.Trim()
+            $export  = '${{ inputs.export_type }}'
+            $group   = '${{ inputs.group_assets }}'
+            $mapOp   = '${{ inputs.map_op }}'
+            $unity   = '${{ inputs.unity_version }}'.Trim()
+            $build   = '${{ inputs.cli_build }}'
+            $publish = '${{ inputs.publish_release }}'
+            Write-Host "Dipicu dari tombol Run workflow"
+          }
+
+          if (-not $game) { $game = 'GI' }
+
+          @(
+            "GAME=$game", "BUNDLE_URL=$bundle", "TYPES=$types", "EXPORT_TYPE=$export",
+            "GROUP_ASSETS=$group", "MAP_OP=$mapOp", "UNITY_VERSION=$unity",
+            "CLI_BUILD=$build", "PUBLISH_RELEASE=$publish", "DRY_RUN=$dryRun"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          Write-Host "game=$game  types=$(if ($types) { $types } else { '(semua)' })  export=$export  publish_release=$publish"
+
+          if ($dryRun -eq 'true') {
+            Write-Host '::notice::dry_run=true -> hanya mencetak input, tidak menjalankan ekstraksi.'
+          }
+          elseif (-not $bundle) {
+            Write-Host '::warning::bundle_url kosong -> tidak ada yang diekstrak. Isi animestudio/trigger.json atau pakai tombol Run workflow.'
+          }
 
       - name: Cek kode game
+        if: env.DRY_RUN != 'true'
         shell: pwsh
         run: |
-          $kode = '${{ inputs.game }}'.Trim()
+          $kode = $env:GAME
           $daftar = @(
             'Normal','UnityCN','GI','GI_Pack','GI_CB1','GI_CB2','GI_CB3','GI_CB3Pre',
             'BH3','BH3Pre','BH3PrePre','SR','SR_CB2','ZZZ','ZZZ_CB1','ZZZ_CB2',
@@ -134,16 +170,24 @@ jobs:
             Write-Host "Kode game OK: $kode"
           }
 
-      - name: Siapkan folder kerja
+      - name: Info awal
+        if: env.DRY_RUN != 'true'
         shell: pwsh
         run: |
+          Write-Host "Game        : $env:GAME"
+          Write-Host "Bundle      : $env:BUNDLE_URL"
+          Write-Host "Jenis asset : $(if ($env:TYPES) { $env:TYPES } else { '(semua)' })"
+          Write-Host "Runner      : $env:RUNNER_OS $env:RUNNER_ARCH"
+          Write-Host "Repo        : ${{ github.repository }} (publik -> menit Windows gratis tanpa batas)"
+          $d = Get-PSDrive -Name D -ErrorAction SilentlyContinue
+          if ($d) { Write-Host ("Disk bebas  : {0:N1} GB" -f ($d.Free / 1GB)) }
           New-Item -ItemType Directory -Force -Path in, out | Out-Null
 
       - name: Download AnimeStudio CLI (build resmi)
+        if: env.DRY_RUN != 'true' && env.BUNDLE_URL != ''
         shell: pwsh
         run: |
-          $build = '${{ inputs.cli_build }}'
-          $url = "https://nightly.link/Escartem/AnimeStudio/workflows/build/master/AnimeStudio-$build.zip"
+          $url = "https://nightly.link/Escartem/AnimeStudio/workflows/build/master/AnimeStudio-$($env:CLI_BUILD).zip"
           Write-Host "Mengunduh $url"
           curl.exe -L --fail --retry 3 --retry-delay 5 -o cli.zip $url
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path cli.zip)) {
@@ -158,29 +202,25 @@ jobs:
           Write-Host "CLI siap: $exe"
 
       - name: Pastikan .NET Desktop Runtime tersedia
+        if: env.DRY_RUN != 'true' && env.BUNDLE_URL != ''
         shell: pwsh
         continue-on-error: true
         run: |
-          $channel = if ('${{ inputs.cli_build }}' -eq 'net9') { '9.0' } else { '10.0' }
+          $channel = if ($env:CLI_BUILD -eq 'net9') { '9.0' } else { '10.0' }
           $sudah = (dotnet --list-runtimes) -match "Microsoft\.WindowsDesktop\.App $([regex]::Escape($channel))\."
-          if ($sudah) {
-            Write-Host "Desktop Runtime $channel sudah tersedia di runner."
-            exit 0
-          }
+          if ($sudah) { Write-Host "Desktop Runtime $channel sudah tersedia di runner."; exit 0 }
           Write-Host "Menginstal Desktop Runtime $channel ..."
           Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile dotnet-install.ps1
           & ./dotnet-install.ps1 -Runtime windowsdesktop -Channel $channel -InstallDir "$env:RUNNER_TEMP\dotnet"
           "$env:RUNNER_TEMP\dotnet" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Ambil file bundle
+        if: env.DRY_RUN != 'true' && env.BUNDLE_URL != ''
         shell: pwsh
         env:
-          # token bawaan repo ini — dipakai gh CLI & unduhan release (repo private juga bisa)
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $src = '${{ inputs.bundle_url }}'.Trim()
-          if (-not $src) { throw 'bundle_url kosong — isi dengan link file bundle.' }
-
+          $src = $env:BUNDLE_URL
           if (Test-Path $src) {
             Write-Host "Memakai file yang sudah ada di repo: $src"
             Copy-Item $src -Destination in -Recurse -Force
@@ -218,6 +258,7 @@ jobs:
           }
 
       - name: Buka arsip bundle (.zip/.7z/.rar)
+        if: env.DRY_RUN != 'true' && env.BUNDLE_URL != ''
         shell: pwsh
         run: |
           $sevenZip = "${env:ProgramFiles}\7-Zip\7z.exe"
@@ -230,40 +271,32 @@ jobs:
               & $sevenZip x -y "-o$sub" $file.FullName | Select-Object -Last 2
               if ($LASTEXITCODE -ne 0) { throw "7-Zip gagal membuka $($file.Name)" }
             }
-            else {
-              Expand-Archive -Path $file.FullName -DestinationPath $sub -Force
-            }
+            else { Expand-Archive -Path $file.FullName -DestinationPath $sub -Force }
           }
           if ($arsip.Count -eq 0) { Write-Host 'Tidak ada arsip, anggap file bundle mentah.' }
 
       - name: Jalankan AnimeStudio CLI
+        if: env.DRY_RUN != 'true' && env.BUNDLE_URL != ''
         shell: pwsh
         run: |
-          $cli = $env:CLI_PATH
-          $cliArgs = @('in', 'out', '--game', '${{ inputs.game }}'.Trim())
-
-          $types = ('${{ inputs.types }}' -replace '\s', '').Trim()
+          $cliArgs = @('in', 'out', '--game', $env:GAME)
+          $types = ($env:TYPES -replace '\s', '').Trim()
           if ($types) { $cliArgs += @('--types', $types) }
-
-          $cliArgs += @('--export_type', '${{ inputs.export_type }}')
-          $cliArgs += @('--group_assets', '${{ inputs.group_assets }}')
-
-          $unityVersion = '${{ inputs.unity_version }}'.Trim()
-          if ($unityVersion) { $cliArgs += @('--unity_version', $unityVersion) }
-
-          $mapOp = '${{ inputs.map_op }}'
-          if ($mapOp -ne 'None') {
-            $cliArgs += @('--map_op', $mapOp, '--map_name', 'assets_map', '--map_type', 'XML')
+          $cliArgs += @('--export_type', $env:EXPORT_TYPE)
+          $cliArgs += @('--group_assets', $env:GROUP_ASSETS)
+          if ($env:UNITY_VERSION) { $cliArgs += @('--unity_version', $env:UNITY_VERSION) }
+          if ($env:MAP_OP -and $env:MAP_OP -ne 'None') {
+            $cliArgs += @('--map_op', $env:MAP_OP, '--map_name', 'assets_map', '--map_type', 'XML')
           }
 
           Write-Host "> AnimeStudio.CLI.exe $($cliArgs -join ' ')"
           Write-Host ''
-          & $cli @cliArgs 2>&1 | Tee-Object -FilePath cli-log.txt
+          & $env:CLI_PATH @cliArgs 2>&1 | Tee-Object -FilePath cli-log.txt
           $code = $LASTEXITCODE
           Write-Host ''
           Write-Host "Exit code: $code"
           if ($code -ne 0) {
-            Write-Host "::warning::AnimeStudio CLI keluar dengan kode $code — cek log di atas (kode game salah? file bukan bundle Unity? versi Unity perlu diisi manual?)"
+            Write-Host "::warning::CLI keluar dengan kode $code — cek log di atas (kode game salah? file bukan bundle Unity? versi Unity perlu diisi manual?)"
           }
 
       - name: Ringkasan hasil
@@ -277,11 +310,12 @@ jobs:
           if (-not $sum) { $sum = 0 }
 
           $baris = New-Object System.Collections.Generic.List[string]
-          $baris.Add('### Hasil ekstraksi AnimeStudio')
+          $baris.Add('### AnimeStudio — ringkasan')
           $baris.Add('')
-          $baris.Add("- Game: ``${{ inputs.game }}``")
-          $baris.Add("- Jenis asset diminta: ``${{ inputs.types }}``")
-          $baris.Add("- Format: ``${{ inputs.export_type }}``")
+          $baris.Add("- Dipicu oleh: ``${{ github.event_name }}``")
+          $baris.Add("- Game: ``$env:GAME``")
+          $baris.Add("- Jenis asset diminta: ``$(if ($env:TYPES) { $env:TYPES } else { '(semua)' })``")
+          $baris.Add("- Format: ``$env:EXPORT_TYPE``")
           $baris.Add("- Jumlah file: **$($files.Count)**")
           $baris.Add(("- Total ukuran: **{0:N2} MB**" -f ($sum / 1MB)))
           $baris.Add('')
@@ -292,31 +326,38 @@ jobs:
             $nama = if ($g.Name) { $g.Name } else { '(tanpa ekstensi)' }
             $baris.Add("| $nama | $($g.Count) |")
           }
-          if ($files.Count -eq 0) {
+          if ($env:DRY_RUN -eq 'true') {
             $baris.Add('')
-            $baris.Add('> **Tidak ada file hasil.** Biasanya karena: kode game salah, filenya bukan bundle Unity, atau filter jenis asset terlalu sempit (coba kosongkan input `types`).')
+            $baris.Add('> `dry_run = true` — hanya uji input, ekstraksi tidak dijalankan.')
+          }
+          elseif (-not $env:BUNDLE_URL) {
+            $baris.Add('')
+            $baris.Add('> `bundle_url` kosong — tidak ada yang diekstrak.')
+          }
+          elseif ($files.Count -eq 0) {
+            $baris.Add('')
+            $baris.Add('> **Tidak ada file hasil.** Biasanya: kode game salah, filenya bukan bundle Unity, atau filter jenis asset terlalu sempit (coba kosongkan `types`).')
           }
           $baris.Add('')
-          $baris.Add('Mau tarik hasil ini dari HP/sandbox tanpa buka halaman? `python3 animestudio/tools/anime.py pull --run ' + $env:GITHUB_RUN_NUMBER + '`')
+          $baris.Add('Tarik hasilnya tanpa browser: `python3 animestudio/tools/anime.py pull --run ' + $env:GITHUB_RUN_NUMBER + '`')
           $baris -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
           $files | Select-Object -First 25 | ForEach-Object {
             Write-Host ("{0}  ({1:N1} KB)" -f $_.FullName.Replace($PWD.Path, '.'), ($_.Length / 1KB))
           }
 
-          # hasil > 450 MB sebaiknya lewat Releases (kuota artifact gratis cuma 500 MB)
           $besar = ($sum -gt 450MB)
           "besar=$($besar.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          if ($besar -and '${{ inputs.publish_release }}' -eq 'no') {
-            Write-Host '::notice::Hasilnya besar (>450 MB) — otomatis ditaruh di Releases supaya tidak menabrak kuota artifact 500 MB.'
-            Write-Host '::warning::Perhatian: repo ini PUBLIK, jadi release tersebut bisa diunduh siapa pun.'
+          if ($besar -and $env:PUBLISH_RELEASE -eq 'no') {
+            Write-Host '::notice::Hasil >450 MB — otomatis lewat Releases supaya tidak menabrak kuota artifact 500 MB.'
+            Write-Host '::warning::Repo ini PUBLIK: release tersebut bisa diunduh siapa pun.'
           }
           if ($sum -gt 8GB) {
-            Write-Host '::warning::Hasil hampir menyentuh batas disk runner (14 GB). Lain kali pakai filter jenis asset atau pecah bundle-nya.'
+            Write-Host '::warning::Hasil hampir menyentuh batas disk runner (14 GB). Pakai filter jenis asset atau pecah bundle-nya.'
           }
 
       - name: Upload hasil ke Artifacts
-        if: ${{ always() && inputs.publish_release == 'no' && steps.ringkasan.outputs.besar != 'true' }}
+        if: ${{ always() && env.DRY_RUN != 'true' && env.PUBLISH_RELEASE == 'no' && steps.ringkasan.outputs.besar != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: hasil-ekstraksi-${{ github.run_number }}
@@ -328,43 +369,35 @@ jobs:
           compression-level: 0
 
       - name: Bungkus hasil jadi zip untuk Release
-        if: ${{ always() && (inputs.publish_release == 'yes' || steps.ringkasan.outputs.besar == 'true') }}
+        if: ${{ always() && env.DRY_RUN != 'true' && (env.PUBLISH_RELEASE == 'yes' || steps.ringkasan.outputs.besar == 'true') }}
         shell: pwsh
         run: |
           $sevenZip = "${env:ProgramFiles}\7-Zip\7z.exe"
           $ada = (Test-Path out) -and (@(Get-ChildItem out -Recurse -File).Count -gt 0)
           if (-not $ada) { Write-Host 'Folder out kosong, tidak ada yang dibungkus.'; exit 0 }
-
           if (Test-Path $sevenZip) {
             # -v1800m: hasil raksasa otomatis dipecah < 1,8 GB per bagian (batas 2 GB GitHub)
             & $sevenZip a -tzip -mx=1 -v1800m hasil-ekstraksi.zip .\out\* | Select-Object -Last 3
           }
-          else {
-            Compress-Archive -Path .\out\* -DestinationPath hasil-ekstraksi.zip -CompressionLevel Fastest
-          }
-
-          Get-ChildItem hasil-ekstraksi.zip* | ForEach-Object {
-            Write-Host ("{0} : {1:N2} MB" -f $_.Name, ($_.Length / 1MB))
-          }
+          else { Compress-Archive -Path .\out\* -DestinationPath hasil-ekstraksi.zip -CompressionLevel Fastest }
+          Get-ChildItem hasil-ekstraksi.zip* | ForEach-Object { Write-Host ("{0} : {1:N2} MB" -f $_.Name, ($_.Length / 1MB)) }
           Write-Host ''
-          Write-Host 'Kalau ada lebih dari satu bagian (.001, .002, ...), gabungkan dulu sebelum dibuka:'
-          Write-Host '  - HP   : pakai aplikasi ZArchiver / RAR, buka bagian .001'
-          Write-Host '  - PC   : "7z x hasil-ekstraksi.zip.001"'
+          Write-Host 'Kalau ada lebih dari satu bagian (.001, .002, ...), gabungkan dulu:'
+          Write-Host '  - HP : ZArchiver / RAR, buka bagian .001'
+          Write-Host '  - PC : 7z x hasil-ekstraksi.zip.001'
 
       - name: Tempel hasil ke Release
-        if: ${{ always() && (inputs.publish_release == 'yes' || steps.ringkasan.outputs.besar == 'true') }}
+        if: ${{ always() && env.DRY_RUN != 'true' && (env.PUBLISH_RELEASE == 'yes' || steps.ringkasan.outputs.besar == 'true') }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: extract-${{ github.run_number }}
-          name: Hasil ekstraksi #${{ github.run_number }} (${{ inputs.game }})
+          name: Hasil ekstraksi #${{ github.run_number }} (${{ github.event_name == 'push' && 'kick' || inputs.game }})
           body: |
             Hasil otomatis dari workflow AnimeStudio.
 
-            - Game: `${{ inputs.game }}`
-            - Jenis asset: `${{ inputs.types }}`
-            - Format: `${{ inputs.export_type }}`
+            - Game: `${{ github.event_name == 'push' && 'kick (trigger.json)' || inputs.game }}`
+            - Log lengkap: artifact `hasil-ekstraksi-${{ github.run_number }}` di tab Actions
 
-            Log lengkap ada di artifact `hasil-ekstraksi-${{ github.run_number }}` pada tab Actions.
             Pakai untuk keperluan sendiri — jangan disebar kalau isinya asset berhak cipta.
           files: |
             hasil-ekstraksi.zip*

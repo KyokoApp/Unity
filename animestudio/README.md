@@ -83,6 +83,30 @@ Daftar lengkap (74 kode): jalankan `python3 animestudio/tools/anime.py games`
 
 ---
 
+## 🔁 Memicu tanpa tombol ("kick")
+
+Workflow ini punya **dua pintu masuk**:
+
+| Cara | Kapan dipakai | Syarat |
+| --- | --- | --- |
+| Tombol **Run workflow** | sehari-hari dari HP | file workflow sudah ada di `main` (tombolnya belum muncul sebelum PR-nya di-merge) |
+| **Kick file** `animestudio/trigger.json` | sekarang juga, dari branch mana pun; dipakai agent/sandbox | tidak ada |
+
+Cara pakai kick file:
+
+1. Buka `animestudio/trigger.json` di GitHub (dari HP pun bisa: tekan ikon ✏️).
+2. Isi `game`, `bundle_url`, dan `types` (contoh lengkap ada di `animestudio/trigger.example.json`).
+3. **Commit changes** → workflow AnimeStudio langsung jalan.
+4. Set `"dry_run": true` kalau hanya ingin menguji input tanpa ekstraksi.
+
+Atau lewat perintah (otomatis: coba tombol dulu, kalau belum aktif pakai jalur kick):
+
+```bash
+python3 animestudio/tools/anime.py kick --game GI --url "https://.../bundle.zip" --watch
+```
+
+---
+
 ## 🤖 Jalankan dari baris perintah (untuk sesi dev / bridge)
 
 `animestudio/tools/anime.py` bisa dipakai tanpa browser — cocok untuk sandbox yang hanya bisa

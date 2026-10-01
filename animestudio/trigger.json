@@ -1,0 +1,13 @@
+{
+  "_catatan": "File pemicu (kick) — mengubah file ini menjalankan workflow AnimeStudio. Set dry_run=false untuk ekstraksi sungguhan. Contoh lengkap: trigger.example.json",
+  "game": "Normal",
+  "bundle_url": "animestudio/README.md",
+  "types": "Texture2D",
+  "export_type": "Convert",
+  "group_assets": "ByType",
+  "map_op": "None",
+  "unity_version": "",
+  "cli_build": "net10",
+  "publish_release": "no",
+  "dry_run": true
+}
