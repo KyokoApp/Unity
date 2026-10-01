@@ -27,15 +27,24 @@ Repo GitHub → **Settings → Secrets and variables → Actions → New reposit
 | `UNITY_PASSWORD` | Password akun Unity                      | **Ya** |
 | `UNITY_LICENSE`  | Seluruh isi teks file `.ulf` (fallback, lihat Langkah 3) | Opsional |
 
-Cara kerja CI (step **"Siapkan lisensi Unity"** di workflow `apk-release`):
+Cara kerja CI (workflow `apk-release`):
 
 - Kalau `UNITY_LICENSE` **terisi** → isinya langsung dipakai sebagai lisensi
   (tanpa aktivasi apa pun).
-- Kalau `UNITY_LICENSE` **kosong** → CI menjalankan container
-  `unityci/editor:ubuntu-2022.3.45f1-base-3`, login dengan `UNITY_EMAIL` +
-  `UNITY_PASSWORD` untuk mengaktivasi **Personal otomatis**, lalu mengambil file
-  `Unity_lic.ulf` yang dihasilkan dan memakainya untuk build. Log aktivasi
-  disaring agar email/password tidak bocor ke halaman Actions.
+- Kalau `UNITY_LICENSE` **kosong** → step **"Siapkan lisensi Unity"**
+  menjalankan container `unityci/editor:ubuntu-2022.3.45f1-base-3` dan
+  mengaktivasi **Personal otomatis** dengan `UNITY_EMAIL` + `UNITY_PASSWORD`
+  lewat `Unity.Licensing.Client --activate-all --include-personal` (fallback:
+  login `unity-editor`). Hasilnya (`Unity_lic.ulf` atau serial Personal)
+  dimasukkan ke environment build, lalu seat dikembalikan agar tidak bocor.
+  Log aktivasi disaring agar email/password/serial tidak muncul di Actions.
+- Lisensi Personal zaman sekarang berupa **seat** (kursi) yang dipegang selama
+  build lalu dilepas — bukan file `.ulf` permanen seperti dulu. Karena
+  `game-ci/unity-builder@v4` bawaan belum tahu cara ini (ia hanya bisa
+  aktivasi serial, yang sudah ditolak Unity untuk Personal), step **"Patch
+  unity-builder v4"** menimpa `activate.sh`/`return_license.sh` milik action
+  dengan strategi seat Personal (pola dari game-ci/cli PR #246). File
+  patch-nya ada di `.github/unity-builder-steps/`.
 
 ## Langkah 3 — (Opsional) Fallback: `UNITY_LICENSE` dari .ulf Unity Hub
 
