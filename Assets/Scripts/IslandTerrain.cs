@@ -264,7 +264,8 @@ public class IslandTerrain : MonoBehaviour
         var shader = Resources.Load<Shader>("Shaders/IslandTerrain");
         if (shader == null) shader = Shader.Find("UAL2/IslandTerrain");
         var mat = new Material(shader);
-        var meadow = Resources.Load<Texture2D>("WorldGen/Textures/meadow_cover");
+        var meadow = RemoteAssetCatalog.Load<Texture2D>("arpg-world", "meadow_cover");
+        if (meadow == null) meadow = Resources.Load<Texture2D>("WorldGen/Textures/meadow_cover");
         if (meadow != null) mat.SetTexture("_MeadowCover", meadow);
         mr.sharedMaterial = mat;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
@@ -351,7 +352,8 @@ public class IslandTerrain : MonoBehaviour
 
     void BuildRocks()
     {
-        var prefabs = Resources.LoadAll<GameObject>("WorldGen/Prefabs");
+        var prefabs = RemoteAssetCatalog.LoadAll<GameObject>("arpg-world");
+        if (prefabs.Length == 0) prefabs = Resources.LoadAll<GameObject>("WorldGen/Prefabs");
         GameObject r1 = null, r2 = null;
         foreach (var p in prefabs)
         {

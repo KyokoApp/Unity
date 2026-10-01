@@ -1,110 +1,123 @@
-# Cara Setup Auto-Build APK (sekali saja)
+# Setup CI Arpg (sekali saja)
 
-Beda dengan Godot, build Unity di GitHub Actions **butuh lisensi Unity** (yang
-Personal gratis). Kabar baiknya: sekarang **cukup 2 secrets** — email + password
-akun Unity — dan CI mengaktivasi lisensi Personal **otomatis** setiap build.
+Workflow `.github/workflows/apk_release.yml` membuat APK Android dan paket
+AssetBundle untuk release GitHub. APK tetap memakai application ID lama
+`com.kyokoapp.ual2playground`; nama yang terlihat di Android adalah **Arpg**.
 
-> **Catatan penting**: jalur lama lewat file `.alf` + https://license.unity3d.com/manual
-> **sudah ditutup Unity** untuk lisensi Personal, jadi workflow `unity-activation`
-> di repo ini sudah dihapus. Tidak perlu (dan tidak bisa lagi) menukar `.alf`
-> menjadi `.ulf` secara manual lewat situs itu.
+## 1. Lisensi Unity untuk GitHub Actions
 
-## Langkah 1 — Siapkan akun Unity
+Unity Personal gratis. Workflow memakai aktivasi seat Personal otomatis melalui
+`Unity.Licensing.Client`; siapkan repository secrets berikut:
 
-1. Buat akun gratis di https://unity.com (atau pakai akun yang sudah ada).
-2. **Nonaktifkan 2FA** di akun tersebut — aktivasi otomatis lewat command line
-   tidak bisa menjawab prompt 2FA, jadi akun dengan 2FA aktif akan gagal.
-3. Disarankan pakai akun khusus (bukan email pribadi utama), karena passwordnya
-   disimpan sebagai secret repo.
+| Secret | Isi | Wajib |
+| --- | --- | --- |
+| `UNITY_EMAIL` | Email akun Unity | Ya |
+| `UNITY_PASSWORD` | Password akun Unity | Ya, kecuali memakai `.ulf` |
+| `UNITY_LICENSE` | Seluruh isi file `.ulf` dari Unity Hub | Opsional; fallback tanpa login |
 
-## Langkah 2 — Isi secrets repo
+Untuk jalur otomatis, akun Unity tidak boleh meminta langkah 2FA interaktif.
+Jangan tulis password atau isi license ke file yang di-commit. Detail proses
+aktivasi ada di `.github/workflows/apk_release.yml` dan helper
+`.github/unity-builder-steps/`.
 
-Repo GitHub → **Settings → Secrets and variables → Actions → New repository secret**:
+## 2. Signing key Android yang stabil — WAJIB sebelum menerbitkan APK
 
-| Nama secret      | Isi                                      | Wajib? |
-|------------------|------------------------------------------|--------|
-| `UNITY_EMAIL`    | Email akun Unity                         | **Ya** |
-| `UNITY_PASSWORD` | Password akun Unity                      | **Ya** |
-| `UNITY_LICENSE`  | Seluruh isi teks file `.ulf` (fallback, lihat Langkah 3) | Opsional |
+Android hanya mengizinkan APK mengganti instalasi lama jika **application ID dan
+sertifikat signing sama**. Karena itu, siapkan **satu keystore release**, simpan
+backup aman, dan gunakan key yang sama untuk semua build. Jangan membuat key baru
+setiap rilis dan jangan commit file keystore ke Git.
 
-Cara kerja CI (workflow `apk-release`):
+Jika sudah ada keystore yang menandatangani APK Arpg sebelumnya, gunakan file dan
+password yang sama. Jika belum pernah ada keystore rilis, buat sekali di komputer
+tepercaya dengan JDK:
 
-- Kalau `UNITY_LICENSE` **terisi** → isinya langsung dipakai sebagai lisensi
-  (tanpa aktivasi apa pun).
-- Kalau `UNITY_LICENSE` **kosong** → step **"Siapkan lisensi Unity"**
-  menjalankan container `unityci/editor:ubuntu-2022.3.45f1-base-3` dan
-  mengaktivasi **Personal otomatis** dengan `UNITY_EMAIL` + `UNITY_PASSWORD`
-  lewat `Unity.Licensing.Client --activate-all --include-personal` (fallback:
-  login `unity-editor`). Hasilnya (`Unity_lic.ulf` atau serial Personal)
-  dimasukkan ke environment build, lalu seat dikembalikan agar tidak bocor.
-  Log aktivasi disaring agar email/password/serial tidak muncul di Actions.
-- Lisensi Personal zaman sekarang berupa **seat** (kursi) yang dipegang selama
-  build lalu dilepas — bukan file `.ulf` permanen seperti dulu. Karena
-  `game-ci/unity-builder@v4` bawaan belum tahu cara ini (ia hanya bisa
-  aktivasi serial, yang sudah ditolak Unity untuk Personal), step **"Patch
-  unity-builder v4"** menimpa `activate.sh`/`return_license.sh` milik action
-  dengan strategi seat Personal (pola dari game-ci/cli PR #246). File
-  patch-nya ada di `.github/unity-builder-steps/`.
-
-## Langkah 3 — (Opsional) Fallback: `UNITY_LICENSE` dari .ulf Unity Hub
-
-Kalau aktivasi otomatis bermasalah (misal tidak bisa menonaktifkan 2FA), kamu
-bisa menyediakan lisensi manual dari PC:
-
-1. Instal **Unity Hub** di PC, login dengan akun Unity-mu, instal editor
-   **2022.3.45f1**, dan pastikan lisensi **Personal** aktif
-   (Hub → ⚙ Preferences → **Licenses** → seharusnya ada "Personal").
-2. Ambil file lisensinya (`Unity_lic.ulf`) di:
-   - **Windows**: `C:\ProgramData\Unity\Unity_lic.ulf`
-   - **macOS**: `~/Library/Application Support/Unity/Unity_lic.ulf`
-   - **Linux**: `~/.local/share/unity3d/Unity/Unity_lic.ulf`
-3. Buka file itu dengan text editor, **copy seluruh isinya**, lalu simpan sebagai
-   secret `UNITY_LICENSE` di repo. Selama secret ini terisi, CI memakainya
-   langsung dan tidak menjalankan aktivasi otomatis.
-
-Catatan: `.ulf` terikat mesin/akun — bila nanti ditolak Unity (misal editor
-di-update), kosongkan secret `UNITY_LICENSE` supaya CI kembali aktivasi otomatis,
-atau ulangi langkah ini dengan `.ulf` yang baru.
-
-## Langkah 4 — Jalankan build
-
-Push apa pun yang menyentuh `Assets/`, `Packages/`, `ProjectSettings/`, atau file
-workflow `apk_release.yml` (atau jalankan manual workflow **apk-release** lewat
-tab Actions → Run workflow). Build pertama ±30–60 menit (download image editor);
-berikutnya lebih cepat karena cache `Library`.
-
-Hasilnya di halaman **Releases**:
-
-- **apk-latest** → `UAL2Playground.apk` — instal **sekali saja** di HP.
-- **content-latest** → `manifest.json`, `tuning.json`, asset bundle — **diunduh
-  otomatis dari dalam game** saat dibuka. Update konten = push → pemain tidak
-  perlu instal ulang.
-
-## Cara kerja update in-game (sama seperti launcher Godot lama)
-
-```
-APK (peluncur, instal sekali)
-  └─ saat start: GET content-latest/manifest.json  (timeout 10 dtk, offline-safe)
-       ├─ contentVersion lebih baru?  → unduh tuning.json (+ pack yang SHA-nya berubah)
-       │    └─ simpan di persistentDataPath/content/ → langsung diterapkan
-       ├─ appVersion lebih baru?      → tampilkan info "APK baru tersedia"
-       └─ gagal/offline?              → pakai cache / bawaan APK, game tetap jalan
+```sh
+keytool -genkeypair -v \
+  -keystore arpg-release.keystore -storetype JKS \
+  -alias arpg -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-`contentVersion` (dan `appVersion`/`versionCode` APK) = **nomor run CI**
-(`github.run_number`). Catatan teknis: unity-builder tidak meneruskan
-`GITHUB_RUN_NUMBER` ke dalam container build, jadi workflow mengirimnya lewat
-input `customParameters: '-runNumber <n>'` yang diteruskan `build.sh` sebagai
-argumen CLI editor dan dibaca `CiBuild.BuildAll`. Tanpa ini, `contentVersion`
-stuck di 0 dan updater in-game tidak akan pernah mengunduh apa pun.
+Simpan file tersebut beserta password keystore, nama alias (`arpg` pada contoh),
+dan password alias di tempat aman/offline. **Kehilangan keystore berarti APK
+selanjutnya tidak bisa memperbarui instalasi yang ditandatangani dengannya.**
 
-Yang bisa di-update tanpa instal ulang APK:
+Tambahkan empat repository secrets pada **GitHub → Settings → Secrets and
+variables → Actions**:
 
-- `Assets/Resources/Content/tuning.json` — MOTD, kecepatan jalan/lari/lompat,
-  warna grid & fog. Edit → push → selesai.
-- **Asset bundle** — beri asset (prefab, model, tekstur, animasi) nama bundle di
-  Inspector (dropdown *AssetBundle* kiri-bawah). CI otomatis mem-build & menerbitkannya;
-  bundle berisi prefab bernama `ContentBoot` akan otomatis di-spawn di world.
-- Catatan: **kode C# baru tidak bisa** dikirim lewat bundle (batasan IL2CPP);
-  perubahan script tetap butuh APK baru — pemain cukup diberi tahu lewat notifikasi
-  "APK baru tersedia" yang muncul otomatis di game.
+| Secret | Isi |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | File keystore yang sama, dikodekan Base64 tanpa line break |
+| `ANDROID_KEYSTORE_PASS` | Password keystore |
+| `ANDROID_KEYALIAS_NAME` | Nama alias, misalnya `arpg` |
+| `ANDROID_KEYALIAS_PASS` | Password alias |
+
+Encoding Base64:
+
+```sh
+# Linux
+base64 -w0 arpg-release.keystore
+
+# macOS
+base64 < arpg-release.keystore | tr -d '\n'
+```
+
+Di Windows PowerShell:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('arpg-release.keystore'))
+```
+
+Salin hasilnya hanya ke secret `ANDROID_KEYSTORE_BASE64`. Workflow akan berhenti
+lebih awal bila salah satu secret signing kosong, agar tidak menerbitkan APK
+ber-tanda tangan debug secara tidak sengaja. Karena build memakai metode kustom
+`CiBuild.BuildAll`, metode itu juga menerapkan sendiri argumen signing GameCI ke
+`PlayerSettings` dan memeriksa file keystore; build gagal tertutup jika nilai
+atau file tidak tersedia.
+
+> **Catatan migrasi instalasi lama:** konfigurasi proyek sebelumnya tidak
+> mengaktifkan custom keystore, sehingga tanda tangan APK lama belum dapat
+> diverifikasi dari checkout ini. Jika APK lama ditandatangani dengan sertifikat
+> yang berbeda dari keystore yang sekarang disiapkan, Android akan menolak
+> pembaruan langsung. Gunakan kembali keystore lama bila tersedia; bila tidak,
+> perangkat mungkin perlu memasang ulang APK sekali. ID aplikasi tetap sama,
+> tetapi tanda tangan lama tidak dapat dipulihkan dari APK.
+
+## 3. Build dan release
+
+Push ke `main` atau `arena/01a0f7e5-unity`, atau jalankan workflow
+**apk-release** melalui tab **Actions → Run workflow**. Build menggunakan Unity
+2022.3, IL2CPP, ikon anime CC0 dari `Assets/Branding/ArpgIcon.png`, serta nama
+produk `Arpg`.
+
+Workflow mengunggah APK lebih dahulu, lalu paket konten ber-hash, dan manifest
+konten paling akhir. Dengan demikian manifest lama tetap menunjuk aset lama yang
+masih tersedia sampai semua aset baru terbit:
+
+- **`apk-latest`** — `Arpg.apk` (alias terbaru) dan APK bernama versi, misalnya `Arpg-1.0.42.apk`. Manifest in-game menunjuk ke file versi yang tidak berubah.
+- **`content-latest`** — `manifest.json`, file tuning ber-hash, serta AssetBundle
+  ber-hash untuk ID `arpg-character` dan `arpg-world`. Nama aset mengikuti
+  `{id}-{sha256}.bundle`; konten lama tidak ditimpa, sehingga cache/link tetap
+  valid saat rilis berlangsung. Release konten ditandai pre-release agar APK
+  tetap menjadi release utama.
+
+`arpg-character` membawa model mannequin dan animasi UAL2; `arpg-world` membawa
+prefab/tekstur dunia. Bundle dibangun untuk Android oleh `CiBuild.BuildAll`.
+Assets bawaan `Resources` tetap berada di APK sebagai fallback offline. Cache
+bundle yang terverifikasi dipakai sejak game mulai; konten yang baru selesai
+diunduh aktif saat Arpg dibuka lagi.
+
+## 4. Pembaruan dari dalam game
+
+Saat berjalan, Arpg mengecek `content-latest/manifest.json` melalui HTTPS.
+Perubahan animasi/visual diunduh ke penyimpanan aplikasi dan diverifikasi dengan
+SHA-256; game tidak perlu memasang APK baru untuk paket tersebut. Jika manifest
+menawarkan versi aplikasi yang lebih baru, tombol **Unduh & Pasang Update**
+akan muncul di UI. Game mengunduh APK, memeriksa ukuran dan SHA-256, lalu membuka
+installer Android.
+
+Pemasangan APK **tidak senyap**: Android dapat meminta izin “install unknown
+apps” untuk Arpg dan tetap meminta persetujuan pengguna pada layar pemasangan.
+Perubahan kode C# atau Player tetap memerlukan APK baru; paket remote ditujukan
+untuk aset visual, model, tekstur, dan animasi.
+
+Jika internet tidak tersedia, game tetap berjalan memakai APK dan konten cache.

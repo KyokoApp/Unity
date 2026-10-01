@@ -14,13 +14,15 @@ name: apk-release
 ## (Unity.Licensing.Client --activate-all --include-personal; game-ci/cli#246).
 ## Fallback opsional: secret UNITY_LICENSE berisi .ulf (mis. dari Unity Hub di
 ## PC) — kalau terisi, dipakai langsung tanpa aktivasi di step lisensi.
+## Signing Android selalu memakai satu keystore release dari empat repository
+## secrets ANDROID_KEYSTORE_*; workflow berhenti bila belum dikonfigurasi.
 ## Lihat docs/CARA_SETUP_CI.md.
 
 on:
   push:
     branches:
       - main
-      - arena/01a0f5f2-unity
+      - arena/01a0f7e5-unity
     paths:
       - "Assets/**"
       - "Packages/**"
@@ -39,6 +41,21 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validasi secrets signing Android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEYALIAS_NAME: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          ANDROID_KEYALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASS ANDROID_KEYALIAS_NAME ANDROID_KEYALIAS_PASS; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Repository secret $name belum diatur. Lihat docs/CARA_SETUP_CI.md; jangan menerbitkan APK debug-signed."
+              exit 1
+            fi
+          done
 
       - name: Siapkan lisensi Unity
         env:
@@ -88,38 +105,73 @@ jobs:
           buildMethod: CiBuild.BuildAll
           versioning: None
           allowDirtyBuild: true
+          androidAppBundle: false
+          androidKeystoreName: arpg-release.keystore
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
           # unity-builder tidak meneruskan GITHUB_RUN_NUMBER ke dalam container;
           # CiBuild.BuildAll membaca "-runNumber <n>" dari argumen CLI editor
           # (build.sh meneruskan $CUSTOM_PARAMETERS ke unity-editor) supaya
           # contentVersion/appVersion/versionCode naik tiap build.
           customParameters: '-runNumber ${{ github.run_number }}'
 
-      - name: Pastikan hasil build ada
+      - name: Pastikan hasil build ada dan hash manifest valid
         run: |
           ls -laR build || true
-          test -f build/Android/UAL2Playground.apk
-          test -f build/content/manifest.json
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
 
-      - name: Terbitkan konten -> release content-latest
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          NOTES="Konten in-game v${{ github.run_number }} (diunduh otomatis oleh aplikasi saat start — tidak perlu instal ulang APK).
-          Release ini sengaja ditandai Pre-release: badge Latest di halaman Releases harus jatuh ke release APK."
-          gh release view content-latest >/dev/null 2>&1 || \
-            gh release create content-latest --title "Konten In-Game (auto-update)" --notes "$NOTES"
-          gh release edit content-latest --prerelease --notes "$NOTES"
-          gh release upload content-latest build/content/* --clobber
+          apk = Path('build/Android/Arpg.apk')
+          root = Path('build/content')
+          manifest_path = root / 'manifest.json'
+          assert apk.is_file() and manifest_path.is_file(), 'APK/manifest build tidak ditemukan'
+          manifest = json.loads(manifest_path.read_text())
+          assert manifest['apkSize'] == apk.stat().st_size, 'apkSize manifest tidak cocok'
+          assert manifest['apkSha256'] == hashlib.sha256(apk.read_bytes()).hexdigest(), 'apkSha256 manifest tidak cocok'
+          assert manifest['apkUrl'].endswith('/Arpg-' + manifest['appVersion'] + '.apk'), 'URL APK versi tidak cocok'
+          tuning = root / manifest['tuningFile']
+          assert tuning.is_file(), 'File tuning versi-hash tidak ditemukan: ' + str(tuning)
+          assert tuning.stat().st_size == manifest['tuningSize'], 'Ukuran tuning manifest tidak cocok'
+          assert hashlib.sha256(tuning.read_bytes()).hexdigest() == manifest['tuningSha256'], 'SHA tuning manifest tidak cocok'
+          packs = {pack['id']: pack for pack in manifest['packs']}
+          for required in ('arpg-character', 'arpg-world'):
+              assert required in packs, 'AssetBundle wajib hilang: ' + required
+          for pack in packs.values():
+              asset = root / pack['file']
+              assert asset.is_file(), 'AssetBundle tidak ditemukan: ' + str(asset)
+              assert asset.stat().st_size == pack['size'], 'Ukuran bundle tidak cocok: ' + pack['id']
+              assert hashlib.sha256(asset.read_bytes()).hexdigest() == pack['sha256'], 'SHA bundle tidak cocok: ' + pack['id']
+          print('APK, dua AssetBundle, dan SHA-256 manifest valid.')
+          PY
+          cp build/Android/Arpg.apk "build/Android/Arpg-1.0.${{ github.run_number }}.apk"
 
       - name: Terbitkan APK -> release apk-latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           NOTES="Build otomatis #${{ github.run_number }} dari commit ${{ github.sha }}.
-          Instal APK ini SEKALI saja — update konten berikutnya diunduh otomatis dari dalam game (release content-latest).
-          Di halaman Releases, release INI yang paling atas (Latest); file APK: UAL2Playground.apk di bawah Assets."
+          Instal APK ini SEKALI saja — animasi dan visual akan diperbarui dari dalam game.
+          Release APK tetap menjadi Latest; file pemasang: Arpg.apk."
           gh release view apk-latest >/dev/null 2>&1 || \
-            gh release create apk-latest --title "APK Terbaru (auto-build)" --notes "$NOTES"
+            gh release create apk-latest --title "APK Arpg Terbaru" --notes "$NOTES"
           gh release edit apk-latest --notes "$NOTES"
-          gh release upload apk-latest build/Android/UAL2Playground.apk --clobber
+          gh release upload apk-latest build/Android/Arpg.apk "build/Android/Arpg-1.0.${{ github.run_number }}.apk" --clobber
+
+      - name: Terbitkan konten -> release content-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="Konten in-game v${{ github.run_number }} — aset visual/animasi diunduh oleh Arpg.
+          Manifest memuat hash dan URL APK resmi; unggahan APK selalu selesai lebih dahulu.
+          Release ini sengaja ditandai Pre-release agar badge Latest tetap jatuh ke APK."
+          gh release view content-latest >/dev/null 2>&1 || \
+            gh release create content-latest --title "Konten Arpg (auto-update)" --notes "$NOTES"
+          gh release edit content-latest --prerelease --notes "$NOTES"
+          # Unggah aset ber-hash yang immutable lebih dulu; manifest baru terakhir,
+          # agar klien lama tidak melihat kombinasi manifest/bundle yang setengah terbit.
+          gh release upload content-latest build/content/*.bundle build/content/tuning-*.json --clobber
+          gh release upload content-latest build/content/manifest.json --clobber
 

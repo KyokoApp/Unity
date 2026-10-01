@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -21,6 +22,9 @@ public class GameUI : MonoBehaviour
     Text modelLabel;
     Text statusText;
     float statusUntil;
+    PressButton appUpdateBtn;
+    Text appUpdateLabel;
+    Action appUpdateAction;
     bool sprintOn;
 
     static readonly Color BtnDark = new Color(0.07f, 0.08f, 0.11f, 0.55f);
@@ -52,6 +56,30 @@ public class GameUI : MonoBehaviour
         statusText.text = msg;
         statusText.enabled = true;
         statusUntil = Time.unscaledTime + seconds;
+    }
+
+    public void ShowAppUpdate(string version, Action downloadAndInstall)
+    {
+        appUpdateAction = downloadAndInstall;
+        if (appUpdateBtn == null) return;
+        appUpdateLabel.text = "UNDUH & PASANG UPDATE  v" + version;
+        appUpdateBtn.gameObject.SetActive(true);
+    }
+
+    public void SetAppUpdateProgress(float progress)
+    {
+        if (appUpdateLabel != null)
+            appUpdateLabel.text = "MENGUNDUH UPDATE... " + Mathf.RoundToInt(Mathf.Clamp01(progress) * 100f) + "%";
+    }
+
+    public void SetAppUpdateMessage(string message)
+    {
+        if (appUpdateLabel != null) appUpdateLabel.text = message;
+    }
+
+    void BeginAppUpdate()
+    {
+        if (appUpdateAction != null) appUpdateAction();
     }
 
     // =====================================================================
@@ -153,11 +181,18 @@ public class GameUI : MonoBehaviour
     void BuildTopBar(RectTransform parent)
     {
         // Judul + kredit (kiri-atas).
-        var title = UiKit.NewText("Title", parent, "UAL2 PLAYGROUND", 34, Color.white, TextAnchor.UpperLeft);
+        var title = UiKit.NewText("Title", parent, "Arpg", 34, Color.white, TextAnchor.UpperLeft);
         UiKit.Anchor((RectTransform)title.transform, new Vector2(0f, 1f), new Vector2(250, -55), new Vector2(460, 50));
         var credit = UiKit.NewText("Credit", parent, "Animasi: Universal Animation Library 2 — Quaternius (CC0)",
             22, new Color(1f, 1f, 1f, 0.65f), TextAnchor.UpperLeft, FontStyle.Normal);
         UiKit.Anchor((RectTransform)credit.transform, new Vector2(0f, 1f), new Vector2(330, -100), new Vector2(620, 40));
+
+        // Tombol hanya muncul jika release GitHub menyediakan APK versi lebih baru.
+        appUpdateBtn = MakeRectButton(parent, "APP_UPDATE", new Vector2(0f, 1f), new Vector2(235, -177), new Vector2(430, 64),
+            BtnAccent, BeginAppUpdate, 21);
+        appUpdateLabel = appUpdateBtn.GetComponentInChildren<Text>();
+        appUpdateLabel.text = "UNDUH & PASANG UPDATE";
+        appUpdateBtn.gameObject.SetActive(false);
 
         // GANTI MODEL (kanan-atas, sebelah kiri tombol ANIMASI).
         var modelBtn = MakeRectButton(parent, "GANTI MODEL", new Vector2(1f, 1f), new Vector2(-480, -75), new Vector2(280, 90),

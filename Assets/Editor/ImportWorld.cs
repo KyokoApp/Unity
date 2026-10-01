@@ -34,6 +34,7 @@ public static class ImportWorld
             || name.IndexOf("Bush", StringComparison.Ordinal) >= 0;
     }
 
+    [MenuItem("Assets/Impor World Nature (Kenney CC0)")]
     public static void Run()
     {
         if (!Directory.Exists(SrcDir))

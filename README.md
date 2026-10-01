@@ -1,54 +1,56 @@
-# UAL2 Playground (Unity, Android)
+# Arpg (Unity, Android)
 
-Game Unity yang dibangun ulang dari nol:
+Game third-person Android dengan pulau eksplorasi dan kontrol sentuh:
 
-- **World datar tanpa batas** dengan garis grid kotak-kotak (shader world-space — lantai selalu mengikuti pemain sehingga tidak pernah ada ujungnya).
-- **Universal Animation Library 2 [Standard]** dari [Quaternius](https://quaternius.com) dipakai **lengkap (43 animasi)** — sumber: [KyokoApp/Godot](https://github.com/KyokoApp/Godot/tree/main/Universal%20Animation%20Library%202%5BStandard%5D), lisensi CC0.
-- **Kontrol sentuh Android** yang diposisikan rapi (safe-area aware):
-  - **Analog kiri-bawah** — jalan (miring sedikit) sampai lari (miring penuh), arah relatif kamera.
-  - **LOMPAT** (tombol besar kanan-bawah) — NinjaJump Start → Idle Loop → Land.
-  - **SERANG** — combo pedang A → B → C (tap beruntun).
-  - **SLIDE** — Slide Start → Loop → Exit sambil meluncur.
-  - **LARI** (toggle) — sprint.
-  - **ANIMASI** (kanan-atas) — panel scroll berisi **semua 43 animasi UAL2**, tap untuk memainkan.
-  - **GANTI MODEL** — tukar mannequin UAL2 ↔ Mannequin F (retarget Humanoid).
-  - **Geser layar kanan** — memutar kamera orbit.
+- Pulau deterministik 1 × 1 km: plaza, jalan, bukit/tebing, danau, sungai,
+  pantai, rumput prosedural, dan nature kit Kenney (CC0).
+- Model dan 43 animasi **Universal Animation Library 2 [Standard]** dari
+  Quaternius (CC0), ditambah tiga clip lokomosi UAL1.
+- Analog kiri untuk bergerak; tombol lompat, serang, slide, sprint, ganti model,
+  dan panel animasi; geser sisi kanan layar untuk memutar kamera.
+- Splash `Arpg` dengan progress bar tipis di bagian bawah.
 
-## Auto-build APK + update in-game (seperti launcher Godot lama)
+## Update konten dan APK dari dalam game
 
-- Push ke repo → GitHub Actions build otomatis → **Releases**:
-  - **`apk-latest`** → `UAL2Playground.apk` — **instal sekali saja**.
-  - **`content-latest`** → manifest + tuning + asset bundle — **diunduh otomatis
-    dari dalam game** saat dibuka (offline-safe, incremental SHA-256). Update
-    konten (MOTD, kecepatan, warna world, asset pack) **tanpa instal ulang APK**.
-- ⚠️ **Setup sekali**: CI Unity butuh lisensi (Personal gratis). Isi secrets
-  `UNITY_LICENSE`, `UNITY_EMAIL`, `UNITY_PASSWORD` — panduan lengkap di
-  [`docs/CARA_SETUP_CI.md`](docs/CARA_SETUP_CI.md).
+- `arpg-character` memuat model/animasi; `arpg-world` memuat visual dunia.
+  Keduanya dibangun menjadi Android AssetBundle dan diterbitkan di release
+  GitHub `content-latest`. Cache yang lolos pemeriksaan SHA-256 dipakai saat
+  Arpg dibuka; file bawaan APK tetap jadi fallback offline.
+- Jika tersedia versi APK baru, tombol dalam game mengunduh APK versi dari
+  release `apk-latest`, memverifikasi hash, lalu membuka installer Android. Android tetap dapat
+  meminta izin sumber instalasi dan konfirmasi pemasangan—tidak ada instalasi
+  senyap.
+- Application ID tetap `com.kyokoapp.ual2playground`, supaya APK bertanda
+  tangan sama dapat memperbarui instalasi yang ada.
 
-## Cara buka
+Sebelum CI dapat menerbitkan APK release, siapkan **satu signing keystore
+permanen** dan empat secrets Android. Lihat
+[`docs/CARA_SETUP_CI.md`](docs/CARA_SETUP_CI.md) untuk lisensi Unity, signing,
+backup keystore, dan catatan kompatibilitas APK lama.
 
-1. Install **Unity Hub** + editor **2022.3 LTS** (atau lebih baru) dengan modul **Android Build Support (SDK/NDK/OpenJDK)**.
-2. `Add project` → pilih folder repo ini → buka.
-3. Import pertama memakan waktu beberapa menit (FBX 24 MB berisi 43 animasi).
-4. Buka `Assets/Scenes/Main.unity` lalu tekan **Play** (di editor, analog bisa di-drag pakai mouse).
+## Buka proyek di Unity
 
-## Build APK
+1. Instal Unity Hub + Unity **2022.3 LTS** dengan Android Build Support
+   (SDK/NDK/OpenJDK).
+2. Tambahkan folder repo ini melalui Unity Hub dan tunggu impor awal.
+3. Untuk aset generated saat Play di Editor, jalankan menu **Assets → Impor
+   World Nature (Kenney CC0)** dan **Assets → Ekstrak Clip Lokomosi UAL1**.
+   Workflow CI menjalankannya otomatis; folder hasilnya di-gitignore.
+4. Buka `Assets/Scenes/Main.unity` lalu tekan Play.
 
-1. `File ▸ Build Settings ▸ Android ▸ Switch Platform`.
-2. `Build` → hasilkan `.apk` → install di HP.
-   - Orientasi landscape, IL2CPP, ARMv7 + ARM64, min SDK 23 sudah dikonfigurasi di `ProjectSettings`.
+## CI dan release GitHub
 
-## Struktur
+Push ke `main` atau `arena/01a0f7e5-unity`, atau jalankan workflow
+**apk-release** secara manual. Workflow menerbitkan APK ke `apk-latest` terlebih dahulu, kemudian manifest dan AssetBundle ke `content-latest`.
 
-```
-Assets/
-  Scenes/Main.unity          # scene: kamera, lampu, GameBootstrap
-  Scripts/                   # semua logika (world, player, animasi, UI dibangun runtime)
-  Resources/UAL2/            # UAL2_Standard.fbx (43 anim) + Mannequin_F.fbx (Humanoid)
-  Resources/Shaders/         # shader grid tanpa batas
-  UAL2/                      # License (CC0) + README asli dari Quaternius
-```
+Application ID tidak diubah. Untuk memperbarui APK lama, sertifikat signing
+harus sama; jika instalasi lama memakai sertifikat berbeda, Android tidak bisa
+memasang build baru di atasnya. Jangan pernah mengganti atau kehilangan
+keystore permanen yang digunakan untuk rilis.
 
-## Kredit
+## Sumber dan lisensi
 
-- Animasi & model: **Quaternius — Universal Animation Library 2 [Standard]**, lisensi **CC0 1.0** (public domain). Dukung di [patreon.com/quaternius](https://www.patreon.com/quaternius).
+- Ikon anime: **Red suit anime girl**, karya jsks (sumber Pixabay), CC0 1.0.
+  Atribusi dan tautan ada di `Assets/Branding/ASSET_CREDITS.md`.
+- Model/animasi: Quaternius, Universal Animation Library 2 [Standard], CC0 1.0.
+- Nature assets: Kenney Nature Kit, CC0 1.0.

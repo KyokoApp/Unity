@@ -24,9 +24,12 @@ public class SimTests
         GameBootstrap.SkipUpdater = true;   // jangan sentuh jaringan saat tes
         bootGO = new GameObject("Boot");
         bootGO.AddComponent<GameBootstrap>();
-        yield return null;
-        player = Object.FindObjectOfType<PlayerController>();
-        Assert.IsNotNull(player, "PlayerController tidak ditemukan setelah bootstrap");
+        for (int frame = 0; frame < 600 && player == null; frame++)
+        {
+            yield return null;
+            player = Object.FindObjectOfType<PlayerController>();
+        }
+        Assert.IsNotNull(player, "PlayerController tidak ditemukan setelah bootstrap/loading");
         panim = player.GetComponent<PlayerAnimator>();
         yield return new WaitForSeconds(1.0f);   // tile rumput/hutan pertama
         Shot("00_plaza_spawn");

@@ -104,10 +104,10 @@ public class GrassField : MonoBehaviour
         var it = IslandTerrain.I;
         if (IslandTerrain.ArenaDistance(x, z) < 2f || Mathf.Abs(x) > 495f || Mathf.Abs(z) > 495f) return false;
         // penipisan deterministik via tuning live (grassDensity)
-        uint h = (uint)(Mathf.RoundToInt(x * 4f) * 73856093 ^ Mathf.RoundToInt(z * 4f) * 19349663);
-        if ((h % 1000) / 1000f > WorldTuning.GrassDensity) return false;
-        float h = it.SurfaceHeight(x, z);
-        if (h < 5.4f || IslandTerrain.WaterCovers(x, z, 1.5f)) return false;
+        uint hash = (uint)(Mathf.RoundToInt(x * 4f) * 73856093 ^ Mathf.RoundToInt(z * 4f) * 19349663);
+        if ((hash % 1000) / 1000f > WorldTuning.GrassDensity) return false;
+        float height = it.SurfaceHeight(x, z);
+        if (height < 5.4f || IslandTerrain.WaterCovers(x, z, 1.5f)) return false;
         if (Mathf.Abs(z) < 340f && IslandTerrain.RoadDistance(x, z) < 15f) return false;
         float gx = it.SurfaceHeight(x + 1f, z) - it.SurfaceHeight(x - 1f, z);
         float gz = it.SurfaceHeight(x, z + 1f) - it.SurfaceHeight(x, z - 1f);
@@ -161,6 +161,7 @@ public class GrassField : MonoBehaviour
 
         if (verts.Count == 0)
         {
+            if (tiles.TryGetValue(key, out var old) && old != null) Destroy(old);
             tiles[key] = null;
             tileGrids[key] = grid;
             return;

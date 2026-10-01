@@ -39,6 +39,8 @@ Thumbs.db
 *.apk
 *.aab
 *.unitypackage
+*.keystore
+*.jks
 *.app
 ExportedObj/
 

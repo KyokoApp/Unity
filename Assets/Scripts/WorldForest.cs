@@ -31,7 +31,8 @@ public class WorldForest : MonoBehaviour
 
     public void LoadAssets()
     {
-        var prefabs = Resources.LoadAll<GameObject>("WorldGen/Prefabs");
+        var prefabs = RemoteAssetCatalog.LoadAll<GameObject>("arpg-world");
+        if (prefabs.Length == 0) prefabs = Resources.LoadAll<GameObject>("WorldGen/Prefabs");
         foreach (var p in prefabs)
         {
             if (p == null) continue;
