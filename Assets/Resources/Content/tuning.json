@@ -1,11 +1,13 @@
 {
-  "motd": "Selamat datang di UAL2 Playground!",
+  "motd": "🏝️ PULAU 1 km live-tuning: rumput & hutan bisa disetel tanpa instal ulang (grassDensity/treeDensity). Kabari kalau mau dirapatkan/dirugikan!",
   "walkSpeed": 2.1,
   "runSpeed": 4.6,
   "sprintMul": 1.35,
   "jumpVel": 9.0,
-  "gridBase": "#EDF1F6",
-  "gridLine": "#A1AEC0",
-  "gridMajor": "#61738F",
-  "fog": "#BFD1E6"
+  "gridBase": "#6B9454",
+  "gridLine": "#61874C",
+  "gridMajor": "#547842",
+  "fog": "#CDE0E8",
+  "grassDensity": 1.0,
+  "treeDensity": 1.0
 }

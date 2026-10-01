@@ -241,6 +241,15 @@ public class TuningData
     public string gridLine;
     public string gridMajor;
     public string fog;
+    public float grassDensity;
+    public float treeDensity;
+}
+
+/// <summary>Parameter dunia yang bisa di-tune live (tanpa instal ulang APK).</summary>
+public static class WorldTuning
+{
+    public static float GrassDensity = 1f;
+    public static float TreeDensity = 1f;
 }
 
 public static class Tuning
@@ -256,6 +265,8 @@ public static class Tuning
         if (t.runSpeed > 0f) PlayerController.RunSpeed = t.runSpeed;
         if (t.sprintMul > 0f) PlayerController.SprintMul = t.sprintMul;
         if (t.jumpVel > 0f) PlayerController.JumpVel = t.jumpVel;
+        if (t.grassDensity > 0f) WorldTuning.GrassDensity = Mathf.Clamp(t.grassDensity, 0.1f, 2f);
+        if (t.treeDensity > 0f) WorldTuning.TreeDensity = Mathf.Clamp(t.treeDensity, 0.1f, 2f);
 
         Color cBase, cLine, cMajor, cFog;
         bool okBase = ColorUtility.TryParseHtmlString(t.gridBase, out cBase);

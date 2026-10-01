@@ -3,7 +3,9 @@ using UnityEngine;
 
 /// <summary>
 /// Memuat seluruh isi Universal Animation Library 2 [Standard] (Quaternius, CC0)
-/// dari folder Resources/UAL2: model mannequin + 43 animation clip.
+/// dari folder Resources/UAL2: model mannequin + 43 animation clip,
+/// PLUS 3 clip lokomosi UAL1 (UAL1_Walk/Jog/Sprint_Loop) dari Resources/UAL1Loco
+/// yang diekstrak ExtractLocomotion saat build CI.
 /// Kunci clip memakai nama take tanpa prefix "Armature|".
 /// </summary>
 public class AnimLibrary
@@ -34,6 +36,19 @@ public class AnimLibrary
                 Keys.Add(key);
             }
         }
+
+        // Lokomosi UAL1 (walk/jog/sprint) — diekstrak dari Assets/UAL1/UAL1_Standard.fbx
+        // saat build CI oleh ExtractLocomotion. Tidak ada folder ini (mis. Play di editor
+        // tanpa menjalankan Ekstrak dulu)? PlayerController fallback ke Walk_Fwd_Loop UAL2.
+        foreach (var c in Resources.LoadAll<AnimationClip>("UAL1Loco"))
+        {
+            if (c == null || c.name.StartsWith("__preview__")) continue;
+            if (!clips.ContainsKey(c.name))
+            {
+                clips[c.name] = c;
+                Keys.Add(c.name);
+            }
+        }
         Keys.Sort();
     }
 
@@ -47,6 +62,14 @@ public class AnimLibrary
             Debug.LogWarning("[UAL2] Clip tidak ditemukan: " + key);
             return null;
         }
+        return c;
+    }
+
+    /// <summary>Ambil clip tanpa warning bila tidak ada (untuk probe opsional tiap frame).</summary>
+    public AnimationClip Find(string key)
+    {
+        AnimationClip c;
+        clips.TryGetValue(key, out c);
         return c;
     }
 

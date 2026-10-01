@@ -4,14 +4,23 @@ name: apk-release
 ##  - APK            -> release `apk-latest`   (instal sekali)
 ##  - manifest+konten -> release `content-latest` (diunduh in-game, tanpa instal ulang)
 ##
-## WAJIB: isi secrets UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD terlebih dulu.
-## Lihat docs/CARA_SETUP_CI.md (lisensi Unity Personal gratis).
+## Lisensi: cukup secrets UNITY_EMAIL + UNITY_PASSWORD (akun Unity biasa, 2FA
+## nonaktif) — step "Siapkan lisensi Unity" mengaktivasi Personal otomatis lewat
+## container unityci/editor (Unity.Licensing.Client, fallback unity-editor login),
+## lalu memasukkan Unity_lic.ulf ATAU serial Personal ke $GITHUB_ENV (dibutuhkan
+## unity-builder@v4 di sisi host). Karena aktivasi serial ala v4 sudah tidak
+## berlaku untuk Personal, step "Patch unity-builder v4" menimpa activate.sh &
+## return_license.sh di cache action runner dengan strategi seat Personal
+## (Unity.Licensing.Client --activate-all --include-personal; game-ci/cli#246).
+## Fallback opsional: secret UNITY_LICENSE berisi .ulf (mis. dari Unity Hub di
+## PC) — kalau terisi, dipakai langsung tanpa aktivasi di step lisensi.
+## Lihat docs/CARA_SETUP_CI.md.
 
 on:
   push:
     branches:
       - main
-      - arena/01a0f56e-unity
+      - arena/01a0f5f2-unity
     paths:
       - "Assets/**"
       - "Packages/**"
@@ -29,15 +38,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Cek secrets lisensi Unity
-        run: |
-          if [ -z "${{ secrets.UNITY_LICENSE }}" ]; then
-            echo "::error::Secret UNITY_LICENSE belum diisi. Jalankan workflow 'unity-activation' lalu ikuti docs/CARA_SETUP_CI.md"
-            exit 1
-          fi
-          echo "lisensi ok"
-
       - uses: actions/checkout@v4
+
+      - name: Siapkan lisensi Unity
+        env:
+          UNITY_LICENSE_SECRET: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: bash .github/unity-builder-steps/prepare_license.sh
 
       - name: Cache Library (percepat build berikutnya)
         uses: actions/cache@v4
@@ -47,10 +55,32 @@ jobs:
           restore-keys: |
             Library-Android-
 
+      - name: Patch unity-builder v4 → aktivasi Personal via Licensing.Client
+        run: |
+          set -euo pipefail
+          # unity-builder@v4 (cache _actions runner, di-mount ke /steps container
+          # build) hanya mendukung aktivasi serial/license-server — keduanya
+          # sudah tidak berlaku untuk Unity Personal. Timpa activate.sh &
+          # return_license.sh dengan strategi seat Personal (game-ci/cli#246):
+          # Unity.Licensing.Client --activate-all --include-personal.
+          shopt -s nullglob
+          CANDIDATES=( "$GITHUB_WORKSPACE"/../../_actions/game-ci/unity-builder/*/dist/platforms/ubuntu/steps )
+          STEPS_DIR="${CANDIDATES[0]:-}"
+          if [ -z "$STEPS_DIR" ] || [ ! -f "$STEPS_DIR/activate.sh" ]; then
+            echo "::error::Folder steps game-ci/unity-builder tidak ditemukan di runner (_actions/game-ci/unity-builder/*/dist/platforms/ubuntu/steps). Layout runner/action berubah — perbarui step patch ini."
+            ls -la "$GITHUB_WORKSPACE/../.." 2>/dev/null || true
+            exit 1
+          fi
+          echo "Patch: $STEPS_DIR"
+          cp -v "$GITHUB_WORKSPACE/.github/unity-builder-steps/activate.sh"       "$STEPS_DIR/activate.sh"
+          cp -v "$GITHUB_WORKSPACE/.github/unity-builder-steps/return_license.sh" "$STEPS_DIR/return_license.sh"
+          chmod +x "$STEPS_DIR/activate.sh" "$STEPS_DIR/return_license.sh"
+          echo "Patch selesai — container build akan aktivasi seat Personal lewat Unity.Licensing.Client."
+
       - name: Build APK + paket konten (Unity 2022.3, Android, IL2CPP)
         uses: game-ci/unity-builder@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_LICENSE: ${{ env.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
@@ -58,6 +88,11 @@ jobs:
           buildMethod: CiBuild.BuildAll
           versioning: None
           allowDirtyBuild: true
+          # unity-builder tidak meneruskan GITHUB_RUN_NUMBER ke dalam container;
+          # CiBuild.BuildAll membaca "-runNumber <n>" dari argumen CLI editor
+          # (build.sh meneruskan $CUSTOM_PARAMETERS ke unity-editor) supaya
+          # contentVersion/appVersion/versionCode naik tiap build.
+          customParameters: '-runNumber ${{ github.run_number }}'
 
       - name: Pastikan hasil build ada
         run: |
@@ -65,23 +100,26 @@ jobs:
           test -f build/Android/UAL2Playground.apk
           test -f build/content/manifest.json
 
+      - name: Terbitkan konten -> release content-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="Konten in-game v${{ github.run_number }} (diunduh otomatis oleh aplikasi saat start — tidak perlu instal ulang APK).
+          Release ini sengaja ditandai Pre-release: badge Latest di halaman Releases harus jatuh ke release APK."
+          gh release view content-latest >/dev/null 2>&1 || \
+            gh release create content-latest --title "Konten In-Game (auto-update)" --notes "$NOTES"
+          gh release edit content-latest --prerelease --notes "$NOTES"
+          gh release upload content-latest build/content/* --clobber
+
       - name: Terbitkan APK -> release apk-latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           NOTES="Build otomatis #${{ github.run_number }} dari commit ${{ github.sha }}.
-          Instal APK ini SEKALI saja — update konten berikutnya diunduh otomatis dari dalam game (release content-latest)."
+          Instal APK ini SEKALI saja — update konten berikutnya diunduh otomatis dari dalam game (release content-latest).
+          Di halaman Releases, release INI yang paling atas (Latest); file APK: UAL2Playground.apk di bawah Assets."
           gh release view apk-latest >/dev/null 2>&1 || \
             gh release create apk-latest --title "APK Terbaru (auto-build)" --notes "$NOTES"
           gh release edit apk-latest --notes "$NOTES"
           gh release upload apk-latest build/Android/UAL2Playground.apk --clobber
 
-      - name: Terbitkan konten -> release content-latest
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          NOTES="Konten in-game v${{ github.run_number }} (diunduh otomatis oleh aplikasi saat start — tidak perlu instal ulang APK)."
-          gh release view content-latest >/dev/null 2>&1 || \
-            gh release create content-latest --title "Konten In-Game (auto-update)" --notes "$NOTES"
-          gh release edit content-latest --notes "$NOTES"
-          gh release upload content-latest build/content/* --clobber
