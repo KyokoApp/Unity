@@ -4,14 +4,17 @@ name: apk-release
 ##  - APK            -> release `apk-latest`   (instal sekali)
 ##  - manifest+konten -> release `content-latest` (diunduh in-game, tanpa instal ulang)
 ##
-## WAJIB: isi secrets UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD terlebih dulu.
-## Lihat docs/CARA_SETUP_CI.md (lisensi Unity Personal gratis).
+## Lisensi: cukup secrets UNITY_EMAIL + UNITY_PASSWORD (akun Unity biasa, 2FA
+## nonaktif) — step "Siapkan lisensi Unity" mengaktivasi Personal otomatis lewat
+## container unityci/editor. Fallback opsional: secret UNITY_LICENSE berisi .ulf
+## (mis. dari Unity Hub di PC) — kalau terisi, dipakai langsung tanpa aktivasi.
+## Lihat docs/CARA_SETUP_CI.md.
 
 on:
   push:
     branches:
       - main
-      - arena/01a0f56e-unity
+      - arena/01a0f5f2-unity
     paths:
       - "Assets/**"
       - "Packages/**"
@@ -29,13 +32,81 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Cek secrets lisensi Unity
+      - name: Siapkan lisensi Unity
+        env:
+          UNITY_LICENSE_SECRET: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: |
-          if [ -z "${{ secrets.UNITY_LICENSE }}" ]; then
-            echo "::error::Secret UNITY_LICENSE belum diisi. Jalankan workflow 'unity-activation' lalu ikuti docs/CARA_SETUP_CI.md"
+          set -uo pipefail
+          IMAGE="unityci/editor:ubuntu-2022.3.45f1-base-3"
+          ULF_IN_CONTAINER="/root/.local/share/unity3d/Unity/Unity_lic.ulf"
+
+          tulis_lisensi_ke_env() {
+            # $1 = file .ulf ; tulis ke $GITHUB_ENV sebagai UNITY_LICENSE (heredoc)
+            {
+              echo "UNITY_LICENSE<<__ULF__"
+              cat "$1"
+              echo "__ULF__"
+            } >> "$GITHUB_ENV"
+          }
+
+          # ---- 1) Secret UNITY_LICENSE terisi? pakai langsung ----
+          if [ -n "${UNITY_LICENSE_SECRET:-}" ]; then
+            echo "Secret UNITY_LICENSE terisi — pakai lisensi dari secrets (tanpa aktivasi)."
+            TMP_ULF="$(mktemp)"
+            printf '%s\n' "$UNITY_LICENSE_SECRET" > "$TMP_ULF"
+            tulis_lisensi_ke_env "$TMP_ULF"
+            rm -f "$TMP_ULF"
+            echo "UNITY_LICENSE siap di \$GITHUB_ENV."
+            exit 0
+          fi
+
+          # ---- 2) Kosong? aktivasi Personal otomatis lewat container ----
+          echo "Secret UNITY_LICENSE kosong — coba aktivasi Personal otomatis dengan $IMAGE."
+          if [ -z "${UNITY_EMAIL:-}" ] || [ -z "${UNITY_PASSWORD:-}" ]; then
+            echo "::error::UNITY_LICENSE kosong DAN UNITY_EMAIL/UNITY_PASSWORD belum lengkap. Isi secrets UNITY_EMAIL + UNITY_PASSWORD (akun Unity biasa, 2FA nonaktif) — lihat docs/CARA_SETUP_CI.md. Fallback: isi UNITY_LICENSE dengan seluruh isi file .ulf dari Unity Hub di PC."
             exit 1
           fi
-          echo "lisensi ok"
+
+          # Saring log Unity: email/password tidak boleh bocor ke log run.
+          saring_log() {
+            while IFS= read -r line; do
+              if [ -n "${UNITY_EMAIL:-}" ]; then line="${line//"$UNITY_EMAIL"/[email-disaring]}"; fi
+              if [ -n "${UNITY_PASSWORD:-}" ]; then line="${line//"$UNITY_PASSWORD"/[password-disaring]}"; fi
+              printf '%s\n' "$line"
+            done
+          }
+
+          docker rm -f unity-activate >/dev/null 2>&1 || true
+          echo "Pull image $IMAGE (bisa beberapa menit, image besar)…"
+          if ! docker pull "$IMAGE"; then
+            echo "::error::Gagal pull image $IMAGE — periksa nama tag/koneksi runner."
+            exit 1
+          fi
+
+          echo "Jalankan aktivasi Personal (kredensial lewat env container, log disaring)…"
+          docker run --name unity-activate \
+            -e UNITY_EMAIL -e UNITY_PASSWORD \
+            "$IMAGE" \
+            bash -c 'unity-editor -batchmode -nographics -quit -logFile /dev/stdout -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD"' \
+            2>&1 | saring_log
+          EDITOR_STATUS=${PIPESTATUS[0]}
+
+          # Unity bisa exit != 0 meski aktivasi sukses — patokan hasil = file .ulf.
+          echo "unity-editor selesai (exit code $EDITOR_STATUS) — periksa $ULF_IN_CONTAINER di container."
+          TMP_DIR="$(mktemp -d)"
+          if ! docker cp "unity-activate:$ULF_IN_CONTAINER" "$TMP_DIR/Unity_lic.ulf" 2>/dev/null || [ ! -s "$TMP_DIR/Unity_lic.ulf" ]; then
+            echo "::error::Aktivasi Personal otomatis GAGAL: $ULF_IN_CONTAINER tidak ada/kosong di container (exit code editor: $EDITOR_STATUS). Penyebab umum: UNITY_EMAIL/UNITY_PASSWORD salah, 2FA masih aktif di akun Unity, atau gangguan server Unity. Coba lagi nanti, atau pakai fallback UNITY_LICENSE (.ulf dari Unity Hub) — lihat docs/CARA_SETUP_CI.md."
+            docker rm -f unity-activate >/dev/null 2>&1 || true
+            rm -rf "$TMP_DIR"
+            exit 1
+          fi
+
+          tulis_lisensi_ke_env "$TMP_DIR/Unity_lic.ulf"
+          rm -rf "$TMP_DIR"
+          docker rm -f unity-activate >/dev/null 2>&1 || true
+          echo "Aktivasi Personal berhasil — UNITY_LICENSE siap di \$GITHUB_ENV."
 
       - uses: actions/checkout@v4
 
@@ -50,7 +121,7 @@ jobs:
       - name: Build APK + paket konten (Unity 2022.3, Android, IL2CPP)
         uses: game-ci/unity-builder@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_LICENSE: ${{ env.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
