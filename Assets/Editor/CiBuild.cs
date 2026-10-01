@@ -116,6 +116,14 @@ public static class CiBuild
             + " (" + (report.summary.totalSize / (1024 * 1024)) + " MB)");
     }
 
+    /// <summary>Dipanggil job sim-test CI: siapkan aset generated sebelum tes PlayMode.</summary>
+    public static void PrepSim()
+    {
+        ExtractLocomotion.Run();
+        ImportWorld.Run();
+        Debug.Log("[CiBuild] PrepSim selesai: UAL1Loco + WorldGen siap untuk tes PlayMode.");
+    }
+
     static string Sha256(string path)
     {
         using (var sha = SHA256.Create())

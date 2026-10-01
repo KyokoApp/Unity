@@ -8,6 +8,9 @@ using UnityEngine.Rendering;
 /// </summary>
 public class GameBootstrap : MonoBehaviour
 {
+    /// <summary>Dimatikan saat tes headless (jangan sentuh jaringan).</summary>
+    public static bool SkipUpdater;
+
     void Awake()
     {
         // ---- Pengaturan global (mobile friendly) ----
@@ -80,8 +83,11 @@ public class GameBootstrap : MonoBehaviour
         ui.Init(player, lib, orbit);
 
         // ---- Updater konten in-game (APK = peluncur; konten diunduh live) ----
-        var updater = gameObject.AddComponent<ContentUpdater>();
-        updater.Init(player, ui);
+        if (!SkipUpdater)
+        {
+            var updater = gameObject.AddComponent<ContentUpdater>();
+            updater.Init(player, ui);
+        }
 
         // ---- EventSystem untuk input sentuh ----
         if (FindObjectOfType<EventSystem>() == null)

@@ -12,6 +12,8 @@ public class SwordProp : MonoBehaviour
     Animator animator;
     bool visible;
 
+    public bool Visible { get { return visible; } }
+
     public void Attach(Animator a)
     {
         animator = a;
