@@ -2,34 +2,32 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Hutan prosedural di world datar tak-berbatas: prefab nature (hasil konversi
-/// glTF Kenney Nature Kit oleh ImportWorld saat build CI) disebar DETERMINISTIK
-/// per sel grid — pola tetap sama setiap kali player kembali ke sel yang sama
-/// (seed dari koordinat sel), spawn/musnah halus mengikuti posisi player.
-///
-/// Ringan untuk mobile: maksimal beberapa ratus instance, update tersebar
-/// (throttle), hanya instantiate/destroy saat melewati batas sel.
+/// Hutan & detail nature deterministik per tile 40 m (port redesign
+/// world/nature_field.gd Godot): 7x7 tile aktif, 6 percobaan pohon + 12 detail
+/// per tile, "grove" sinusoidal supaya padang terbuka berselang-seling dengan
+/// rumpun rapat (bukan grid teratur), maksimal 1 tile dibangun per frame.
+/// Prefab = konversi glTF Kenney (CC0) oleh ImportWorld saat build CI.
 /// </summary>
 public class WorldForest : MonoBehaviour
 {
     public Transform target;
 
-    const float CellSize = 12f;
-    const float SpawnRadius = 70f;
-    const float DespawnRadius = 88f;
-    const float ClearRadius = 9f;      // area lahir player bersih
-    const int MaxInstances = 240;
-    const float UpdateInterval = 0.2f;
+    const float Tile = 40f;
+    const int Radius = 3;
+    const int TreeAttempts = 6;
+    const int DetailAttempts = 12;
 
-    // kategori prefab (diisi LoadAssets)
     readonly List<GameObject> trees = new List<GameObject>();
     readonly List<GameObject> bushes = new List<GameObject>();
-    readonly List<GameObject> rocks = new List<GameObject>();
     readonly List<GameObject> covers = new List<GameObject>();
+    readonly List<GameObject> pebbles = new List<GameObject>();
 
-    readonly Dictionary<long, List<GameObject>> active = new Dictionary<long, List<GameObject>>();
-    float nextUpdate;
+    readonly Dictionary<long, GameObject> tiles = new Dictionary<long, GameObject>();
+    readonly Dictionary<long, int> tileCounts = new Dictionary<long, int>();
+    readonly Queue<long> pending = new Queue<long>();
+    Vector2Int center = new Vector2Int(99999, 99999);
     int instanceCount;
+    const int MaxInstances = 340;   // pagu draw call mobile
 
     public void LoadAssets()
     {
@@ -38,109 +36,138 @@ public class WorldForest : MonoBehaviour
         {
             if (p == null) continue;
             string n = p.name;
-            if (n.IndexOf("Tree", System.StringComparison.Ordinal) >= 0 ||
-                n.IndexOf("Pine", System.StringComparison.Ordinal) >= 0) trees.Add(p);
-            else if (n.IndexOf("Bush", System.StringComparison.Ordinal) >= 0) bushes.Add(p);
-            else if (n.IndexOf("Rock", System.StringComparison.Ordinal) >= 0 ||
-                     n.IndexOf("Pebble", System.StringComparison.Ordinal) >= 0) rocks.Add(p);
-            else covers.Add(p);   // Fern, Flower, dll.
+            if (n.Contains("Tree") || n.Contains("Pine")) trees.Add(p);
+            else if (n.Contains("Bush")) bushes.Add(p);
+            else if (n.Contains("Pebble") || n.Contains("RockPath")) pebbles.Add(p);
+            else covers.Add(p);   // Fern, Flower
         }
-        Debug.Log("[WorldForest] prefab termuat: trees=" + trees.Count + " bushes=" + bushes.Count
-                  + " rocks=" + rocks.Count + " covers=" + covers.Count);
+        Debug.Log("[WorldForest] prefab: trees=" + trees.Count + " bushes=" + bushes.Count
+                  + " covers=" + covers.Count + " pebbles=" + pebbles.Count);
     }
 
     void Update()
     {
-        if (target == null) return;
-        if (Time.time < nextUpdate) return;
-        nextUpdate = Time.time + UpdateInterval;
+        if (target == null || IslandTerrain.I == null) return;
+        var c = new Vector2Int(Mathf.FloorToInt(target.position.x / Tile),
+                               Mathf.FloorToInt(target.position.z / Tile));
+        if (c != center) Recenter(c);
+        if (pending.Count > 0) BuildTile(pending.Dequeue());
+    }
 
-        Vector3 p = target.position;
-        int cx = Mathf.FloorToInt(p.x / CellSize);
-        int cz = Mathf.FloorToInt(p.z / CellSize);
-        int range = Mathf.CeilToInt(SpawnRadius / CellSize);
+    static long Key(int x, int z) { return ((long)x << 32) | (uint)z; }
 
-        // spawn sel yang terlihat
-        for (int x = cx - range; x <= cx + range; x++)
-        {
-            for (int z = cz - range; z <= cz + range; z++)
-            {
-                Vector3 center = new Vector3((x + 0.5f) * CellSize, 0f, (z + 0.5f) * CellSize);
-                if ((center - p).sqrMagnitude > SpawnRadius * SpawnRadius) continue;
-                long key = Key(x, z);
-                if (active.ContainsKey(key)) continue;
-                SpawnCell(key, x, z);
-            }
-        }
-
-        // musnahkan yang jauh
+    void Recenter(Vector2Int c)
+    {
+        center = c;
+        pending.Clear();
         var dead = new List<long>();
-        foreach (var kv in active)
+        foreach (var kv in tiles)
         {
-            var list = kv.Value;
-            if (list.Count == 0) { dead.Add(kv.Key); continue; }
-            Vector3 c = list[0].transform.position;
-            if ((c - p).sqrMagnitude > DespawnRadius * DespawnRadius)
-            {
-                for (int i = 0; i < list.Count; i++)
-                {
-                    if (list[i] != null) { Destroy(list[i]); instanceCount--; }
-                }
-                dead.Add(kv.Key);
-            }
+            int x = (int)(kv.Key >> 32), z = (int)(kv.Key & 0xFFFFFFFF);
+            if (Mathf.Max(Mathf.Abs(x - c.x), Mathf.Abs(z - c.z)) > Radius) dead.Add(kv.Key);
         }
-        for (int i = 0; i < dead.Count; i++) active.Remove(dead[i]);
+        for (int i = 0; i < dead.Count; i++)
+        {
+            if (tiles.TryGetValue(dead[i], out var go) && go != null) Destroy(go);
+            if (tileCounts.TryGetValue(dead[i], out int cn)) instanceCount -= cn;
+            tiles.Remove(dead[i]);
+            tileCounts.Remove(dead[i]);
+        }
+        var order = new List<long>();
+        for (int z = c.z - Radius; z <= c.z + Radius; z++)
+            for (int x = c.x - Radius; x <= c.x + Radius; x++)
+                if (!tiles.ContainsKey(Key(x, z))) order.Add(Key(x, z));
+        order.Sort((a, b) => Dist(a, c).CompareTo(Dist(b, c)));
+        for (int i = 0; i < order.Count; i++) pending.Enqueue(order[i]);
     }
 
-    void SpawnCell(long key, int x, int z)
+    static float Dist(long key, Vector2Int c)
     {
-        var list = new List<GameObject>();
-        active[key] = list;
-
-        var rng = new System.Random(unchecked(x * 73856093 ^ z * 19349663));
-        Vector3 center = new Vector3((x + 0.5f) * CellSize, 0f, (z + 0.5f) * CellSize);
-
-        // satu objek "utama" per sel + kemungkinan penutup tanah
-        float roll = (float)rng.NextDouble();
-        GameObject main = null;
-        if (roll < 0.34f && trees.Count > 0) main = Pick(trees, rng);
-        else if (roll < 0.52f && bushes.Count > 0) main = Pick(bushes, rng);
-        else if (roll < 0.70f && rocks.Count > 0) main = Pick(rocks, rng);
-        else if (covers.Count > 0 && (float)rng.NextDouble() < 0.75f) main = Pick(covers, rng);
-
-        if (main != null) Place(list, main, center, rng);
-
-        // penutup tanah tambahan (rumput/bunga) biar tidak gersang
-        if (covers.Count > 0 && (float)rng.NextDouble() < 0.45f)
-            Place(list, Pick(covers, rng), center, rng);
-
-        if (list.Count == 0) return;
+        int x = (int)(key >> 32), z = (int)(key & 0xFFFFFFFF);
+        return (x - c.x) * (x - c.x) + (z - c.z) * (z - c.z);
     }
 
-    void Place(List<GameObject> list, GameObject prefab, Vector3 center, System.Random rng)
+    bool CanPlace(float x, float z, bool tree)
     {
-        if (instanceCount >= MaxInstances) return;
+        var it = IslandTerrain.I;
+        if (IslandTerrain.ArenaDistance(x, z) < 5f || new Vector2(x, z).magnitude > 405f) return false;
+        float h = it.SurfaceHeight(x, z);
+        if (h < 5.5f || IslandTerrain.WaterCovers(x, z, 3f)) return false;
+        if (Mathf.Abs(z) < 345f && IslandTerrain.RoadDistance(x, z) < (tree ? 17f : 14f)) return false;
+        float gx = it.SurfaceHeight(x + 1f, z) - it.SurfaceHeight(x - 1f, z);
+        float gz = it.SurfaceHeight(x, z + 1f) - it.SurfaceHeight(x, z - 1f);
+        if (new Vector2(gx, gz).magnitude * 0.5f > 0.40f) return false;
+        for (int i = 0; i < it.RockClearances.Count; i++)
+        {
+            var r = it.RockClearances[i];
+            if (new Vector2(x - r.x, z - r.z).magnitude < r.y + 2f) return false;
+        }
+        return true;
+    }
 
-        float jx = ((float)rng.NextDouble() - 0.5f) * (CellSize - 2f);
-        float jz = ((float)rng.NextDouble() - 0.5f) * (CellSize - 2f);
-        Vector3 pos = center + new Vector3(jx, 0f, jz);
-        if (pos.magnitude < ClearRadius) return;   // zona lahir player
+    void BuildTile(long key)
+    {
+        int kx = (int)(key >> 32), kz = (int)(key & 0xFFFFFFFF);
+        var root = new GameObject("Nature_" + kx + "_" + kz);
+        root.transform.SetParent(transform, false);
+        root.transform.localPosition = new Vector3(kx * Tile, 0f, kz * Tile);
 
-        var go = Instantiate(prefab, pos, Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f));
-        float s = 0.85f + (float)rng.NextDouble() * 0.4f;
-        go.transform.localScale = Vector3.one * s;
-        go.transform.SetParent(transform);
-        list.Add(go);
-        instanceCount++;
+        var rng = new System.Random(unchecked(kx * 73856093 ^ kz * 19349663) + 71037);
+        var placed = new List<Vector2>();
+        var placedTree = new List<Vector2>();
+
+        for (int i = 0; i < TreeAttempts + DetailAttempts; i++)
+        {
+            if (instanceCount >= MaxInstances) break;
+            bool tree = i < TreeAttempts;
+            float px = kx * Tile + (float)(rng.NextDouble() * (Tile - 8) + 4);
+            float pz = kz * Tile + (float)(rng.NextDouble() * (Tile - 8) + 4);
+
+            // padang terbuka berselang-seling dengan rumpun rapat
+            float grove = Mathf.Sin(px * 0.027f) * Mathf.Cos(pz * 0.033f);
+            if (tree && rng.NextDouble() > 0.58 + grove * 0.25) continue;
+            if (!CanPlace(px, pz, tree)) continue;
+
+            var pt = new Vector2(px, pz);
+            float minGap = tree ? 6f : 1.5f;
+            var others = tree ? placedTree : placed;
+            bool tooClose = false;
+            for (int j = 0; j < others.Count; j++)
+                if ((others[j] - pt).sqrMagnitude < minGap * minGap) { tooClose = true; break; }
+            if (tooClose) continue;
+
+            GameObject prefab;
+            if (tree) prefab = Pick(trees, rng);
+            else
+            {
+                double r = rng.NextDouble();
+                if (r < 0.35 && bushes.Count > 0) prefab = Pick(bushes, rng);
+                else if (r < 0.90 && covers.Count > 0) prefab = Pick(covers, rng);
+                else if (pebbles.Count > 0) prefab = Pick(pebbles, rng);
+                else prefab = Pick(bushes, rng);
+                if (prefab == null) prefab = Pick(covers, rng);
+            }
+            if (prefab == null) continue;
+
+            float y = IslandTerrain.I.SurfaceHeight(px, pz) - 0.05f;
+            var go = Instantiate(prefab, root.transform);
+            go.transform.localPosition = new Vector3(px - kx * Tile, y, pz - kz * Tile);
+            go.transform.localRotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
+            float s = tree ? 0.9f + (float)rng.NextDouble() * 0.4f
+                           : 0.85f + (float)rng.NextDouble() * 0.4f;
+            go.transform.localScale = Vector3.one * s;
+
+            placed.Add(pt);
+            if (tree) placedTree.Add(pt);
+            instanceCount++;
+        }
+
+        tiles[key] = root;
+        tileCounts[key] = placed.Count;
     }
 
     static GameObject Pick(List<GameObject> list, System.Random rng)
     {
-        return list[rng.Next(list.Count)];
-    }
-
-    static long Key(int x, int z)
-    {
-        return ((long)x << 32) | (uint)z;
+        return list.Count > 0 ? list[rng.Next(list.Count)] : null;
     }
 }

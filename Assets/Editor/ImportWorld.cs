@@ -59,6 +59,27 @@ public static class ImportWorld
                 Debug.LogError("[ImportWorld] Gagal konversi " + gltfPath + ": " + e);
             }
         }
+        // tekstur scatter meadow (mask grayscale dari repo Godot) untuk corak
+        // shader terrain — harus di bawah Resources agar bisa di-load runtime.
+        string texDir = OutDir + "/Textures";
+        Directory.CreateDirectory(texDir);
+        string meadowSrc = SrcDir + "/meadow_cover.png";
+        string meadowDst = texDir + "/meadow_cover.png";
+        if (File.Exists(meadowSrc))
+        {
+            File.Copy(meadowSrc, meadowDst, true);
+            AssetDatabase.ImportAsset(meadowDst);
+            var ti = AssetDatabase.LoadAssetAtPath<TextureImporter>(meadowDst);
+            if (ti != null)
+            {
+                ti.wrapMode = TextureWrapMode.Repeat;
+                ti.filterMode = FilterMode.Bilinear;
+                ti.mipmapEnabled = true;
+                ti.maxTextureSize = 256;
+                ti.SaveAndReimport();
+            }
+        }
+
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         Debug.Log("[ImportWorld] " + done + "/" + gltfs.Length + " model nature siap di " + OutDir + "/Prefabs");

@@ -82,6 +82,11 @@ public class PlayerController : MonoBehaviour
 
     float landTimer;
 
+    // titik aman terakhir di perairan dangkal (air dalam bukan lantai)
+    Vector3 lastSafe;
+    bool lastSafeValid;
+    SwordProp sword;
+
     public bool Sprint { get { return sprint; } }
     public string CurrentModelName { get { return modelIndex == 0 ? "UAL2" : "Mannequin F"; } }
 
@@ -98,6 +103,7 @@ public class PlayerController : MonoBehaviour
         cc.skinWidth = 0.04f;
 
         anim = gameObject.AddComponent<PlayerAnimator>();
+        sword = gameObject.AddComponent<SwordProp>();
 
         CameraTarget = new GameObject("CamTarget").transform;
         CameraTarget.SetParent(transform, false);
@@ -131,6 +137,7 @@ public class PlayerController : MonoBehaviour
         animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
 
         anim.Bind(animator);
+        if (sword != null) sword.Attach(animator);
         state = State.Loco;
         vy = 0f; airTime = 0f; speedSm = 0f;
         anim.Play(lib.Get("Idle_FoldArms_Loop"), true, 1f, 0f);
@@ -147,7 +154,13 @@ public class PlayerController : MonoBehaviour
         vy = JumpVel;
         airTime = 0f;
         state = State.Air;
-        anim.Play(lib.Get("NinjaJump_Start"), false, 1.25f, 0.08f);
+        // samakan durasi anim lepas-landas dengan balistik (udara = 2*v/|g|)
+        var jumpClip = lib.Get("NinjaJump_Start");
+        float airTime01 = 2f * JumpVel / -Gravity;
+        float jumpSpd = jumpClip != null
+            ? Mathf.Clamp(jumpClip.length / Mathf.Max(airTime01, 0.2f), 0.8f, 2f)
+            : 1.25f;
+        anim.Play(jumpClip, false, jumpSpd, 0.08f);
     }
 
     public void OnAttack()
@@ -236,12 +249,35 @@ public class PlayerController : MonoBehaviour
         Vector3 sd = d / steps;
         for (int i = 0; i < steps; i++) cc.Move(sd);
 
-        if (transform.position.y < GroundY - 0.4f)
+        if (IslandTerrain.I == null)
         {
-            Debug.LogWarning("[UAL2] Failsafe: player tembus lantai — dikembalikan ke permukaan.");
-            transform.position = new Vector3(transform.position.x, GroundY + 0.05f, transform.position.z);
-            vy = 0f; airTime = 0f;
-            EnterLand();
+            if (transform.position.y < GroundY - 0.4f)
+            {
+                Debug.LogWarning("[UAL2] Failsafe: player tembus lantai — dikembalikan ke permukaan.");
+                transform.position = new Vector3(transform.position.x, GroundY + 0.05f, transform.position.z);
+                vy = 0f; airTime = 0f;
+                EnterLand();
+            }
+            return;
+        }
+
+        // ---- pulau: failsafe mengikuti permukaan terrain, dan air dalam
+        // (danau/sungai/laut) bukan lantai — dorong kembali ke titik dangkal. ----
+        {
+            Vector3 p = transform.position;
+            float surf = IslandTerrain.I.SurfaceHeight(p.x, p.z);
+            if (p.y < surf - 0.6f)
+            {
+                transform.position = new Vector3(p.x, surf + 0.05f, p.z);
+                vy = 0f; airTime = 0f;
+                EnterLand();
+                return;
+            }
+            float wl = IslandTerrain.I.WaterLevelAt(p.x, p.z);
+            if (wl > -100f && wl - surf > 1.05f)
+            {
+                if (lastSafeValid) { transform.position = lastSafe; vy = 0f; }
+            }
         }
     }
 
@@ -280,6 +316,15 @@ public class PlayerController : MonoBehaviour
         Vector3 dir = CamRelative(inp);
         if (mag > 0.08f) lastMoveDir = dir;
 
+        // titik aman = membumi di air dangkal/darat (untuk dorongan air dalam)
+        if (IslandTerrain.I != null && IsGrounded())
+        {
+            Vector3 p = transform.position;
+            float wl = IslandTerrain.I.WaterLevelAt(p.x, p.z);
+            float surf = IslandTerrain.I.SurfaceHeight(p.x, p.z);
+            if (wl < -100f || wl - surf <= 1.05f) { lastSafe = p; lastSafeValid = true; }
+        }
+
         switch (state)
         {
             case State.Loco: UpdateLoco(dt, inp, dir, mag); break;
@@ -288,6 +333,10 @@ public class PlayerController : MonoBehaviour
             case State.Action: UpdateAction(dt, mag); break;
             case State.Slide: UpdateSlide(dt); break;
         }
+
+        // pedang terlihat hanya selama combo/animasi pedang
+        if (sword != null)
+            sword.SetVisible(state == State.Action && actionKey.IndexOf("Sword", System.StringComparison.Ordinal) >= 0);
     }
 
     void UpdateLoco(float dt, Vector2 inp, Vector3 dir, float mag)
@@ -392,7 +441,11 @@ public class PlayerController : MonoBehaviour
         speedSm = Mathf.MoveTowards(speedSm, 0f, 14f * dt);
 
         bool grounded = IsGrounded();
-        PhysicsMove(lastMoveDir * speedSm, dt, grounded);
+        // langkah masuk saat mengayun pedang: ayunan terasa "berisi"
+        float lunge = 0f;
+        if (IsComboKey(actionKey) && actionTime < 0.35f)
+            lunge = (1f - actionTime / 0.35f) * 2.4f;
+        PhysicsMove(lastMoveDir * speedSm + transform.forward * lunge, dt, grounded);
         if (!grounded && CheckFallTransition()) return;   // aksi dibatalkan oleh jatuh
 
         if (!actionLoop && anim.IsDone())

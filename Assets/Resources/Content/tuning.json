@@ -1,5 +1,5 @@
 {
-  "motd": "🌳 World nature AKTIF — hutan, semak, batu & padang rumput (CC0 Kenney). Tuning ini diunduh otomatis dari release content-latest, tanpa instal ulang APK!",
+  "motd": "🏝️ PULAU 1 km: gunung & tebing, danau + sungai, jalan pedesaan, plaza batu, rumput bergoyang — port redesign world Godot-mu (CC0 Kenney). Tuning live tanpa instal ulang!",
   "walkSpeed": 2.1,
   "runSpeed": 4.6,
   "sprintMul": 1.35,
@@ -7,5 +7,5 @@
   "gridBase": "#6B9454",
   "gridLine": "#61874C",
   "gridMajor": "#547842",
-  "fog": "#B8D1B3"
+  "fog": "#CDE0E8"
 }

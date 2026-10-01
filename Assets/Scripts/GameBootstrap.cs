@@ -29,29 +29,30 @@ public class GameBootstrap : MonoBehaviour
         var lib = new AnimLibrary();
         Debug.Log("[UAL2] Animasi termuat: " + lib.Count);
 
-        // ---- World: lantai datar + grid kotak-kotak tanpa batas ----
-        var world = WorldGrid.Create();
+        // ---- World: pulau 1 km x 1 km (port redesign world Godot-mu):
+        // gunung/tebing, danau + sungai, jalan pedesaan, plaza batu, laut ----
+        var island = IslandTerrain.Build();
 
-        // ---- Player ----
+        // ---- Player (lahir di plaza batu) ----
         var playerGO = new GameObject("Player");
-        playerGO.transform.position = new Vector3(0f, 0.1f, 0f);
+        playerGO.transform.position = island.SpawnPoint;
         var player = playerGO.AddComponent<PlayerController>();
         player.Init(lib);
 
-        world.target = playerGO.transform;
+        // ---- rumput berlapis (port grass_field.gd) + hutan deterministik ----
+        var grassGO = new GameObject("GrassField");
+        var grass = grassGO.AddComponent<GrassField>();
+        grass.player = playerGO.transform;
 
-        // ---- hutan prosedural: nature CC0 (Kenney) dari repo Godot, dikonversi saat build ----
         var forestGO = new GameObject("WorldForest");
         var forest = forestGO.AddComponent<WorldForest>();
         forest.target = playerGO.transform;
         forest.LoadAssets();
 
-        // ---- look ground: padang rumput stylized (bukan grid abu-abu) ----
-        WorldGrid.ApplyLook(
-            new Color(0.42f, 0.58f, 0.33f),  // base rumput
-            new Color(0.38f, 0.53f, 0.30f),  // garis grid halus
-            new Color(0.33f, 0.47f, 0.26f),  // garis utama
-            new Color(0.72f, 0.82f, 0.70f)); // fog/cakrawala lembut
+        // ---- cakrawala pulau (grid kotak-kotak dihapus) ----
+        RenderSettings.fogColor = new Color(0.80f, 0.87f, 0.91f);
+        RenderSettings.fogStartDistance = 80f;
+        RenderSettings.fogEndDistance = 650f;
 
         // ---- Kamera orbit (third person) ----
         var cam = Camera.main;
@@ -63,10 +64,10 @@ public class GameBootstrap : MonoBehaviour
             camGO.AddComponent<AudioListener>();
         }
         cam.clearFlags = CameraClearFlags.SolidColor;
-        cam.backgroundColor = new Color(0.75f, 0.82f, 0.90f);
+        cam.backgroundColor = new Color(0.80f, 0.87f, 0.91f);
         cam.fieldOfView = 55f;
         cam.nearClipPlane = 0.1f;
-        cam.farClipPlane = 400f;
+        cam.farClipPlane = 3000f;   // pulau 1 km + laut 4 km harus terlihat utuh
 
         var orbit = cam.gameObject.AddComponent<OrbitCamera>();
         orbit.target = player.CameraTarget;
