@@ -2,6 +2,7 @@
     "name": "PlaymodeSim",
     "rootNamespace": "",
     "references": [
+        "Game",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
