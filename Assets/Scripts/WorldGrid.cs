@@ -36,10 +36,10 @@ public class WorldGrid : MonoBehaviour
         var wg = root.AddComponent<WorldGrid>();
 
         // Collider lantai besar yang ikut bergerak bersama player.
-        // Tebal 20 m (puncak tetap y=0): mustahil ditembus gerakan yang
-        // sudah di-substep ≤0.25 m, bahkan saat frame spike / jatuh cepat.
+        // Cadangan lantai selebar pulau 200 m (puncak tetap y=0), cukup luas
+        // untuk map aktif tanpa collider ribuan meter yang tidak diperlukan.
         var col = root.AddComponent<BoxCollider>();
-        col.size = new Vector3(4000f, 20f, 4000f);
+        col.size = new Vector3(IslandTerrain.WorldSize, 20f, IslandTerrain.WorldSize);
         col.center = new Vector3(0f, -10f, 0f);
 
         // Plane visual dengan shader grid tanpa batas.
@@ -48,7 +48,7 @@ public class WorldGrid : MonoBehaviour
         Object.Destroy(plane.GetComponent<Collider>());
         plane.transform.SetParent(root.transform, false);
         plane.transform.localPosition = Vector3.zero;
-        plane.transform.localScale = new Vector3(80f, 1f, 80f); // 800 x 800 meter
+        plane.transform.localScale = new Vector3(IslandTerrain.WorldSize / 10f, 1f, IslandTerrain.WorldSize / 10f); // 200 x 200 m
 
         var shader = Resources.Load<Shader>("Shaders/InfiniteGrid");
         if (shader == null) shader = Shader.Find("UAL2/InfiniteGrid");
@@ -65,9 +65,9 @@ public class WorldGrid : MonoBehaviour
 
     // Collider statis yang DIPINDAH tiap frame membuat PhysX glitch (karakter
     // bisa terdorong/grounded flicker → "tembus tanah"). Karena lantai datar
-    // sempurna dan pola grid dihitung dari world-space, memindahkan collider
-    // dalam langkah kasar tidak terlihat bedanya. Snap tiap 250 m saja.
-    const float SnapDistance = 250f;
+    // sempurna dan pola grid dihitung dari world-space, collider hanya di-snap
+    // saat player mendekati tepi area cadangan 200 m.
+    const float SnapDistance = IslandTerrain.WorldHalfSize;
 
     void LateUpdate()
     {
@@ -75,7 +75,7 @@ public class WorldGrid : MonoBehaviour
         Vector3 c = transform.position;
         Vector3 p = target.position;
 
-        // Collider lantai (root): snap kasar tiap 250 m agar PhysX tidak glitch.
+        // Collider lantai (root): snap kasar tiap 100 m agar PhysX tidak glitch.
         if (Mathf.Abs(p.x - c.x) > SnapDistance || Mathf.Abs(p.z - c.z) > SnapDistance)
         {
             float sx = Mathf.Round(p.x / SnapDistance) * SnapDistance;

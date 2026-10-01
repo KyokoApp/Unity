@@ -4,7 +4,7 @@ using UnityEngine.Playables;
 
 /// <summary>
 /// Pemutar animasi berbasis PlayableGraph: crossfade 2 slot, loop manual,
-/// dan hold pose di frame terakhir untuk clip non-loop.
+/// hold pose non-loop, dan Foot IK opsional untuk clip ground locomotion.
 /// Bisa di-rebind ke Animator lain (ganti model mannequin).
 /// </summary>
 public class PlayerAnimator : MonoBehaviour
@@ -37,15 +37,16 @@ public class PlayerAnimator : MonoBehaviour
         fadeT = 1f;
     }
 
-    public void Play(AnimationClip clip, bool loop, float speed = 1f, float fade = 0.15f)
+    public void Play(AnimationClip clip, bool loop, float speed = 1f, float fade = 0.15f, bool applyFootIK = false)
     {
         if (!hasGraph || clip == null) return;
 
-        // Clip loop yang sama sedang jalan: cukup update kecepatan.
+        // Clip loop yang sama sedang jalan: cukup update kecepatan dan mode IK.
         // (Clip non-loop yang sama tetap di-restart dari awal.)
         if (cur >= 0 && slotClip[cur] == clip && slotLoop[cur] == loop && loop && slot[cur].IsValid())
         {
             slot[cur].SetSpeed(speed);
+            slot[cur].SetApplyFootIK(applyFootIK);
             return;
         }
 
@@ -57,7 +58,7 @@ public class PlayerAnimator : MonoBehaviour
         }
 
         var p = AnimationClipPlayable.Create(graph, clip);
-        p.SetApplyFootIK(false);
+        p.SetApplyFootIK(applyFootIK);
         p.SetApplyPlayableIK(false);
         p.SetTime(0);
         p.SetSpeed(speed);

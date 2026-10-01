@@ -77,9 +77,17 @@ public class WorldForest : MonoBehaviour
         var order = new List<long>();
         for (int z = c.y - Radius; z <= c.y + Radius; z++)
             for (int x = c.x - Radius; x <= c.x + Radius; x++)
-                if (!tiles.ContainsKey(Key(x, z))) order.Add(Key(x, z));
+                if (TileIntersectsWorld(x, z) && !tiles.ContainsKey(Key(x, z))) order.Add(Key(x, z));
         order.Sort((a, b) => Dist(a, c).CompareTo(Dist(b, c)));
         for (int i = 0; i < order.Count; i++) pending.Enqueue(order[i]);
+    }
+
+    static bool TileIntersectsWorld(int x, int z)
+    {
+        float minX = x * Tile, minZ = z * Tile;
+        float max = IslandTerrain.WorldHalfSize;
+        return minX < max && minX + Tile > -max
+            && minZ < max && minZ + Tile > -max;
     }
 
     static float Dist(long key, Vector2Int c)
@@ -91,10 +99,14 @@ public class WorldForest : MonoBehaviour
     bool CanPlace(float x, float z, bool tree)
     {
         var it = IslandTerrain.I;
-        if (IslandTerrain.ArenaDistance(x, z) < 5f || new Vector2(x, z).magnitude > 405f) return false;
+        if (IslandTerrain.ArenaDistance(x, z) < 5f
+            || Mathf.Abs(x) >= IslandTerrain.WorldHalfSize
+            || Mathf.Abs(z) >= IslandTerrain.WorldHalfSize) return false;
         float h = it.SurfaceHeight(x, z);
-        if (h < 5.5f || IslandTerrain.WaterCovers(x, z, 3f)) return false;
-        if (Mathf.Abs(z) < 345f && IslandTerrain.RoadDistance(x, z) < (tree ? 17f : 14f)) return false;
+        if (h < 5.5f * IslandTerrain.WorldScale
+            || IslandTerrain.WaterCovers(x, z, 3f * IslandTerrain.WorldScale)) return false;
+        if (Mathf.Abs(z) < 345f * IslandTerrain.WorldScale
+            && IslandTerrain.RoadDistance(x, z) < (tree ? 17f : 14f) * IslandTerrain.WorldScale) return false;
         float gx = it.SurfaceHeight(x + 1f, z) - it.SurfaceHeight(x - 1f, z);
         float gz = it.SurfaceHeight(x, z + 1f) - it.SurfaceHeight(x, z - 1f);
         if (new Vector2(gx, gz).magnitude * 0.5f > 0.40f) return false;

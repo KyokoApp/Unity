@@ -2,8 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Pulau deterministik 1 km x 1 km — port + redesign halus dari world Godot
-/// (KyokoApp/Godot, project/src/game/island.gd + water_shape.gd + arena_shape.gd).
+/// Pulau deterministik 200 m x 200 m — bentuk port dari world Godot dalam
+/// koordinat sumber 1 km, diperkecil seragam agar ukuran fitur dan kemiringan
+/// tetap proporsional (terrain, air, jalan, arena, dan spawn).
 ///
 /// Redesign "lebih smooth" dibanding aslinya: normal terrain halus (tanpa
 /// facet low-poly cliff), batas jalan/batu plaza dihitung per-fragment di
@@ -18,8 +19,13 @@ public class IslandTerrain : MonoBehaviour
 {
     public static IslandTerrain I;
 
+    public const float WorldScale = 0.2f;
+    public const float WorldSize = 200f;
+    public const float WorldHalfSize = WorldSize * 0.5f;
+
     const int Cells = 200;
-    const float Step = 5f;
+    const float Step = 5f;                 // jarak sampel dalam koordinat sumber
+    const float SourceHalfSize = 500f;
     const float SeaLevel = 0f;
 
     static readonly Color GrassCol = new Color(0.349f, 0.647f, 0.255f);   // #59a541
@@ -30,6 +36,10 @@ public class IslandTerrain : MonoBehaviour
     public List<Vector3> RockClearances { get; } = new List<Vector3>();
 
     float[] heights = new float[(Cells + 1) * (Cells + 1)];
+    Mesh terrainMesh;
+    Mesh inlandWaterMesh;
+    Material terrainMaterial;
+    Material waterMaterial;
 
     // ================= bentuk analitik (port 1:1 dari Godot) =================
 
@@ -41,20 +51,29 @@ public class IslandTerrain : MonoBehaviour
 
     static float Lerp(float a, float b, float t) { return a + (b - a) * t; }
 
-    public static float RoadX(float z)
+    static float SourceRoadX(float z)
     {
         return 65f * Mathf.Sin(z / 95f) + 22f * Mathf.Sin(z / 43f);
     }
 
-    public static float RoadHeight(float z)
+    static float SourceRoadHeight(float z)
     {
         return 5f + 7f * (1f - Mathf.Cos(z / 110f)) + 1.1f * (1f - Mathf.Cos(z / 28f));
     }
 
-    public static float RoadDistance(float x, float z)
+    static float SourceRoadDistance(float x, float z)
     {
         float slope = (65f / 95f) * Mathf.Cos(z / 95f) + (22f / 43f) * Mathf.Cos(z / 43f);
-        return Mathf.Abs(x - RoadX(z)) / Mathf.Sqrt(1f + slope * slope);
+        return Mathf.Abs(x - SourceRoadX(z)) / Mathf.Sqrt(1f + slope * slope);
+    }
+
+    // API dunia menerima meter Unity (rentang x/z -100..100), sedangkan rumus
+    // bentuk tetap ditulis dalam koordinat sumber 1 km.
+    public static float RoadX(float z) { return SourceRoadX(z / WorldScale) * WorldScale; }
+    public static float RoadHeight(float z) { return SourceRoadHeight(z / WorldScale) * WorldScale; }
+    public static float RoadDistance(float x, float z)
+    {
+        return SourceRoadDistance(x / WorldScale, z / WorldScale) * WorldScale;
     }
 
     // ---- danau + sungai (water_shape.gd) ----
@@ -92,20 +111,35 @@ public class IslandTerrain : MonoBehaviour
         return Mathf.Max(distance, Mathf.Max(RiverBegin - z, z - RiverEnd));
     }
 
-    public static float DistanceToWater(float x, float z)
+    static float SourceDistanceToWater(float x, float z)
     {
         if (x < 15f || x > 340f || z < -125f || z > 355f) return 1000f;
         return Mathf.Min(LakeDistance(x, z), RiverDistance(x, z));
     }
 
-    public static float WaterLevel(float z)
+    static float SourceWaterLevel(float z)
     {
         return LakeLevel * (1f - Smoothstep(0f, 320f, z));
     }
 
+    static bool SourceWaterCovers(float x, float z, float margin = 0f)
+    {
+        return SourceDistanceToWater(x, z) < 6f + margin;
+    }
+
+    public static float DistanceToWater(float x, float z)
+    {
+        return SourceDistanceToWater(x / WorldScale, z / WorldScale) * WorldScale;
+    }
+
+    public static float WaterLevel(float z)
+    {
+        return SourceWaterLevel(z / WorldScale) * WorldScale;
+    }
+
     public static bool WaterCovers(float x, float z, float margin = 0f)
     {
-        return DistanceToWater(x, z) < 6f + margin;
+        return SourceWaterCovers(x / WorldScale, z / WorldScale, margin / WorldScale);
     }
 
     // ---- plaza batu / arena (arena_shape.gd) ----
@@ -113,7 +147,7 @@ public class IslandTerrain : MonoBehaviour
     const float ArenaRadius = 42f;
     const float ArenaHeight = 9f;
 
-    public static float ArenaDistance(float x, float z)
+    static float SourceArenaDistance(float x, float z)
     {
         Vector2 p = new Vector2(x - ArenaCenter.x, z - ArenaCenter.y);
         float angle = Mathf.Atan2(p.y, p.x);
@@ -121,8 +155,13 @@ public class IslandTerrain : MonoBehaviour
         return p.magnitude - r;
     }
 
-    // ---- tinggi terrain ----
-    public static float TerrainHeight(float x, float z)
+    public static float ArenaDistance(float x, float z)
+    {
+        return SourceArenaDistance(x / WorldScale, z / WorldScale) * WorldScale;
+    }
+
+    // ---- tinggi terrain dalam koordinat sumber, lalu wrapper meter Unity ----
+    static float SourceTerrainHeight(float x, float z)
     {
         float angle = Mathf.Atan2(z, x);
         float radius = 435f + 22f * Mathf.Sin(angle * 3f) + 18f * Mathf.Cos(angle * 5f);
@@ -139,32 +178,42 @@ public class IslandTerrain : MonoBehaviour
         float rolling = 3f * Mathf.Sin(x / 48f) * Mathf.Cos(z / 61f);
         float height = -7f + coast * (12f + hills + cliff + rolling);
 
-        float roadWeight = (1f - Smoothstep(13f, 38f, RoadDistance(x, z)))
+        float roadWeight = (1f - Smoothstep(13f, 38f, SourceRoadDistance(x, z)))
                          * (1f - Smoothstep(300f, 350f, Mathf.Abs(z)));
-        height = Lerp(height, RoadHeight(z), roadWeight);
+        height = Lerp(height, SourceRoadHeight(z), roadWeight);
 
         // ukir badan air (danau+sungai), lalu plaza arena
-        float dw = DistanceToWater(x, z);
+        float dw = SourceDistanceToWater(x, z);
         if (dw < 22f)
         {
-            float bed = WaterLevel(z) - 2.6f * (1f - Smoothstep(-12f, 1.5f, dw));
+            float bed = SourceWaterLevel(z) - 2.6f * (1f - Smoothstep(-12f, 1.5f, dw));
             float infl = 1f - Smoothstep(0f, 22f, dw);
             height = Mathf.Min(height, Lerp(height, bed, infl));
         }
-        height = Lerp(ArenaHeight, height, Smoothstep(0f, 22f, ArenaDistance(x, z)));
+        height = Lerp(ArenaHeight, height, Smoothstep(0f, 22f, SourceArenaDistance(x, z)));
         return height;
+    }
+
+    public static float TerrainHeight(float x, float z)
+    {
+        return SourceTerrainHeight(x / WorldScale, z / WorldScale) * WorldScale;
     }
 
     /// <summary>Interpolasi segitiga yang SAMA dengan mesh collider.</summary>
     public float SurfaceHeight(float x, float z)
     {
-        float gx = Mathf.Clamp((x + 500f) / Step, 0f, Cells - 0.001f);
-        float gz = Mathf.Clamp((z + 500f) / Step, 0f, Cells - 0.001f);
+        // Input/output dalam koordinat dunia; mesh dan height array tetap
+        // disimpan pada grid sumber berukuran 1 km dan diperkecil oleh transform.
+        Vector3 local = transform.InverseTransformPoint(new Vector3(x, 0f, z));
+        float gx = Mathf.Clamp((local.x + SourceHalfSize) / Step, 0f, Cells - 0.001f);
+        float gz = Mathf.Clamp((local.z + SourceHalfSize) / Step, 0f, Cells - 0.001f);
         int ix = (int)gx, iz = (int)gz;
         float fx = gx - ix, fz = gz - iz;
         float a = H(ix, iz), b = H(ix + 1, iz), c = H(ix, iz + 1), d = H(ix + 1, iz + 1);
-        if (fx + fz <= 1f) return a + (b - a) * fx + (c - a) * fz;
-        return d + (c - d) * (1f - fx) + (b - d) * (1f - fz);
+        float localHeight = fx + fz <= 1f
+            ? a + (b - a) * fx + (c - a) * fz
+            : d + (c - d) * (1f - fx) + (b - d) * (1f - fz);
+        return transform.TransformPoint(new Vector3(local.x, localHeight, local.z)).y;
     }
 
     float H(int x, int z)
@@ -183,7 +232,16 @@ public class IslandTerrain : MonoBehaviour
     public bool IsWalkableShore(float x, float z)
     {
         float wl = WaterCovers(x, z) ? Mathf.Max(WaterLevel(z), 0f) : 0f;
-        return SurfaceHeight(x, z) >= wl + 0.6f;
+        return SurfaceHeight(x, z) >= wl + 0.6f * WorldScale;
+    }
+
+    void OnDestroy()
+    {
+        if (I == this) I = null;
+        if (terrainMesh != null) Destroy(terrainMesh);
+        if (inlandWaterMesh != null) Destroy(inlandWaterMesh);
+        if (terrainMaterial != null) Destroy(terrainMaterial);
+        if (waterMaterial != null) Destroy(waterMaterial);
     }
 
     // ================= build =================
@@ -191,6 +249,7 @@ public class IslandTerrain : MonoBehaviour
     public static IslandTerrain Build()
     {
         var go = new GameObject("Island");
+        go.transform.localScale = Vector3.one * WorldScale;
         var it = go.AddComponent<IslandTerrain>();
         it.BuildInternal();
         I = it;
@@ -201,13 +260,15 @@ public class IslandTerrain : MonoBehaviour
     {
         for (int z = 0; z <= Cells; z++)
             for (int x = 0; x <= Cells; x++)
-                heights[z * (Cells + 1) + x] = TerrainHeight(x * Step - 500f, z * Step - 500f);
+                heights[z * (Cells + 1) + x] = SourceTerrainHeight(x * Step - SourceHalfSize, z * Step - SourceHalfSize);
 
         BuildTerrainMesh();
         BuildWater();
         BuildRocks();
 
-        SpawnPoint = new Vector3(ArenaCenter.x, ArenaHeight + 0.05f, ArenaCenter.y);
+        SpawnPoint = new Vector3(ArenaCenter.x * WorldScale,
+                                 ArenaHeight * WorldScale + 0.05f,
+                                 ArenaCenter.y * WorldScale);
     }
 
     void BuildTerrainMesh()
@@ -222,7 +283,7 @@ public class IslandTerrain : MonoBehaviour
             for (int x = 0; x <= Cells; x++)
             {
                 float h = H(x, z);
-                verts[z * n + x] = new Vector3(x * Step - 500f, h, z * Step - 500f);
+                verts[z * n + x] = new Vector3(x * Step - SourceHalfSize, h, z * Step - SourceHalfSize);
 
                 // normal halus (beda pusat) — redesign: tanpa facet low-poly
                 float hx = H(x - 1, z) - H(x + 1, z);
@@ -249,7 +310,8 @@ public class IslandTerrain : MonoBehaviour
             }
         }
 
-        var mesh = new Mesh();
+        terrainMesh = new Mesh();
+        var mesh = terrainMesh;
         mesh.name = "IslandTerrain";
         mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         mesh.vertices = verts;
@@ -263,7 +325,9 @@ public class IslandTerrain : MonoBehaviour
         var mr = gameObject.AddComponent<MeshRenderer>();
         var shader = Resources.Load<Shader>("Shaders/IslandTerrain");
         if (shader == null) shader = Shader.Find("UAL2/IslandTerrain");
-        var mat = new Material(shader);
+        terrainMaterial = new Material(shader);
+        var mat = terrainMaterial;
+        if (mat.HasProperty("_WorldScale")) mat.SetFloat("_WorldScale", WorldScale);
         var meadow = RemoteAssetCatalog.Load<Texture2D>("arpg-world", "meadow_cover");
         if (meadow == null) meadow = Resources.Load<Texture2D>("WorldGen/Textures/meadow_cover");
         if (meadow != null) mat.SetTexture("_MeadowCover", meadow);
@@ -277,7 +341,8 @@ public class IslandTerrain : MonoBehaviour
 
     void BuildWater()
     {
-        var waterMat = new Material(Shader.Find("Standard"));
+        waterMaterial = new Material(Shader.Find("Standard"));
+        var waterMat = waterMaterial;
         waterMat.SetColor("_Color", new Color(0.396f, 0.725f, 0.784f, 0.82f));  // #65b9c8
         waterMat.SetFloat("_Mode", 3f);
         waterMat.EnableKeyword("_ALPHABLEND_ON");
@@ -286,12 +351,12 @@ public class IslandTerrain : MonoBehaviour
         waterMat.SetOverrideTag("RenderType", "Transparent");
         waterMat.renderQueue = 3000;
 
-        // laut lepas: plane besar di y=0
+        // Laut lepas: ukuran sumber ikut diperkecil oleh transform pulau.
         var sea = GameObject.CreatePrimitive(PrimitiveType.Plane);
         sea.name = "Sea";
         sea.transform.SetParent(transform, false);
         sea.transform.localPosition = new Vector3(0f, SeaLevel, 0f);
-        sea.transform.localScale = new Vector3(400f, 1f, 400f);   // 4000 m
+        sea.transform.localScale = new Vector3(400f, 1f, 400f);   // 800 m setelah skala dunia
         Object.Destroy(sea.GetComponent<Collider>());
         var seaMr = sea.GetComponent<MeshRenderer>();
         seaMr.sharedMaterial = waterMat;
@@ -310,7 +375,7 @@ public class IslandTerrain : MonoBehaviour
                 {
                     for (float x = x0; x < x0 + tile - 0.01f; x += wstep)
                     {
-                        if (DistanceToWater(x + wstep * 0.5f, z + wstep * 0.5f) > 7f) continue;
+                        if (SourceDistanceToWater(x + wstep * 0.5f, z + wstep * 0.5f) > 7f) continue;
                         if (z >= 317.5f) continue;   // di sana laut sudah menyambung
                         int b = verts.Count;
                         AddWaterQuad(verts, norms, tris, b, x, z, wstep);
@@ -320,7 +385,8 @@ public class IslandTerrain : MonoBehaviour
         }
         if (verts.Count > 0)
         {
-            var wm = new Mesh();
+            inlandWaterMesh = new Mesh();
+            var wm = inlandWaterMesh;
             wm.name = "InlandWater";
             wm.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             wm.SetVertices(verts);
@@ -343,7 +409,7 @@ public class IslandTerrain : MonoBehaviour
         for (int i = 0; i < 4; i++)
         {
             float px = x + corners[i].x, pz = z + corners[i].y;
-            verts.Add(new Vector3(px, WaterLevel(pz) - 0.02f, pz));
+            verts.Add(new Vector3(px, SourceWaterLevel(pz) - 0.02f, pz));
             norms.Add(Vector3.up);
         }
         tris.Add(b); tris.Add(b + 2); tris.Add(b + 1);
@@ -363,22 +429,25 @@ public class IslandTerrain : MonoBehaviour
         if (r1 == null || r2 == null) return;
 
         var rng = new System.Random(42017);
+        // Boulder tetap berukuran realistis (dalam meter Unity); hanya
+        // koordinat fitur terrain yang diperkecil.
         var parent = new GameObject("Boulders").transform;
-        parent.SetParent(transform);
         int placed = 0;
         for (int i = 0; i < 60 && placed < 40; i++)
         {
-            float x = (float)(rng.NextDouble() * 740.0 - 370.0);
-            float z = (float)(rng.NextDouble() * 740.0 - 370.0);
+            float sourceX = (float)(rng.NextDouble() * 740.0 - 370.0);
+            float sourceZ = (float)(rng.NextDouble() * 740.0 - 370.0);
+            float x = sourceX * WorldScale, z = sourceZ * WorldScale;
             float y = SurfaceHeight(x, z);
             if (ArenaDistance(x, z) < 5f) continue;
-            if (y < 2f || RoadDistance(x, z) < 24f || WaterCovers(x, z, 5f)) continue;
+            if (y < 2f * WorldScale || RoadDistance(x, z) < 24f * WorldScale
+                || WaterCovers(x, z, 5f)) continue;
 
             var prefab = rng.NextDouble() < 0.5 ? r1 : r2;
             var go = Instantiate(prefab, parent);
             float s = 1.4f + (float)rng.NextDouble() * 2.2f;
-            go.transform.localPosition = new Vector3(x, y - 0.3f * s, z);
-            go.transform.localRotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
+            go.transform.position = new Vector3(x, y - 0.3f * s, z);
+            go.transform.rotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
             go.transform.localScale = new Vector3(
                 s * (0.85f + (float)rng.NextDouble() * 0.5f),
                 s * (0.7f + (float)rng.NextDouble() * 0.5f),

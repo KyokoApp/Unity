@@ -2,8 +2,8 @@
 
 Game third-person Android dengan pulau eksplorasi dan kontrol sentuh:
 
-- Pulau deterministik 1 × 1 km: plaza, jalan, bukit/tebing, danau, sungai,
-  pantai, rumput prosedural, dan nature kit Kenney (CC0).
+- Pulau deterministik 200 × 200 m: plaza, jalan, bukit/tebing, danau, sungai,
+  pantai, rumput prosedural ber-streaming, dan nature kit Kenney (CC0).
 - Model dan 43 animasi **Universal Animation Library 2 [Standard]** dari
   Quaternius (CC0), ditambah tiga clip lokomosi UAL1.
 - Analog kiri untuk bergerak; tombol lompat, serang, slide, sprint, ganti model,

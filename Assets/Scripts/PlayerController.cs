@@ -20,6 +20,8 @@ using UnityEngine;
 /// - Lokomosi 3 tingkat dari UAL1 (Walk/Jog/Sprint_Loop, diekstrak saat build
 ///   oleh ExtractLocomotion; fallback Walk_Fwd_Loop UAL2) dengan skala
 ///   kecepatan wajar → animasi kaki sesuai kecepatan gerak.
+/// - Humanoid Foot IK diaktifkan untuk idle/lokomosi/landing agar telapak
+///   kaki mengikuti permukaan saat berbelok dan berjalan di lereng.
 /// </summary>
 public class PlayerController : MonoBehaviour
 {
@@ -36,7 +38,8 @@ public class PlayerController : MonoBehaviour
     public static float JumpVel = 9f;
 
     // ---- konstanta fisika ----
-    const float GroundY = 0f;         // puncak lantai selalu y=0 (WorldGrid)
+    const float GroundY = 0f;         // permukaan datar cadangan bila pulau tidak tersedia
+    const float DeepWaterDepth = 1.05f * IslandTerrain.WorldScale;
     const float TerminalVel = -18f;   // batas kecepatan jatuh (m/s)
     const float GroundStick = -3f;    // dorongan ke bawah saat membumi
     const float ProbeLen = 0.28f;     // panjang sinar probe tanah
@@ -146,7 +149,7 @@ public class PlayerController : MonoBehaviour
         state = State.Loco;
         locomotionTier = LocomotionTier.Idle;
         vy = 0f; airTime = 0f; speedSm = 0f;
-        anim.Play(lib.Get("Idle_FoldArms_Loop"), true, 1f, 0f);
+        anim.Play(lib.Get("Idle_FoldArms_Loop"), true, 1f, 0f, true);
     }
 
     // ================= INPUT DARI UI =================
@@ -280,7 +283,7 @@ public class PlayerController : MonoBehaviour
                 return;
             }
             float wl = IslandTerrain.I.WaterLevelAt(p.x, p.z);
-            if (wl > -100f && wl - surf > 1.05f)
+            if (wl > -100f && wl - surf > DeepWaterDepth)
             {
                 if (lastSafeValid) { transform.position = lastSafe; vy = 0f; }
             }
@@ -299,7 +302,7 @@ public class PlayerController : MonoBehaviour
         state = State.Land;
         landTimer = 0.28f;
         vy = 0f; airTime = 0f;
-        anim.Play(lib.Get("NinjaJump_Land"), false, 1.35f, 0.05f);
+        anim.Play(lib.Get("NinjaJump_Land"), false, 1.35f, 0.05f, true);
     }
 
     /// <summary>Bila sedang tidak membumi cukup lama dan menurun → jatuh.</summary>
@@ -328,7 +331,7 @@ public class PlayerController : MonoBehaviour
             Vector3 p = transform.position;
             float wl = IslandTerrain.I.WaterLevelAt(p.x, p.z);
             float surf = IslandTerrain.I.SurfaceHeight(p.x, p.z);
-            if (wl < -100f || wl - surf <= 1.05f) { lastSafe = p; lastSafeValid = true; }
+            if (wl < -100f || wl - surf <= DeepWaterDepth) { lastSafe = p; lastSafeValid = true; }
         }
 
         switch (state)
@@ -389,7 +392,7 @@ public class PlayerController : MonoBehaviour
         {
             locomotionTier = LocomotionTier.Idle;
             AnimationClip idle = lib.Find("Idle_FoldArms_Loop");
-            if (idle != null) anim.Play(idle, true, 1f, 0.18f);
+            if (idle != null) anim.Play(idle, true, 1f, 0.18f, true);
             return;
         }
 
@@ -436,7 +439,7 @@ public class PlayerController : MonoBehaviour
 
         if (clip == null) return;
         float playbackRate = Mathf.Clamp(actualSpeed / refSpeed, minRate, maxRate);
-        anim.Play(clip, true, playbackRate, 0.18f);
+        anim.Play(clip, true, playbackRate, 0.18f, true);
     }
 
     void UpdateAir(float dt, Vector3 dir, float mag)

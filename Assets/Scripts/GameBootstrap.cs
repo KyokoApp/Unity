@@ -47,7 +47,7 @@ public class GameBootstrap : MonoBehaviour
         yield return null;
         Debug.Log("[ARPG] Animasi termuat: " + lib.Count);
 
-        // Pulau mencakup terrain 1 km, air, plaza, jalan, dan batu.
+        // Pulau mencakup terrain 200 m x 200 m, air, plaza, jalan, dan batu.
         if (loading != null) loading.SetProgress(0.36f, "MEMBANGUN DUNIA...");
         yield return null;
         var island = IslandTerrain.Build();
@@ -70,7 +70,7 @@ public class GameBootstrap : MonoBehaviour
 
         RenderSettings.fogColor = new Color(0.80f, 0.87f, 0.91f);
         RenderSettings.fogStartDistance = 80f;
-        RenderSettings.fogEndDistance = 650f;
+        RenderSettings.fogEndDistance = 180f;
 
         if (loading != null) loading.SetProgress(0.80f, "MENYIAPKAN KAMERA...");
         yield return null;
