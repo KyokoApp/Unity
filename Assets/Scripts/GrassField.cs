@@ -103,6 +103,9 @@ public class GrassField : MonoBehaviour
     {
         var it = IslandTerrain.I;
         if (IslandTerrain.ArenaDistance(x, z) < 2f || Mathf.Abs(x) > 495f || Mathf.Abs(z) > 495f) return false;
+        // penipisan deterministik via tuning live (grassDensity)
+        uint h = (uint)(Mathf.RoundToInt(x * 4f) * 73856093 ^ Mathf.RoundToInt(z * 4f) * 19349663);
+        if ((h % 1000) / 1000f > WorldTuning.GrassDensity) return false;
         float h = it.SurfaceHeight(x, z);
         if (h < 5.4f || IslandTerrain.WaterCovers(x, z, 1.5f)) return false;
         if (Mathf.Abs(z) < 340f && IslandTerrain.RoadDistance(x, z) < 15f) return false;

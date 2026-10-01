@@ -1,5 +1,5 @@
 {
-  "motd": "🏝️ PULAU 1 km: gunung & tebing, danau + sungai, jalan pedesaan, plaza batu, rumput bergoyang — port redesign world Godot-mu (CC0 Kenney). Tuning live tanpa instal ulang!",
+  "motd": "🏝️ PULAU 1 km live-tuning: rumput & hutan bisa disetel tanpa instal ulang (grassDensity/treeDensity). Kabari kalau mau dirapatkan/dirugikan!",
   "walkSpeed": 2.1,
   "runSpeed": 4.6,
   "sprintMul": 1.35,
@@ -7,5 +7,7 @@
   "gridBase": "#6B9454",
   "gridLine": "#61874C",
   "gridMajor": "#547842",
-  "fog": "#CDE0E8"
+  "fog": "#CDE0E8",
+  "grassDensity": 1.0,
+  "treeDensity": 1.0
 }

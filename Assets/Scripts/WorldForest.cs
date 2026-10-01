@@ -123,9 +123,10 @@ public class WorldForest : MonoBehaviour
             float px = kx * Tile + (float)(rng.NextDouble() * (Tile - 8) + 4);
             float pz = kz * Tile + (float)(rng.NextDouble() * (Tile - 8) + 4);
 
-            // padang terbuka berselang-seling dengan rumpun rapat
+            // padang terbuka berselang-seling dengan rumpun rapat (densitas live)
             float grove = Mathf.Sin(px * 0.027f) * Mathf.Cos(pz * 0.033f);
-            if (tree && rng.NextDouble() > 0.58 + grove * 0.25) continue;
+            float accept = Mathf.Clamp01((0.58f + grove * 0.25f) * WorldTuning.TreeDensity);
+            if (tree && rng.NextDouble() > accept) continue;
             if (!CanPlace(px, pz, tree)) continue;
 
             var pt = new Vector2(px, pz);
