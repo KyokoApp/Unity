@@ -216,12 +216,23 @@ public static class ImportWorld
         if (alphaMode == "MASK")
         {
             mat.SetFloat("_Mode", 1f);   // Cutout
+            mat.EnableKeyword("_ALPHATEST_ON");          // WAJIB: tanpa ini Standard tetap varian Opaque
+            mat.DisableKeyword("_ALPHABLEND_ON");        // -> background transparan (RGB hitam) ikut tergambar
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            mat.SetOverrideTag("RenderType", "TransparentCutout");
             float cutoff = m.ContainsKey("alphaCutoff") ? (float)MiniJson.Num(m["alphaCutoff"]) : 0.5f;
             mat.SetFloat("_Cutoff", cutoff);
         }
         else if (alphaMode == "BLEND")
         {
             mat.SetFloat("_Mode", 2f);   // Fade
+            mat.EnableKeyword("_ALPHABLEND_ON");
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.SetOverrideTag("RenderType", "Transparent");
+        }
+        else
+        {
+            mat.SetOverrideTag("RenderType", "Opaque");
         }
 
         if (m.ContainsKey("pbrMetallicRoughness"))
