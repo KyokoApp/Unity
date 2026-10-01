@@ -86,14 +86,25 @@ jobs:
           fi
 
           echo "Jalankan aktivasi Personal (kredensial lewat env container, log disaring)…"
-          # Runner memakai `bash -e`; errexit dimatikan sementara karena
-          # unity-editor sering exit != 0 meski aktivasi LISENSI-nya sukses
-          # (mis. editor lalu gagal membuka project kosong) — patokan = file .ulf.
+          # Runner memakai `bash -e`; errexit dimatikan sementara — patokan sukses
+          # aktivasi adalah file .ulf, bukan exit code unity-editor.
+          # -createProject /tmp/actproj: tanpa project valid, editor crash
+          # ("Failed to update project manifest") dan .ulf tidak sempat ditulis.
           set +e
           docker run --name unity-activate \
             -e UNITY_EMAIL -e UNITY_PASSWORD \
             "$IMAGE" \
-            bash -c 'unity-editor -batchmode -nographics -quit -logFile /dev/stdout -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD"' \
+            bash -c 'unity-editor -batchmode -nographics -quit -createProject /tmp/actproj -logFile /dev/stdout -username "$UNITY_EMAIL" -password "$UNITY_PASSWORD"
+              st=$?
+              echo "[activation] unity-editor exit=$st"
+              # Editor bisa exit sebelum daemon lisensi selesai menulis .ulf — tunggu.
+              for i in $(seq 1 20); do
+                [ -s /root/.local/share/unity3d/Unity/Unity_lic.ulf ] && { echo "[activation] Unity_lic.ulf tertulis setelah ${i}s"; break; }
+                sleep 1
+              done
+              echo "[activation] diagnostik (hanya path, tanpa kredensial):"
+              find /root -name "*.ulf" 2>/dev/null | head -5
+              ls -la /root/.local/share/unity3d/Unity/ 2>/dev/null || echo "[activation] direktori /root/.local/share/unity3d/Unity tidak ada"' \
             2>&1 | saring_log
           EDITOR_STATUS=${PIPESTATUS[0]}
           set -e
