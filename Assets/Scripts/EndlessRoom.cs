@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 /// <summary>
 /// Lorong modular tanpa ujung: jalur beton terang di kiri, dinding/atap putih,
-/// dan kolam air hitam yang sangat lebar di kanan. Modul 24 meter didaur ulang
+/// dan kolam jernih yang makin dalam di kanan. Modul 24 meter didaur ulang
 /// saat pemain melangkah, sehingga dunia tidak memiliki ujung atau batas float.
 /// </summary>
 public class EndlessRoom : MonoBehaviour
@@ -17,6 +17,8 @@ public class EndlessRoom : MonoBehaviour
     public const float RightWallX = 38f;
     public const float CeilingY = 8.2f;
     public const float WaterY = -0.38f;
+    public const float ShallowWaterDepth = 0.95f;
+    public const float DeepWaterDepth = 5.2f;
     public const float SpawnX = -2.35f;
     public const float MinWalkX = -4.25f;
     public const float MaxWalkX = -0.16f;
@@ -35,6 +37,7 @@ public class EndlessRoom : MonoBehaviour
     Material edgeMaterial;
     Material lightMaterial;
     Material waterMaterial;
+    Material waterBedMaterial;
 
     Mesh architectureMesh;
     Mesh floorMesh;
@@ -42,6 +45,7 @@ public class EndlessRoom : MonoBehaviour
     Mesh edgeMesh;
     Mesh fixtureMesh;
     Mesh waterMesh;
+    Mesh waterBedMesh;
 
     public static EndlessRoom Build(Transform parent, FirstPersonRoomController controller)
     {
@@ -101,11 +105,24 @@ public class EndlessRoom : MonoBehaviour
         if (waterShader == null) waterShader = Shader.Find("Stillwater/DeepCalmWater");
         if (waterShader == null) waterShader = standard;
         waterMaterial = new Material(waterShader);
-        waterMaterial.name = "Deep still water";
-        SetIfPresent(waterMaterial, "_NearColor", new Color(0.018f, 0.044f, 0.052f, 1f));
-        SetIfPresent(waterMaterial, "_DeepColor", new Color(0.003f, 0.010f, 0.017f, 1f));
-        SetIfPresent(waterMaterial, "_ReflectionColor", new Color(0.10f, 0.18f, 0.20f, 1f));
+        waterMaterial.name = "Clear shallow-to-deep water";
+        waterMaterial.renderQueue = (int)RenderQueue.Transparent;
+        SetIfPresent(waterMaterial, "_NearColor", new Color(0.13f, 0.29f, 0.32f, 1f));
+        SetIfPresent(waterMaterial, "_DeepColor", new Color(0.018f, 0.060f, 0.082f, 1f));
+        SetIfPresent(waterMaterial, "_ReflectionColor", new Color(0.42f, 0.60f, 0.66f, 1f));
         SetIfPresent(waterMaterial, "_WaterStartX", WaterStartX);
+        SetIfPresent(waterMaterial, "_ShallowOpacity", 0.24f);
+        SetIfPresent(waterMaterial, "_DeepOpacity", 0.82f);
+
+        Shader waterBedShader = Resources.Load<Shader>("Shaders/UnderwaterBed");
+        if (waterBedShader == null) waterBedShader = Shader.Find("Stillwater/UnderwaterBed");
+        if (waterBedShader == null) waterBedShader = porcelain;
+        waterBedMaterial = new Material(waterBedShader);
+        waterBedMaterial.name = "Submerged basin stone";
+        SetIfPresent(waterBedMaterial, "_ShallowColor", new Color(0.40f, 0.49f, 0.48f, 1f));
+        SetIfPresent(waterBedMaterial, "_DeepColor", new Color(0.075f, 0.15f, 0.18f, 1f));
+        SetIfPresent(waterBedMaterial, "_WaterStartX", WaterStartX);
+        SetIfPresent(waterBedMaterial, "_RightWallX", RightWallX);
     }
 
     static Material MakePorcelain(Shader shader, string materialName, Color color,
@@ -144,6 +161,7 @@ public class EndlessRoom : MonoBehaviour
         edgeMesh = BuildEdgeMesh();
         fixtureMesh = BuildFixtureMesh();
         waterMesh = BuildWaterMesh();
+        waterBedMesh = BuildWaterBedMesh();
     }
 
     Transform CreateSegment(int index, float z)
@@ -157,7 +175,8 @@ public class EndlessRoom : MonoBehaviour
         AddMeshObject(segment.transform, "Trim and wall panels", detailMesh, trimMaterial, false, true);
         AddMeshObject(segment.transform, "Deep water edge", edgeMesh, edgeMaterial, false, true);
         AddMeshObject(segment.transform, "Diffused ceiling panels", fixtureMesh, lightMaterial, false, false);
-        AddMeshObject(segment.transform, "Still dark water", waterMesh, waterMaterial, false, false);
+        AddMeshObject(segment.transform, "Sloped submerged basin floor", waterBedMesh, waterBedMaterial, false, false);
+        AddMeshObject(segment.transform, "Clear shallow-to-deep water", waterMesh, waterMaterial, false, false);
 
         // Sumber cahaya lembut tiap 24 m. Bayangan diserahkan ke satu sun
         // berintensitas rendah agar tetap ringan untuk GPU ponsel.
@@ -309,9 +328,13 @@ public class EndlessRoom : MonoBehaviour
         const float z0 = -SegmentLength * 0.5f;
         const float z1 = SegmentLength * 0.5f;
         var mesh = new MeshBuilder("Water drop edge");
-        mesh.AddBox(new Vector3(WaterStartX - 0.075f, -4.8f, z0),
+        mesh.AddBox(new Vector3(WaterStartX - 0.075f, WaterY - ShallowWaterDepth, z0),
             new Vector3(WaterStartX + 0.01f, 0.015f, z1));
         mesh.AddBox(new Vector3(0.14f, 0.003f, z0), new Vector3(0.19f, 0.009f, z1));
+
+        // Submerged far wall closes the basin below the waterline.
+        mesh.AddBox(new Vector3(RightWallX - 0.12f, WaterY - DeepWaterDepth, z0),
+            new Vector3(RightWallX, WaterY + 0.015f, z1));
         return mesh.Build();
     }
 
@@ -389,6 +412,52 @@ public class EndlessRoom : MonoBehaviour
         return mesh;
     }
 
+    Mesh BuildWaterBedMesh()
+    {
+        const int XSteps = 36;
+        const int ZSteps = 24;
+        const float z0 = -SegmentLength * 0.5f;
+        const float z1 = SegmentLength * 0.5f;
+        var vertices = new List<Vector3>((XSteps + 1) * (ZSteps + 1));
+        var triangles = new List<int>(XSteps * ZSteps * 6);
+
+        for (int z = 0; z <= ZSteps; z++)
+        {
+            float pz = Mathf.Lerp(z0, z1, (float)z / ZSteps);
+            for (int x = 0; x <= XSteps; x++)
+            {
+                float across = (float)x / XSteps;
+                float px = Mathf.Lerp(WaterStartX, RightWallX, across);
+                float slope = Mathf.SmoothStep(0f, 1f, across);
+                float bedY = WaterY - Mathf.Lerp(ShallowWaterDepth, DeepWaterDepth, slope);
+                vertices.Add(new Vector3(px, bedY, pz));
+            }
+        }
+
+        int stride = XSteps + 1;
+        for (int z = 0; z < ZSteps; z++)
+        {
+            for (int x = 0; x < XSteps; x++)
+            {
+                int a = z * stride + x;
+                int b = a + 1;
+                int c = a + stride;
+                int d = c + 1;
+                triangles.Add(a); triangles.Add(c); triangles.Add(b);
+                triangles.Add(b); triangles.Add(c); triangles.Add(d);
+            }
+        }
+
+        var mesh = new Mesh();
+        mesh.name = "Sloped submerged stone basin";
+        mesh.indexFormat = IndexFormat.UInt32;
+        mesh.SetVertices(vertices);
+        mesh.SetTriangles(triangles, 0);
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
     void OnDestroy()
     {
         DestroyRuntimeObject(architectureMesh);
@@ -397,12 +466,14 @@ public class EndlessRoom : MonoBehaviour
         DestroyRuntimeObject(edgeMesh);
         DestroyRuntimeObject(fixtureMesh);
         DestroyRuntimeObject(waterMesh);
+        DestroyRuntimeObject(waterBedMesh);
         DestroyRuntimeObject(wallMaterial);
         DestroyRuntimeObject(floorMaterial);
         DestroyRuntimeObject(trimMaterial);
         DestroyRuntimeObject(edgeMaterial);
         DestroyRuntimeObject(lightMaterial);
         DestroyRuntimeObject(waterMaterial);
+        DestroyRuntimeObject(waterBedMaterial);
     }
 
     static void DestroyRuntimeObject(UnityEngine.Object value)

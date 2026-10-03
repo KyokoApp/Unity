@@ -45,6 +45,22 @@ public class SimTests
         Assert.IsTrue(room.IsBuilt);
         Assert.AreEqual(EndlessRoom.SegmentCount, room.ActiveSegmentCount);
         Assert.Greater(room.WaterWidth, 25f, "Air harus terbentang luas di sisi kanan lorong");
+
+        MeshRenderer[] roomRenderers = room.GetComponentsInChildren<MeshRenderer>(true);
+        MeshRenderer waterSurface = null;
+        bool hasSubmergedFloor = false;
+        for (int i = 0; i < roomRenderers.Length; i++)
+        {
+            if (roomRenderers[i].gameObject.name == "Clear shallow-to-deep water")
+                waterSurface = roomRenderers[i];
+            if (roomRenderers[i].gameObject.name == "Sloped submerged basin floor")
+                hasSubmergedFloor = roomRenderers[i].GetComponent<MeshFilter>().sharedMesh.vertexCount > 0;
+        }
+        Assert.IsNotNull(waterSurface, "Permukaan air transparan harus dibuat");
+        Assert.GreaterOrEqual(waterSurface.sharedMaterial.renderQueue, 3000,
+            "Permukaan air harus dirender sebagai material transparan");
+        Assert.IsTrue(hasSubmergedFloor, "Dasar kolam miring harus terlihat melalui air dangkal");
+
         Assert.IsTrue(player.ViewCamera.transform.IsChildOf(player.transform),
             "Kamera harus menjadi kamera first-person pada rig pemain");
         Assert.AreEqual(0, player.GetComponentsInChildren<Renderer>(true).Length,

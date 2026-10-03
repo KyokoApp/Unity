@@ -1,12 +1,12 @@
 # Stillwater Room (Unity · Android)
 
-Game first-person minimalis di dalam lorong putih yang seolah tidak berujung. Pemain berjalan di jalur beton sisi kiri; di sisi kanan terbentang permukaan air tenang, luas, dan hampir hitam. Tidak ada karakter/avatar yang terlihat — kamera berada langsung pada tinggi pandang manusia.
+Game first-person minimalis di dalam lorong putih yang seolah tidak berujung. Pemain berjalan di jalur beton sisi kiri; di kanan ada kolam tenang yang luas, dengan air bening di tepi dangkal dan dasar batu yang terlihat. Bagian yang makin dalam berangsur gelap. Tidak ada karakter/avatar yang terlihat — kamera berada langsung pada tinggi pandang manusia.
 
 ## Dunia dan visual
 
 - Lorong dibangun dari modul 24 m yang terus didaur ulang, jadi perjalanan tidak memiliki ujung dan presisi tetap terjaga.
 - Dinding dan plafon porselen putih, sambungan panel tipis, jalur beton bertekstur halus, ambang rendah, serta lampu plafon lembut.
-- Air menggunakan shader prosedural ringan: riak sangat kecil, permukaan reflektif, dan warna yang makin dalam/gelap menjauh dari tepi.
+- Air menggunakan shader transparan ringan dengan riak halus dan pantulan lembut; dasar batu terlihat di area dangkal, lalu menyerap cahaya dan menggelap seiring kedalaman.
 - Kabut putih menutup perspektif jauh agar koridor terasa tak terbatas.
 - Geometri dan material dibuat saat runtime; tidak memerlukan asset world atau model karakter eksternal.
 

@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 /// <summary>
 /// Membangun pengalaman ROOM dari scene kosong: lorong putih tak berujung,
-/// kolam air gelap di kanan, kamera first-person tanpa karakter, dan kontrol HP.
+/// kolam air jernih yang makin dalam di kanan, kamera first-person tanpa karakter, dan kontrol HP.
 /// </summary>
 public class GameBootstrap : MonoBehaviour
 {
