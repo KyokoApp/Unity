@@ -53,7 +53,7 @@ jobs:
           cp -v "$GITHUB_WORKSPACE/.github/unity-builder-steps/return_license.sh" "$STEPS_DIR/return_license.sh"
           chmod +x "$STEPS_DIR/activate.sh" "$STEPS_DIR/return_license.sh"
 
-      - name: Build Stillwater Room APK
+      - name: Build PoolRooms Android APK
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ env.UNITY_LICENSE }}
@@ -70,16 +70,22 @@ jobs:
       - name: Pastikan APK berhasil dibuat
         run: |
           ls -laR build/Android || true
-          test -f build/Android/StillwaterRoom.apk
+          test -f build/Android/PoolRooms.apk
 
       - name: Terbitkan APK → release apk-latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTES="Build Stillwater Room otomatis #${{ github.run_number }} dari commit ${{ github.sha }}.
-          Untuk update game, unduh APK terbaru dari release ini dan instal di HP."
+          NOTES="Build PoolRooms Mobile otomatis #${{ github.run_number }} dari commit ${{ github.sha }}.
+          APK standalone Android: unduh PoolRooms.apk lalu instal di HP."
           gh release view apk-latest >/dev/null 2>&1 || \
-            gh release create apk-latest --title "Stillwater Room — APK Terbaru" --notes "$NOTES"
-          gh release edit apk-latest --title "Stillwater Room — APK Terbaru" --notes "$NOTES"
-          gh release delete-asset apk-latest UAL2Playground.apk --yes 2>/dev/null || true
-          gh release upload apk-latest build/Android/StillwaterRoom.apk --clobber
+            gh release create apk-latest --title "PoolRooms Mobile — APK Terbaru" --notes "$NOTES"
+          gh release edit apk-latest --title "PoolRooms Mobile — APK Terbaru" --notes "$NOTES"
+          while IFS= read -r asset; do
+            case "$asset" in
+              UAL2Playground.apk|StillwaterRoom.apk|Arpg.apk|Arpg-*.apk)
+                gh release delete-asset apk-latest "$asset" --yes 2>/dev/null || true
+                ;;
+            esac
+          done < <(gh release view apk-latest --json assets --jq '.assets[].name')
+          gh release upload apk-latest build/Android/PoolRooms.apk --clobber

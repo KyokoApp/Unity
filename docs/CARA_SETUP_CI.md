@@ -33,4 +33,4 @@ Lokasi umum:
 
 Push perubahan pada `Assets/`, `Packages/`, atau `ProjectSettings/`, atau jalankan workflow **Android APK** secara manual melalui tab **Actions → Run workflow**.
 
-Workflow membangun `build/Android/StillwaterRoom.apk` lalu mengunggah APK terbaru ke release `apk-latest`. Setup ini hanya menerbitkan APK; game room tidak mengunduh konten/world saat dijalankan.
+Workflow membangun `build/Android/PoolRooms.apk` lalu mengunggah APK terbaru ke release `apk-latest`. Game PoolRooms ini mandiri untuk Android; tidak membutuhkan Lethal Company, BepInEx, DunGen, atau pengunduhan konten tambahan saat dijalankan.

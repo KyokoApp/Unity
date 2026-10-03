@@ -5,10 +5,10 @@ using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
-/// <summary>Build APK Android untuk ROOM; tidak lagi mengekstrak world/animasi lama.</summary>
+/// <summary>Build APK Android untuk game PoolRooms mandiri.</summary>
 public static class CiBuild
 {
-    const string ApkName = "StillwaterRoom.apk";
+    const string ApkName = "PoolRooms.apk";
 
     public static void BuildAll()
     {
@@ -16,10 +16,10 @@ public static class CiBuild
         RemoveUnusedGeneratedResources(root);
 
         int run = ReadRunNumber();
-        string appVersion = "1.0." + run;
+        string appVersion = "2.0." + run;
         PlayerSettings.bundleVersion = appVersion;
         PlayerSettings.Android.bundleVersionCode = Mathf.Max(1, run);
-        Debug.Log("[CiBuild] Stillwater Room appVersion=" + appVersion);
+        Debug.Log("[CiBuild] PoolRooms appVersion=" + appVersion);
 
         string apkDir = Path.Combine(root, "build/Android");
         Directory.CreateDirectory(apkDir);
@@ -51,7 +51,7 @@ public static class CiBuild
     {
         string root = Directory.GetParent(Application.dataPath).FullName;
         RemoveUnusedGeneratedResources(root);
-        Debug.Log("[CiBuild] ROOM siap untuk PlayMode tests; tidak ada asset ekstraksi.");
+        Debug.Log("[CiBuild] PoolRooms siap untuk PlayMode tests; environment dibangun saat runtime.");
     }
 
     static int ReadRunNumber()

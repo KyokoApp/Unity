@@ -1,11 +1,11 @@
-Shader "Stillwater/UnderwaterBed"
+Shader "PoolRooms/SubmergedPoolTile"
 {
     Properties
     {
-        _ShallowColor ("Shallow basin stone", Color) = (0.40, 0.49, 0.48, 1)
-        _DeepColor ("Deep basin stone", Color) = (0.075, 0.15, 0.18, 1)
-        _WaterStartX ("Shallow edge", Float) = 0.63
-        _RightWallX ("Deep wall", Float) = 38
+        _ShallowColor ("Shallow tile color", Color) = (0.35, 0.47, 0.51, 1)
+        _DeepColor ("Deep tile color", Color) = (0.055, 0.13, 0.19, 1)
+        _PoolCenterX ("Pool center X", Float) = 0
+        _PoolHalfWidth ("Pool half width", Float) = 6.2
     }
 
     SubShader
@@ -19,8 +19,8 @@ Shader "Stillwater/UnderwaterBed"
 
         float4 _ShallowColor;
         float4 _DeepColor;
-        float _WaterStartX;
-        float _RightWallX;
+        float _PoolCenterX;
+        float _PoolHalfWidth;
 
         struct Input
         {
@@ -49,22 +49,23 @@ Shader "Stillwater/UnderwaterBed"
         void surf(Input IN, inout SurfaceOutputStandard o)
         {
             float2 p = IN.worldPos.xz;
-            float across = saturate((IN.worldPos.x - _WaterStartX) / max(_RightWallX - _WaterStartX, 0.01));
-            float depth = pow(smoothstep(0.0, 1.0, across), 0.78);
-            float3 stone = lerp(_ShallowColor.rgb, _DeepColor.rgb, depth);
+            float halfWidth = max(_PoolHalfWidth, 0.1);
+            float depth = 1.0 - saturate(abs(IN.worldPos.x - _PoolCenterX) / halfWidth);
+            depth = pow(smoothstep(0.0, 1.0, depth), 0.82);
+            float3 tile = lerp(_ShallowColor.rgb, _DeepColor.rgb, depth);
 
-            // Mottled mineral sediment and very faint submerged slab joints.
+            // Soft mineral mottling and faint, regular grout lines remain visible through the clear edge water.
             float broad = valueNoise(p * 0.34);
             float fine = valueNoise(p * 2.7);
-            stone *= 0.93 + (broad - 0.5) * 0.18 + (fine - 0.5) * 0.045;
-            float2 cell = p / 4.0;
-            float2 edge = min(frac(cell), 1.0 - frac(cell)) * 4.0;
-            float seam = 1.0 - smoothstep(0.025, 0.075, min(edge.x, edge.y));
-            stone = lerp(stone, stone * 0.66, seam * 0.42);
+            tile *= 0.93 + (broad - 0.5) * 0.18 + (fine - 0.5) * 0.045;
+            float2 cell = p / 0.78;
+            float2 edge = min(frac(cell), 1.0 - frac(cell)) * 0.78;
+            float seam = 1.0 - smoothstep(0.022, 0.055, min(edge.x, edge.y));
+            tile = lerp(tile, tile * 0.62, seam * 0.35);
 
-            o.Albedo = stone;
-            o.Metallic = 0.015;
-            o.Smoothness = 0.24;
+            o.Albedo = tile;
+            o.Metallic = 0.01;
+            o.Smoothness = 0.30;
             o.Alpha = 1.0;
         }
         ENDCG

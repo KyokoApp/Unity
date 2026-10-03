@@ -1,40 +1,39 @@
-# Stillwater Room (Unity · Android)
+# PoolRooms Mobile (Unity · Android)
 
-Game first-person minimalis di dalam lorong putih yang seolah tidak berujung. Pemain berjalan di jalur beton sisi kiri; di kanan ada kolam tenang yang luas, dengan air bening di tepi dangkal dan dasar batu yang terlihat. Bagian yang makin dalam berangsur gelap. Tidak ada karakter/avatar yang terlihat — kamera berada langsung pada tinggi pandang manusia.
+Game first-person mandiri untuk HP, terinspirasi dari suasana interior kolam renang liminal **PoolRooms**. Ini bukan mod Lethal Company dan tidak membutuhkan game Lethal Company, BepInEx, DunGen, atau mod PC lain. Lingkungan dibuat ulang sebagai geometri runtime yang ringan untuk Android; repo referensi tidak disalin mentah ke APK.
 
-## Dunia dan visual
+## Lingkungan
 
-- Lorong dibangun dari modul 24 m yang terus didaur ulang, jadi perjalanan tidak memiliki ujung dan presisi tetap terjaga.
-- Dinding dan plafon porselen putih, sambungan panel tipis, jalur beton bertekstur halus, ambang rendah, serta lampu plafon lembut.
-- Air menggunakan shader transparan ringan dengan riak halus dan pantulan lembut; dasar batu terlihat di area dangkal, lalu menyerap cahaya dan menggelap seiring kedalaman.
-- Kabut putih menutup perspektif jauh agar koridor terasa tak terbatas.
-- Geometri dan material dibuat saat runtime; tidak memerlukan asset world atau model karakter eksternal.
+- Ruang utama kolam renang, locker room, shower room, dan atrium dengan planter/palm, tersambung sebagai rangkaian ruang yang terus didaur ulang.
+- Keramik biru-abu, lantai basah, pintu antarruang, bangku, locker, shower, pilar, ladder kolam, serta panel lampu langit-langit.
+- Air kolam tenang dengan riak dan pantulan halus; bagian dangkal memperlihatkan ubin dasar, sedangkan bagian terdalam menyerap cahaya.
+- Kamera first-person tanpa model tubuh/avatar; kontrol joystick dan swipe multi-touch.
+- Material dan mesh utama dibuat prosedural, sehingga tidak perlu mengunduh paket asset 772 MB dari proyek mod PC.
 
-## Kontrol di HP
+Referensi visual/konsep: [rfsheffer/PoolRooms](https://github.com/rfsheffer/PoolRooms), sebuah interior mod Lethal Company. Aplikasi ini tidak menyertakan kode runtime, bundle, atau asset pihak ketiga dari mod tersebut.
 
-- **Joystick kiri** — berjalan maju/mundur dan sedikit bergeser di jalur kering.
-- **Geser sisi kanan layar** — lihat sekeliling. Bisa digunakan bersamaan dengan joystick.
-- Pemain dapat mendekati bibir air, tetapi tetap dibatasi di walkway.
+## Kontrol HP
 
-Untuk mencoba di Editor: tekan Play, gunakan **WASD / tombol panah** untuk berjalan dan **klik-kanan + drag** untuk melihat.
+- **Joystick kiri** — berjalan maju/mundur dan bergerak ke samping.
+- **Geser sisi kanan layar** — melihat sekeliling; bisa dipakai bersamaan dengan joystick.
 
 ## Buka dan build
 
 1. Buka project dengan **Unity 2022.3 LTS** (versi proyek: 2022.3.45f1).
 2. Buka `Assets/Scenes/Main.unity`, lalu tekan **Play**.
-3. Untuk APK, pilih `File ▸ Build Settings ▸ Android ▸ Switch Platform`, lalu Build. Orientasi Android sudah disetel landscape.
+3. Untuk APK, pilih `File ▸ Build Settings ▸ Android ▸ Switch Platform`, lalu Build. Orientasi Android sudah landscape.
 
-GitHub Actions membangun APK Android dan menerbitkannya ke release `apk-latest`. Setup lisensi Unity Personal untuk CI dijelaskan di [`docs/CARA_SETUP_CI.md`](docs/CARA_SETUP_CI.md). Package ID lama dipertahankan supaya APK baru tetap bisa memperbarui instalasi sebelumnya.
+[Unduh PoolRooms.apk](https://github.com/KyokoApp/Unity/releases/download/apk-latest/PoolRooms.apk) dari release terbaru. GitHub Actions membangun APK Android tersebut otomatis; setup lisensi Unity Personal untuk CI dijelaskan di [`docs/CARA_SETUP_CI.md`](docs/CARA_SETUP_CI.md). Package ID lama dipertahankan sebagai aplikasi Android yang sama; build baru dimaksudkan untuk menggantikan versi sebelumnya.
 
 ## Struktur utama
 
 ```
 Assets/
-  Scenes/Main.unity                 # kamera, directional light, GameBootstrap
-  Scripts/GameBootstrap.cs          # inisialisasi scene first-person
-  Scripts/EndlessRoom.cs            # lorong, walkway, air, modul tanpa ujung
+  Scenes/Main.unity                 # bootstrap kamera dan lingkungan
+  Scripts/GameBootstrap.cs          # konfigurasi mobile dan bootstrap
+  Scripts/PoolRoomsEnvironment.cs   # pool, locker, shower, atrium, daur ulang ruang
   Scripts/FirstPersonRoomController.cs
   Scripts/GameUI.cs                 # joystick + swipe-look
-  Resources/Shaders/                # porcelain dan deep still-water
-  Tests/SimTests.cs                 # tes room, gerak, batas walkway, dan kamera
+  Resources/Shaders/                # tile, air kolam, dan ubin dasar kolam
+  Tests/SimTests.cs                 # smoke tests lingkungan dan kontrol
 ```

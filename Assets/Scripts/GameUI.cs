@@ -10,8 +10,8 @@ public class GameUI : MonoBehaviour
     float statusUntil;
     bool joystickWasHeld;
 
-    static readonly Color Ink = new Color(0.16f, 0.21f, 0.23f, 0.90f);
-    static readonly Color MutedInk = new Color(0.20f, 0.26f, 0.28f, 0.62f);
+    static readonly Color Ink = new Color(0.79f, 0.88f, 0.92f, 0.88f);
+    static readonly Color MutedInk = new Color(0.56f, 0.72f, 0.77f, 0.68f);
 
     public void Init(FirstPersonRoomController controller)
     {
@@ -89,19 +89,19 @@ public class GameUI : MonoBehaviour
         zone.raycastTarget = true;
 
         var ring = UiKit.NewImage("JoystickRing", zone.transform, UiKit.Ring(),
-            new Color(0.19f, 0.25f, 0.27f, 0.52f));
+            new Color(0.44f, 0.68f, 0.74f, 0.42f));
         UiKit.Anchor((RectTransform)ring.transform, new Vector2(0.5f, 0.5f), Vector2.zero,
             new Vector2(258f, 258f));
         ring.raycastTarget = false;
 
         var baseFill = UiKit.NewImage("JoystickFill", zone.transform, UiKit.Circle(),
-            new Color(0.09f, 0.14f, 0.16f, 0.15f));
+            new Color(0.09f, 0.18f, 0.22f, 0.16f));
         UiKit.Anchor((RectTransform)baseFill.transform, new Vector2(0.5f, 0.5f), Vector2.zero,
             new Vector2(238f, 238f));
         baseFill.raycastTarget = false;
 
         var knob = UiKit.NewImage("JoystickKnob", zone.transform, UiKit.Circle(),
-            new Color(0.25f, 0.32f, 0.34f, 0.48f));
+            new Color(0.62f, 0.79f, 0.83f, 0.56f));
         UiKit.Anchor((RectTransform)knob.transform, new Vector2(0.5f, 0.5f), Vector2.zero,
             new Vector2(92f, 92f));
         knob.raycastTarget = false;
@@ -113,11 +113,11 @@ public class GameUI : MonoBehaviour
 
     void BuildHud(RectTransform parent)
     {
-        var title = UiKit.NewText("RoomTitle", parent, "ROOM 01", 25, Ink, TextAnchor.MiddleLeft);
+        var title = UiKit.NewText("RoomTitle", parent, "POOLROOMS", 25, Ink, TextAnchor.MiddleLeft);
         UiKit.Anchor((RectTransform)title.transform, new Vector2(0f, 1f),
             new Vector2(142f, -68f), new Vector2(310f, 38f));
 
-        var subtitle = UiKit.NewText("RoomSubtitle", parent, "STILLWATER", 16, MutedInk,
+        var subtitle = UiKit.NewText("RoomSubtitle", parent, "LIMINAL AQUATIC WING", 16, MutedInk,
             TextAnchor.MiddleLeft, FontStyle.Normal);
         UiKit.Anchor((RectTransform)subtitle.transform, new Vector2(0f, 1f),
             new Vector2(147f, -105f), new Vector2(310f, 30f));
@@ -128,8 +128,8 @@ public class GameUI : MonoBehaviour
         rule.raycastTarget = false;
 
         var hint = UiKit.NewText("ControlHint", parent,
-            "Joystick kiri: berjalan     •     Geser sisi kanan: melihat sekeliling",
-            21, new Color(0.14f, 0.19f, 0.21f, 0.72f), TextAnchor.MiddleCenter, FontStyle.Normal);
+            "Joystick kiri: jelajahi     •     Geser sisi kanan: lihat sekeliling",
+            21, new Color(0.75f, 0.85f, 0.89f, 0.72f), TextAnchor.MiddleCenter, FontStyle.Normal);
         UiKit.Anchor((RectTransform)hint.transform, new Vector2(0.5f, 0f),
             new Vector2(0f, 36f), new Vector2(1120f, 42f));
         hint.gameObject.AddComponent<FadeOutHint>();

@@ -64,8 +64,8 @@ public class FirstPersonRoomController : MonoBehaviour
     }
 
     /// <summary>
-    /// Saat lorong di-recycle, posisi pemain dan seluruh modul digeser dengan
-    /// jumlah yang sama agar gerak terasa benar-benar tanpa ujung dan presisi float tetap baik.
+    /// Saat modul pool-room di-recycle, posisi pemain dan seluruh ruang digeser
+    /// dengan jumlah yang sama agar perjalanan terus tersambung dan presisi float tetap baik.
     /// </summary>
     public void RebaseZ(float amount)
     {
@@ -117,13 +117,12 @@ public class FirstPersonRoomController : MonoBehaviour
         Vector3 before = transform.position;
         characterController.Move((planarVelocity + Vector3.up * verticalSpeed) * dt);
 
-        // Lorong hanya dapat dilalui di jalur kiri yang kering. Batas ini tetap
-        // membolehkan pemain merapat ke tepi air untuk melihat ke bawah.
+        // Jaga eksplorasi tetap di dalam gedung pool-room; kolam dibatasi bibirnya.
         Vector3 p = transform.position;
-        p.x = Mathf.Clamp(p.x, EndlessRoom.MinWalkX, EndlessRoom.MaxWalkX);
+        p.x = Mathf.Clamp(p.x, PoolRoomsEnvironment.MinWalkX, PoolRoomsEnvironment.MaxWalkX);
         if (p.y < -4f)
         {
-            p.x = EndlessRoom.SpawnX;
+            p.x = PoolRoomsEnvironment.SpawnX;
             p.y = 0.03f;
             p.z = 0f;
             verticalSpeed = 0f;
