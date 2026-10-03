@@ -13,10 +13,10 @@ PlayerSettings:
   useOnDemandResources: 0
   accelerometerFrequency: 60
   companyName: KyokoApp
-  productName: UAL2 Playground
+  productName: Stillwater Room
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
-  m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b: 0.1254902, a: 1}
+  m_SplashScreenBackgroundColor: {r: 0.84, g: 0.87, b: 0.88, a: 1}
   m_ShowUnitySplashScreen: 1
   m_ShowUnitySplashLogo: 1
   m_SplashScreenOverlayOpacity: 1
@@ -566,14 +566,14 @@ PlayerSettings:
   apiCompatibilityLevelPerPlatform: {}
   m_RenderingPath: 1
   m_MobileRenderingPath: 1
-  metroPackageName: UAL2Playground
+  metroPackageName: StillwaterRoom
   metroPackageVersion: 
   metroCertificatePath: 
   metroCertificatePassword: 
   metroCertificateSubject: 
   metroCertificateIssuer: 
   metroCertificateNotAfter: 0000000000000000
-  metroApplicationDescription: UAL2 Playground
+  metroApplicationDescription: Stillwater Room
   wsaImages: {}
   metroTileShortName: 
   metroTileShowName: 0
@@ -645,7 +645,7 @@ PlayerSettings:
   cloudProjectId: 
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: UAL2 Playground
+  projectName: Stillwater Room
   organizationId: kyokoapp
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0

@@ -1,7 +1,5 @@
-using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.UI;
 
 /// <summary>Analog stick virtual: zona sentuh tetap di kiri-bawah, knob mengikuti jari.</summary>
 public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
@@ -9,16 +7,29 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
     public RectTransform knob;
     public float radius = 120f;
     public Vector2 Value { get; private set; }
+    public bool IsHeld { get; private set; }
 
     RectTransform rt;
 
     void Awake() { rt = (RectTransform)transform; }
 
-    public void OnPointerDown(PointerEventData e) { Handle(e); }
+    public void OnPointerDown(PointerEventData e)
+    {
+        IsHeld = true;
+        Handle(e);
+    }
     public void OnDrag(PointerEventData e) { Handle(e); }
 
     public void OnPointerUp(PointerEventData e)
     {
+        IsHeld = false;
+        Value = Vector2.zero;
+        if (knob != null) knob.anchoredPosition = Vector2.zero;
+    }
+
+    void OnDisable()
+    {
+        IsHeld = false;
         Value = Vector2.zero;
         if (knob != null) knob.anchoredPosition = Vector2.zero;
     }
@@ -33,69 +44,16 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
     }
 }
 
-/// <summary>Tombol aksi: merespons saat jari MENYENTUH (pointer down), bukan saat dilepas.</summary>
-public class PressButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
-{
-    public Action onDown;
-    public Action onUp;
-    public Graphic targetGraphic;
-
-    Color baseColor;
-    Vector3 baseScale;
-    bool baseSet;
-
-    void Awake()
-    {
-        baseScale = transform.localScale;
-    }
-
-    void EnsureBase()
-    {
-        if (!baseSet && targetGraphic != null)
-        {
-            baseColor = targetGraphic.color;
-            baseSet = true;
-        }
-    }
-
-    public void OnPointerDown(PointerEventData e)
-    {
-        EnsureBase();
-        transform.localScale = baseScale * 0.9f;
-        if (targetGraphic != null)
-            targetGraphic.color = new Color(baseColor.r, baseColor.g, baseColor.b, Mathf.Min(1f, baseColor.a + 0.25f));
-        if (onDown != null) onDown();
-    }
-
-    public void OnPointerUp(PointerEventData e)
-    {
-        EnsureBase();
-        transform.localScale = baseScale;
-        if (targetGraphic != null) targetGraphic.color = baseColor;
-        if (onUp != null) onUp();
-    }
-
-    /// <summary>Set warna dasar baru (untuk tombol toggle seperti LARI).</summary>
-    public void SetBaseColor(Color c)
-    {
-        baseColor = c;
-        baseSet = true;
-        if (targetGraphic != null) targetGraphic.color = c;
-    }
-}
-
 /// <summary>Area transparan di sisi kanan layar untuk memutar kamera dengan geser jari.</summary>
 public class TouchLookPad : MonoBehaviour, IPointerDownHandler, IDragHandler
 {
-    public OrbitCamera cam;
+    public FirstPersonRoomController player;
 
     public void OnPointerDown(PointerEventData e) { }
 
     public void OnDrag(PointerEventData e)
     {
-        if (cam == null) return;
-        float scale = 240f / Mathf.Max(1, Screen.height);
-        cam.AddLook(e.delta * scale);
+        if (player != null) player.AddLookPixels(e.delta);
     }
 }
 

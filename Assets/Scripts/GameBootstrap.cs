@@ -3,98 +3,107 @@ using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// Satu-satunya script yang dipasang di scene. Membangun seluruh game saat runtime:
-/// world grid tanpa batas, player (UAL2), kamera orbit, dan UI sentuh Android.
+/// Membangun pengalaman ROOM dari scene kosong: lorong putih tak berujung,
+/// kolam air gelap di kanan, kamera first-person tanpa karakter, dan kontrol HP.
 /// </summary>
 public class GameBootstrap : MonoBehaviour
 {
-    /// <summary>Dimatikan saat tes headless (jangan sentuh jaringan).</summary>
-    public static bool SkipUpdater;
-
     void Awake()
     {
-        // ---- Pengaturan global (mobile friendly) ----
+        ConfigureRendering();
+
+        Camera viewCamera = Camera.main;
+        if (viewCamera == null)
+        {
+            var cameraGO = new GameObject("Main Camera");
+            cameraGO.tag = "MainCamera";
+            viewCamera = cameraGO.AddComponent<Camera>();
+            cameraGO.AddComponent<AudioListener>();
+        }
+        else if (viewCamera.GetComponent<AudioListener>() == null)
+        {
+            viewCamera.gameObject.AddComponent<AudioListener>();
+        }
+
+        viewCamera.clearFlags = CameraClearFlags.SolidColor;
+        viewCamera.backgroundColor = new Color(0.84f, 0.87f, 0.88f, 1f);
+        viewCamera.fieldOfView = 74f;
+        viewCamera.nearClipPlane = 0.08f;
+        viewCamera.farClipPlane = 260f;
+        viewCamera.allowHDR = false;
+        viewCamera.allowMSAA = true;
+        viewCamera.useOcclusionCulling = false;
+
+        // Rig hanya berisi CharacterController + kamera; tidak ada mesh, avatar,
+        // tangan, atau bayangan karakter yang muncul di layar.
+        var rigGO = new GameObject("First Person Camera Rig (no visible body)");
+        rigGO.transform.SetParent(transform, false);
+        var firstPerson = rigGO.AddComponent<FirstPersonRoomController>();
+        firstPerson.Initialize(viewCamera, new Vector3(EndlessRoom.SpawnX, 0.03f, 0f), 10f);
+
+        EndlessRoom.Build(transform, firstPerson);
+        BuildMobileUI(firstPerson);
+        EnsureEventSystem(transform);
+    }
+
+    static void ConfigureRendering()
+    {
         Application.targetFrameRate = 60;
         QualitySettings.vSyncCount = 0;
+        QualitySettings.antiAliasing = 2;
         QualitySettings.shadows = ShadowQuality.HardOnly;
-        QualitySettings.shadowDistance = 45f;
+        QualitySettings.shadowDistance = 34f;
+        QualitySettings.pixelLightCount = 4;
         Input.multiTouchEnabled = true;
 
         RenderSettings.fog = true;
         RenderSettings.fogMode = FogMode.Linear;
-        RenderSettings.fogColor = new Color(0.75f, 0.82f, 0.90f);
-        RenderSettings.fogStartDistance = 45f;
-        RenderSettings.fogEndDistance = 170f;
+        RenderSettings.fogColor = new Color(0.84f, 0.87f, 0.88f, 1f);
+        RenderSettings.fogStartDistance = 24f;
+        RenderSettings.fogEndDistance = 112f;
         RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.62f, 0.65f, 0.71f);
+        RenderSettings.ambientLight = new Color(0.68f, 0.71f, 0.73f, 1f);
+        RenderSettings.reflectionIntensity = 0.4f;
 
-        // ---- Library animasi (Universal Animation Library 2 - Quaternius) ----
-        var lib = new AnimLibrary();
-        Debug.Log("[UAL2] Animasi termuat: " + lib.Count);
-
-        // ---- World: pulau 1 km x 1 km (port redesign world Godot-mu):
-        // gunung/tebing, danau + sungai, jalan pedesaan, plaza batu, laut ----
-        var island = IslandTerrain.Build();
-
-        // ---- Player (lahir di plaza batu) ----
-        var playerGO = new GameObject("Player");
-        playerGO.transform.position = island.SpawnPoint;
-        var player = playerGO.AddComponent<PlayerController>();
-        player.Init(lib);
-
-        // ---- rumput berlapis (port grass_field.gd) + hutan deterministik ----
-        var grassGO = new GameObject("GrassField");
-        var grass = grassGO.AddComponent<GrassField>();
-        grass.player = playerGO.transform;
-
-        var forestGO = new GameObject("WorldForest");
-        var forest = forestGO.AddComponent<WorldForest>();
-        forest.target = playerGO.transform;
-        forest.LoadAssets();
-
-        // ---- cakrawala pulau (grid kotak-kotak dihapus) ----
-        RenderSettings.fogColor = new Color(0.80f, 0.87f, 0.91f);
-        RenderSettings.fogStartDistance = 80f;
-        RenderSettings.fogEndDistance = 650f;
-
-        // ---- Kamera orbit (third person) ----
-        var cam = Camera.main;
-        if (cam == null)
+        Light keyLight = null;
+        var lights = FindObjectsOfType<Light>();
+        for (int i = 0; i < lights.Length; i++)
         {
-            var camGO = new GameObject("Main Camera");
-            camGO.tag = "MainCamera";
-            cam = camGO.AddComponent<Camera>();
-            camGO.AddComponent<AudioListener>();
+            if (lights[i] != null && lights[i].type == LightType.Directional)
+            {
+                keyLight = lights[i];
+                break;
+            }
         }
-        cam.clearFlags = CameraClearFlags.SolidColor;
-        cam.backgroundColor = new Color(0.80f, 0.87f, 0.91f);
-        cam.fieldOfView = 55f;
-        cam.nearClipPlane = 0.1f;
-        cam.farClipPlane = 3000f;   // pulau 1 km + laut 4 km harus terlihat utuh
+        if (keyLight == null)
+        {
+            var lightGO = new GameObject("Soft room key light");
+            keyLight = lightGO.AddComponent<Light>();
+        }
 
-        var orbit = cam.gameObject.AddComponent<OrbitCamera>();
-        orbit.target = player.CameraTarget;
-        orbit.SnapBehind(playerGO.transform);
-        player.cameraTransform = cam.transform;
+        keyLight.type = LightType.Directional;
+        keyLight.color = new Color(0.82f, 0.88f, 0.93f);
+        keyLight.intensity = 0.42f;
+        keyLight.shadows = LightShadows.Hard;
+        keyLight.shadowStrength = 0.22f;
+        keyLight.transform.rotation = Quaternion.Euler(52f, -28f, 0f);
+        RenderSettings.sun = keyLight;
+    }
 
-        // ---- UI sentuh (analog + tombol) ----
-        var uiGO = new GameObject("GameUI");
+    void BuildMobileUI(FirstPersonRoomController player)
+    {
+        var uiGO = new GameObject("Room Mobile UI");
+        uiGO.transform.SetParent(transform, false);
         var ui = uiGO.AddComponent<GameUI>();
-        ui.Init(player, lib, orbit);
+        ui.Init(player);
+    }
 
-        // ---- Updater konten in-game (APK = peluncur; konten diunduh live) ----
-        if (!SkipUpdater)
-        {
-            var updater = gameObject.AddComponent<ContentUpdater>();
-            updater.Init(player, ui);
-        }
-
-        // ---- EventSystem untuk input sentuh ----
-        if (FindObjectOfType<EventSystem>() == null)
-        {
-            var es = new GameObject("EventSystem");
-            es.AddComponent<EventSystem>();
-            es.AddComponent<StandaloneInputModule>();
-        }
+    static void EnsureEventSystem(Transform parent)
+    {
+        if (FindObjectOfType<EventSystem>() != null) return;
+        var eventSystem = new GameObject("EventSystem");
+        eventSystem.transform.SetParent(parent, false);
+        eventSystem.AddComponent<EventSystem>();
+        eventSystem.AddComponent<StandaloneInputModule>();
     }
 }

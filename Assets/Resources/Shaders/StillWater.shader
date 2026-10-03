@@ -1,0 +1,107 @@
+Shader "Stillwater/DeepCalmWater"
+{
+    Properties
+    {
+        _NearColor ("Near water", Color) = (0.018, 0.044, 0.052, 1)
+        _DeepColor ("Deep water", Color) = (0.003, 0.010, 0.017, 1)
+        _ReflectionColor ("Cool reflection", Color) = (0.10, 0.18, 0.20, 1)
+        _WaterStartX ("Water edge", Float) = 0.63
+        _Metallic ("Reflectivity", Range(0, 1)) = 0.28
+        _Smoothness ("Polished surface", Range(0, 1)) = 0.98
+    }
+
+    SubShader
+    {
+        Tags { "RenderType" = "Opaque" }
+        LOD 180
+
+        CGPROGRAM
+        #pragma surface surf Standard vertex:vert fullforwardshadows
+        #pragma target 3.0
+
+        float4 _NearColor;
+        float4 _DeepColor;
+        float4 _ReflectionColor;
+        float _WaterStartX;
+        half _Metallic;
+        half _Smoothness;
+
+        struct Input
+        {
+            float3 worldPos;
+        };
+
+        float waveHeight(float2 p, float time)
+        {
+            const float zA = 0.2617994; // 24 m period: exactly matches a room module
+            const float zB = 0.5235988;
+            const float zC = 1.0471976;
+            return 0.010 * sin(p.x * 0.38 + p.y * zA + time * 0.22)
+                 + 0.007 * sin(p.x * 0.72 - p.y * zB - time * 0.14)
+                 + 0.0035 * sin(p.x * 1.40 + p.y * zC + time * 0.17);
+        }
+
+        void vert(inout appdata_full v)
+        {
+            float3 world = mul(unity_ObjectToWorld, v.vertex).xyz;
+            v.vertex.y += waveHeight(world.xz, _Time.y);
+        }
+
+        void surf(Input IN, inout SurfaceOutputStandard o)
+        {
+            float2 p = IN.worldPos.xz;
+            float t = _Time.y;
+            const float zA = 0.2617994;
+            const float zB = 0.5235988;
+            const float zC = 1.0471976;
+
+            float a = p.x * 0.38 + p.y * zA + t * 0.22;
+            float b = p.x * 0.72 - p.y * zB - t * 0.14;
+            float c = p.x * 1.40 + p.y * zC + t * 0.17;
+            float dhdx = 0.010 * 0.38 * cos(a)
+                       + 0.007 * 0.72 * cos(b)
+                       + 0.0035 * 1.40 * cos(c);
+            float dhdz = 0.010 * zA * cos(a)
+                       - 0.007 * zB * cos(b)
+                       + 0.0035 * zC * cos(c);
+
+            // UV tangent pada mesh air sejajar sumbu X/Z, jadi riak mengubah normal
+            // tanpa tekstur eksternal atau resolusi tinggi.
+            o.Normal = normalize(float3(-dhdx * 13.0, -dhdz * 13.0, 1.0));
+
+            float depth = saturate((p.x - _WaterStartX) / 32.0);
+            depth = smoothstep(0.0, 1.0, depth);
+            float shimmer = 0.94 + 0.035 * sin(p.x * 1.8 + p.y * (2.0 * zA) + t * 0.21)
+                                  + 0.025 * sin(p.x * 3.1 - p.y * (2.0 * zB) - t * 0.15);
+            o.Albedo = lerp(_NearColor.rgb, _DeepColor.rgb, depth) * shimmer;
+            o.Metallic = _Metallic;
+            o.Smoothness = _Smoothness;
+
+            float3 normalWS = normalize(float3(-dhdx * 13.0, 1.0, -dhdz * 13.0));
+            float3 viewWS = normalize(_WorldSpaceCameraPos.xyz - IN.worldPos);
+            float grazing = 1.0 - saturate(dot(normalWS, viewWS));
+            float fresnel = grazing * grazing * grazing * grazing * grazing;
+
+            // Pantulan lampu plafon berupa kilau panjang yang patah oleh riak kecil.
+            // Jalur pantulan tetap tenang, bukan ombak besar atau air berwarna cerah.
+            float drift = 0.18 * sin(p.y * zB + t * 0.10)
+                        + 0.09 * sin(p.y * zC - t * 0.08);
+            float broken = saturate(0.58 + 0.21 * sin(p.y * zC + t * 0.12)
+                                         + 0.15 * sin(p.y * zB - t * 0.09));
+            float laneA = exp(-pow((p.x - (8.5 + drift)) * 1.25, 2.0));
+            float laneB = exp(-pow((p.x - (20.0 - drift * 0.65)) * 1.15, 2.0));
+            float laneC = exp(-pow((p.x - (31.5 + drift * 0.45)) * 1.05, 2.0));
+            float reflectedLights = (laneA + laneB + laneC) * broken;
+
+            float micro = abs(sin(p.x * 2.2 + p.y * (2.0 * zC) + t * 0.18)
+                            * sin(p.x * 1.65 - p.y * 1.5 * zC - t * 0.13));
+            float3 reflection = _ReflectionColor.rgb * (0.018 + fresnel * 0.34);
+            reflection += float3(0.20, 0.29, 0.31) * reflectedLights * (0.07 + fresnel * 0.22);
+            reflection += float3(0.035, 0.060, 0.067) * micro * fresnel * 0.10;
+            o.Emission = reflection;
+            o.Alpha = 1.0;
+        }
+        ENDCG
+    }
+    FallBack "Standard"
+}

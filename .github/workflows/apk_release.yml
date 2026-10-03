@@ -1,26 +1,10 @@
-name: apk-release
-## Auto-build APK Unity + paket konten di GitHub Actions (pola sama seperti
-## repo Godot lama): push konten game -> langsung build -> terbit ke Release.
-##  - APK            -> release `apk-latest`   (instal sekali)
-##  - manifest+konten -> release `content-latest` (diunduh in-game, tanpa instal ulang)
-##
-## Lisensi: cukup secrets UNITY_EMAIL + UNITY_PASSWORD (akun Unity biasa, 2FA
-## nonaktif) — step "Siapkan lisensi Unity" mengaktivasi Personal otomatis lewat
-## container unityci/editor (Unity.Licensing.Client, fallback unity-editor login),
-## lalu memasukkan Unity_lic.ulf ATAU serial Personal ke $GITHUB_ENV (dibutuhkan
-## unity-builder@v4 di sisi host). Karena aktivasi serial ala v4 sudah tidak
-## berlaku untuk Personal, step "Patch unity-builder v4" menimpa activate.sh &
-## return_license.sh di cache action runner dengan strategi seat Personal
-## (Unity.Licensing.Client --activate-all --include-personal; game-ci/cli#246).
-## Fallback opsional: secret UNITY_LICENSE berisi .ulf (mis. dari Unity Hub di
-## PC) — kalau terisi, dipakai langsung tanpa aktivasi di step lisensi.
-## Lihat docs/CARA_SETUP_CI.md.
+name: Android APK
 
 on:
   push:
     branches:
       - main
-      - arena/01a0f5f2-unity
+      - arena/01a10152-unity
     paths:
       - "Assets/**"
       - "Packages/**"
@@ -28,7 +12,7 @@ on:
       - ".github/workflows/apk_release.yml"
   workflow_dispatch:
 
-concurrency: apk-release
+concurrency: android-apk
 
 permissions:
   contents: write
@@ -47,7 +31,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: bash .github/unity-builder-steps/prepare_license.sh
 
-      - name: Cache Library (percepat build berikutnya)
+      - name: Cache Library
         uses: actions/cache@v4
         with:
           path: Library
@@ -58,26 +42,18 @@ jobs:
       - name: Patch unity-builder v4 → aktivasi Personal via Licensing.Client
         run: |
           set -euo pipefail
-          # unity-builder@v4 (cache _actions runner, di-mount ke /steps container
-          # build) hanya mendukung aktivasi serial/license-server — keduanya
-          # sudah tidak berlaku untuk Unity Personal. Timpa activate.sh &
-          # return_license.sh dengan strategi seat Personal (game-ci/cli#246):
-          # Unity.Licensing.Client --activate-all --include-personal.
           shopt -s nullglob
           CANDIDATES=( "$GITHUB_WORKSPACE"/../../_actions/game-ci/unity-builder/*/dist/platforms/ubuntu/steps )
           STEPS_DIR="${CANDIDATES[0]:-}"
           if [ -z "$STEPS_DIR" ] || [ ! -f "$STEPS_DIR/activate.sh" ]; then
-            echo "::error::Folder steps game-ci/unity-builder tidak ditemukan di runner (_actions/game-ci/unity-builder/*/dist/platforms/ubuntu/steps). Layout runner/action berubah — perbarui step patch ini."
-            ls -la "$GITHUB_WORKSPACE/../.." 2>/dev/null || true
+            echo "::error::Folder steps game-ci/unity-builder tidak ditemukan."
             exit 1
           fi
-          echo "Patch: $STEPS_DIR"
           cp -v "$GITHUB_WORKSPACE/.github/unity-builder-steps/activate.sh"       "$STEPS_DIR/activate.sh"
           cp -v "$GITHUB_WORKSPACE/.github/unity-builder-steps/return_license.sh" "$STEPS_DIR/return_license.sh"
           chmod +x "$STEPS_DIR/activate.sh" "$STEPS_DIR/return_license.sh"
-          echo "Patch selesai — container build akan aktivasi seat Personal lewat Unity.Licensing.Client."
 
-      - name: Build APK + paket konten (Unity 2022.3, Android, IL2CPP)
+      - name: Build Stillwater Room APK
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ env.UNITY_LICENSE }}
@@ -88,38 +64,22 @@ jobs:
           buildMethod: CiBuild.BuildAll
           versioning: None
           allowDirtyBuild: true
-          # unity-builder tidak meneruskan GITHUB_RUN_NUMBER ke dalam container;
-          # CiBuild.BuildAll membaca "-runNumber <n>" dari argumen CLI editor
-          # (build.sh meneruskan $CUSTOM_PARAMETERS ke unity-editor) supaya
-          # contentVersion/appVersion/versionCode naik tiap build.
+          # Nomor versi APK mengikuti nomor run GitHub Actions.
           customParameters: '-runNumber ${{ github.run_number }}'
 
-      - name: Pastikan hasil build ada
+      - name: Pastikan APK berhasil dibuat
         run: |
-          ls -laR build || true
-          test -f build/Android/UAL2Playground.apk
-          test -f build/content/manifest.json
+          ls -laR build/Android || true
+          test -f build/Android/StillwaterRoom.apk
 
-      - name: Terbitkan konten -> release content-latest
+      - name: Terbitkan APK → release apk-latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTES="Konten in-game v${{ github.run_number }} (diunduh otomatis oleh aplikasi saat start — tidak perlu instal ulang APK).
-          Release ini sengaja ditandai Pre-release: badge Latest di halaman Releases harus jatuh ke release APK."
-          gh release view content-latest >/dev/null 2>&1 || \
-            gh release create content-latest --title "Konten In-Game (auto-update)" --notes "$NOTES"
-          gh release edit content-latest --prerelease --notes "$NOTES"
-          gh release upload content-latest build/content/* --clobber
-
-      - name: Terbitkan APK -> release apk-latest
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          NOTES="Build otomatis #${{ github.run_number }} dari commit ${{ github.sha }}.
-          Instal APK ini SEKALI saja — update konten berikutnya diunduh otomatis dari dalam game (release content-latest).
-          Di halaman Releases, release INI yang paling atas (Latest); file APK: UAL2Playground.apk di bawah Assets."
+          NOTES="Build Stillwater Room otomatis #${{ github.run_number }} dari commit ${{ github.sha }}.
+          Untuk update game, unduh APK terbaru dari release ini dan instal di HP."
           gh release view apk-latest >/dev/null 2>&1 || \
-            gh release create apk-latest --title "APK Terbaru (auto-build)" --notes "$NOTES"
-          gh release edit apk-latest --notes "$NOTES"
-          gh release upload apk-latest build/Android/UAL2Playground.apk --clobber
-
+            gh release create apk-latest --title "Stillwater Room — APK Terbaru" --notes "$NOTES"
+          gh release edit apk-latest --title "Stillwater Room — APK Terbaru" --notes "$NOTES"
+          gh release delete-asset apk-latest UAL2Playground.apk --yes 2>/dev/null || true
+          gh release upload apk-latest build/Android/StillwaterRoom.apk --clobber
